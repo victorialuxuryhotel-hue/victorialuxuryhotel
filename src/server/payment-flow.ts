@@ -8,7 +8,7 @@ import { PaystackNotFoundError, verifyTransaction, type VerifiedTransaction } fr
 
 export type SettleOutcome =
   | "confirmed" | "part_paid" | "paid_unavailable" | "paid_closed" | "already_settled" | "already_processed"
-  | "amount_mismatch" | "overpaid" | "failed" | "abandoned" | "still_pending" | "unknown_reference";
+  | "amount_mismatch" | "already_flagged" | "overpaid" | "failed" | "abandoned" | "still_pending" | "unknown_reference";
 
 /**
  * The one path by which a Paystack payment affects a booking. Used by both the

@@ -98,6 +98,10 @@ describe("Paystack payments", () => {
     expect(r.status).toBe("pending_payment");
     expect(r.attention_reason).toMatch(/does not match/);
     expect((await payment(attempt.reference)).status).toBe("pending");
+    // Re-checking the same payment doesn't flag (or alert) again.
+    expect((await apply(attempt.reference, "success", attempt.amount_kobo - delta, currency)).data).toBe("already_flagged");
+    const { count } = await admin.from("activity_log").select("id", { count: "exact", head: true }).eq("entity_id", res.id).eq("action", "payment.mismatch");
+    expect(count).toBe(1);
   });
 
   it("records failed and abandoned attempts without touching the reservation", async () => {
