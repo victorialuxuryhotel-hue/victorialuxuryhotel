@@ -16,6 +16,7 @@ const SELF = `http://127.0.0.1:${PORT}`;
 
 const transactions = new Map(); // reference -> tx
 const emails = [];
+const alerts = []; // operational alerts posted to the Slack/Discord-style webhook
 const idempotency = new Map();
 let nextWebhook = "send"; // send | skip (simulates a delayed / lost webhook)
 
@@ -123,6 +124,12 @@ createServer(async (req, res) => {
       const deliveries = [];
       for (let i = 0; i < (b.webhooks ?? 0); i++) deliveries.push(await sendWebhook(tx, { badSignature: b.badSignature }));
       return json(res, 200, { tx, deliveries });
+    }
+    // ---------------- Alert webhook (Slack/Discord-compatible)
+    if (path === "/__alerts") {
+      if (req.method === "POST") { alerts.push(JSON.parse((await readBody(req)) || "{}")); return json(res, 200, { ok: true }); }
+      if (req.method === "DELETE") { alerts.length = 0; return json(res, 200, { ok: true }); }
+      return json(res, 200, alerts);
     }
     if (path === "/__health") return json(res, 200, { ok: true });
     json(res, 404, { status: false, message: "Not found" });
