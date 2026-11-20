@@ -31,13 +31,20 @@ async function signIn(email) {
 const publicImages = async (path) => {
   const ctx = await browser.createBrowserContext();
   const p = await ctx.newPage();
-  await p.goto(`${BASE}${path}`, { waitUntil: "networkidle0" });
+  // Wait for the page to load (not for total network silence: image
+  // optimisation can keep a connection busy briefly on first request).
+  await p.goto(`${BASE}${path}`, { waitUntil: "load" });
+  await new Promise((r) => setTimeout(r, 1000));
   const srcs = await p.$$eval("img", (imgs) => imgs.map((i) => decodeURIComponent(i.currentSrc || i.src)));
   await ctx.close();
   return srcs;
 };
 
 const cat = sql("select id from room_categories where slug = 'deluxe';");
+// Start clean: remove photos an interrupted earlier run may have left behind.
+sql("delete from room_category_images where alt_text like 'Deluxe test photo%' or alt_text = 'Not really a photo';");
+sql("delete from site_photos where alt_text like '%(test)%';");
+const hadPhotos = sql(`select count(*) from room_category_images where category_id = '${cat}';`) !== "0";
 const tag = `Deluxe test photo ${Date.now()}`;
 
 // Manager uploads a room photo
@@ -48,25 +55,26 @@ const tag = `Deluxe test photo ${Date.now()}`;
 
   // Fake image first: rejected by the server
   await (await p.$('input[type=file][name=file]')).uploadFile(fakeImage);
-  await p.type(`input[name=altText]`, "Not really a photo");
+  await p.type("form:has(input[type=file]) input[name=altText]", "Not really a photo");
   await p.click("button::-p-text(Upload photo)");
   await waitText(p, /Only JPEG, PNG or WebP/);
   check("a file that isn't really an image is refused", sql(`select count(*) from room_category_images where alt_text = 'Not really a photo';`) === "0");
 
   await p.reload({ waitUntil: "networkidle0" });
   await (await p.$('input[type=file][name=file]')).uploadFile(realImage);
-  await p.type(`input[name=altText]`, tag);
+  await p.type("form:has(input[type=file]) input[name=altText]", tag);
   await p.click("button::-p-text(Upload photo)");
   await waitText(p, /Photo uploaded/);
   const path = sql(`select storage_path from room_category_images where alt_text = '${tag}';`);
   check("manager uploads a room photo", path.startsWith(`${cat}/`), path);
-  check("first photo becomes the cover", sql(`select is_cover from room_category_images where alt_text = '${tag}';`).startsWith("t"));
+  const isCover = sql(`select is_cover from room_category_images where alt_text = '${tag}';`).startsWith("t");
+  check(hadPhotos ? "an extra photo doesn't replace the existing cover" : "first photo becomes the cover", isCover === !hadPhotos);
   await ctx.close();
 
   const imgs = await publicImages("/rooms/deluxe");
   check("photo appears on the public room page at once", imgs.some((s) => s.includes(path)), imgs.slice(0, 3).join(" "));
   const listImgs = await publicImages("/rooms");
-  check("and on the rooms list as the cover", listImgs.some((s) => s.includes(path)));
+  if (!hadPhotos) check("and on the rooms list as the cover", listImgs.some((s) => s.includes(path)));
 }
 
 // Website hero photo
@@ -103,7 +111,11 @@ const tag = `Deluxe test photo ${Date.now()}`;
   await p.goto(`${BASE}/app/rooms/categories/${cat}`, { waitUntil: "networkidle0" });
   const path = sql(`select storage_path from room_category_images where alt_text = '${tag}';`);
   p.on("dialog", (d) => d.accept());
-  await p.click('button:has([aria-label="Delete photo"])');
+  // Delete this test's photo (the card whose image has the test description).
+  await p.evaluate((alt) => {
+    const card = [...document.querySelectorAll("li")].find((li) => li.querySelector(`img[alt="${alt}"]`));
+    card?.querySelector('button:has([aria-label="Delete photo"])')?.click();
+  }, tag);
   // Wait until no displayed image uses the file any more.
   await p.waitForFunction((t) => ![...document.images].some((i) => decodeURIComponent(i.currentSrc || i.src).includes(t)), { timeout: 20000 }, path);
   check("deleting removes the record", sql(`select count(*) from room_category_images where alt_text = '${tag}';`) === "0");

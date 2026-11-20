@@ -36,7 +36,8 @@ const tag = `pg${Date.now().toString(36)}`;
   await p.waitForFunction(() => location.href.includes("/checkout/"), { timeout: 20000 });
   const payRef = new URL(p.url()).pathname.split("/").pop();
   await fetch(`${MOCK}/__control/tx/${payRef}`, { method: "POST", body: JSON.stringify({ reportedAmount: 100 }) }); // tampered
-  await Promise.all([p.waitForNavigation({ waitUntil: "networkidle0" }), p.click("#pay-success")]);
+  await p.click("#pay-success");
+  await p.waitForFunction(() => location.pathname.startsWith("/book/confirmation/"), { timeout: 30000 });
   await waitText(p, /checking your payment/);
   await ctx.close();
 

@@ -55,7 +55,8 @@ async function payAt(p, button) {
   await p.click("button::-p-text(Pay securely)");
   await p.waitForFunction(() => location.href.includes("/checkout/"), { timeout: 20000 });
   const paystackRef = new URL(p.url()).pathname.split("/").pop();
-  await Promise.all([p.waitForNavigation({ waitUntil: "networkidle0" }), p.click(`#${button}`)]);
+  await p.click(`#${button}`);
+  await p.waitForFunction(() => location.pathname.startsWith("/book/confirmation/"), { timeout: 30000 });
   return paystackRef;
 }
 const resStatus = (ref) => sql(`select status from reservations where reference = '${ref}';`);
@@ -151,7 +152,8 @@ const resStatus = (ref) => sql(`select status from reservations where reference 
   await p.waitForFunction(() => location.href.includes("/checkout/"), { timeout: 20000 });
   const payRef = new URL(p.url()).pathname.split("/").pop();
   await control(payRef, { reportedAmount: 100 });
-  await Promise.all([p.waitForNavigation({ waitUntil: "networkidle0" }), p.click("#pay-success")]);
+  await p.click("#pay-success");
+  await p.waitForFunction(() => location.pathname.startsWith("/book/confirmation/"), { timeout: 30000 });
   await waitText(p, /checking your payment/);
   check("wrong amount is not confirmed; guest told staff will check", resStatus(ref) === "pending_payment");
   check("reservation flagged for staff", /does not match/.test(sql(`select attention_reason from reservations where reference='${ref}';`)));
