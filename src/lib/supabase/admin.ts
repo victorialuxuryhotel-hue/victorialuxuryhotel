@@ -12,11 +12,13 @@ import type { Database } from "./database.types";
  * verified), the public booking flow (calls narrowly scoped database
  * functions), and scheduled jobs (CRON_SECRET). Never import from client code.
  */
-let adminClient: ReturnType<typeof createClient<Database>> | undefined;
-
 export function createAdminClient() {
-  adminClient ??= createClient<Database>(publicEnv().NEXT_PUBLIC_SUPABASE_URL, serverEnv.supabaseSecretKey(), {
+  // Deliberately NOT cached across requests. On Cloudflare Workers, an object
+  // holding a pending promise from one request (supabase-js starts auth
+  // initialisation on construction) can't be awaited by a later request; the
+  // runtime rejects it. A client is just an object, so creating one per use
+  // is cheap.
+  return createClient<Database>(publicEnv().NEXT_PUBLIC_SUPABASE_URL, serverEnv.supabaseSecretKey(), {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
-  return adminClient;
 }
