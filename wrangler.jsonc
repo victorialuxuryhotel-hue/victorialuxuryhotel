@@ -1,0 +1,37 @@
+{
+  // Cloudflare Worker for the Victoria Luxury Hotel app (built with OpenNext).
+  // Before the first deploy, create the R2 bucket and D1 database named below
+  // and paste the D1 database_id: see docs/deployment-cloudflare.md.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "victoria-hotel",
+  "main": "worker.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    // Self-reference used by OpenNext for cache revalidation.
+    { "binding": "WORKER_SELF_REFERENCE", "service": "victoria-hotel" }
+  ],
+  "r2_buckets": [
+    { "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "victoria-hotel-opennext-cache" }
+  ],
+  "d1_databases": [
+    {
+      "binding": "NEXT_TAG_CACHE_D1",
+      "database_name": "victoria-hotel-tag-cache",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+    }
+  ],
+  // next/image optimization via Cloudflare Images.
+  "images": { "binding": "IMAGES" },
+  // Housekeeping every 10 minutes: settle pending payments, expire unpaid
+  // holds, send/retry queued emails (see worker.ts).
+  "triggers": { "crons": ["*/10 * * * *"] },
+  "observability": { "enabled": true },
+  // Local preview (pnpm cf:preview) serves on the same port as `next dev`, so
+  // the site URL baked into the build (NEXT_PUBLIC_SITE_URL) matches.
+  "dev": { "port": 3000 }
+}

@@ -8,7 +8,8 @@ import { deliverEmails } from "@/server/notifications";
 import { settlePaystackReference } from "@/server/payment-flow";
 
 /**
- * Scheduled housekeeping (Vercel Cron sends `Authorization: Bearer $CRON_SECRET`):
+ * Scheduled housekeeping, called by the Cloudflare Cron Trigger in worker.ts with
+ * `Authorization: Bearer $CRON_SECRET`:
  *  1. Re-verify Paystack attempts still pending after 30 minutes, so a payment
  *     whose webhook was delayed or lost is still settled, and attempts that
  *     never reached Paystack are closed as abandoned (reconciliation).

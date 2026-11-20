@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 /**
  * Design preview: every screen rendered with SAMPLE data, before its
  * functionality is connected. Disabled in production unless
- * ENABLE_DESIGN_PREVIEW=true (e.g. on a Vercel preview deployment for review).
+ * ENABLE_DESIGN_PREVIEW=true (e.g. on a staging deployment for review).
  */
 export default function PreviewLayout({ children }: LayoutProps<"/preview">) {
   if (process.env.NODE_ENV === "production" && process.env.ENABLE_DESIGN_PREVIEW !== "true") notFound();

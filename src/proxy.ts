@@ -45,7 +45,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Only routes that need the session: management, login, and auth callbacks.
-  // Public pages and webhooks skip the proxy entirely.
-  matcher: ["/app/:path*", "/login", "/auth/:path*"],
+  // Only routes that need the session refreshed: the management app and the
+  // auth callback. Public pages, /login (the sign-in action sets its own
+  // cookies) and webhooks skip the proxy entirely.
+  matcher: ["/app/:path*", "/auth/:path*"],
 };
