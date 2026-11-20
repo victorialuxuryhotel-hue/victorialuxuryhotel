@@ -21,7 +21,7 @@ tests fail).
 | 13 Email (Resend) | Done (mocked) | Confirmation, payment received, cancellation; sent exactly once; real Resend key not yet used |
 | 14 Future departments doc | Not started | |
 | 15 QA | Ongoing | 10 unit, 111 database, 91 browser checks |
-| 16 Deployment | Not started | |
+| 16 Deployment | Ready for Cloudflare | OpenNext build; full browser suite passes against the local Workers runtime; steps in docs/deployment-cloudflare.md. Not yet deployed |
 
 ## Known gaps
 
@@ -30,8 +30,6 @@ tests fail).
   clear its page cache) to get back to the clean demo data. A separate test
   database would remove this.
 
-- Scheduled job runs every 10 minutes via Vercel Cron, which needs the Pro plan
-  (Hobby allows daily only). Availability doesn't depend on it.
 - Refunds are flagged for staff, not processed in the app (policy pending).
 - Dev-mode only: Next's instant-navigation validator logs a redirect warning
   for `/app` when signed out. Production behaviour is correct.

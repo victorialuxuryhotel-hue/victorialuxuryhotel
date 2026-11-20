@@ -54,11 +54,11 @@ and never undoes a payment or booking. Idempotency keys prevent duplicates.
 
 ## Scheduled job
 
-`GET /api/cron/expire-reservations` (Bearer `CRON_SECRET`, configured in
-`vercel.json` every 10 minutes): settles pending Paystack attempts, then expires
-lapsed holds. Vercel's Hobby plan only allows daily cron jobs; the Pro plan is
-needed for 10-minute runs. Availability is correct regardless, because expired
-holds stop counting immediately.
+`GET /api/cron/expire-reservations` (Bearer `CRON_SECRET`), run every 10
+minutes by a Cloudflare Cron Trigger (`wrangler.jsonc` → `worker.ts`): settles
+pending Paystack attempts, expires lapsed holds and sends queued emails.
+Availability is correct regardless, because expired holds stop counting
+immediately.
 
 ## Testing locally
 

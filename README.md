@@ -17,7 +17,7 @@ rooms, availability, reservations and payments.
 | Database / auth / files | Supabase: PostgreSQL 17, Supabase Auth, Supabase Storage |
 | Payments | Paystack (NGN), verified server-side |
 | Email | Resend |
-| Hosting | Vercel; DNS via Cloudflare or the hotel's registrar |
+| Hosting | Cloudflare Workers via the OpenNext adapter; see [docs/deployment-cloudflare.md](docs/deployment-cloudflare.md) |
 | Tests | Vitest: unit tests, plus database integration tests against local Supabase |
 
 ## Project layout
@@ -82,6 +82,7 @@ pnpm typecheck    # generates route types, then tsc
 pnpm lint
 pnpm test         # unit tests
 pnpm test:db      # database integration tests (local Supabase must be running)
-pnpm test:e2e     # browser tests (needs pnpm dev; starts the integrations mock)
+pnpm test:e2e     # browser tests (needs pnpm dev or pnpm cf:preview; starts the integrations mock)
 pnpm build
+pnpm cf:preview   # build for Cloudflare and serve the Worker locally (workerd) on :3000
 ```
