@@ -1,6 +1,6 @@
 /**
- * Minimal structured logger. Emits one JSON line per event so Vercel's log
- * search can filter by `event` and fields. Never pass card data, full auth
+ * Minimal structured logger. Emits one JSON line per event so Cloudflare's
+ * Workers Logs can filter by `event` and fields. Never pass card data, full auth
  * tokens or secrets in `context`.
  */
 type Level = "debug" | "info" | "warn" | "error";
@@ -8,7 +8,15 @@ type Context = Record<string, unknown>;
 
 function serializeError(err: unknown): Context {
   if (err instanceof Error) {
-    return { errorName: err.name, errorMessage: err.message, stack: err.stack };
+    return { errorName: err.name, errorMessage: err.message, stack: err.stack, ...(err.cause ? { cause: serializeError(err.cause) } : {}) };
+  }
+  // Supabase/PostgREST errors are plain objects ({ message, code, hint, details }).
+  if (err && typeof err === "object") {
+    try {
+      return { error: JSON.parse(JSON.stringify(err)) };
+    } catch {
+      return { error: Object.prototype.toString.call(err) };
+    }
   }
   return { error: String(err) };
 }

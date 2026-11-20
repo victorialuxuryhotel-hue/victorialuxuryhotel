@@ -29,6 +29,10 @@ export async function searchStay(stay: Stay): Promise<{ ok: true; options: Avail
   });
   if (error) {
     if (error.hint === "VALIDATION") return { ok: false, message: error.message };
+    // Next cancels in-flight requests when a prerender/prefetch completes.
+    // That is not a failed search: let Next handle it rather than rendering a
+    // "couldn't check availability" message into the prefetched page.
+    if (/During prerendering, fetch\(\) rejects/.test(error.message)) throw new Error(error.message);
     logger.error("booking.search_failed", error);
     return { ok: false, message: "We couldn't check availability just now. Please try again." };
   }

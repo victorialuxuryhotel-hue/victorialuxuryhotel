@@ -7,13 +7,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Per-visitor limits for anonymous website actions that hold inventory or call
- * Paystack. The visitor is identified by IP (from the proxy headers set by
- * Vercel), stored only as a salted hash. Fails OPEN if the limiter itself
- * errors: a database hiccup must not stop genuine guests booking.
+ * Paystack. The visitor is identified by IP, stored only as a salted hash.
+ * On Cloudflare the client IP comes from CF-Connecting-IP, which Cloudflare
+ * sets itself; X-Forwarded-For can be supplied by the client, so it is only a
+ * fallback for local development. Fails OPEN if the limiter itself errors: a
+ * database hiccup must not stop genuine guests booking.
  */
 async function visitorKey(): Promise<string> {
   const h = await headers();
-  const ip = h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = h.get("cf-connecting-ip") ?? h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const salt = process.env.RATE_LIMIT_SALT ?? process.env.SUPABASE_SECRET_KEY ?? "";
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex").slice(0, 32);
 }
