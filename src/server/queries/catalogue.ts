@@ -1,11 +1,15 @@
 import "server-only";
-import { cacheLife, cacheTag } from "next/cache";
+import { cache } from "react";
 import { createPublicClient, publicImageUrl, ROOM_IMAGES, SITE_IMAGES } from "@/lib/supabase/public";
 
 /**
  * Public catalogue: what website visitors see about room types and photos.
- * Cached (no cookies involved) and tagged "catalogue"; staff changes call
- * updateTag("catalogue") so the website updates immediately. Rates shown here
+ *
+ * Read from the database on each request (de-duplicated within a request with
+ * React cache). Deliberately not stored in Next's data cache: on Cloudflare
+ * Workers, regenerating cached pages after an invalidation is unreliable, and
+ * a per-request read means staff changes appear on the very next page view.
+ * At a single hotel's traffic the extra query is negligible. Rates shown here
  * are "from" prices only; the price of a stay always comes from live
  * availability.
  */
@@ -23,10 +27,7 @@ export type PublicCategory = {
   photos: PublicPhoto[]; // cover first
 };
 
-export async function getPublicCategories(): Promise<PublicCategory[]> {
-  "use cache";
-  cacheTag("catalogue");
-  cacheLife("hours");
+export const getPublicCategories = cache(async (): Promise<PublicCategory[]> => {
   const { data, error } = await createPublicClient()
     .from("room_categories")
     .select("slug, name, short_description, description, amenities, max_occupancy, nightly_rate_kobo, sort_order, room_category_images(storage_path, alt_text, sort_order, is_cover)")
@@ -46,7 +47,7 @@ export async function getPublicCategories(): Promise<PublicCategory[]> {
       .sort((a, b) => Number(b.is_cover) - Number(a.is_cover) || a.sort_order - b.sort_order)
       .map((p) => ({ image: publicImageUrl(ROOM_IMAGES, p.storage_path), alt: p.alt_text })),
   }));
-}
+});
 
 export async function getPublicCategory(slug: string): Promise<PublicCategory | null> {
   return (await getPublicCategories()).find((c) => c.slug === slug) ?? null;
@@ -57,10 +58,7 @@ export type SitePhotos = {
   gallery: Array<PublicPhoto & { group: string }>;
 };
 
-export async function getSitePhotos(): Promise<SitePhotos> {
-  "use cache";
-  cacheTag("catalogue");
-  cacheLife("hours");
+export const getSitePhotos = cache(async (): Promise<SitePhotos> => {
   const { data, error } = await createPublicClient().from("site_photos").select("slot, gallery_group, storage_path, alt_text, sort_order").order("sort_order");
   if (error) throw new Error("Could not load website photos", { cause: error });
   const slots: SitePhotos["slots"] = {};
@@ -71,4 +69,4 @@ export async function getSitePhotos(): Promise<SitePhotos> {
     else slots[p.slot] = photo;
   }
   return { slots, gallery };
-}
+});

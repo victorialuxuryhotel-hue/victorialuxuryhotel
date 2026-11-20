@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, updateTag } from "next/cache";
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
@@ -34,7 +34,7 @@ export async function updateRoomStatus(_prev: ActionResult | null, formData: For
       p_room_id: v.roomId, p_readiness: v.readiness, p_service_status: v.serviceStatus, p_note: v.note,
     });
     if (error) throwDbError(error);
-    revalidatePath("/app", "layout");
+    refresh();
   });
 }
 
@@ -55,7 +55,7 @@ export async function createRoom(_prev: ActionResult | null, formData: FormData)
       if (error.code === "23505") throw new AppError("CONFLICT", `Room ${v.roomNumber} already exists.`);
       throwDbError(error);
     }
-    revalidatePath("/app/rooms");
+    refresh();
   });
 }
 
@@ -97,8 +97,7 @@ export async function saveCategory(_prev: ActionResult | null, formData: FormDat
       if (error.code === "23505") throw new AppError("CONFLICT", "A category with this name or web address already exists.");
       throwDbError(error);
     }
-    updateTag("catalogue"); // public room pages show the change immediately
-    revalidatePath("/app/rooms", "layout");
+    refresh();
   });
   if (result.ok) redirect("/app/rooms/categories");
   return result;

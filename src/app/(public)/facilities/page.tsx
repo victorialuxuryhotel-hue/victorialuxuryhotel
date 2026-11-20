@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/public/page-skeleton";
 import { CtaBand } from "@/components/public/cta-band";
 import { PageHero } from "@/components/public/page-hero";
 import { Photo } from "@/components/public/photo";
@@ -12,7 +14,7 @@ export const metadata: Metadata = {
   description: "Indoor pool, spa, restaurant, lounge and bar, conference room and more at Victoria Luxury Hotel, Akure.",
 };
 
-export default async function FacilitiesPage() {
+async function FacilitiesPageContent() {
   const photos = await getSitePhotos();
   const slots = ["pool", "spa", "bar"];
   return (
@@ -57,5 +59,14 @@ export default async function FacilitiesPage() {
 
       <CtaBand />
     </>
+  );
+}
+
+/** Content reads room types and photos per request; the page frame shows immediately. */
+export default function FacilitiesPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <FacilitiesPageContent />
+    </Suspense>
   );
 }

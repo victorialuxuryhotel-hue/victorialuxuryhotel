@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/public/page-skeleton";
 import { CtaBand } from "@/components/public/cta-band";
 import { PageHero } from "@/components/public/page-hero";
 import { Photo } from "@/components/public/photo";
@@ -16,7 +18,7 @@ export const metadata: Metadata = {
 // Varied tile shapes give an editorial rhythm on large screens.
 const spans = ["lg:col-span-2 lg:row-span-2", "", "", "lg:row-span-2", "", "lg:col-span-2", ""];
 
-export default async function GalleryPage() {
+async function GalleryPageContent() {
   const [categories, site] = await Promise.all([getPublicCategories(), getSitePhotos()]);
 
   // Real photos per section: room-type photos feed "Rooms"; the rest come from
@@ -54,5 +56,14 @@ export default async function GalleryPage() {
       </Section>
       <CtaBand />
     </>
+  );
+}
+
+/** Content reads room types and photos per request; the page frame shows immediately. */
+export default function GalleryPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <GalleryPageContent />
+    </Suspense>
   );
 }

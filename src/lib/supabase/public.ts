@@ -5,7 +5,7 @@ import type { Database } from "./database.types";
 /**
  * Anonymous, cookie-free client for public catalogue reads (room types, photos).
  * Runs under RLS as a website visitor, so it can only see what the public may
- * see, and can be used inside "use cache" functions.
+ * see. Needs no request cookies.
  */
 export function createPublicClient() {
   const env = publicEnv();

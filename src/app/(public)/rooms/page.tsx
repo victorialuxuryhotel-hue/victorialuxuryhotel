@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Users } from "lucide-react";
 import { BookingBar } from "@/components/public/booking-bar";
+import { PageSkeleton } from "@/components/public/page-skeleton";
 import { CtaBand } from "@/components/public/cta-band";
 import { PageHero } from "@/components/public/page-hero";
 import { Photo } from "@/components/public/photo";
@@ -18,7 +20,7 @@ export const metadata: Metadata = {
 // Shared by every room type; all are facilities the hotel offers.
 const included = ["Free Wi-Fi", "24/7 power", "Access to the indoor pool", "On-site parking"];
 
-export default async function RoomsPage() {
+async function RoomsPageContent() {
   const categories = await getPublicCategories();
   return (
     <>
@@ -60,5 +62,14 @@ export default async function RoomsPage() {
 
       <CtaBand title="Found the right room?" />
     </>
+  );
+}
+
+/** Content reads room types and photos per request; the page frame shows immediately. */
+export default function RoomsPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <RoomsPageContent />
+    </Suspense>
   );
 }

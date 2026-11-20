@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { revalidatePath, updateTag } from "next/cache";
+import { refresh } from "next/cache";
 import { z } from "zod";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { detectImage, MAX_IMAGE_BYTES } from "@/lib/images";
@@ -14,7 +14,7 @@ import { throwDbError } from "./db-errors";
 /**
  * Photo management for managers. Files are uploaded with the staff member's own
  * session, so storage RLS (managers only) applies on top of authorize().
- * Every change refreshes the cached public catalogue.
+ * Public pages read photos per request, so changes show immediately.
  */
 
 async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResult<T>> {
@@ -27,9 +27,7 @@ async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResul
 }
 
 function refreshPublic() {
-  updateTag("catalogue");
-  revalidatePath("/app/rooms/categories", "layout");
-  revalidatePath("/app/settings/photos");
+  refresh();
 }
 
 const altText = z.string().trim().min(3, "Describe the photo in a few words (for screen readers)").max(200);

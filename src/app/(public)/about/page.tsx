@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Crown, HeartHandshake, ShieldCheck } from "lucide-react";
+import { PageSkeleton } from "@/components/public/page-skeleton";
 import { CtaBand } from "@/components/public/cta-band";
 import { PageHero } from "@/components/public/page-hero";
 import { Photo } from "@/components/public/photo";
@@ -19,7 +21,7 @@ const values = [
   { icon: ShieldCheck, title: "Peace of mind", text: "Uninterrupted power, free Wi-Fi and on-site parking, at a convenient address in Alagbaka GRA." },
 ];
 
-export default async function AboutPage() {
+async function AboutPageContent() {
   const photos = await getSitePhotos();
   return (
     <>
@@ -76,5 +78,14 @@ export default async function AboutPage() {
 
       <CtaBand />
     </>
+  );
+}
+
+/** Content reads room types and photos per request; the page frame shows immediately. */
+export default function AboutPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <AboutPageContent />
+    </Suspense>
   );
 }

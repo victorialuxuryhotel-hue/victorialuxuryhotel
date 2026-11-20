@@ -13,13 +13,10 @@ import { getPublicCategories, getPublicCategory } from "@/server/queries/catalog
 
 const included = ["Free Wi-Fi", "24/7 power", "Access to the indoor pool", "On-site parking", "Laundry service", "Airport shuttle on request"];
 
-export async function generateStaticParams() {
-  return (await getPublicCategories()).map((c) => ({ slug: c.slug }));
-}
-
 export async function generateMetadata({ params }: PageProps<"/rooms/[slug]">): Promise<Metadata> {
-  const c = await getPublicCategory((await params).slug);
-  return c ? { title: c.name, description: c.summary || `${c.name} at ${hotel.name}, Akure.` } : {};
+  // Derived from the URL so metadata needs no database read.
+  const name = (await params).slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  return { title: name, description: `${name} at ${hotel.name}, Akure. Check availability and book online.` };
 }
 
 export default function RoomTypePage(props: PageProps<"/rooms/[slug]">) {

@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { ArrowRight, ArrowUpRight, MapPin } from "lucide-react";
 import { BookingBar } from "@/components/public/booking-bar";
+import { PageSkeleton } from "@/components/public/page-skeleton";
 import { CtaBand } from "@/components/public/cta-band";
 import { Photo } from "@/components/public/photo";
 import { Container, Section, SectionHeading } from "@/components/public/section";
@@ -15,7 +17,7 @@ import { getPublicCategories, getSitePhotos } from "@/server/queries/catalogue";
 const rail = "-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:overflow-visible sm:px-0 sm:pb-0";
 const railItem = "w-[78%] shrink-0 snap-start sm:w-auto";
 
-export default async function HomePage() {
+async function HomePageContent() {
   const [categories, photos] = await Promise.all([getPublicCategories(), getSitePhotos()]);
   const experienceSlots = ["pool", "spa", "bar"];
   return (
@@ -183,5 +185,14 @@ export default async function HomePage() {
 
       <CtaBand />
     </>
+  );
+}
+
+/** Content reads room types and photos per request; the page frame shows immediately. */
+export default function HomePage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <HomePageContent />
+    </Suspense>
   );
 }
