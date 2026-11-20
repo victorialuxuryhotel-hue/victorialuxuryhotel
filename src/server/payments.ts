@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
@@ -43,7 +43,7 @@ export async function recordOfflinePayment(_prev: ActionResult | null, formData:
     // Emails were queued in the same transaction; send them after responding.
     after(() => deliverEmails({ reservationId: v.reservationId }));
 
-    revalidatePath("/app", "layout");
+    refresh();
     target = `/app/reservations/${v.reservationId}?paid=${encodeURIComponent(row.receipt_number)}`;
   } catch (err) {
     if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("payment.record_failed", err);

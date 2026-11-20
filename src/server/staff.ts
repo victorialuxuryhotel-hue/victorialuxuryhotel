@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { z } from "zod";
 import { publicEnv } from "@/lib/env";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
@@ -46,7 +46,7 @@ export async function inviteStaff(_prev: ActionResult<{ email: string }> | null,
       throw new AppError("INTERNAL", "Could not create the staff profile.", { cause: profileError });
     }
 
-    revalidatePath("/app/settings");
+    refresh();
     return ok({ email });
   } catch (err) {
     if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("staff.invite_failed", err);
@@ -80,7 +80,7 @@ export async function updateStaff(_prev: ActionResult | null, formData: FormData
     }
     if (!data?.length) throw new AppError("NOT_FOUND", "Staff member not found.");
 
-    revalidatePath("/app/settings");
+    refresh();
     return ok(undefined);
   } catch (err) {
     if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("staff.update_failed", err);

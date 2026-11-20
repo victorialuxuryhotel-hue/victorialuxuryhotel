@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { z } from "zod";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -38,7 +38,7 @@ export async function updateBookingRules(_prev: ActionResult | null, formData: F
       .eq("id", true)
       .select("id");
     if (error || !data?.length) throw new AppError("INTERNAL", "Could not save the booking rules.", { cause: error });
-    revalidatePath("/app/settings");
+    refresh();
     return ok(undefined);
   } catch (err) {
     if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("settings.update_failed", err);

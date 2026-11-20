@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
@@ -22,10 +22,7 @@ async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResul
   }
 }
 
-function refresh(id?: string) {
-  revalidatePath("/app", "layout");
-  if (id) revalidatePath(`/app/reservations/${id}`);
-}
+
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date");
 const id = z.uuid();
@@ -70,7 +67,7 @@ export async function assignRoom(_prev: ActionResult | null, formData: FormData)
     if (!roomId.success) throw new AppError("VALIDATION", "Choose a room");
     const { error } = await (await createClient()).rpc("assign_room", { p_reservation_id: reservationId, p_room_id: roomId.data });
     if (error) throwDbError(error);
-    refresh(reservationId);
+    refresh();
   });
 }
 
@@ -80,7 +77,7 @@ export async function checkIn(_prev: ActionResult | null, formData: FormData): P
     const reservationId = id.parse(formData.get("reservationId"));
     const { error } = await (await createClient()).rpc("check_in_reservation", { p_reservation_id: reservationId });
     if (error) throwDbError(error);
-    refresh(reservationId);
+    refresh();
   });
 }
 
@@ -90,7 +87,7 @@ export async function checkOut(_prev: ActionResult<{ balanceKobo: number }> | nu
     const reservationId = id.parse(formData.get("reservationId"));
     const { data, error } = await (await createClient()).rpc("check_out_reservation", { p_reservation_id: reservationId });
     if (error) throwDbError(error);
-    refresh(reservationId);
+    refresh();
     return { balanceKobo: Number(data ?? 0) };
   });
 }
@@ -103,7 +100,7 @@ export async function cancelReservation(_prev: ActionResult | null, formData: Fo
     const { error } = await (await createClient()).rpc("cancel_reservation", { p_reservation_id: reservationId, p_reason: reason });
     if (error) throwDbError(error);
     after(() => deliverEmails({ reservationId }));
-    refresh(reservationId);
+    refresh();
   });
 }
 
@@ -113,7 +110,7 @@ export async function markNoShow(_prev: ActionResult | null, formData: FormData)
     const reservationId = id.parse(formData.get("reservationId"));
     const { error } = await (await createClient()).rpc("mark_no_show", { p_reservation_id: reservationId });
     if (error) throwDbError(error);
-    refresh(reservationId);
+    refresh();
   });
 }
 
@@ -128,7 +125,7 @@ export async function overridePayment(_prev: ActionResult | null, formData: Form
     });
     if (error) throwDbError(error);
     after(() => deliverEmails({ reservationId }));
-    refresh(reservationId);
+    refresh();
   });
 }
 
@@ -146,7 +143,7 @@ export async function updateReservationDetails(_prev: ActionResult | null, formD
       p_reservation_id: v.reservationId, p_guests: v.guests, p_special_requests: v.specialRequests,
     });
     if (error) throwDbError(error);
-    refresh(v.reservationId);
+    refresh();
   });
 }
 
@@ -174,7 +171,7 @@ export async function updateGuest(_prev: ActionResult | null, formData: FormData
       throwDbError(error);
     }
     if (!data?.length) throw new AppError("NOT_FOUND", "Guest not found.");
-    revalidatePath(`/app/guests/${v.guestId}`);
+    refresh();
   });
 }
 
@@ -189,7 +186,7 @@ export async function changeDates(_prev: ActionResult | null, formData: FormData
       p_reservation_id: reservationId, p_check_in: checkIn.data, p_check_out: checkOut.data,
     });
     if (error) throwDbError(error);
-    refresh(reservationId);
+    refresh();
   });
 }
 
@@ -199,6 +196,6 @@ export async function resolveAttention(_prev: ActionResult | null, formData: For
     const reservationId = id.parse(formData.get("reservationId"));
     const { error } = await (await createClient()).rpc("resolve_attention", { p_reservation_id: reservationId, p_note: String(formData.get("note") ?? "") });
     if (error) throwDbError(error);
-    refresh(reservationId);
+    refresh();
   });
 }
