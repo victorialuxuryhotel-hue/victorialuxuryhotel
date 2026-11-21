@@ -15,6 +15,16 @@
     // Self-reference used by OpenNext for cache revalidation.
     { "binding": "WORKER_SELF_REFERENCE", "service": "victorialuxuryhotel" }
   ],
+  // The hotel database. Schema and business rules: migrations/*.sql
+  // (apply with `pnpm db:migrate`, or `--remote` for production).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "victoria-hotel-db",
+      "database_id": "f14f8279-a2df-4fe8-99fd-0522934463e5",
+      "migrations_dir": "migrations"
+    }
+  ],
   // next/image optimization via Cloudflare Images.
   "images": { "binding": "IMAGES" },
   // Housekeeping every 10 minutes: settle pending payments, expire unpaid
