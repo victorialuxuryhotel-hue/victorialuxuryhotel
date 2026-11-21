@@ -25,6 +25,9 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Hotel photos (room types and website), served by /media/[...key].
+  // R2 must be enabled on the account before the first deploy.
+  "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "victoria-hotel-photos" }],
   // next/image optimization via Cloudflare Images.
   "images": { "binding": "IMAGES" },
   // Housekeeping every 10 minutes: settle pending payments, expire unpaid

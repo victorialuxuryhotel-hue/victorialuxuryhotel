@@ -50,8 +50,9 @@ BEGIN
   INSERT OR IGNORE INTO email_outbox (kind, reservation_id, payment_id) VALUES ('payment_received', NEW.reservation_id, NEW.id);
 END;
 
-CREATE TRIGGER payments_updated_at AFTER UPDATE ON payments
-WHEN NEW.updated_at = OLD.updated_at
+-- Every change bumps the version (optimistic concurrency) and updated_at.
+CREATE TRIGGER payments_version AFTER UPDATE ON payments
+WHEN NEW.version = OLD.version
 BEGIN
-  UPDATE payments SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = NEW.id;
+  UPDATE payments SET version = OLD.version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = NEW.id;
 END;

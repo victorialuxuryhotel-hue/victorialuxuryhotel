@@ -34,6 +34,16 @@ CREATE TABLE _ctx (
   reason TEXT
 );
 
+-- Optimistic concurrency. A business action reads what it needs, decides, and
+-- then writes in one batch whose first statement asserts nothing it read has
+-- changed (version numbers below). If something did, the insert here aborts
+-- the whole batch ('stale_state') and the action re-reads and decides again.
+CREATE TABLE _guard (ok INTEGER);
+CREATE TRIGGER _guard_abort BEFORE INSERT ON _guard
+BEGIN
+  SELECT RAISE(ABORT, 'stale_state');
+END;
+
 -- One row per date. SQLite triggers can't use recursive CTEs, so the capacity
 -- trigger walks the nights of a stay through this table.
 CREATE TABLE calendar (d TEXT PRIMARY KEY) WITHOUT ROWID;
@@ -123,6 +133,8 @@ CREATE TABLE rooms (
   readiness TEXT NOT NULL DEFAULT 'ready' CHECK (readiness IN ('needs_cleaning', 'cleaning_in_progress', 'ready')),
   -- 0 = permanently removed from inventory (kept for history).
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  -- Bumped by a trigger on every change (optimistic concurrency).
+  version INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
@@ -179,6 +191,8 @@ CREATE TABLE reservations (
   -- Set when something needs a human. Cleared by a manager.
   attention_reason TEXT,
   created_by TEXT REFERENCES staff_profiles (id) ON DELETE SET NULL,
+  -- Bumped by a trigger on every change (optimistic concurrency).
+  version INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 
@@ -231,6 +245,8 @@ CREATE TABLE payments (
   receipt_number TEXT UNIQUE,
   recorded_by TEXT REFERENCES staff_profiles (id) ON DELETE SET NULL,
   notes TEXT CHECK (length(notes) <= 1000),
+  -- Bumped by a trigger on every change (optimistic concurrency).
+  version INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 

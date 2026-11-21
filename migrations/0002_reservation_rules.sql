@@ -200,8 +200,9 @@ BEGIN
   VALUES (CASE NEW.status WHEN 'confirmed' THEN 'booking_confirmed' ELSE 'reservation_cancelled' END, NEW.id);
 END;
 
-CREATE TRIGGER reservations_updated_at AFTER UPDATE ON reservations
-WHEN NEW.updated_at = OLD.updated_at
+-- Every change bumps the version (optimistic concurrency) and updated_at.
+CREATE TRIGGER reservations_version AFTER UPDATE ON reservations
+WHEN NEW.version = OLD.version
 BEGIN
-  UPDATE reservations SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = NEW.id;
+  UPDATE reservations SET version = OLD.version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = NEW.id;
 END;

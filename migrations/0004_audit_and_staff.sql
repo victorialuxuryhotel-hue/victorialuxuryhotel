@@ -164,7 +164,7 @@ CREATE TRIGGER hotel_settings_updated_at AFTER UPDATE ON hotel_settings WHEN NEW
 BEGIN UPDATE hotel_settings SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = NEW.id; END;
 CREATE TRIGGER room_categories_updated_at AFTER UPDATE ON room_categories WHEN NEW.updated_at = OLD.updated_at
 BEGIN UPDATE room_categories SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = NEW.id; END;
-CREATE TRIGGER rooms_updated_at AFTER UPDATE ON rooms WHEN NEW.updated_at = OLD.updated_at
-BEGIN UPDATE rooms SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = NEW.id; END;
+CREATE TRIGGER rooms_version AFTER UPDATE ON rooms WHEN NEW.version = OLD.version
+BEGIN UPDATE rooms SET version = OLD.version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = NEW.id; END;
 CREATE TRIGGER guests_updated_at AFTER UPDATE ON guests WHEN NEW.updated_at = OLD.updated_at
 BEGIN UPDATE guests SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = NEW.id; END;
