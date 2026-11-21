@@ -1,13 +1,14 @@
 "use server";
 
+import { clerkClient } from "@clerk/nextjs/server";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { publicEnv } from "@/lib/env";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-import { authorize } from "./auth";
+import { actorOf, authorize } from "./auth";
+import { first, getDb } from "./db";
+import { createStaffProfile, updateStaffProfile } from "./domain/admin";
 
 const roleSchema = z.enum(["owner", "general_manager", "front_desk"]);
 
@@ -17,35 +18,47 @@ const inviteSchema = z.object({
   role: roleSchema,
 });
 
+/** Clerk errors carry codes; anything else is unexpected. */
+const clerkCode = (err: unknown) => (err as { errors?: Array<{ code?: string }> })?.errors?.[0]?.code;
+
 /**
- * Owner invites a staff member. Creating an auth user needs the admin API, so
- * this is one of the few places the service-role client is used, strictly
- * after authorize("staff.manage") has confirmed the caller is the owner.
+ * Owner invites a staff member: Clerk emails an invitation link to
+ * /auth/accept, and the staff record (role, access) is created here. The
+ * person's Clerk account is linked to this record by email on first sign-in.
+ * If the record can't be created, the invitation is revoked.
  */
 export async function inviteStaff(_prev: ActionResult<{ email: string }> | null, formData: FormData): Promise<ActionResult<{ email: string }>> {
   try {
-    await authorize("staff.manage");
+    const me = await authorize("staff.manage");
     const parsed = inviteSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) {
       throw new AppError("VALIDATION", "Check the details", { fieldErrors: z.flattenError(parsed.error).fieldErrors });
     }
     const { fullName, email, role } = parsed.data;
-    const admin = createAdminClient();
+    const db = await getDb();
+    if (await first(db, "SELECT 1 FROM staff_profiles WHERE email = ?", email)) throw new AppError("CONFLICT", "Someone with this email already has an account.");
 
-    const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${publicEnv().NEXT_PUBLIC_SITE_URL}/auth/confirm`,
-    });
-    if (error || !data.user) {
-      if (error?.code === "email_exists") throw new AppError("CONFLICT", "Someone with this email already has an account.");
-      throw new AppError("INTERNAL", "Could not send the invitation. Please try again.", { cause: error });
+    const clerk = await clerkClient();
+    let invitationId: string;
+    try {
+      const invitation = await clerk.invitations.createInvitation({
+        emailAddress: email,
+        redirectUrl: `${publicEnv().NEXT_PUBLIC_SITE_URL}/auth/accept`,
+        notify: true,
+        ignoreExisting: true,
+      });
+      invitationId = invitation.id;
+    } catch (err) {
+      if (clerkCode(err) === "duplicate_record") throw new AppError("CONFLICT", "An invitation is already waiting for this email.");
+      throw new AppError("INTERNAL", "Could not send the invitation. Please try again.", { cause: err });
     }
 
-    const { error: profileError } = await admin.from("staff_profiles").insert({ id: data.user.id, full_name: fullName, email, role });
-    if (profileError) {
-      await admin.auth.admin.deleteUser(data.user.id);
-      throw new AppError("INTERNAL", "Could not create the staff profile.", { cause: profileError });
+    try {
+      await createStaffProfile(db, actorOf(me), { fullName, email, role });
+    } catch (err) {
+      await clerk.invitations.revokeInvitation(invitationId).catch((e: unknown) => logger.error("staff.invite_revoke_failed", e));
+      throw err;
     }
-
     refresh();
     return ok({ email });
   } catch (err) {
@@ -61,8 +74,10 @@ const updateSchema = z.object({
 });
 
 /**
- * Change role or access. Runs as the owner (not service role), so RLS and the
- * "keep an owner" trigger enforce the rules, and the audit trigger records it.
+ * Change role or access. The database keeps at least one active owner and
+ * audits the change. Deactivation takes effect on the person's next request
+ * (every request re-checks the record); their Clerk account is also locked so
+ * they can't sign in again.
  */
 export async function updateStaff(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
@@ -70,16 +85,18 @@ export async function updateStaff(_prev: ActionResult | null, formData: FormData
     const parsed = updateSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) throw new AppError("VALIDATION", "Invalid request");
     const { staffId, role, isActive } = parsed.data;
-    if (staffId === me.id && !isActive) throw new AppError("VALIDATION", "You can't deactivate your own account.");
+    const record = await updateStaffProfile(await getDb(), actorOf(me), { staffId, role, isActive });
 
-    const supabase = await createClient();
-    const { data, error } = await supabase.from("staff_profiles").update({ role, is_active: isActive }).eq("id", staffId).select("id");
-    if (error) {
-      if (/active owner/.test(error.message)) throw new AppError("CONFLICT", "The hotel must always have at least one active owner.");
-      throw new AppError("INTERNAL", "Could not update this staff member.", { cause: error });
+    if (record.clerk_user_id) {
+      const clerk = await clerkClient();
+      try {
+        if (isActive) await clerk.users.unbanUser(record.clerk_user_id);
+        else await clerk.users.banUser(record.clerk_user_id);
+      } catch (err) {
+        // Access is already removed by the database record; log so the lock can be retried.
+        logger.error("staff.clerk_lock_failed", err, { staffId });
+      }
     }
-    if (!data?.length) throw new AppError("NOT_FOUND", "Staff member not found.");
-
     refresh();
     return ok(undefined);
   } catch (err) {

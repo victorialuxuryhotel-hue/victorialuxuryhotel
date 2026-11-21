@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { MobileBar, Sidebar } from "@/components/management/nav";
@@ -44,10 +45,12 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
 
 export default function ManagementLayout({ children }: LayoutProps<"/app">) {
   return (
-    <div className="flex min-h-screen flex-1 flex-col bg-ivory-100 lg:flex-row">
-      <Suspense fallback={<LoadingState label="Checking your access…" />}>
-        <StaffShell>{children}</StaffShell>
-      </Suspense>
-    </div>
+    <ClerkProvider signInUrl="/login">
+      <div className="flex min-h-screen flex-1 flex-col bg-ivory-100 lg:flex-row">
+        <Suspense fallback={<LoadingState label="Checking your access…" />}>
+          <StaffShell>{children}</StaffShell>
+        </Suspense>
+      </div>
+    </ClerkProvider>
   );
 }

@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/management/page-header";
 import { Card, CardHeader } from "@/components/ui/card";
 import { staffRole } from "@/domain/status";
 import { requireStaff } from "@/server/auth";
-import { PasswordForm } from "./password-form";
+import { AccountSecurity } from "./account-security";
 
 export const metadata: Metadata = { title: "Your account" };
 
@@ -23,8 +23,8 @@ async function AccountContent() {
       <PageHeader title="Your account" description={`${staff.fullName} · ${staffRole[staff.role]} · ${staff.email}`} />
       <div className="px-4 py-6 lg:px-8">
         <Card className="max-w-xl">
-          <CardHeader title="Password" description="New staff: set your password here after accepting your invitation." />
-          <PasswordForm />
+          <CardHeader title="Password and security" description="Change your password, or sign out of other devices." />
+          <AccountSecurity />
         </Card>
       </div>
     </>

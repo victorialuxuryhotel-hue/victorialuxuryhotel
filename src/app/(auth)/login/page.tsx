@@ -4,13 +4,16 @@ import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { hotel } from "@/config/hotel";
-import { LoginForm } from "./login-form";
+import { auth } from "@clerk/nextjs/server";
+import { AccessDenied, SignInPanel } from "./sign-in-panel";
 
 export const metadata: Metadata = { title: "Staff sign in", robots: { index: false, follow: false } };
 
 async function FormWithNext({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const next = (await searchParams).next;
-  return <LoginForm next={typeof next === "string" ? next : undefined} />;
+  const params = await searchParams;
+  // Signed in with Clerk but sent back here: the account isn't active staff.
+  if (params.denied && (await auth()).userId) return <AccessDenied />;
+  return <SignInPanel next={typeof params.next === "string" ? params.next : undefined} />;
 }
 
 export default function LoginPage(props: PageProps<"/login">) {

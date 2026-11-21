@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LogOut } from "lucide-react";
-import { signOut } from "@/app/(auth)/login/actions";
+import { SignOutButton } from "@clerk/nextjs";
 import { staffRole, type StaffRole } from "@/domain/status";
 
 export function StaffCard({ fullName, role }: { fullName: string; role: StaffRole }) {
@@ -14,11 +14,11 @@ export function StaffCard({ fullName, role }: { fullName: string; role: StaffRol
           <span className="block text-xs text-ivory-200/60">{staffRole[role]}</span>
         </span>
       </Link>
-      <form action={signOut}>
-        <button type="submit" aria-label="Sign out" title="Sign out" className="rounded-md p-2 text-ivory-200/70 hover:bg-white/10 hover:text-white">
+      <SignOutButton redirectUrl="/login">
+        <button type="button" aria-label="Sign out" title="Sign out" className="rounded-md p-2 text-ivory-200/70 hover:bg-white/10 hover:text-white">
           <LogOut className="size-4" aria-hidden />
         </button>
-      </form>
+      </SignOutButton>
     </div>
   );
 }

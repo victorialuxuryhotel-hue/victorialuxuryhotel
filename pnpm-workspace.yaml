@@ -1,3 +1,11 @@
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+# Clerk publishes several releases a day. Pin its internal packages to the
+# versions released with @clerk/nextjs 7.9.25 so installs don't pull code
+# that is only hours old. Bump these together with @clerk/nextjs.
+overrides:
+  "@clerk/backend": 3.27.0
+  "@clerk/react": 6.18.6
+  "@clerk/shared": 4.44.1

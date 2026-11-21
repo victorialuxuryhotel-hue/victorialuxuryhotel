@@ -1,52 +1,28 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 /**
- * Runs before matched requests to:
- *  1. Refresh the Supabase auth session cookie (Server Components can't write cookies).
- *  2. Optimistically redirect signed-out visitors away from /app.
+ * Runs before staff routes to keep the Clerk session fresh and to send
+ * signed-out visitors from /app to the sign-in page.
  *
- * This is NOT the authorization layer. Every management page, server action and
- * route handler re-checks the staff member and role on the server, and RLS
- * enforces access in the database.
+ * This is NOT the authorization layer. Every management page, server action
+ * and staff query re-checks the staff member and role (src/server/auth.ts),
+ * and every business function checks the role again at the data layer.
  */
-export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+const isManagement = createRouteMatcher(["/app(.*)"]);
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll: () => request.cookies.getAll(),
-        setAll: (toSet) => {
-          for (const { name, value } of toSet) request.cookies.set(name, value);
-          response = NextResponse.next({ request });
-          for (const { name, value, options } of toSet) response.cookies.set(name, value, options);
-        },
-      },
-    },
-  );
-
-  // getClaims() validates the JWT and refreshes it if expired. Do not put code
-  // between client creation and this call.
-  const { data } = await supabase.auth.getClaims();
-  const signedIn = Boolean(data?.claims?.sub);
-  const { pathname } = request.nextUrl;
-
-  if (!signedIn && (pathname === "/app" || pathname.startsWith("/app/"))) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = `?next=${encodeURIComponent(pathname)}`;
-    return NextResponse.redirect(url);
+export const proxy = clerkMiddleware(async (auth, request) => {
+  if (isManagement(request)) {
+    const { userId } = await auth();
+    if (!userId) {
+      const url = new URL("/login", request.url);
+      url.searchParams.set("next", request.nextUrl.pathname);
+      return Response.redirect(url);
+    }
   }
-
-  return response;
-}
+});
 
 export const config = {
-  // Only routes that need the session refreshed: the management app and the
-  // auth callback. Public pages, /login (the sign-in action sets its own
-  // cookies) and webhooks skip the proxy entirely.
-  matcher: ["/app/:path*", "/auth/:path*"],
+  // Only routes that use the staff session. The public website, booking and
+  // payment routes and webhooks skip it entirely.
+  matcher: ["/app/:path*", "/login", "/auth/:path*"],
 };
