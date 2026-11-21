@@ -18,7 +18,6 @@ function read<T extends z.ZodType>(name: string, schema: T): z.infer<T> {
 const nonEmpty = z.string().min(1);
 
 export const serverEnv = {
-  supabaseSecretKey: () => read("SUPABASE_SECRET_KEY", nonEmpty),
   paystackSecretKey: () => read("PAYSTACK_SECRET_KEY", z.string().regex(/^sk_(test|live)_/)),
   resendApiKey: () => read("RESEND_API_KEY", nonEmpty),
   emailFrom: () => read("EMAIL_FROM", nonEmpty),

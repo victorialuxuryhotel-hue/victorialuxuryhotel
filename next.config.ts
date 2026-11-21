@@ -1,23 +1,16 @@
 import type { NextConfig } from "next";
-
-const supabaseUrl = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321");
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   images: {
-    // Only our own public storage buckets may be optimized: no open image proxy.
-    remotePatterns: [
-      {
-        protocol: supabaseUrl.protocol.replace(":", "") as "http" | "https",
-        hostname: supabaseUrl.hostname,
-        port: supabaseUrl.port,
-        pathname: "/storage/v1/object/public/**",
-        search: "",
-      },
+    // Photos are served by our own /media route (from R2); no remote images,
+    // so next/image is never an open proxy.
+    localPatterns: [
+      { pathname: "/media/**", search: "" },
+      { pathname: "/brand/**", search: "" },
     ],
-    // Local Supabase runs on 127.0.0.1. Never allowed in production (SSRF risk).
-    dangerouslyAllowLocalIP: process.env.NODE_ENV === "development",
   },
   experimental: {
     // Photo uploads (5 MB max per file) plus multipart overhead.
@@ -34,3 +27,7 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+// `next dev` gets the same bindings as the Worker (local D1 and R2 under
+// .wrangler/state), so the app runs locally exactly as on Cloudflare.
+if (process.env.NODE_ENV === "development") void initOpenNextCloudflareForDev();
