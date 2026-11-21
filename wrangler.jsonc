@@ -3,7 +3,7 @@
   // Pages are served with a read-only cache from static assets (see
   // open-next.config.ts), so no R2 bucket or D1 database is needed.
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "victoria-hotel",
+  "name": "victorialuxuryhotel",
   "main": "worker.ts",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -13,7 +13,7 @@
   },
   "services": [
     // Self-reference used by OpenNext for cache revalidation.
-    { "binding": "WORKER_SELF_REFERENCE", "service": "victoria-hotel" }
+    { "binding": "WORKER_SELF_REFERENCE", "service": "victorialuxuryhotel" }
   ],
   // next/image optimization via Cloudflare Images.
   "images": { "binding": "IMAGES" },
