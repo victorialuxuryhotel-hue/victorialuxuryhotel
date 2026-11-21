@@ -2,8 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { alert } from "@/lib/alert";
 import { logger } from "@/lib/logger";
-import type { Json } from "@/lib/supabase/database.types";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { first, getDb } from "@/server/db";
 import { settlePaystackReference } from "@/server/payment-flow";
 import { isValidWebhookSignature } from "@/server/paystack";
 
@@ -32,42 +31,52 @@ export async function POST(request: NextRequest) {
   const d = (event.data ?? {}) as Record<string, unknown>;
   const reference = typeof d.reference === "string" ? d.reference : null;
   const hash = createHash("sha256").update(raw).digest("hex");
-  const db = createAdminClient();
+  const db = await getDb();
 
   // Store only what's needed to investigate: no card authorization details.
-  const payload: Json = {
+  const payload = {
     event: type,
     data: { reference, status: String(d.status ?? ""), amount: Number(d.amount ?? 0), currency: String(d.currency ?? ""), paid_at: d.paid_at ? String(d.paid_at) : null, channel: d.channel ? String(d.channel) : null, gateway_response: d.gateway_response ? String(d.gateway_response) : null },
   };
-  const { data: inserted, error } = await db
-    .from("payment_events")
-    .upsert({ provider: "paystack", event_type: type, provider_reference: reference, payload_hash: hash, payload }, { onConflict: "payload_hash", ignoreDuplicates: true })
-    .select("id");
-  if (error) {
-    logger.error("webhook.paystack_store_failed", error);
+  let eventId: number | undefined;
+  try {
+    const inserted = await db
+      .prepare(
+        `INSERT INTO payment_events (provider, event_type, provider_reference, payload_hash, payload) VALUES ('paystack', ?, ?, ?, ?)
+         ON CONFLICT (payload_hash) DO NOTHING RETURNING id`,
+      )
+      .bind(type, reference, hash, JSON.stringify(payload))
+      .first<{ id: number }>();
+    eventId = inserted?.id;
+  } catch (err) {
+    logger.error("webhook.paystack_store_failed", err);
     return NextResponse.json({ error: "store failed" }, { status: 500 });
   }
 
-  let eventId = inserted?.[0]?.id;
   if (!eventId) {
-    const { data: existing } = await db.from("payment_events").select("id, processed_at").eq("payload_hash", hash).single();
+    const existing = await first<{ id: number; processed_at: string | null }>(db, "SELECT id, processed_at FROM payment_events WHERE payload_hash = ?", hash);
     if (existing?.processed_at) return NextResponse.json({ received: true, duplicate: true });
     eventId = existing?.id; // stored but not processed (an earlier attempt failed): process now
   }
+  const mark = (processingError: string | null, processed: boolean) =>
+    db
+      .prepare("UPDATE payment_events SET processed_at = CASE WHEN ? THEN ? ELSE processed_at END, processing_error = ? WHERE id = ?")
+      .bind(processed ? 1 : 0, new Date().toISOString(), processingError, eventId)
+      .run();
 
   if (!HANDLED.has(type) || !reference) {
-    await db.from("payment_events").update({ processed_at: new Date().toISOString() }).eq("id", eventId!);
+    await mark(null, true);
     return NextResponse.json({ received: true, ignored: true });
   }
 
   try {
     const outcome = await settlePaystackReference(reference, "webhook");
-    await db.from("payment_events").update({ processed_at: new Date().toISOString(), processing_error: outcome === "unknown_reference" ? "unknown reference" : null }).eq("id", eventId!);
+    await mark(outcome === "unknown_reference" ? "unknown reference" : null, true);
     return NextResponse.json({ received: true, outcome });
   } catch (err) {
     logger.error("webhook.paystack_process_failed", err, { reference });
     await alert("webhook_failed", "A Paystack payment notification could not be processed (Paystack will retry)", { reference });
-    await db.from("payment_events").update({ processing_error: err instanceof Error ? err.message.slice(0, 500) : "error" }).eq("id", eventId!);
+    await mark(err instanceof Error ? err.message.slice(0, 500) : "error", false);
     return NextResponse.json({ error: "processing failed" }, { status: 500 });
   }
 }

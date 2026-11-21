@@ -1,9 +1,8 @@
 import "server-only";
 import type { PaymentRow } from "@/domain/views";
-import { createClient } from "@/lib/supabase/server";
-import { hotelToday, netPaid } from "./reservations";
-
-const lagosDate = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos" }).format(new Date(iso));
+import { addDays, hotelDateOf, hotelToday } from "@/lib/hotel-date";
+import { authorize } from "../auth";
+import { all, first, getDb } from "../db";
 
 /**
  * Basic revenue visibility (not accounting). Three different measures, never mixed:
@@ -12,68 +11,77 @@ const lagosDate = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: 
  *  - outstanding: unpaid balances on confirmed / in-house / completed stays
  */
 export async function revenueSummary() {
-  const supabase = await createClient();
-  const today = await hotelToday();
+  await authorize("reports.view");
+  const db = await getDb();
+  const today = hotelToday();
   const monthStart = `${today.slice(0, 7)}-01`;
-  const since = new Date(`${today}T00:00:00+01:00`);
-  since.setUTCDate(since.getUTCDate() - 13);
+  const firstDay = addDays(today, -13) < monthStart ? addDays(today, -13) : monthStart;
+  // Hotel-local midnight (UTC+1) of the earliest day needed, as a UTC instant.
+  const since = new Date(`${firstDay}T00:00:00+01:00`).toISOString();
 
   const [payments, stays] = await Promise.all([
-    supabase.from("payments").select("amount_kobo, kind, paid_at").eq("status", "successful").gte("paid_at", new Date(Math.min(since.getTime(), Date.parse(`${monthStart}T00:00:00+01:00`))).toISOString()),
-    supabase.from("reservations").select("check_in, total_amount_kobo, status, payments(amount_kobo, kind, status)").in("status", ["confirmed", "checked_in", "checked_out"]),
+    all<{ amount_kobo: number; kind: string; paid_at: string }>(db, "SELECT amount_kobo, kind, paid_at FROM payments WHERE status = 'successful' AND paid_at >= ?", since),
+    first<{ booked: number; outstanding: number }>(
+      db,
+      `SELECT
+         coalesce(sum(CASE WHEN substr(check_in, 1, 7) = ?1 THEN total_amount_kobo ELSE 0 END), 0) AS booked,
+         coalesce(sum(max(0, total_amount_kobo - (
+           SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
+           FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful'))), 0) AS outstanding
+       FROM reservations r WHERE status IN ('confirmed', 'checked_in', 'checked_out')`,
+      today.slice(0, 7),
+    ),
   ]);
-  if (payments.error || stays.error) throw new Error("Could not load revenue", { cause: payments.error ?? stays.error });
 
   const signed = (p: { amount_kobo: number; kind: string }) => (p.kind === "refund" ? -p.amount_kobo : p.amount_kobo);
   const daily = new Map<string, number>();
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(`${today}T12:00:00Z`);
-    d.setUTCDate(d.getUTCDate() - i);
-    daily.set(d.toISOString().slice(0, 10), 0);
-  }
+  for (let i = 13; i >= 0; i--) daily.set(addDays(today, -i), 0);
   let receivedToday = 0;
   let receivedMonth = 0;
-  for (const p of payments.data) {
-    const day = lagosDate(p.paid_at!);
+  for (const p of payments) {
+    const day = hotelDateOf(p.paid_at);
     if (daily.has(day)) daily.set(day, daily.get(day)! + signed(p));
     if (day === today) receivedToday += signed(p);
     if (day >= monthStart) receivedMonth += signed(p);
   }
 
-  type Stay = { check_in: string; total_amount_kobo: number; payments: Array<{ amount_kobo: number; kind: "payment" | "refund"; status: string }> };
-  let bookedValue = 0;
-  let outstanding = 0;
-  for (const s of stays.data as unknown as Stay[]) {
-    if (s.check_in >= monthStart && s.check_in.slice(0, 7) === today.slice(0, 7)) bookedValue += s.total_amount_kobo;
-    outstanding += Math.max(0, s.total_amount_kobo - netPaid(s.payments));
-  }
-
-  return { today, receivedToday, receivedMonth, bookedValue, outstanding, daily: [...daily.entries()].map(([day, kobo]) => ({ day, kobo })) };
+  return {
+    today,
+    receivedToday,
+    receivedMonth,
+    bookedValue: stays?.booked ?? 0,
+    outstanding: stays?.outstanding ?? 0,
+    daily: [...daily.entries()].map(([day, kobo]) => ({ day, kobo })),
+  };
 }
 
 export async function awaitingPaymentCount() {
-  const supabase = await createClient();
-  const { count } = await supabase
-    .from("reservations")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending_payment")
-    .gt("hold_expires_at", new Date().toISOString());
-  return count ?? 0;
+  await authorize();
+  const row = await first<{ n: number }>(
+    await getDb(),
+    "SELECT count(*) AS n FROM reservations WHERE status = 'pending_payment' AND hold_expires_at > ?",
+    new Date().toISOString(),
+  );
+  return row?.n ?? 0;
 }
 
+type P = {
+  id: string; amount_kobo: number; method: string | null; provider: "paystack" | "offline"; provider_reference: string | null; status: PaymentRow["status"];
+  paid_at: string | null; receipt_number: string | null; reference: string; guest_name: string; recorder: string | null;
+};
+const PAYMENT_SELECT = `SELECT p.id, p.amount_kobo, p.method, p.provider, p.provider_reference, p.status, p.paid_at, p.receipt_number,
+    r.reference, g.full_name AS guest_name, s.full_name AS recorder
+  FROM payments p JOIN reservations r ON r.id = p.reservation_id JOIN guests g ON g.id = r.guest_id
+  LEFT JOIN staff_profiles s ON s.id = p.recorded_by`;
+
+const toPayment = (p: P): PaymentRow => ({
+  id: p.id, reservationReference: p.reference, guestName: p.guest_name, amountKobo: p.amount_kobo,
+  method: (p.method ?? "other") as PaymentRow["method"], provider: p.provider, providerReference: p.provider_reference ?? undefined,
+  status: p.status, paidAt: p.paid_at ?? undefined, receiptNumber: p.receipt_number ?? undefined, recordedBy: p.recorder ?? undefined,
+});
+
 export async function listPayments(page = 1, size = 50): Promise<PaymentRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("payments")
-    .select("id, amount_kobo, method, provider, provider_reference, status, paid_at, receipt_number, reservation:reservations!inner(reference, guest:guests!inner(full_name)), recorder:staff_profiles!payments_recorded_by_fkey(full_name)")
-    .order("created_at", { ascending: false })
-    .order("id")
-    .range((page - 1) * size, (page - 1) * size + size);
-  if (error) throw new Error("Could not load payments", { cause: error });
-  type P = { id: string; amount_kobo: number; method: string | null; provider: "paystack" | "offline"; provider_reference: string | null; status: PaymentRow["status"]; paid_at: string | null; receipt_number: string | null; reservation: { reference: string; guest: { full_name: string } }; recorder: { full_name: string } | null };
-  return (data as unknown as P[]).map((p) => ({
-    id: p.id, reservationReference: p.reservation.reference, guestName: p.reservation.guest.full_name, amountKobo: p.amount_kobo,
-    method: (p.method ?? "other") as PaymentRow["method"], provider: p.provider, providerReference: p.provider_reference ?? undefined,
-    status: p.status, paidAt: p.paid_at ?? undefined, receiptNumber: p.receipt_number ?? undefined, recordedBy: p.recorder?.full_name,
-  }));
+  await authorize();
+  const rows = await all<P>(await getDb(), `${PAYMENT_SELECT} ORDER BY p.created_at DESC, p.id LIMIT ? OFFSET ?`, size + 1, (page - 1) * size);
+  return rows.map(toPayment);
 }

@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getDb } from "./db";
+import { hitRateLimit } from "./domain/system";
 
 /**
  * Per-visitor limits for anonymous website actions that hold inventory or call
@@ -16,15 +17,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 async function visitorKey(): Promise<string> {
   const h = await headers();
   const ip = h.get("cf-connecting-ip") ?? h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const salt = process.env.RATE_LIMIT_SALT ?? process.env.SUPABASE_SECRET_KEY ?? "";
+  const salt = process.env.RATE_LIMIT_SALT ?? "";
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex").slice(0, 32);
 }
 
 export async function enforceRateLimit(action: string, limit: number, windowSeconds: number) {
   const key = `${action}:${await visitorKey()}`;
-  const { data: allowed, error } = await createAdminClient().rpc("hit_rate_limit", { p_key: key, p_limit: limit, p_window_seconds: windowSeconds });
-  if (error) {
-    logger.error("rate_limit.check_failed", error, { action });
+  let allowed: boolean;
+  try {
+    allowed = await hitRateLimit(await getDb(), key, limit, windowSeconds);
+  } catch (err) {
+    logger.error("rate_limit.check_failed", err, { action });
     return;
   }
   if (!allowed) {

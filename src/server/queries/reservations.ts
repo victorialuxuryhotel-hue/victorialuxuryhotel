@@ -1,48 +1,49 @@
 import "server-only";
 import type { ReservationStatus } from "@/domain/status";
 import type { HistoryEntry, PaymentRow, ReservationDetail, ReservationRow } from "@/domain/views";
-import { createClient } from "@/lib/supabase/server";
 import { formatNaira } from "@/lib/format";
-import { cleanSearch } from "../db-errors";
+import { hotelToday as today } from "@/lib/hotel-date";
 import { reservationStatus } from "@/domain/status";
+import { authorize } from "../auth";
+import { all, first, getDb } from "../db";
+import { cleanSearch } from "../db-errors";
 
-const listSelect = `
-  id, reference, check_in, check_out, guest_count, total_amount_kobo, status, source, hold_expires_at, attention_reason,
-  guest:guests!inner(full_name, phone),
-  category:room_categories!inner(name),
-  room:rooms(room_number),
-  payments(amount_kobo, kind, status)
-` as const;
+/**
+ * Staff reads of reservations. Every query starts with authorize(): with no
+ * row-level security in D1, this (plus the role checks in the domain layer)
+ * is what keeps staff data to staff.
+ */
 
-type PaymentLite = { amount_kobo: number; kind: "payment" | "refund"; status: string };
-
-/** Net verified money in for a reservation (payments minus refunds). */
-export function netPaid(payments: PaymentLite[]): number {
-  return payments
-    .filter((p) => p.status === "successful")
-    .reduce((sum, p) => sum + (p.kind === "refund" ? -p.amount_kobo : p.amount_kobo), 0);
-}
+/** Columns for list rows, with net paid computed in the database. */
+const LIST_COLUMNS = `
+  r.id, r.reference, r.check_in, r.check_out, r.guest_count, r.total_amount_kobo, r.status, r.source, r.hold_expires_at, r.attention_reason,
+  g.full_name AS guest_name, g.phone AS guest_phone, c.name AS category_name, rm.room_number,
+  (SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
+     FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful') AS paid_kobo`;
+const LIST_FROM = `FROM reservations r
+  JOIN guests g ON g.id = r.guest_id
+  JOIN room_categories c ON c.id = r.category_id
+  LEFT JOIN rooms rm ON rm.id = r.room_id`;
 
 type ListRow = {
   id: string; reference: string; check_in: string; check_out: string; guest_count: number; total_amount_kobo: number;
   status: ReservationStatus; source: ReservationRow["source"]; hold_expires_at: string | null; attention_reason: string | null;
-  guest: { full_name: string; phone: string | null }; category: { name: string }; room: { room_number: string } | null;
-  payments: PaymentLite[];
+  guest_name: string; guest_phone: string | null; category_name: string; room_number: string | null; paid_kobo: number;
 };
 
 function toRow(r: ListRow): ReservationRow {
   return {
     id: r.id,
     reference: r.reference,
-    guestName: r.guest.full_name,
-    guestPhone: r.guest.phone ?? undefined,
-    category: r.category.name,
-    roomNumber: r.room?.room_number,
+    guestName: r.guest_name,
+    guestPhone: r.guest_phone ?? undefined,
+    category: r.category_name,
+    roomNumber: r.room_number ?? undefined,
     checkIn: r.check_in,
     checkOut: r.check_out,
     guests: r.guest_count,
     totalKobo: r.total_amount_kobo,
-    paidKobo: netPaid(r.payments),
+    paidKobo: r.paid_kobo,
     status: r.status,
     source: r.source,
     holdExpiresAt: r.hold_expires_at ?? undefined,
@@ -50,133 +51,135 @@ function toRow(r: ListRow): ReservationRow {
   };
 }
 
+/** Today's date at the hotel (Africa/Lagos). */
 export async function hotelToday(): Promise<string> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("hotel_today");
-  if (error) throw new Error("Could not read hotel date", { cause: error });
-  return data as unknown as string;
+  return today();
 }
 
 export type ReservationTab = "upcoming" | "in_house" | "awaiting" | "attention" | "all";
 
+const tabWhere: Record<ReservationTab, string> = {
+  upcoming: "r.status IN ('pending_payment', 'confirmed') AND r.check_out >= ?today",
+  in_house: "r.status = 'checked_in'",
+  awaiting: "r.status = 'pending_payment'",
+  attention: "r.attention_reason IS NOT NULL",
+  all: "1 = 1",
+};
+
 export async function listReservations(opts: { tab?: ReservationTab; q?: string; status?: string; source?: string; guestId?: string; page?: number; pageSize?: number } = {}) {
-  const supabase = await createClient();
-  const today = await hotelToday();
+  await authorize();
+  const db = await getDb();
+  const tab = opts.tab ?? "upcoming";
   const size = opts.pageSize ?? 50;
-  const from = ((opts.page ?? 1) - 1) * size;
-  // One extra row tells the caller whether there is a next page.
-  let query = supabase.from("reservations").select(listSelect).order("check_in", { ascending: opts.tab !== "all" }).order("id").range(from, from + size);
-
-  switch (opts.tab ?? "upcoming") {
-    case "upcoming":
-      query = query.in("status", ["pending_payment", "confirmed"]).gte("check_out", today);
-      break;
-    case "in_house":
-      query = query.eq("status", "checked_in");
-      break;
-    case "awaiting":
-      query = query.eq("status", "pending_payment");
-      break;
-    case "attention":
-      query = query.not("attention_reason", "is", null);
-      break;
-    case "all":
-      break;
+  const where = [tabWhere[tab].replace("?today", "?")];
+  const params: unknown[] = tab === "upcoming" ? [today()] : [];
+  if (opts.status && opts.status in reservationStatus) {
+    where.push("r.status = ?");
+    params.push(opts.status);
   }
-  if (opts.status && opts.status in reservationStatus) query = query.eq("status", opts.status as ReservationStatus);
-  if (opts.source) query = query.eq("source", opts.source as ReservationRow["source"]);
-  if (opts.guestId) query = query.eq("guest_id", opts.guestId);
-
+  if (opts.source) {
+    where.push("r.source = ?");
+    params.push(opts.source);
+  }
+  if (opts.guestId) {
+    where.push("r.guest_id = ?");
+    params.push(opts.guestId);
+  }
   const q = cleanSearch(opts.q);
   if (q) {
-    const { data: guests } = await supabase
-      .from("guests")
-      .select("id")
-      .or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`)
-      .limit(100);
-    const ids = (guests ?? []).map((g) => g.id);
-    query = query.or([`reference.ilike.%${q}%`, ids.length ? `guest_id.in.(${ids.join(",")})` : null].filter(Boolean).join(","));
+    where.push("(r.reference LIKE ?1x OR g.full_name LIKE ?1x OR g.phone LIKE ?1x OR g.email LIKE ?1x)".replaceAll("?1x", "?"));
+    const like = `%${q}%`;
+    params.push(like, like, like, like);
   }
-
-  const { data, error } = await query;
-  if (error) throw new Error("Could not load reservations", { cause: error });
-  return (data as unknown as ListRow[]).map(toRow);
+  // One extra row tells the caller whether there is a next page.
+  params.push(size + 1, ((opts.page ?? 1) - 1) * size);
+  const rows = await all<ListRow>(
+    db,
+    `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE ${where.join(" AND ")}
+     ORDER BY r.check_in ${tab === "all" ? "DESC" : "ASC"}, r.id LIMIT ? OFFSET ?`,
+    ...params,
+  );
+  return rows.map(toRow);
 }
 
 export async function tabCounts(): Promise<Record<Exclude<ReservationTab, "all">, number>> {
-  const supabase = await createClient();
-  const today = await hotelToday();
-  const count = async (build: (q: ReturnType<typeof base>) => ReturnType<typeof base>) => (await build(base())).count ?? 0;
-  const base = () => supabase.from("reservations").select("id", { count: "exact", head: true });
-  const [upcoming, in_house, awaiting, attention] = await Promise.all([
-    count((q) => q.in("status", ["pending_payment", "confirmed"]).gte("check_out", today)),
-    count((q) => q.eq("status", "checked_in")),
-    count((q) => q.eq("status", "pending_payment")),
-    count((q) => q.not("attention_reason", "is", null)),
-  ]);
-  return { upcoming, in_house, awaiting, attention };
+  await authorize();
+  const row = await first<Record<Exclude<ReservationTab, "all">, number>>(
+    await getDb(),
+    `SELECT
+       sum(status IN ('pending_payment', 'confirmed') AND check_out >= ?) AS upcoming,
+       sum(status = 'checked_in') AS in_house,
+       sum(status = 'pending_payment') AS awaiting,
+       sum(attention_reason IS NOT NULL) AS attention
+     FROM reservations`,
+    today(),
+  );
+  return { upcoming: row?.upcoming ?? 0, in_house: row?.in_house ?? 0, awaiting: row?.awaiting ?? 0, attention: row?.attention ?? 0 };
 }
 
 /** Arrivals (due today, not yet in) and departures (in house, due out today or overdue). */
 export async function movements(day?: string) {
-  const supabase = await createClient();
-  const today = day ?? (await hotelToday());
+  await authorize();
+  const db = await getDb();
+  const d = day ?? today();
   const [arrivals, departures, inHouse] = await Promise.all([
-    supabase.from("reservations").select(listSelect).eq("check_in", today).in("status", ["confirmed", "pending_payment"]).order("created_at"),
-    supabase.from("reservations").select(listSelect).lte("check_out", today).eq("status", "checked_in").order("check_out"),
-    supabase.from("reservations").select(listSelect).eq("status", "checked_in").order("check_out"),
+    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_in = ? AND r.status IN ('confirmed', 'pending_payment') ORDER BY r.created_at`, d),
+    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_out <= ? AND r.status = 'checked_in' ORDER BY r.check_out`, d),
+    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.status = 'checked_in' ORDER BY r.check_out`),
   ]);
-  for (const r of [arrivals, departures, inHouse]) if (r.error) throw new Error("Could not load front desk", { cause: r.error });
-  return {
-    today,
-    arrivals: (arrivals.data as unknown as ListRow[]).map(toRow),
-    departures: (departures.data as unknown as ListRow[]).map(toRow),
-    inHouse: (inHouse.data as unknown as ListRow[]).map(toRow),
-  };
+  return { today: d, arrivals: arrivals.map(toRow), departures: departures.map(toRow), inHouse: inHouse.map(toRow) };
 }
 
-const methodOf = (m: string | null): PaymentRow["method"] => (m ?? "other") as PaymentRow["method"];
-
 export async function getReservation(id: string): Promise<(ReservationDetail & { categoryId: string; roomId?: string; guestId: string; maxGuests: number }) | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("reservations")
-    .select(`
-      ${listSelect}, category_id, room_id, nightly_rate_kobo, nights, special_requests, created_at, cancellation_reason,
-      guest_full:guests!inner(id, email),
-      cat_full:room_categories!inner(max_occupancy),
-      creator:staff_profiles!reservations_created_by_fkey(full_name),
-      payment_rows:payments(id, amount_kobo, method, provider, provider_reference, status, paid_at, receipt_number, kind, recorder:staff_profiles!payments_recorded_by_fkey(full_name)),
-      history:reservation_status_history(created_at, from_status, to_status, reason, changer:staff_profiles(full_name))
-    `)
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw new Error("Could not load reservation", { cause: error });
-  if (!data) return null;
+  await authorize();
+  const db = await getDb();
+  const r = await first<
+    ListRow & {
+      category_id: string; room_id: string | null; guest_id: string; nightly_rate_kobo: number; nights: number; special_requests: string | null;
+      created_at: string; guest_email: string | null; max_occupancy: number; creator: string | null;
+    }
+  >(
+    db,
+    `SELECT ${LIST_COLUMNS}, r.category_id, r.room_id, r.guest_id, r.nightly_rate_kobo, r.nights, r.special_requests, r.created_at,
+            g.email AS guest_email, c.max_occupancy, s.full_name AS creator
+     ${LIST_FROM} LEFT JOIN staff_profiles s ON s.id = r.created_by
+     WHERE r.id = ?`,
+    id,
+  );
+  if (!r) return null;
 
-  const r = data as unknown as ListRow & {
-    category_id: string; room_id: string | null; nightly_rate_kobo: number; nights: number; special_requests: string | null; created_at: string;
-    guest_full: { id: string; email: string | null }; cat_full: { max_occupancy: number }; creator: { full_name: string } | null;
-    payment_rows: Array<{ id: string; amount_kobo: number; method: string | null; provider: "paystack" | "offline"; provider_reference: string | null; status: PaymentRow["status"]; paid_at: string | null; receipt_number: string | null; kind: string; recorder: { full_name: string } | null }>;
-    history: Array<{ created_at: string; from_status: ReservationStatus | null; to_status: ReservationStatus; reason: string | null; changer: { full_name: string } | null }>;
-  };
+  const [paymentRows, historyRows] = await Promise.all([
+    all<{
+      id: string; amount_kobo: number; method: string | null; provider: "paystack" | "offline"; provider_reference: string | null;
+      status: PaymentRow["status"]; paid_at: string | null; receipt_number: string | null; recorder: string | null;
+    }>(
+      db,
+      `SELECT p.id, p.amount_kobo, p.method, p.provider, p.provider_reference, p.status, p.paid_at, p.receipt_number, s.full_name AS recorder
+       FROM payments p LEFT JOIN staff_profiles s ON s.id = p.recorded_by
+       WHERE p.reservation_id = ? ORDER BY coalesce(p.paid_at, ''), p.created_at`,
+      id,
+    ),
+    all<{ created_at: string; from_status: ReservationStatus | null; to_status: ReservationStatus; reason: string | null; changer: string | null }>(
+      db,
+      `SELECT h.created_at, h.from_status, h.to_status, h.reason, s.full_name AS changer
+       FROM reservation_status_history h LEFT JOIN staff_profiles s ON s.id = h.changed_by
+       WHERE h.reservation_id = ? ORDER BY h.created_at, h.id`,
+      id,
+    ),
+  ]);
 
-  const payments: PaymentRow[] = r.payment_rows
-    .sort((a, b) => (a.paid_at ?? "").localeCompare(b.paid_at ?? ""))
-    .map((p) => ({
-      id: p.id, reservationReference: r.reference, guestName: r.guest.full_name, amountKobo: p.amount_kobo, method: methodOf(p.method),
-      provider: p.provider, providerReference: p.provider_reference ?? undefined, status: p.status, paidAt: p.paid_at ?? undefined,
-      receiptNumber: p.receipt_number ?? undefined, recordedBy: p.recorder?.full_name,
-    }));
+  const payments: PaymentRow[] = paymentRows.map((p) => ({
+    id: p.id, reservationReference: r.reference, guestName: r.guest_name, amountKobo: p.amount_kobo,
+    method: (p.method ?? "other") as PaymentRow["method"], provider: p.provider, providerReference: p.provider_reference ?? undefined,
+    status: p.status, paidAt: p.paid_at ?? undefined, receiptNumber: p.receipt_number ?? undefined, recordedBy: p.recorder ?? undefined,
+  }));
 
-  const history: HistoryEntry[] = r.history
-    .sort((a, b) => a.created_at.localeCompare(b.created_at))
-    .map((h) => ({
-      at: h.created_at,
-      label: h.from_status ? reservationStatus[h.to_status].label : `Created (${reservationStatus[h.to_status].label.toLowerCase()})`,
-      by: h.changer?.full_name,
-      note: h.reason ?? undefined,
-    }));
+  const history: HistoryEntry[] = historyRows.map((h) => ({
+    at: h.created_at,
+    label: h.from_status ? reservationStatus[h.to_status].label : `Created (${reservationStatus[h.to_status].label.toLowerCase()})`,
+    by: h.changer ?? undefined,
+    note: h.reason ?? undefined,
+  }));
   for (const p of payments.filter((p) => p.status === "successful" && p.paidAt)) {
     history.push({ at: p.paidAt!, label: `Payment received: ${formatNaira(p.amountKobo)}`, by: p.recordedBy, note: p.provider === "paystack" ? "Verified with Paystack" : undefined });
   }
@@ -185,16 +188,23 @@ export async function getReservation(id: string): Promise<(ReservationDetail & {
   return {
     ...toRow(r),
     categoryId: r.category_id,
-    guestId: r.guest_full.id,
-    maxGuests: r.cat_full.max_occupancy,
+    guestId: r.guest_id,
+    maxGuests: r.max_occupancy,
     roomId: r.room_id ?? undefined,
-    guestEmail: r.guest_full.email ?? undefined,
+    guestEmail: r.guest_email ?? undefined,
     nightlyRateKobo: r.nightly_rate_kobo,
     nights: r.nights,
     specialRequests: r.special_requests ?? undefined,
     createdAt: r.created_at,
-    createdBy: r.creator?.full_name,
+    createdBy: r.creator ?? undefined,
     payments,
     history,
   };
+}
+
+/** Which reservation a receipt number belongs to. */
+export async function reservationIdForReceipt(receiptNumber: string): Promise<string | null> {
+  await authorize();
+  const row = await first<{ reservation_id: string }>(await getDb(), "SELECT reservation_id FROM payments WHERE receipt_number = ?", receiptNumber);
+  return row?.reservation_id ?? null;
 }

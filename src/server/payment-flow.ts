@@ -1,14 +1,14 @@
 import "server-only";
 import { logger } from "@/lib/logger";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { AppError } from "@/lib/errors";
+import { first, getDb } from "./db";
+import { applyPaystackResult, type SettleOutcome as DbOutcome } from "./domain/payments";
 import { after } from "next/server";
 import { alert } from "@/lib/alert";
 import { deliverEmails } from "./notifications";
 import { PaystackNotFoundError, verifyTransaction, type VerifiedTransaction } from "./paystack";
 
-export type SettleOutcome =
-  | "confirmed" | "part_paid" | "paid_unavailable" | "paid_closed" | "already_settled" | "already_processed"
-  | "amount_mismatch" | "already_flagged" | "overpaid" | "failed" | "abandoned" | "still_pending" | "unknown_reference";
+export type SettleOutcome = DbOutcome | "unknown_reference";
 
 /**
  * The one path by which a Paystack payment affects a booking. Used by both the
@@ -33,26 +33,27 @@ export async function settlePaystackReference(reference: string, trigger: "callb
     return "unknown_reference";
   }
 
-  const db = createAdminClient();
-  const { data, error } = await db.rpc("apply_paystack_result", {
-    p_reference: reference,
-    p_status: tx.status,
-    p_amount_kobo: tx.amountKobo,
-    p_currency: tx.currency,
-    p_paid_at: tx.paidAt ?? new Date().toISOString(),
-    p_channel: tx.channel ?? "",
-    p_gateway_response: tx.gatewayResponse ?? "",
-  });
-  if (error) {
-    if (error.hint === "NOT_FOUND") return "unknown_reference";
-    throw new Error("Could not apply Paystack result", { cause: error });
+  const db = await getDb();
+  let outcome: SettleOutcome;
+  try {
+    outcome = await applyPaystackResult(db, {
+      reference,
+      status: tx.status,
+      amountKobo: tx.amountKobo,
+      currency: tx.currency,
+      paidAt: tx.paidAt ?? new Date().toISOString(),
+      channel: tx.channel ?? null,
+      gatewayResponse: tx.gatewayResponse ?? null,
+    });
+  } catch (err) {
+    if (err instanceof AppError && err.code === "NOT_FOUND") return "unknown_reference";
+    throw new Error("Could not apply Paystack result", { cause: err });
   }
-  const outcome = data as SettleOutcome;
   logger.info("payment.settled", { reference, trigger, paystackStatus: tx.status, outcome });
 
   // The confirmation email was queued in the same transaction; send it after responding.
   if (outcome === "confirmed") {
-    const { data: p } = await db.from("payments").select("reservation_id").eq("provider", "paystack").eq("provider_reference", reference).single();
+    const p = await first<{ reservation_id: string }>(db, "SELECT reservation_id FROM payments WHERE provider = 'paystack' AND provider_reference = ?", reference);
     after(() => deliverEmails({ reservationId: p?.reservation_id }));
   }
 

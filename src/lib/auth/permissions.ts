@@ -2,10 +2,9 @@ import type { StaffRole } from "@/domain/status";
 
 /**
  * What each role may do. Deliberately small: three roles, a flat list of
- * capabilities. The database enforces the same rules through RLS and the
- * business functions (see supabase/migrations/*access_control*); this matrix
- * decides what the app offers and gives a clear error before the database
- * would refuse.
+ * capabilities. The data layer enforces the same rules again in every
+ * business function (requireRole in src/server/domain/*); this matrix decides
+ * what the app offers and gives a clear error first.
  *
  * Future departments (finance, restaurant, housekeeping) add roles to the
  * staff_role enum and rows here; nothing else needs to change.

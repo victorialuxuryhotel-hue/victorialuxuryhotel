@@ -1,46 +1,51 @@
 import "server-only";
 import type { GuestRow } from "@/domain/views";
-import { createClient } from "@/lib/supabase/server";
+import { authorize } from "../auth";
+import { all, first, getDb } from "../db";
 import { cleanSearch } from "../db-errors";
-import { listReservations, netPaid } from "./reservations";
+import { listReservations } from "./reservations";
 
-type G = {
-  id: string; full_name: string; email: string | null; phone: string | null; notes: string | null;
-  reservations: Array<{ status: string; check_in: string; payments: Array<{ amount_kobo: number; kind: "payment" | "refund"; status: string }> }>;
-};
+type G = { id: string; full_name: string; email: string | null; phone: string | null; notes: string | null; stays: number; last_stay: string | null; total_paid: number };
+
+const COLUMNS = `g.id, g.full_name, g.email, g.phone, g.notes,
+  (SELECT count(*) FROM reservations r WHERE r.guest_id = g.id AND r.status IN ('checked_in', 'checked_out')) AS stays,
+  (SELECT max(r.check_in) FROM reservations r WHERE r.guest_id = g.id AND r.status IN ('checked_in', 'checked_out')) AS last_stay,
+  (SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
+     FROM payments p JOIN reservations r ON r.id = p.reservation_id
+     WHERE r.guest_id = g.id AND p.status = 'successful') AS total_paid`;
 
 function toGuest(g: G): GuestRow & { notes?: string } {
-  const stays = g.reservations.filter((r) => ["checked_in", "checked_out"].includes(r.status));
   return {
     id: g.id,
     name: g.full_name,
     email: g.email ?? undefined,
     phone: g.phone ?? undefined,
     notes: g.notes ?? undefined,
-    stays: stays.length,
-    lastStay: stays.map((s) => s.check_in).sort().at(-1),
-    totalPaidKobo: g.reservations.reduce((sum, r) => sum + netPaid(r.payments), 0),
+    stays: g.stays,
+    lastStay: g.last_stay ?? undefined,
+    totalPaidKobo: g.total_paid,
   };
 }
 
-const select = "id, full_name, email, phone, notes, reservations(status, check_in, payments(amount_kobo, kind, status))";
-
 export async function listGuests(q?: string, page = 1, size = 50): Promise<GuestRow[]> {
-  const supabase = await createClient();
-  const from = (page - 1) * size;
-  let query = supabase.from("guests").select(select).order("updated_at", { ascending: false }).order("id").range(from, from + size);
+  await authorize();
   const term = cleanSearch(q);
-  if (term) query = query.or(`full_name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`);
-  const { data, error } = await query;
-  if (error) throw new Error("Could not load guests", { cause: error });
-  return (data as unknown as G[]).map(toGuest);
+  const like = `%${term}%`;
+  const rows = await all<G>(
+    await getDb(),
+    `SELECT ${COLUMNS} FROM guests g
+     ${term ? "WHERE g.full_name LIKE ?1 OR g.phone LIKE ?1 OR g.email LIKE ?1" : "WHERE ?1 IS NOT NULL"}
+     ORDER BY g.updated_at DESC, g.id LIMIT ?2 OFFSET ?3`,
+    like,
+    size + 1,
+    (page - 1) * size,
+  );
+  return rows.map(toGuest);
 }
 
 export async function getGuest(id: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("guests").select(select).eq("id", id).maybeSingle();
-  if (error) throw new Error("Could not load guest", { cause: error });
-  if (!data) return null;
-  const guest = toGuest(data as unknown as G);
-  return { guest, stays: await listReservations({ tab: "all", guestId: id, pageSize: 500 }) };
+  await authorize();
+  const g = await first<G>(await getDb(), `SELECT ${COLUMNS} FROM guests g WHERE g.id = ?`, id);
+  if (!g) return null;
+  return { guest: toGuest(g), stays: await listReservations({ tab: "all", guestId: id, pageSize: 500 }) };
 }

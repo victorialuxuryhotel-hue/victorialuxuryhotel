@@ -5,9 +5,10 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { createClient } from "@/lib/supabase/server";
-import { authorize } from "./auth";
-import { throwDbError } from "./db-errors";
+import { actorOf, authorize } from "./auth";
+import { getDb } from "./db";
+import { createRoom as addRoom, saveCategory as save } from "./domain/admin";
+import { updateRoomStatus as setRoomStatus } from "./domain/reservations";
 
 async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResult<T>> {
   try {
@@ -28,12 +29,9 @@ const statusSchema = z.object({
 /** Readiness and maintenance: any staff member, via the audited database function. */
 export async function updateRoomStatus(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return run("room.status", async () => {
-    await authorize("rooms.status");
+    const staff = await authorize("rooms.status");
     const v = statusSchema.parse(Object.fromEntries([...formData.entries()].filter(([, val]) => val !== "")));
-    const { error } = await (await createClient()).rpc("update_room_status", {
-      p_room_id: v.roomId, p_readiness: v.readiness, p_service_status: v.serviceStatus, p_note: v.note,
-    });
-    if (error) throwDbError(error);
+    await setRoomStatus(await getDb(), actorOf(staff), { roomId: v.roomId, readiness: v.readiness, serviceStatus: v.serviceStatus, note: v.note ?? null });
     refresh();
   });
 }
@@ -46,15 +44,11 @@ const roomSchema = z.object({
 
 export async function createRoom(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return run("room.create", async () => {
-    await authorize("rooms.configure");
+    const staff = await authorize("rooms.configure");
     const parsed = roomSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) throw new AppError("VALIDATION", "Check the highlighted fields", { fieldErrors: z.flattenError(parsed.error).fieldErrors });
     const v = parsed.data;
-    const { error } = await (await createClient()).from("rooms").insert({ room_number: v.roomNumber, category_id: v.categoryId, floor: v.floor || null });
-    if (error) {
-      if (error.code === "23505") throw new AppError("CONFLICT", `Room ${v.roomNumber} already exists.`);
-      throwDbError(error);
-    }
+    await addRoom(await getDb(), actorOf(staff), { roomNumber: v.roomNumber, categoryId: v.categoryId, floor: v.floor || null });
     refresh();
   });
 }
@@ -75,28 +69,23 @@ const categorySchema = z.object({
 /** Create or update a room category. Rates are entered in naira and stored in kobo. */
 export async function saveCategory(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const result = await run("category.save", async () => {
-    await authorize("categories.manage");
+    const staff = await authorize("categories.manage");
     const raw = Object.fromEntries(formData);
     const parsed = categorySchema.safeParse({ ...raw, id: raw.id || undefined });
     if (!parsed.success) throw new AppError("VALIDATION", "Check the highlighted fields", { fieldErrors: z.flattenError(parsed.error).fieldErrors });
     const v = parsed.data;
-    const row = {
+    await save(await getDb(), actorOf(staff), {
+      id: v.id,
       name: v.name,
       slug: v.slug,
-      short_description: v.shortDescription || null,
+      shortDescription: v.shortDescription || null,
       description: v.description || null,
       amenities: v.amenities.split("\n").map((a) => a.trim()).filter(Boolean).slice(0, 30),
-      nightly_rate_kobo: Math.round(v.nightlyRate * 100),
-      max_occupancy: v.maxOccupancy,
-      sort_order: v.sortOrder,
-      is_active: v.isActive === "on",
-    };
-    const supabase = await createClient();
-    const { error } = v.id ? await supabase.from("room_categories").update(row).eq("id", v.id) : await supabase.from("room_categories").insert(row);
-    if (error) {
-      if (error.code === "23505") throw new AppError("CONFLICT", "A category with this name or web address already exists.");
-      throwDbError(error);
-    }
+      nightlyRateKobo: Math.round(v.nightlyRate * 100),
+      maxOccupancy: v.maxOccupancy,
+      sortOrder: v.sortOrder,
+      isActive: v.isActive === "on",
+    });
     refresh();
   });
   if (result.ok) redirect("/app/rooms/categories");

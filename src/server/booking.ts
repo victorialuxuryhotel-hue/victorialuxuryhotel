@@ -4,9 +4,10 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AppError, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { publicEnv } from "@/lib/env";
-import { throwDbError } from "./db-errors";
+import { getDb } from "./db";
+import { beginPaystackPayment } from "./domain/payments";
+import { createWebsiteReservation } from "./domain/reservations";
 import { initializeTransaction } from "./paystack";
 import { enforceRateLimit, limits } from "./rate-limit";
 
@@ -41,19 +42,18 @@ export async function createWebsiteBooking(_prev: ActionResult | null, formData:
     // Holds take rooms off sale for a while: limit how many one visitor can create.
     await enforceRateLimit("hold", limits.holdsPerHour, 3600);
     const v = parsed.data;
-    const { data, error } = await createAdminClient().rpc("create_website_reservation", {
-      p_category_slug: v.category,
-      p_check_in: v.checkIn,
-      p_check_out: v.checkOut,
-      p_guests: v.guests,
-      p_full_name: v.fullName,
-      p_email: v.email,
-      p_phone: v.phone,
-      p_special_requests: v.specialRequests || undefined,
+    const held = await createWebsiteReservation(await getDb(), {
+      categorySlug: v.category,
+      checkIn: v.checkIn,
+      checkOut: v.checkOut,
+      guests: v.guests,
+      fullName: v.fullName,
+      email: v.email,
+      phone: v.phone,
+      specialRequests: v.specialRequests || null,
     });
-    if (error) throwDbError(error, "We couldn't complete your booking. Please try again or contact the hotel.");
-    token = data![0]!.public_token;
-    logger.info("booking.held", { reference: data![0]!.reference });
+    token = held.publicToken;
+    logger.info("booking.held", { reference: held.reference });
   } catch (err) {
     if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("booking.create_failed", err);
     return toActionError(err);
@@ -70,16 +70,13 @@ export async function startPayment(_prev: ActionResult | null, formData: FormDat
   try {
     const token = z.uuid().parse(formData.get("token"));
     await enforceRateLimit("payment", limits.paymentsPerHour, 3600);
-    const db = createAdminClient();
-    const { data, error } = await db.rpc("begin_paystack_payment", { p_public_token: token });
-    if (error) throwDbError(error, "We couldn't start the payment. Please try again.");
-    const attempt = data![0]!;
+    const attempt = await beginPaystackPayment(await getDb(), token);
     ({ authorizationUrl } = await initializeTransaction({
       email: attempt.email,
-      amountKobo: attempt.amount_kobo,
+      amountKobo: attempt.amountKobo,
       reference: attempt.reference,
       callbackUrl: `${publicEnv().NEXT_PUBLIC_SITE_URL}/api/paystack/callback`,
-      metadata: { reservation_reference: attempt.reservation_reference },
+      metadata: { reservation_reference: attempt.reservationReference },
     }));
   } catch (err) {
     if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("booking.payment_start_failed", err);

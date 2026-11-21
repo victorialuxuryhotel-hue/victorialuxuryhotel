@@ -1,6 +1,6 @@
 import { AppError } from "@/lib/errors";
 import { dbErrorToken } from "../db-errors";
-import { activity, all, first, MANAGERS, OWNER, requireRole, uuid, writeBatch, type Actor, type Db, type StaffRole } from "../db";
+import { all, first, MANAGERS, OWNER, requireRole, uuid, writeBatch, type Actor, type Db, type StaffRole } from "../db";
 
 /**
  * Configuration: room types, rooms, photos, booking rules and staff.
@@ -250,4 +250,3 @@ export async function linkClerkUser(db: Db, clerkUserId: string, email: string):
   return first<StaffRecord>(db, "SELECT id, clerk_user_id, full_name, email, role, is_active FROM staff_profiles WHERE clerk_user_id = ?", clerkUserId);
 }
 
-export { activity };

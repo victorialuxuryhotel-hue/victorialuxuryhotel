@@ -4,8 +4,9 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { createClient } from "@/lib/supabase/server";
-import { authorize } from "./auth";
+import { actorOf, authorize } from "./auth";
+import { getDb } from "./db";
+import { updateBookingRules as save } from "./domain/admin";
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:00)?$/, "Use a time like 14:00");
 
@@ -19,25 +20,13 @@ const schema = z.object({
 
 export async function updateBookingRules(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
-    await authorize("settings.manage");
+    const staff = await authorize("settings.manage");
     const parsed = schema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) {
       throw new AppError("VALIDATION", "Check the highlighted fields", { fieldErrors: z.flattenError(parsed.error).fieldErrors });
     }
     const v = parsed.data;
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("hotel_settings")
-      .update({
-        check_in_time: v.checkInTime,
-        check_out_time: v.checkOutTime,
-        website_hold_minutes: v.websiteHoldMinutes,
-        staff_hold_hours: v.staffHoldHours,
-        cancellation_policy: v.cancellationPolicy,
-      })
-      .eq("id", true)
-      .select("id");
-    if (error || !data?.length) throw new AppError("INTERNAL", "Could not save the booking rules.", { cause: error });
+    await save(await getDb(), actorOf(staff), v);
     refresh();
     return ok(undefined);
   } catch (err) {

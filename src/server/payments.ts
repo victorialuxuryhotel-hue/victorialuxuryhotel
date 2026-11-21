@@ -6,9 +6,9 @@ import { after } from "next/server";
 import { z } from "zod";
 import { AppError, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { createClient } from "@/lib/supabase/server";
-import { authorize } from "./auth";
-import { throwDbError } from "./db-errors";
+import { actorOf, authorize } from "./auth";
+import { getDb } from "./db";
+import { recordOfflinePayment as record } from "./domain/payments";
 import { deliverEmails } from "./notifications";
 
 const schema = z.object({
@@ -28,23 +28,21 @@ const schema = z.object({
 export async function recordOfflinePayment(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   let target: string;
   try {
-    await authorize("payments.record");
+    const staff = await authorize("payments.record");
     const parsed = schema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) throw new AppError("VALIDATION", "Check the highlighted fields", { fieldErrors: z.flattenError(parsed.error).fieldErrors });
     const v = parsed.data;
     const amountKobo = Math.round(v.amount * 100);
-    const { data, error } = await (await createClient()).rpc("record_offline_payment", {
-      p_reservation_id: v.reservationId, p_amount_kobo: amountKobo, p_method: v.method, p_reference: v.reference ?? "",
-      p_paid_on: v.paidOn, p_notes: v.notes ?? "", p_confirm_received: true,
+    const row = await record(await getDb(), actorOf(staff), {
+      reservationId: v.reservationId, amountKobo, method: v.method, reference: v.reference ?? null,
+      paidOn: v.paidOn, notes: v.notes ?? null, confirmReceived: true,
     });
-    if (error) throwDbError(error);
-    const row = data![0]!;
 
     // Emails were queued in the same transaction; send them after responding.
     after(() => deliverEmails({ reservationId: v.reservationId }));
 
     refresh();
-    target = `/app/reservations/${v.reservationId}?paid=${encodeURIComponent(row.receipt_number)}`;
+    target = `/app/reservations/${v.reservationId}?paid=${encodeURIComponent(row.receiptNumber)}`;
   } catch (err) {
     if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("payment.record_failed", err);
     return toActionError(err);
