@@ -15,8 +15,7 @@ the Worker.
 | --- | --- |
 | Pages, server actions, API routes (webhook, callback, health) | The Worker (`worker.ts` → `.open-next/worker.js`) |
 | Static files (JS, CSS, fonts, logo) | Workers static assets |
-| Next.js cache | R2 bucket `victoria-hotel-opennext-cache` |
-| Cache tags | D1 database `victoria-hotel-tag-cache` |
+| Prerendered page shells | Read-only cache in the Worker's static assets (no R2 or D1 needed) |
 | Image resizing (`next/image`) | Cloudflare Images binding |
 | Housekeeping every 10 minutes | Cron Trigger → `/api/cron/expire-reservations` (in `wrangler.jsonc`) |
 | Data, auth, photos | Supabase (production project) |
@@ -43,16 +42,11 @@ the Worker.
      --email owner@hotel.com --name "Full Name" --role owner
    ```
 
-## 2. Cloudflare resources (once)
+## 2. Cloudflare resources
 
-```bash
-pnpm exec wrangler login
-pnpm exec wrangler r2 bucket create victoria-hotel-opennext-cache
-pnpm exec wrangler d1 create victoria-hotel-tag-cache   # copy the database_id
-```
-
-Paste the D1 `database_id` into `wrangler.jsonc` (replace
-`REPLACE_WITH_D1_DATABASE_ID`) and commit it. It is an identifier, not a secret.
+None to create by hand. The Worker, its static assets, the Images binding and
+the Cron Trigger are all created by the first deploy from `wrangler.jsonc`.
+R2 does not need to be enabled on the account (see "Caching" below).
 
 ## 3. Connect the repository (Workers Builds)
 
@@ -134,6 +128,24 @@ before deploying.
 - **Public pages read room types and photos per request** (not Next's data
   cache), so staff changes show on the next page view and no cache
   regeneration is needed.
+- **Caching.** The only cached output is what `next build` prerenders, served
+  read-only from static assets (`open-next.config.ts`). This works because the
+  app uses no `"use cache"`, `revalidatePath`/`revalidateTag` or ISR.
+
+### If caching is added later
+
+If any of those are introduced, a read-only cache will silently serve stale
+pages. Switch to a writable cache first:
+
+1. Enable R2 on the account, then create the storage:
+   ```bash
+   pnpm exec wrangler r2 bucket create victoria-hotel-opennext-cache
+   pnpm exec wrangler d1 create victoria-hotel-tag-cache   # copy the database_id
+   ```
+2. In `open-next.config.ts`, use `r2IncrementalCache`, `d1NextTagCache` and
+   `memoryQueue` (from `@opennextjs/cloudflare/overrides/...`).
+3. Add the `r2_buckets` (`NEXT_INC_CACHE_R2_BUCKET`) and `d1_databases`
+   (`NEXT_TAG_CACHE_D1`) bindings to `wrangler.jsonc`.
 - **The session proxy (`src/proxy.ts`) uses OpenNext's Node middleware support,
   which OpenNext marks experimental.** Sign-in, session refresh and role access
   are covered by the browser tests run against the Cloudflare preview.

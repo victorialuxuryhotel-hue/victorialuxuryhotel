@@ -1,7 +1,7 @@
 {
   // Cloudflare Worker for the Victoria Luxury Hotel app (built with OpenNext).
-  // Before the first deploy, create the R2 bucket and D1 database named below
-  // and paste the D1 database_id: see docs/deployment-cloudflare.md.
+  // Pages are served with a read-only cache from static assets (see
+  // open-next.config.ts), so no R2 bucket or D1 database is needed.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "victoria-hotel",
   "main": "worker.ts",
@@ -14,16 +14,6 @@
   "services": [
     // Self-reference used by OpenNext for cache revalidation.
     { "binding": "WORKER_SELF_REFERENCE", "service": "victoria-hotel" }
-  ],
-  "r2_buckets": [
-    { "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "victoria-hotel-opennext-cache" }
-  ],
-  "d1_databases": [
-    {
-      "binding": "NEXT_TAG_CACHE_D1",
-      "database_name": "victoria-hotel-tag-cache",
-      "database_id": "862f16f1-c114-47cb-bdcf-7ec034693634"
-    }
   ],
   // next/image optimization via Cloudflare Images.
   "images": { "binding": "IMAGES" },
