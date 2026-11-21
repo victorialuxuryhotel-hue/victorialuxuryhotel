@@ -1,17 +1,20 @@
 import "server-only";
 import type { ManagedPhoto } from "@/components/management/photo-manager";
-import { publicImageUrl, SITE_IMAGES } from "@/lib/supabase/public";
-import { createClient } from "@/lib/supabase/server";
+import { mediaUrl } from "@/lib/media";
+import { authorize } from "../auth";
+import { all, getDb } from "../db";
 
-/** Website photos for the management screen (read as the signed-in manager). */
+/** Website photos for the management screen. */
 export async function listSitePhotos(): Promise<{ bySlot: Record<string, ManagedPhoto>; gallery: ManagedPhoto[] }> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("site_photos").select("id, slot, gallery_group, storage_path, alt_text, sort_order").order("sort_order");
-  if (error) throw new Error("Could not load website photos", { cause: error });
+  await authorize("categories.manage");
+  const rows = await all<{ id: string; slot: string; gallery_group: string | null; storage_path: string; alt_text: string }>(
+    await getDb(),
+    "SELECT id, slot, gallery_group, storage_path, alt_text FROM site_photos ORDER BY sort_order, created_at",
+  );
   const bySlot: Record<string, ManagedPhoto> = {};
   const gallery: ManagedPhoto[] = [];
-  for (const p of data) {
-    const photo = { id: p.id, url: publicImageUrl(SITE_IMAGES, p.storage_path), alt: p.alt_text, group: p.gallery_group ?? undefined };
+  for (const p of rows) {
+    const photo = { id: p.id, url: mediaUrl(p.storage_path), alt: p.alt_text, group: p.gallery_group ?? undefined };
     if (p.slot === "gallery") gallery.push(photo);
     else bySlot[p.slot] = photo;
   }

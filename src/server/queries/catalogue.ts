@@ -1,17 +1,16 @@
 import "server-only";
 import { cache } from "react";
-import { createPublicClient, publicImageUrl, ROOM_IMAGES, SITE_IMAGES } from "@/lib/supabase/public";
+import { mediaUrl } from "@/lib/media";
+import { all, getDb } from "../db";
 
 /**
  * Public catalogue: what website visitors see about room types and photos.
  *
  * Read from the database on each request (de-duplicated within a request with
- * React cache). Deliberately not stored in Next's data cache: on Cloudflare
- * Workers, regenerating cached pages after an invalidation is unreliable, and
- * a per-request read means staff changes appear on the very next page view.
- * At a single hotel's traffic the extra query is negligible. Rates shown here
- * are "from" prices only; the price of a stay always comes from live
- * availability.
+ * React cache). Deliberately not stored in Next's data cache, so staff changes
+ * appear on the very next page view and the Worker needs no writable cache.
+ * Rates shown here are "from" prices only; the price of a stay always comes
+ * from live availability.
  */
 
 export type PublicPhoto = { image: string; alt: string };
@@ -28,24 +27,29 @@ export type PublicCategory = {
 };
 
 export const getPublicCategories = cache(async (): Promise<PublicCategory[]> => {
-  const { data, error } = await createPublicClient()
-    .from("room_categories")
-    .select("slug, name, short_description, description, amenities, max_occupancy, nightly_rate_kobo, sort_order, room_category_images(storage_path, alt_text, sort_order, is_cover)")
-    .eq("is_active", true)
-    .order("sort_order")
-    .order("nightly_rate_kobo");
-  if (error) throw new Error("Could not load room types", { cause: error });
-  return data.map((c) => ({
+  const db = await getDb();
+  const [categories, photos] = await Promise.all([
+    all<{ id: string; slug: string; name: string; short_description: string | null; description: string | null; amenities: string; max_occupancy: number; nightly_rate_kobo: number }>(
+      db,
+      `SELECT id, slug, name, short_description, description, amenities, max_occupancy, nightly_rate_kobo
+       FROM room_categories WHERE is_active = 1 ORDER BY sort_order, nightly_rate_kobo`,
+    ),
+    all<{ category_id: string; storage_path: string; alt_text: string }>(
+      db,
+      `SELECT i.category_id, i.storage_path, i.alt_text FROM room_category_images i
+       JOIN room_categories c ON c.id = i.category_id AND c.is_active = 1
+       ORDER BY i.is_cover DESC, i.sort_order, i.created_at`,
+    ),
+  ]);
+  return categories.map((c) => ({
     slug: c.slug,
     name: c.name,
     summary: c.short_description ?? "",
     description: c.description ?? "",
-    amenities: c.amenities,
+    amenities: JSON.parse(c.amenities) as string[],
     maxOccupancy: c.max_occupancy,
     fromRateKobo: c.nightly_rate_kobo,
-    photos: [...c.room_category_images]
-      .sort((a, b) => Number(b.is_cover) - Number(a.is_cover) || a.sort_order - b.sort_order)
-      .map((p) => ({ image: publicImageUrl(ROOM_IMAGES, p.storage_path), alt: p.alt_text })),
+    photos: photos.filter((p) => p.category_id === c.id).map((p) => ({ image: mediaUrl(p.storage_path), alt: p.alt_text })),
   }));
 });
 
@@ -59,12 +63,14 @@ export type SitePhotos = {
 };
 
 export const getSitePhotos = cache(async (): Promise<SitePhotos> => {
-  const { data, error } = await createPublicClient().from("site_photos").select("slot, gallery_group, storage_path, alt_text, sort_order").order("sort_order");
-  if (error) throw new Error("Could not load website photos", { cause: error });
+  const rows = await all<{ slot: string; gallery_group: string | null; storage_path: string; alt_text: string }>(
+    await getDb(),
+    "SELECT slot, gallery_group, storage_path, alt_text FROM site_photos ORDER BY sort_order, created_at",
+  );
   const slots: SitePhotos["slots"] = {};
   const gallery: SitePhotos["gallery"] = [];
-  for (const p of data) {
-    const photo = { image: publicImageUrl(SITE_IMAGES, p.storage_path), alt: p.alt_text };
+  for (const p of rows) {
+    const photo = { image: mediaUrl(p.storage_path), alt: p.alt_text };
     if (p.slot === "gallery") gallery.push({ ...photo, group: p.gallery_group! });
     else slots[p.slot] = photo;
   }
