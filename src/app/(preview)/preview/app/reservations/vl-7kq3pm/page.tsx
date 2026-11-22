@@ -1,10 +1,24 @@
+import { Suspense } from "react";
 import { ReservationDetailView } from "@/components/management/reservation-detail";
 import { reservationDetail } from "../../../_sample";
 
-export default function Page() {
+type Props = { searchParams: Promise<{ paid?: string }> };
+
+/** ?paid=RCT-… shows the after-payment banner (with Share on WhatsApp). */
+export default function Page(props: Props) {
+  return (
+    <Suspense>
+      <Content {...props} />
+    </Suspense>
+  );
+}
+
+async function Content({ searchParams }: Props) {
+  const { paid } = await searchParams;
   return (
     <ReservationDetailView
-      r={reservationDetail}
+      r={{ ...reservationDetail, publicToken: "sample-token" }}
+      paidReceipt={paid}
       backHref="/preview/app/reservations"
       paymentsHref="/preview/app/payments/record"
       receiptHref={() => "/preview/app/payments/receipt"}

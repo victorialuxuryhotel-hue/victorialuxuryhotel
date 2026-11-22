@@ -41,6 +41,12 @@ export type PaymentRow = {
   paidAt?: string;
   receiptNumber?: string;
   recordedBy?: string;
+  /** "refund" rows on a reservation are corrections made by a manager. */
+  kind?: "payment" | "refund";
+  correctsPaymentId?: string;
+  /** For a payment: how much of it has been corrected so far. */
+  correctedKobo?: number;
+  notes?: string;
 };
 
 export type HistoryEntry = { at: string; label: string; by?: string; note?: string };

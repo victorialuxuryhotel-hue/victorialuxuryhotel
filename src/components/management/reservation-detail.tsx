@@ -6,7 +6,10 @@ import { Collapsible } from "@/components/ui/collapsible";
 import { FormMessage } from "@/components/ui/form";
 import { bookingSource, paymentMethod } from "@/domain/status";
 import type { ReservationDetail as Detail } from "@/domain/views";
+import { hotel } from "@/config/hotel";
+import { publicEnv } from "@/lib/env";
 import { formatDate, formatDateTime, formatNaira, plural } from "@/lib/format";
+import { whatsappLink } from "@/lib/whatsapp";
 import { PaidProgress, PaymentBadge, ReservationBadge } from "./badges";
 import {
   AssignRoomForm,
@@ -21,6 +24,7 @@ import {
   type RoomOption,
 } from "./reservation-actions";
 import { ActionFeedbackProvider } from "./action-feedback";
+import { CorrectPaymentForm } from "./payment-correction";
 import { NextStepBar } from "./reservation-guide";
 import { reservationSteps, StepList } from "./reservation-steps";
 
@@ -53,7 +57,7 @@ export function ReservationDetailView({
   justCreated,
   paidReceipt,
 }: {
-  r: Detail & { roomId?: string };
+  r: Detail & { roomId?: string; publicToken?: string };
   today: string;
   backHref: string;
   paymentsHref: string;
@@ -67,6 +71,16 @@ export function ReservationDetailView({
   paidReceipt?: string;
 }) {
   const balance = r.totalKobo - r.paidKobo;
+  // The guest's own receipt page, shareable on WhatsApp (no sign-in needed; the token is unguessable).
+  const receiptLink = r.publicToken ? `${publicEnv().NEXT_PUBLIC_SITE_URL}/book/confirmation/${r.publicToken}` : null;
+  const shareReceipt = (receipt: string) =>
+    receiptLink
+      ? whatsappLink(
+          r.guestPhone,
+          `Hello ${r.guestName.split(" ")[0]}, thank you for your payment to ${hotel.shortName}. Your receipt ${receipt} for booking ${r.reference}: ${receiptLink}`,
+        )
+      : null;
+  const receiptsById = new Map(r.payments.map((p) => [p.id, p.receiptNumber]));
   const open = r.status === "confirmed" || r.status === "pending_payment";
   const steps = reservationSteps(r, today);
   const checkInBlocker =
@@ -90,9 +104,20 @@ export function ReservationDetailView({
       {paidReceipt ? (
         <div className="mt-4">
           <FormMessage tone="success">
-            Payment recorded. Receipt {paidReceipt}.{" "}
+            Payment recorded. Receipt {paidReceipt}
+            {r.guestEmail ? <> emailed to <span className="break-all">{r.guestEmail}</span></> : null}.{" "}
             <Link href={receiptHref(paidReceipt)} className="font-medium underline">Print receipt</Link>
           </FormMessage>
+          {shareReceipt(paidReceipt) ? (
+            <a
+              href={shareReceipt(paidReceipt)!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonStyles({ variant: "secondary", className: "mt-2 w-full sm:w-auto" })}
+            >
+              Share on WhatsApp
+            </a>
+          ) : null}
         </div>
       ) : null}
 
@@ -200,14 +225,28 @@ export function ReservationDetailView({
             ) : (
               <ul className="divide-y divide-ivory-200">
                 {r.payments.map((p) => (
-                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-                    <div>
-                      <p className="font-medium tabular-nums text-ink-900">{formatNaira(p.amountKobo)}</p>
+                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-4">
+                    {p.kind === "refund" ? (
+                      <div className="min-w-0">
+                        <p className="font-medium tabular-nums text-ink-900">−{formatNaira(p.amountKobo)}</p>
+                        <p className="text-xs text-ink-500">
+                          Correction{p.correctsPaymentId && receiptsById.get(p.correctsPaymentId) ? ` to ${receiptsById.get(p.correctsPaymentId)}` : ""} by {p.recordedBy ?? "a manager"}
+                          {p.paidAt ? ` · ${formatDateTime(p.paidAt)}` : ""}
+                        </p>
+                        {p.notes ? <p className="mt-0.5 text-xs text-ink-700">{p.notes}</p> : null}
+                      </div>
+                    ) : (
+                    <div className="min-w-0">
+                      <p className="font-medium tabular-nums text-ink-900">
+                        {formatNaira(p.amountKobo)}
+                        {p.correctedKobo ? <span className="ml-2 text-xs font-normal text-ink-500">{formatNaira(p.correctedKobo)} corrected</span> : null}
+                      </p>
                       <p className="text-xs text-ink-500">
                         {paymentMethod[p.method]} · {p.provider === "paystack" ? "Paystack" : `Recorded by ${p.recordedBy ?? "staff"}`}
                         {p.paidAt ? ` · ${formatDateTime(p.paidAt)}` : ""}
                       </p>
                     </div>
+                    )}
                     <div className="flex items-center gap-3">
                       <PaymentBadge status={p.status} />
                       {p.receiptNumber ? (
@@ -216,6 +255,14 @@ export function ReservationDetailView({
                         </Link>
                       ) : null}
                     </div>
+                    {canOverride && p.kind !== "refund" && p.status === "successful" && p.amountKobo - (p.correctedKobo ?? 0) > 0 ? (
+                      <CorrectPaymentForm
+                        paymentId={p.id}
+                        reservationId={r.id}
+                        receiptNumber={p.receiptNumber}
+                        correctableKobo={p.amountKobo - (p.correctedKobo ?? 0)}
+                      />
+                    ) : null}
                   </li>
                 ))}
               </ul>

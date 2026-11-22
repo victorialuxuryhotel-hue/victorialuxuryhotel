@@ -130,17 +130,19 @@ export async function movements(day?: string) {
   return { today: d, arrivals: arrivals.map(toRow), departures: departures.map(toRow), inHouse: inHouse.map(toRow) };
 }
 
-export async function getReservation(id: string): Promise<(ReservationDetail & { categoryId: string; roomId?: string; guestId: string; maxGuests: number }) | null> {
+export async function getReservation(
+  id: string,
+): Promise<(ReservationDetail & { categoryId: string; roomId?: string; guestId: string; maxGuests: number; publicToken: string }) | null> {
   await authorize();
   const db = await getDb();
   const r = await first<
     ListRow & {
       category_id: string; room_id: string | null; guest_id: string; nightly_rate_kobo: number; nights: number; special_requests: string | null;
-      created_at: string; guest_email: string | null; max_occupancy: number; creator: string | null;
+      created_at: string; guest_email: string | null; max_occupancy: number; creator: string | null; public_token: string;
     }
   >(
     db,
-    `SELECT ${LIST_COLUMNS}, r.category_id, r.room_id, r.guest_id, r.nightly_rate_kobo, r.nights, r.special_requests, r.created_at,
+    `SELECT ${LIST_COLUMNS}, r.category_id, r.room_id, r.guest_id, r.nightly_rate_kobo, r.nights, r.special_requests, r.created_at, r.public_token,
             g.email AS guest_email, c.max_occupancy, s.full_name AS creator
      ${LIST_FROM} LEFT JOIN staff_profiles s ON s.id = r.created_by
      WHERE r.id = ?`,
@@ -152,9 +154,12 @@ export async function getReservation(id: string): Promise<(ReservationDetail & {
     all<{
       id: string; amount_kobo: number; method: string | null; provider: "paystack" | "offline"; provider_reference: string | null;
       status: PaymentRow["status"]; paid_at: string | null; receipt_number: string | null; recorder: string | null;
+      kind: "payment" | "refund"; corrects_payment_id: string | null; notes: string | null; corrected_kobo: number;
     }>(
       db,
-      `SELECT p.id, p.amount_kobo, p.method, p.provider, p.provider_reference, p.status, p.paid_at, p.receipt_number, s.full_name AS recorder
+      `SELECT p.id, p.amount_kobo, p.method, p.provider, p.provider_reference, p.status, p.paid_at, p.receipt_number, s.full_name AS recorder,
+              p.kind, p.corrects_payment_id, p.notes,
+              (SELECT coalesce(sum(c.amount_kobo), 0) FROM payments c WHERE c.corrects_payment_id = p.id AND c.status = 'successful') AS corrected_kobo
        FROM payments p LEFT JOIN staff_profiles s ON s.id = p.recorded_by
        WHERE p.reservation_id = ? ORDER BY coalesce(p.paid_at, ''), p.created_at`,
       id,
@@ -172,6 +177,7 @@ export async function getReservation(id: string): Promise<(ReservationDetail & {
     id: p.id, reservationReference: r.reference, guestName: r.guest_name, amountKobo: p.amount_kobo,
     method: (p.method ?? "other") as PaymentRow["method"], provider: p.provider, providerReference: p.provider_reference ?? undefined,
     status: p.status, paidAt: p.paid_at ?? undefined, receiptNumber: p.receipt_number ?? undefined, recordedBy: p.recorder ?? undefined,
+    kind: p.kind, correctsPaymentId: p.corrects_payment_id ?? undefined, correctedKobo: p.corrected_kobo, notes: p.notes ?? undefined,
   }));
 
   const history: HistoryEntry[] = historyRows.map((h) => ({
@@ -181,7 +187,11 @@ export async function getReservation(id: string): Promise<(ReservationDetail & {
     note: h.reason ?? undefined,
   }));
   for (const p of payments.filter((p) => p.status === "successful" && p.paidAt)) {
-    history.push({ at: p.paidAt!, label: `Payment received: ${formatNaira(p.amountKobo)}`, by: p.recordedBy, note: p.provider === "paystack" ? "Verified with Paystack" : undefined });
+    history.push(
+      p.kind === "refund"
+        ? { at: p.paidAt!, label: `Payment corrected: −${formatNaira(p.amountKobo)}`, by: p.recordedBy, note: p.notes }
+        : { at: p.paidAt!, label: `Payment received: ${formatNaira(p.amountKobo)}`, by: p.recordedBy, note: p.provider === "paystack" ? "Verified with Paystack" : undefined },
+    );
   }
   history.sort((a, b) => a.at.localeCompare(b.at));
 
@@ -197,6 +207,7 @@ export async function getReservation(id: string): Promise<(ReservationDetail & {
     specialRequests: r.special_requests ?? undefined,
     createdAt: r.created_at,
     createdBy: r.creator ?? undefined,
+    publicToken: r.public_token,
     payments,
     history,
   };
