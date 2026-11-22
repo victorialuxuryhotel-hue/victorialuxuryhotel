@@ -30,10 +30,10 @@ async function HomePageContent() {
           <h1 className="mt-4 max-w-3xl font-display text-[2.375rem] leading-[1.04] text-balance sm:mt-5 sm:text-7xl sm:leading-[1.02]">{home.title}</h1>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-ivory-200/80 sm:mt-6 sm:text-lg">{home.intro}</p>
           <div className="mt-9 hidden flex-wrap gap-3 sm:flex">
-            <Link href="/rooms" className={buttonStyles({ variant: "accent", size: "lg" })}>
+            <Link href="/rooms" className={buttonStyles({ variant: "accent", size: "lg", className: "border-gold-400 text-gold-200 hover:bg-gold-400/15" })}>
               Explore rooms
             </Link>
-            <Link href="/facilities" className={buttonStyles({ variant: "secondary", size: "lg", className: "border-white/25 bg-white/5 text-white hover:bg-white/15" })}>
+            <Link href="/facilities" className={buttonStyles({ variant: "secondary", size: "lg", className: "border-white/40 text-white hover:bg-ivory-50/12" })}>
               See facilities
             </Link>
           </div>
@@ -41,7 +41,7 @@ async function HomePageContent() {
       </section>
 
       {/* Phones: the search sits below the hero (not over it). Larger screens: it floats over the hero's edge. */}
-      <div className="border-b border-ivory-200 bg-ivory-50 py-4 sm:border-0 sm:bg-transparent sm:py-0">
+      <div className="border-b border-hairline bg-ivory-50 py-4 sm:border-0 sm:bg-transparent sm:py-0">
         <Container className="relative z-10 sm:-mt-12">
           <BookingBar />
         </Container>
@@ -52,7 +52,7 @@ async function HomePageContent() {
         <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-20">
           <div className="relative">
             <Photo photo={sitePhoto(photos, "welcome", { alt: "Hotel interior" })} className="aspect-[4/3] rounded-card sm:aspect-[4/5]" />
-            <div className="absolute -bottom-6 left-6 max-w-56 rounded-card bg-white px-6 py-5 shadow-card sm:left-auto sm:-right-6">
+            <div className="absolute -bottom-6 left-6 max-w-56 rounded-card bg-ivory-50 px-6 py-5 shadow-card sm:left-auto sm:-right-6">
               <p className="font-display text-2xl leading-tight text-navy-900">Kings & queens</p>
               <p className="mt-1 text-sm text-ink-600">That&apos;s how we treat every guest.</p>
             </div>
@@ -63,7 +63,7 @@ async function HomePageContent() {
               title="Rest, recharge and feel looked after"
               intro="Whether you're here for a meeting, a weekend or a month, everything you need is under one roof, with a team that takes care of the details."
             />
-            <dl className="mt-10 grid grid-cols-2 gap-x-6 gap-y-6 border-t border-ivory-200 pt-8">
+            <dl className="mt-10 grid grid-cols-2 gap-x-6 gap-y-6 border-t border-hairline pt-8">
               {[
                 ["Indoor pool", "Exclusive to guests"],
                 ["In-house spa", "Heated room & body scrub"],
@@ -165,7 +165,7 @@ async function HomePageContent() {
 
       {/* Location */}
       <Section>
-        <div className="grid overflow-hidden rounded-card bg-white shadow-card lg:grid-cols-2">
+        <div className="grid overflow-hidden rounded-card bg-ivory-50 shadow-card lg:grid-cols-2">
           <div className="p-8 sm:p-12">
             <SectionHeading eyebrow="Location" title="Alagbaka GRA, Akure" />
             <p className="mt-6 flex gap-3 text-ink-700">

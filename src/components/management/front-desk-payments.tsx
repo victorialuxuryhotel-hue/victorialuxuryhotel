@@ -49,18 +49,18 @@ export function FrontDeskPayments({
       href={v === "today" ? basePath : `${basePath}?view=mine`}
       aria-current={view === v ? "page" : undefined}
       className={cn(
-        "flex min-h-13 flex-1 flex-col items-center justify-center rounded-md px-2 py-1.5 text-center",
-        view === v ? "bg-white text-navy-950 shadow-sm" : "text-ink-600 hover:text-ink-900",
+        "flex min-h-13 flex-1 flex-col items-center justify-center px-2 py-1.5 text-center",
+        view === v ? "text-navy-800 shadow-[inset_0_0_0_1px_var(--color-navy-800)]" : "text-ink-900 hover:bg-ink-900/7",
       )}
     >
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-sm">{label}</span>
       <span className="text-xs text-ink-500 tabular-nums">{count}</span>
     </Link>
   );
 
   return (
     <div className="space-y-5">
-      <nav aria-label="Which payments" className="flex gap-1 rounded-lg bg-ivory-200 p-1 sm:max-w-md">
+      <nav aria-label="Which payments" className="flex overflow-hidden rounded-md border border-hairline [&>*+*]:border-l [&>*+*]:border-hairline sm:max-w-md">
         {tab("today", "Today", `${summary.todayCount} ${summary.todayCount === 1 ? "payment" : "payments"} today`)}
         {tab("mine", "Recorded by me", `${summary.mineCount} all time`)}
       </nav>
@@ -68,9 +68,9 @@ export function FrontDeskPayments({
       {view === "today" ? (
         <Card>
           <CardHeader title="Today's takings" description="Money received today, after any corrections." />
-          <dl className="grid grid-cols-2 gap-px border-t border-ivory-200 bg-ivory-200 sm:grid-cols-3 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
+          <dl className="grid grid-cols-2 gap-px border-t border-hairline bg-hairline sm:grid-cols-3 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
             {takings.map(([label, kobo]) => (
-              <div key={label} className="bg-white px-4 py-3.5">
+              <div key={label} className="bg-ivory-50 px-4 py-3.5">
                 <dt className="text-xs text-ink-500">{label}</dt>
                 <dd className="mt-1 text-xl font-semibold tabular-nums text-ink-900">{formatNaira(kobo)}</dd>
               </div>
@@ -85,7 +85,7 @@ export function FrontDeskPayments({
             <EmptyState title={view === "today" ? "No payments yet today" : "You haven't recorded any payments"} />
           </div>
         ) : (
-          <ul className="divide-y divide-ivory-200">
+          <ul className="divide-y divide-hairline">
             {rows.map((p) => (
               <li key={p.id}>
                 <Link href={reservationHref(p)} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 px-4 py-3.5 hover:bg-ivory-50 sm:px-5">

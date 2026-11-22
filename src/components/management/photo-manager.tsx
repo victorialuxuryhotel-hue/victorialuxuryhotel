@@ -114,7 +114,7 @@ export function CategoryPhotoManager({ categoryId, photos }: { categoryId: strin
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {photos.map((p, i) => (
-            <li key={p.id} className="overflow-hidden rounded-md border border-ivory-200 bg-white">
+            <li key={p.id} className="overflow-hidden rounded-md border border-hairline bg-ivory-50">
               <div className="relative aspect-[4/3] bg-ivory-200">
                 <Image src={p.url} alt={p.alt} fill sizes="(min-width: 1280px) 20vw, 50vw" className="object-cover" />
                 {p.isCover ? <span className="absolute top-2 left-2 rounded-full bg-gold-400 px-2 py-0.5 text-xs font-semibold text-navy-950">Cover</span> : null}
@@ -160,7 +160,7 @@ export function SitePhotoSlot({
   photo?: ManagedPhoto;
 }) {
   return (
-    <div className="grid gap-5 border-b border-ivory-200 p-5 last:border-0 md:grid-cols-[16rem_1fr]">
+    <div className="grid gap-5 border-b border-hairline p-5 last:border-0 md:grid-cols-[16rem_1fr]">
       <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-ivory-200">
         {photo ? (
           <Image src={photo.url} alt={photo.alt} fill sizes="16rem" className="object-cover" />
@@ -215,7 +215,7 @@ export function GalleryManager({ photos, groups }: { photos: ManagedPhoto[]; gro
           </section>
         ) : null;
       })}
-      <div className="max-w-xl border-t border-ivory-200 pt-5">
+      <div className="max-w-xl border-t border-hairline pt-5">
         <UploadForm action={uploadSitePhoto} hidden={{ slot: "gallery" }} groups={groups} label="Add to gallery" />
       </div>
     </div>

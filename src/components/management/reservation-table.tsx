@@ -10,7 +10,7 @@ export function ReservationTable({ rows, hrefFor }: { rows: ReservationRow[]; hr
   return (
     <>
       {/* Cards on phones */}
-      <ul className="divide-y divide-ivory-200 md:hidden">
+      <ul className="divide-y divide-hairline md:hidden">
         {rows.map((r) => (
           <li key={r.id}>
             <Link href={hrefFor(r)} className="block px-4 py-4 hover:bg-ivory-50">

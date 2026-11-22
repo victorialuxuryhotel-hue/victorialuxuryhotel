@@ -47,7 +47,7 @@ export function RoomTile({
         {children}
       </button>
       {open === "left" || open === "right" ? (
-        <div className={cn("absolute top-full z-20 mt-1 w-60 rounded-card border border-ivory-200 bg-white p-3 shadow-lg", open === "left" ? "left-0" : "right-0")}>
+        <div className={cn("absolute top-full z-20 mt-1 w-60 rounded-card border border-hairline bg-ivory-50 p-3 shadow-lg", open === "left" ? "left-0" : "right-0")}>
           <p className="mb-2 text-xs font-semibold text-ink-500">Room {room.number}</p>
           {actions}
         </div>

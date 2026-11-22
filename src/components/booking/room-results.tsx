@@ -20,7 +20,7 @@ function OptionCard({ o, stay, selectHref }: { o: AvailabilityOption; stay: Stay
     <li
       className={cn(
         "grid overflow-hidden rounded-card sm:grid-cols-[minmax(0,16rem)_1fr]",
-        full ? "border-2 border-dashed border-ivory-300 bg-ivory-50" : "bg-white shadow-card",
+        full ? "border-2 border-dashed border-ivory-300 bg-ivory-50" : "bg-ivory-50 shadow-card",
       )}
     >
       <Photo photo={{ alt: o.name }} className={cn("aspect-video sm:aspect-auto sm:h-full", full && "opacity-60")} sizes="(min-width: 640px) 16rem, 100vw" />
@@ -57,7 +57,7 @@ function OptionCard({ o, stay, selectHref }: { o: AvailabilityOption; stay: Stay
 
 export function MoreThanOneRoom() {
   return (
-    <div className="rounded-card border border-ivory-200 bg-white p-5">
+    <div className="rounded-card border border-hairline bg-ivory-50 p-5">
       <p className="font-medium text-navy-950">Need more than one room? Call or WhatsApp us</p>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:flex">
         <a href={`tel:${hotel.phone}`} className={buttonStyles({ size: "md", className: "h-11.5" })}><Phone className="size-4" aria-hidden /> Call</a>
@@ -93,12 +93,12 @@ export function RoomResults({ options, stay, selectHref }: { options: Availabili
       {tooSmall.length ? (
         <>
           <MoreThanOneRoom />
-          <details className="group rounded-card border border-ivory-200 bg-white">
+          <details className="group rounded-card border border-hairline bg-ivory-50">
             <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 text-sm font-medium text-ink-800 [&::-webkit-details-marker]:hidden">
               Too small for {plural(stay.guests, "guest")} · {plural(tooSmall.length, "type")}
               <span aria-hidden className="text-ink-400 transition-transform group-open:rotate-45">+</span>
             </summary>
-            <ul className="divide-y divide-ivory-200 border-t border-ivory-200">
+            <ul className="divide-y divide-hairline border-t border-hairline">
               {tooSmall.map((o) => (
                 <li key={o.slug} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
                   <span className="text-ink-800">{o.name} <span className="text-ink-500">· sleeps {o.maxOccupancy}</span></span>

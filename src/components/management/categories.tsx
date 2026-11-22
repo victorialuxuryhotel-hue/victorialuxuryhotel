@@ -7,7 +7,7 @@ import { formatNaira } from "@/lib/format";
 export function CategoryTable({ rows, hrefFor }: { rows: CategoryRow[]; hrefFor: (c: CategoryRow) => string }) {
   return (
     <>
-      <ul className="divide-y divide-ivory-200 md:hidden">
+      <ul className="divide-y divide-hairline md:hidden">
         {rows.map((c) => (
           <li key={c.id}>
             <Link href={hrefFor(c)} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 px-4 py-3.5 hover:bg-ivory-50">

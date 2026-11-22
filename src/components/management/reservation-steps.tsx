@@ -41,7 +41,7 @@ export function StepList({ steps }: { steps: Step[] }) {
   // Only the first "now" step is the next step; later "now"s wait for it.
   const next = steps.findIndex((s) => s.state === "now");
   return (
-    <ol className="divide-y divide-ivory-200 rounded-card border border-ivory-200 bg-white" aria-label="Progress of this booking">
+    <ol className="divide-y divide-hairline rounded-card border border-hairline bg-ivory-50" aria-label="Progress of this booking">
       {steps.map((s, i) => {
         const state = s.state === "now" && i !== next ? "later" : s.state;
         return (

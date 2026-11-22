@@ -48,11 +48,11 @@ export function ReservationForm({ categories, today, holdHours }: { categories: 
               </Select>
             </Field>
           </div>
-          <fieldset className="border-t border-ivory-200 p-5">
+          <fieldset className="border-t border-hairline p-5">
             <legend className="mb-3 text-sm font-medium text-ink-700">Room type</legend>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {categories.filter((c) => c.isActive).map((c) => (
-                <label key={c.id} className="flex cursor-pointer flex-col rounded-md border border-ivory-200 p-4 has-[:checked]:border-navy-700 has-[:checked]:bg-navy-50">
+                <label key={c.id} className="flex cursor-pointer flex-col rounded-md border border-hairline p-4 has-[:checked]:border-navy-700 has-[:checked]:bg-navy-50">
                   <span className="flex items-center justify-between">
                     <span className="font-medium text-ink-900">{c.name}</span>
                     <input type="radio" name="categoryId" value={c.id} checked={categoryId === c.id} onChange={() => setCategoryId(c.id)} className="accent-navy-800" />
@@ -84,14 +84,14 @@ export function ReservationForm({ categories, today, holdHours }: { categories: 
             {cat && nights > 0 ? (
               <>
                 <div className="flex justify-between"><span className="text-ink-500">{formatNaira(cat.nightlyRateKobo)} × {plural(nights, "night")}</span><span className="tabular-nums">{formatNaira(cat.nightlyRateKobo * nights)}</span></div>
-                <div className="flex justify-between border-t border-ivory-200 pt-3 text-base font-semibold"><span>Total</span><span className="tabular-nums">{formatNaira(cat.nightlyRateKobo * nights)}</span></div>
+                <div className="flex justify-between border-t border-hairline pt-3 text-base font-semibold"><span>Total</span><span className="tabular-nums">{formatNaira(cat.nightlyRateKobo * nights)}</span></div>
                 <p className="text-xs text-ink-500">Final price is confirmed by the system when you create the reservation.</p>
               </>
             ) : (
               <p className="text-ink-500">Choose dates and a room type to see the price.</p>
             )}
           </div>
-          <div className="space-y-3 border-t border-ivory-200 p-5">
+          <div className="space-y-3 border-t border-hairline p-5">
             <p className="text-sm text-ink-600">
               The room is held for {plural(holdHours, "hour")} while awaiting payment. Record the payment on the next screen to confirm it.
             </p>

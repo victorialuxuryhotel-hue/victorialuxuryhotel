@@ -5,12 +5,16 @@ import { Spinner } from "./feedback";
 type Variant = "primary" | "accent" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
+/**
+ * Classical buttons: outlined, never filled. Hover tints 12%, pressed 22%.
+ * Disabled is 45% opacity. Colours stay the hotel's navy and gold.
+ */
 const variants: Record<Variant, string> = {
-  primary: "bg-navy-800 text-white hover:bg-navy-700 disabled:bg-navy-800/50",
-  accent: "bg-gold-400 text-navy-950 hover:bg-gold-300 disabled:bg-gold-400/50",
-  secondary: "border border-ink-300 bg-white text-ink-900 hover:bg-ivory-100 disabled:text-ink-400",
-  ghost: "text-ink-700 hover:bg-ivory-200 disabled:text-ink-400",
-  danger: "bg-danger-600 text-white hover:bg-danger-700 disabled:bg-danger-600/50",
+  primary: "border border-navy-800 text-navy-800 hover:bg-navy-800/12 active:bg-navy-800/22",
+  accent: "border border-gold-500 text-gold-800 hover:bg-gold-500/12 active:bg-gold-500/22",
+  secondary: "border border-hairline text-ink-900 hover:bg-ink-900/7 active:bg-ink-900/14",
+  ghost: "text-navy-800 hover:bg-navy-800/10 active:bg-navy-800/18",
+  danger: "border border-danger-600 text-danger-700 hover:bg-danger-600/10 active:bg-danger-600/20",
 };
 
 const sizes: Record<Size, string> = {
@@ -22,7 +26,7 @@ const sizes: Record<Size, string> = {
 /** Class string for buttons and for links styled as buttons. */
 export function buttonStyles({ variant = "primary", size = "md", className }: { variant?: Variant; size?: Size; className?: string } = {}) {
   return cn(
-    "inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors disabled:cursor-not-allowed",
+    "inline-flex items-center justify-center gap-2 rounded-md bg-transparent font-normal transition-colors disabled:cursor-not-allowed disabled:opacity-45",
     variants[variant],
     sizes[size],
     className,

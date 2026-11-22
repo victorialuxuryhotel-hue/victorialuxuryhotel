@@ -43,7 +43,7 @@ function NavLinks({ onNavigate, base, allowed }: { onNavigate?: () => void; base
                 aria-current={current ? "page" : undefined}
                 className={cn(
                   "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                  current ? "bg-white/10 text-white" : "text-ivory-200/70 hover:bg-white/5 hover:text-white",
+                  current ? "bg-ivory-50/10 text-white" : "text-ivory-200/70 hover:bg-ivory-50/5 hover:text-white",
                 )}
               >
                 <Icon className={cn("size-[18px]", current ? "text-gold-400" : "")} aria-hidden />
@@ -107,7 +107,7 @@ export function MobileBar({ footer, base = "/app", allowed }: NavProps) {
           aria-expanded={open}
           aria-controls="management-menu"
           aria-label={open ? "Close menu" : "Open menu"}
-          className="flex size-11 items-center justify-center rounded-md text-ivory-100 hover:bg-white/10"
+          className="flex size-11 items-center justify-center rounded-md text-ivory-100 hover:bg-ivory-50/10"
         >
           {open ? <X className="size-6" aria-hidden /> : <Menu className="size-6" aria-hidden />}
         </button>
@@ -150,7 +150,7 @@ export function DeskTabs({ base = "/app" }: { base?: string }) {
       <div aria-hidden className="h-[calc(3.25rem+env(safe-area-inset-bottom))] md:hidden print:hidden" />
       <nav
         aria-label="Front desk"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-ivory-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-hairline bg-ivory-50 pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
       >
         {tabs.map(({ href, label, icon: Icon }) => {
           const active = href === pathname;

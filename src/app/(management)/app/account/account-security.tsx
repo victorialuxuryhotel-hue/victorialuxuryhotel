@@ -17,7 +17,7 @@ export function AccountSecurity() {
         elements: {
           ...clerkAppearance.elements,
           rootBox: "!w-full",
-          cardBox: "!w-full !max-w-none rounded-card border border-ivory-200 bg-white shadow-card",
+          cardBox: "!w-full !max-w-none rounded-card border border-hairline bg-ivory-50 shadow-card",
           scrollBox: "rounded-none shadow-none",
         },
       }}

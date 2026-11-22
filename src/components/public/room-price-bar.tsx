@@ -41,7 +41,7 @@ export function RoomPriceBar({ price, targetId }: { price: string; targetId: str
     <>
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-40 border-t border-ivory-200 bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden",
+          "fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden",
           formVisible ? "pointer-events-none translate-y-full" : "translate-y-0",
         )}
       >

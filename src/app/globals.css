@@ -8,7 +8,7 @@
  */
 @theme {
   --font-display: var(--font-display-base), "Cormorant Garamond", Georgia, serif;
-  --font-sans: var(--font-sans-base), "Inter", system-ui, sans-serif;
+  --font-sans: var(--font-sans-base), "Lora", Georgia, serif;
 
   --color-navy-50: #eef2fc;
   --color-navy-100: #d9e1f8;
@@ -56,8 +56,16 @@
   --color-info-50: #eff6ff;
   --color-info-700: #1d4ed8;
 
-  --radius-card: 0.75rem;
-  --shadow-card: 0 1px 2px rgb(20 32 66 / 0.06), 0 4px 16px rgb(20 32 66 / 0.06);
+  /* Classical shape: small radii, hairlines instead of shadows. Elevation is for overlays only. */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 7px;
+  --radius-xl: 7px;
+  --radius-2xl: 7px;
+  --radius-3xl: 7px;
+  --radius-card: 4px;
+  --shadow-card: none;
+  --color-hairline: rgb(23 27 36 / 0.16);
 }
 
 @layer base {
@@ -68,10 +76,17 @@
     background-color: var(--color-ivory-50);
     color: var(--color-ink-900);
     font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
   }
   h1,
   h2,
-  h3 {
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -0.015em;
     text-wrap: balance;
   }
   :focus-visible {

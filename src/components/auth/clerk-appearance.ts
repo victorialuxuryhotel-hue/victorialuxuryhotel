@@ -1,29 +1,34 @@
 /**
- * Clerk's sign-in, invitation and account components, styled to match the
- * management app (navy and gold on ivory). Our pages provide the headings,
- * so Clerk's own card header and chrome are hidden.
+ * Clerk's sign-in, invitation and account components, styled to match the app
+ * (Classical look: Lora, 4px corners, hairlines, outlined buttons; navy and
+ * gold on ivory). Our pages provide the headings, so Clerk's own card header
+ * and chrome are hidden. Classes use Tailwind's `!` so they beat Clerk's
+ * built-in styles.
  */
 export const clerkAppearance = {
   variables: {
-    colorPrimary: "#0b1f4b",
-    colorText: "#1c1f26",
-    colorTextSecondary: "#5b6170",
-    colorBackground: "#ffffff",
-    colorInputBackground: "#ffffff",
-    colorDanger: "#b42318",
-    borderRadius: "0.5rem",
-    fontFamily: "var(--font-sans-base), system-ui, sans-serif",
-    fontSize: "0.95rem",
+    colorPrimary: "#032684",
+    colorText: "#171b24",
+    colorTextSecondary: "#4b5260",
+    colorBackground: "#fdfcf9",
+    colorInputBackground: "transparent",
+    colorDanger: "#b91c1c",
+    borderRadius: "4px",
+    fontFamily: "var(--font-sans-base), Lora, Georgia, serif",
+    fontFamilyButtons: "var(--font-sans-base), Lora, Georgia, serif",
+    fontSize: "15px",
   },
   elements: {
-    rootBox: "w-full",
-    cardBox: "w-full shadow-none border-0",
-    card: "w-full shadow-none border-0 p-0 bg-transparent",
-    header: "hidden",
-    footer: "bg-transparent [&>div:first-child]:hidden",
-    formButtonPrimary: "h-11 text-sm font-medium normal-case",
-    formFieldInput: "h-11",
-    socialButtons: "hidden",
-    dividerRow: "hidden",
+    rootBox: "w-full!",
+    cardBox: "w-full! shadow-none! border-0! rounded-none!",
+    card: "w-full! shadow-none! border-0! p-0! bg-transparent!",
+    header: "hidden!",
+    footer: "bg-transparent! [&>div:first-child]:hidden!",
+    socialButtons: "hidden!",
+    dividerRow: "hidden!",
+    formFieldLabel: "text-[13px]! font-normal! text-ink-700!",
+    formFieldInput: "h-11.5! shadow-none! border! border-hairline! bg-transparent!",
+    formButtonPrimary:
+      "h-12! normal-case! text-base! font-normal! shadow-none! bg-transparent! bg-none! border! border-navy-800! text-navy-800! hover:bg-navy-800/12! after:hidden!",
   },
 } as const;

@@ -13,13 +13,12 @@ const tones: Record<Tone, string> = {
 };
 
 /**
- * Status pill. Colour is never the only signal: the label is always text, and
- * a dot reinforces the tone. Domain status → tone maps live with each domain.
+ * Status tag (Classical: square, 11px, word first). Colour is never the only
+ * signal: the label is always text. Domain status → tone maps live with each domain.
  */
 export function Badge({ tone = "neutral", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium", tones[tone], className)}>
-      <span aria-hidden className="size-1.5 rounded-full bg-current opacity-70" />
+    <span className={cn("inline-flex items-center whitespace-nowrap rounded-[3px] px-2.5 py-0.5 text-[11px] tracking-[0.02em]", tones[tone], className)}>
       {children}
     </span>
   );

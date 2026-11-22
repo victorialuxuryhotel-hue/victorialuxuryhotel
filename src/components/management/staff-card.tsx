@@ -6,7 +6,7 @@ import { staffRole, type StaffRole } from "@/domain/status";
 /** Menu footer: who is signed in, with Manage sign-in and Sign out. */
 export function StaffCard({ fullName, role, children }: { fullName: string; role: StaffRole; children?: React.ReactNode }) {
   const initials = fullName.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-  const row = "flex min-h-10 items-center gap-2.5 rounded-md px-2 text-sm text-ivory-200/80 hover:bg-white/10 hover:text-white";
+  const row = "flex min-h-10 items-center gap-2.5 rounded-md px-2 text-sm text-ivory-200/80 hover:bg-ivory-50/10 hover:text-white";
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">

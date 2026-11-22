@@ -34,7 +34,7 @@ export function CorrectPaymentForm({
           <FormMessage tone="success">Correction recorded. Receipt {state.data.receiptNumber}.</FormMessage>
         </div>
       ) : (
-        <form action={action} onSubmit={keepValues(action)} className="mt-2 space-y-3 rounded-card border border-ivory-200 bg-ivory-50 p-4">
+        <form action={action} onSubmit={keepValues(action)} className="mt-2 space-y-3 rounded-card border border-hairline bg-ivory-50 p-4">
           <input type="hidden" name="paymentId" value={paymentId} />
           <input type="hidden" name="reservationId" value={reservationId} />
           <p className="text-ink-700">

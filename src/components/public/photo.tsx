@@ -54,7 +54,7 @@ export function Photo({
       <span
         className={cn(
           "absolute bottom-3 left-3 rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] backdrop-blur",
-          dark ? "bg-white/10 text-white/60" : "bg-white/60 text-ink-500",
+          dark ? "bg-ivory-50/10 text-white/60" : "bg-ivory-50/60 text-ink-500",
         )}
       >
         {photo.alt}

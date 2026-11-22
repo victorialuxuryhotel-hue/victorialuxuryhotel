@@ -158,7 +158,7 @@ export function ReservationDetailView({
 
       {r.status === "pending_payment" && canOverride ? <div className="hidden lg:block"><OverrideForm reservationId={r.id} /></div> : null}
       {r.status === "pending_payment" && !canOverride ? (
-        <p className="mt-6 hidden rounded-card border border-ivory-200 bg-white p-4 text-sm text-ink-700 lg:block">
+        <p className="mt-6 hidden rounded-card border border-hairline bg-ivory-50 p-4 text-sm text-ink-700 lg:block">
           <span className="mr-2 rounded-full bg-ivory-200 px-2 py-0.5 text-xs font-medium text-ink-600">Manager</span>
           To confirm without full payment or hold the room longer, ask {manager ? `${manager.name} (${staffRole[manager.role]})` : "a manager"}.
         </p>
@@ -191,13 +191,13 @@ export function ReservationDetailView({
               </Fact>
             </div>
             {r.specialRequests && r.status !== "checked_in" && !open ? (
-              <div className="border-t border-ivory-200 px-5 py-4">
+              <div className="border-t border-hairline px-5 py-4">
                 <p className="text-xs uppercase tracking-wide text-ink-500">Special requests</p>
                 <p className="mt-1 text-sm text-ink-700">{r.specialRequests}</p>
               </div>
             ) : null}
             {open || r.status === "checked_in" ? (
-              <div className="border-t border-ivory-200 xl:border-0">
+              <div className="border-t border-hairline xl:border-0">
                 <Collapsible id="change-stay" title="Change dates or room">
                   <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
                   <ChangeDatesForm reservationId={r.id} checkIn={r.checkIn} checkOut={r.checkOut} inHouse={r.status === "checked_in"} />
@@ -214,7 +214,7 @@ export function ReservationDetailView({
                 <Link href={paymentsHref} className="text-sm font-medium text-navy-800 hover:text-navy-600">Record payment</Link>
               ) : undefined}
             />
-            <div className="grid grid-cols-3 gap-3 border-b border-ivory-200 p-4 sm:gap-4 sm:p-5">
+            <div className="grid grid-cols-3 gap-3 border-b border-hairline p-4 sm:gap-4 sm:p-5">
               <div>
                 <p className="text-xs text-ink-500">Total for stay</p>
                 <p className="mt-1 text-base sm:text-lg font-semibold tabular-nums">{formatNaira(r.totalKobo)}</p>
@@ -233,7 +233,7 @@ export function ReservationDetailView({
             {r.payments.length === 0 ? (
               <p className="px-5 py-4 text-sm text-ink-500">No payments recorded yet.</p>
             ) : (
-              <ul className="divide-y divide-ivory-200">
+              <ul className="divide-y divide-hairline">
                 {r.payments.map((p) => (
                   <li key={p.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-4">
                     {p.kind === "refund" ? (

@@ -96,7 +96,7 @@ async function RoomType({ params }: { params: Promise<{ slug: string }> }) {
           </div>
 
           <aside className="lg:pt-10">
-            <div id="availability" className="scroll-mt-24 rounded-card bg-white p-5 shadow-card sm:p-6 lg:sticky lg:top-28">
+            <div id="availability" className="scroll-mt-24 rounded-card bg-ivory-50 p-5 shadow-card sm:p-6 lg:sticky lg:top-28">
               <p className="font-display text-2xl text-navy-950">Check availability</p>
               <p className="mt-1 text-sm text-ink-500">See the exact total for your dates. Instant confirmation once paid.</p>
               <div className="mt-5"><BookingBar variant="stacked" /></div>

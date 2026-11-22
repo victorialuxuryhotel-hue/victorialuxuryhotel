@@ -2,7 +2,7 @@ import { Children, cloneElement, isValidElement, type InputHTMLAttributes, type 
 import { cn } from "@/lib/utils/cn";
 
 const control =
-  "block w-full rounded-md border border-ink-300 bg-white px-3 text-base text-ink-900 md:text-sm placeholder:text-ink-400 focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/20 disabled:bg-ivory-100 aria-invalid:border-danger-600";
+  "block w-full rounded-md border border-hairline bg-transparent px-3 text-base text-ink-900 caret-navy-700 md:text-sm placeholder:text-ink-400 hover:border-ink-900/45 focus:border-navy-700 focus:outline-none focus:ring-2 focus:ring-navy-700/20 disabled:opacity-45 aria-invalid:border-danger-600";
 
 /**
  * Label + control + hint/error, wired for accessibility. Pass the control as
@@ -30,7 +30,7 @@ export function Field({ label, htmlFor, hint, error, optional, children, classNa
       : children;
   return (
     <div className={cn("space-y-1.5", className)}>
-      <label htmlFor={htmlFor} className="block text-sm font-medium text-ink-700">
+      <label htmlFor={htmlFor} className="block text-[13px] text-ink-700">
         {label}
         {optional ? <span className="font-normal text-ink-500"> (optional)</span> : null}
       </label>

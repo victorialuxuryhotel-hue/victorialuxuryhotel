@@ -12,7 +12,7 @@ export default function Page() {
         <div>
           <h1 className="font-display text-4xl text-navy-950 sm:text-5xl">Review and pay</h1>
           <p className="mt-3 text-ink-600">Your room is held for 30 minutes while you pay.</p>
-          <dl className="mt-8 divide-y divide-ivory-200 rounded-card bg-white text-sm shadow-card">
+          <dl className="mt-8 divide-y divide-hairline rounded-card bg-ivory-50 text-sm shadow-card">
             {[["Name", "Adaeze Okafor"], ["Email", "adaeze@example.com"], ["Phone", "+234 803 000 0001"], ["Special requests", "Late arrival, around 9pm"]].map(([k, v]) => (
               <div key={k} className="flex justify-between gap-6 px-5 py-4"><dt className="text-ink-500">{k}</dt><dd className="text-right text-ink-900">{v}</dd></div>
             ))}

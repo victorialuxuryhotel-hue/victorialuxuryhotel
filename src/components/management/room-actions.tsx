@@ -20,7 +20,7 @@ export function RoomQuickActions({ roomId, readiness, maintenance, large = false
         {readiness !== "cleaning_in_progress" ? <ActionButton action={updateRoomStatus} fields={set("cleaning_in_progress")} size={size} variant="secondary" className="items-stretch [&_button]:w-full">Cleaning in progress</ActionButton> : null}
         {readiness !== "needs_cleaning" ? <ActionButton action={updateRoomStatus} fields={set("needs_cleaning")} size={size} variant="secondary" className="items-stretch [&_button]:w-full">Needs cleaning</ActionButton> : null}
       </div>
-      <div className="border-t border-ivory-200 pt-3">
+      <div className="border-t border-hairline pt-3">
         {maintenance ? (
           <ActionButton action={updateRoomStatus} fields={{ roomId, serviceStatus: "in_service" }} size={size} variant="secondary" className="items-stretch [&_button]:w-full">Return to service</ActionButton>
         ) : (

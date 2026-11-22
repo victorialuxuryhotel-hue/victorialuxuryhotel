@@ -83,7 +83,7 @@ function NoShowConfirm({ r, onKeep }: { r: R; onKeep: () => void }) {
 function OverrideInline({ id }: { id: string }) {
   const [state, action, pending] = useActionState(overridePayment, null);
   return (
-    <form action={action} onSubmit={keepValues(action)} className="mt-4 space-y-3 rounded-card border border-ivory-200 p-4">
+    <form action={action} onSubmit={keepValues(action)} className="mt-4 space-y-3 rounded-card border border-hairline p-4">
       <input type="hidden" name="reservationId" value={id} />
       <Field label="Reason (recorded in the activity log)" htmlFor="ovr-why"><Input id="ovr-why" name="reason" required minLength={5} placeholder="e.g. Company paying on invoice" /></Field>
       {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
@@ -177,7 +177,7 @@ export function NextStepBar({ r, today, paymentsHref, canOverride, manager = nul
 
   return (
     <>
-      <div className="fixed inset-x-0 bottom-0 z-40 space-y-1 border-t border-ivory-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 space-y-1 border-t border-hairline bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
         {primary}
         {options.length ? (
           <button ref={moreRef} type="button" onClick={() => setSheet("menu")} className="flex min-h-10 w-full items-center justify-center text-sm text-ink-700">
@@ -188,7 +188,7 @@ export function NextStepBar({ r, today, paymentsHref, canOverride, manager = nul
       <div aria-hidden className="h-32 lg:hidden" />
       <BottomSheet open={sheet !== null} onClose={() => setSheet(null)} title="Other options" subtitle={subtitle} trigger={moreRef}>
         {sheet === "menu" ? (
-          <ul className="divide-y divide-ivory-200 border-y border-ivory-200">
+          <ul className="divide-y divide-hairline border-y border-hairline">
             {options.map((o) => (
               <li key={o.label}>
                 {o.href ? (

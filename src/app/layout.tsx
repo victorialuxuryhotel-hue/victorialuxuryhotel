@@ -1,17 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Inter } from "next/font/google";
+import { Cormorant_Garamond, Lora } from "next/font/google";
 import { hotel } from "@/config/hotel";
 import "./globals.css";
 
 const display = Cormorant_Garamond({
   variable: "--font-display-base",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["400", "500", "600"],
 });
 
-const sans = Inter({
+// Body text: Lora (Classical design system). Colour stays the hotel's navy and gold.
+const sans = Lora({
   variable: "--font-sans-base",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 // viewport-fit=cover lets pinned bottom bars clear the iPhone home indicator

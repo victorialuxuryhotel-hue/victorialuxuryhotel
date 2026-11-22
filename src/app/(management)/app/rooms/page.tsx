@@ -23,10 +23,10 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   return (
     <div className="space-y-6">
       <Card>
-        <div className="border-b border-ivory-200 px-4 py-3 md:hidden">
+        <div className="border-b border-hairline px-4 py-3 md:hidden">
           <RoomStateChips rooms={rooms} active={active} hrefFor={(s) => (s ? `/app/rooms?state=${s}` : "/app/rooms")} />
         </div>
-        <div className="hidden border-b border-ivory-200 px-5 py-4 md:block"><RoomBoardLegend rooms={rooms} /></div>
+        <div className="hidden border-b border-hairline px-5 py-4 md:block"><RoomBoardLegend rooms={rooms} /></div>
         <div className="p-4 sm:p-5">
           {rooms.length ? (
             <RoomBoard rooms={active ? rooms.filter((r) => r.state === active) : rooms} />
@@ -34,7 +34,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
             <EmptyState title="No rooms yet" description="Add rooms below, or ask a manager to." />
           )}
         </div>
-        <p className="border-t border-ivory-200 px-5 py-3 text-xs text-ink-500">Tap a room to update cleaning status or mark it under maintenance.</p>
+        <p className="border-t border-hairline px-5 py-3 text-xs text-ink-500">Tap a room to update cleaning status or mark it under maintenance.</p>
       </Card>
       {configure ? (
         <Card>

@@ -30,7 +30,7 @@ export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
         Payment received and your reservation is confirmed. We&apos;ve emailed the details to <span className="font-medium text-ink-900">{stay.email}</span>.
       </p>
 
-      <div className="mt-10 overflow-hidden rounded-card bg-white text-left shadow-card">
+      <div className="mt-10 overflow-hidden rounded-card bg-ivory-50 text-left shadow-card">
         <div className="flex items-center justify-between bg-navy-950 px-6 py-4 text-ivory-50">
           <span className="text-xs uppercase tracking-[0.2em] text-gold-300">Booking reference</span>
           <span className="font-mono text-lg tracking-wider">{stay.reference}</span>
@@ -43,7 +43,7 @@ export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
           <div><dt className="text-ink-500">Paid</dt><dd className="mt-1 font-medium text-ink-900">{formatNaira(stay.paidKobo)} · {plural(stay.nights, "night")}</dd></div>
           <div><dt className="text-ink-500">Receipt</dt><dd className="mt-1 font-mono text-ink-900">{stay.receiptNumber}</dd></div>
         </dl>
-        <div className="grid gap-3 border-t border-ivory-200 bg-ivory-50 p-6 text-sm sm:grid-cols-3">
+        <div className="grid gap-3 border-t border-hairline bg-ivory-50 p-6 text-sm sm:grid-cols-3">
           <a href={hotel.mapsUrl} className="flex items-center gap-2 text-navy-800 hover:text-gold-600"><MapPin className="size-4" aria-hidden />Directions</a>
           <a href={`tel:${hotel.phone}`} className="flex items-center gap-2 text-navy-800 hover:text-gold-600"><Phone className="size-4" aria-hidden />Call the hotel</a>
           <a href={`mailto:${hotel.email}`} className="flex items-center gap-2 text-navy-800 hover:text-gold-600"><Mail className="size-4" aria-hidden />Email us</a>

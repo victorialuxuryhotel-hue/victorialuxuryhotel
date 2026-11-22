@@ -46,7 +46,7 @@ export function StickyBookBar() {
       <div aria-hidden className="h-20 bg-navy-950 md:hidden" />
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-40 border-t border-ivory-200 bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden",
+          "fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden",
           show ? "translate-y-0" : "pointer-events-none translate-y-full",
         )}
         aria-hidden={!show}

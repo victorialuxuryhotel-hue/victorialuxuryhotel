@@ -90,7 +90,7 @@ export function TodayView({
                 </div>
               </div>
             ) : (
-              <ul className="divide-y divide-ivory-200">
+              <ul className="divide-y divide-hairline">
                 {needs.map((n) => {
                   const d = describe(n, links);
                   return (
@@ -131,7 +131,7 @@ export function TodayView({
         <section aria-label="Rooms">
           <Card>
             <CardHeader title="Rooms" description="Right now" />
-            <div className="grid grid-cols-3 divide-x divide-ivory-200">
+            <div className="grid grid-cols-3 divide-x divide-hairline">
               {([
                 ["Ready", counts.ready, links.rooms("available")],
                 ["Guests in", counts.guestsIn, links.rooms("occupied")],

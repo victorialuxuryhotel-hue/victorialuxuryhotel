@@ -44,7 +44,7 @@ async function FacilitiesPageContent() {
         <SectionHeading eyebrow="At a glance" title="Facilities & services" align="center" />
         <ul className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {facilities.map((f) => (
-            <li key={f.name} className="flex gap-5 rounded-card bg-white p-6 shadow-card">
+            <li key={f.name} className="flex gap-5 rounded-card bg-ivory-50 p-6 shadow-card">
               <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-navy-50">
                 <f.icon className="size-6 text-navy-800" strokeWidth={1.5} aria-hidden />
               </span>

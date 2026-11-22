@@ -42,7 +42,7 @@ export function SiteHeader() {
   return (
     <>
       <UtilityBar />
-      <header className="sticky top-0 z-40 border-b border-ivory-200 bg-ivory-50/95 backdrop-blur supports-[backdrop-filter]:bg-ivory-50/85">
+      <header className="sticky top-0 z-40 border-b border-hairline bg-ivory-50/95 backdrop-blur supports-[backdrop-filter]:bg-ivory-50/85">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 md:h-20">
           <Link href="/" className="flex items-center gap-3" aria-label={`${hotel.name}, home`}>
             <Logo className="w-9 md:w-11" priority />

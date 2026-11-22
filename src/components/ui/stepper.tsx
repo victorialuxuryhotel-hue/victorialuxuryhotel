@@ -23,7 +23,7 @@ export function Stepper({ id, name, min = 1, max, defaultValue = min, unit, clas
   const button = "flex h-full w-11 items-center justify-center text-navy-700 disabled:text-ink-300";
   return (
     <div className={cn("space-y-1", className)}>
-      <div className="flex h-11.5 items-center justify-between rounded-md border border-ink-300 bg-white pl-3 md:h-10">
+      <div className="flex h-11.5 items-center justify-between rounded-md border border-ink-300 bg-ivory-50 pl-3 md:h-10">
         <output id={id} aria-live="polite" className="text-base tabular-nums text-ink-900 md:text-sm">
           {shown} {shown === 1 ? unit[0] : unit[1]}
         </output>

@@ -20,7 +20,7 @@ export function FiltersToggle({ children, initiallyOpen = false }: { children: R
         aria-controls="list-filters"
         aria-label="Filters"
         className={cn(
-          "flex size-11 shrink-0 items-center justify-center rounded-md border border-ink-300 bg-white text-ink-700 md:hidden",
+          "flex size-11 shrink-0 items-center justify-center rounded-md border border-ink-300 bg-ivory-50 text-ink-700 md:hidden",
           open && "border-navy-600 text-navy-800",
         )}
       >

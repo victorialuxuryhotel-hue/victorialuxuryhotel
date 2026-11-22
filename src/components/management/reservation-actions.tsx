@@ -100,7 +100,7 @@ export function AssignRoomForm({
   const others = rooms.filter((r) => r.category !== booked);
   const label = (r: RoomOption) => `Room ${r.number}${r.ready ? "" : " (not ready yet)"}`;
   return (
-    <form action={action} onSubmit={keepValues(action)} className="flex flex-col gap-3 border-t border-ivory-200 bg-ivory-50 px-5 py-4">
+    <form action={action} onSubmit={keepValues(action)} className="flex flex-col gap-3 border-t border-hairline bg-ivory-50 px-5 py-4">
       <input type="hidden" name="reservationId" value={reservationId} />
       {specialRequests ? (
         <div className="rounded-md border border-gold-300 bg-gold-50 px-3 py-2 text-sm">
@@ -138,7 +138,7 @@ export function CancelForm({ reservationId }: { reservationId: string }) {
       <summary className="inline-flex h-10 cursor-pointer list-none items-center gap-2 rounded-md px-4 text-sm font-medium text-danger-700 hover:bg-danger-50">
         <XCircle className="size-4" aria-hidden /> Cancel
       </summary>
-      <form action={action} onSubmit={keepValues(action)} className="absolute right-0 z-20 mt-2 w-80 space-y-3 rounded-card border border-ivory-200 bg-white p-4 shadow-lg">
+      <form action={action} onSubmit={keepValues(action)} className="absolute right-0 z-20 mt-2 w-80 space-y-3 rounded-card border border-hairline bg-ivory-50 p-4 shadow-lg">
         <input type="hidden" name="reservationId" value={reservationId} />
         <Field label="Reason for cancelling" htmlFor="cancel-reason">
           <Textarea id="cancel-reason" name="reason" rows={2} required minLength={3} />
@@ -154,7 +154,7 @@ export function CancelForm({ reservationId }: { reservationId: string }) {
 export function OverrideForm({ reservationId }: { reservationId: string }) {
   const [state, action, pending] = useActionState(overridePayment, null);
   return (
-    <details className="mt-6 rounded-card border border-ivory-200 bg-white p-4 text-sm">
+    <details className="mt-6 rounded-card border border-hairline bg-ivory-50 p-4 text-sm">
       <summary className="cursor-pointer font-medium text-ink-900">Manager options: confirm without full payment, or extend the hold</summary>
       <form action={action} onSubmit={keepValues(action)} className="mt-4 space-y-3">
         <input type="hidden" name="reservationId" value={reservationId} />
@@ -175,7 +175,7 @@ export function OverrideForm({ reservationId }: { reservationId: string }) {
 export function DetailsForm({ reservationId, guests, specialRequests, maxGuests }: { reservationId: string; guests: number; specialRequests?: string; maxGuests: number }) {
   const [state, action, pending] = useActionState(updateReservationDetails, null);
   return (
-    <form action={action} onSubmit={keepValues(action)} className="space-y-3 border-t border-ivory-200 px-5 py-4">
+    <form action={action} onSubmit={keepValues(action)} className="space-y-3 border-t border-hairline px-5 py-4">
       <input type="hidden" name="reservationId" value={reservationId} />
       <div className="grid gap-3 sm:grid-cols-[11rem_1fr]">
         <Field label="Guests" htmlFor="d-guests"><Stepper id="d-guests" name="guests" max={maxGuests} defaultValue={guests} unit={["guest", "guests"]} /></Field>
@@ -191,7 +191,7 @@ export function DetailsForm({ reservationId, guests, specialRequests, maxGuests 
 export function ChangeDatesForm({ reservationId, checkIn: ci, checkOut: co, inHouse }: { reservationId: string; checkIn: string; checkOut: string; inHouse: boolean }) {
   const [state, action, pending] = useActionState(changeDates, null);
   return (
-    <details className="border-t border-ivory-200 px-5 py-4 text-sm">
+    <details className="border-t border-hairline px-5 py-4 text-sm">
       <summary className="cursor-pointer font-medium text-navy-800">{inHouse ? "Extend or shorten the stay" : "Change dates"}</summary>
       <form action={action} onSubmit={keepValues(action)} className="mt-3 space-y-3">
         <input type="hidden" name="reservationId" value={reservationId} />
@@ -216,7 +216,7 @@ export function ResolveAttentionForm({ reservationId }: { reservationId: string 
     <form action={action} onSubmit={keepValues(action)} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start">
       <input type="hidden" name="reservationId" value={reservationId} />
       <label className="sr-only" htmlFor="resolve-note">How was this resolved?</label>
-      <Input id="resolve-note" name="note" required minLength={5} placeholder="How was this resolved? (recorded)" className="flex-1 bg-white" />
+      <Input id="resolve-note" name="note" required minLength={5} placeholder="How was this resolved? (recorded)" className="flex-1 bg-ivory-50" />
       <Button type="submit" size="md" variant="secondary" pending={pending}>Mark resolved</Button>
       {state && !state.ok ? <p role="alert" className="text-xs text-danger-700 sm:basis-full">{state.message}</p> : null}
     </form>

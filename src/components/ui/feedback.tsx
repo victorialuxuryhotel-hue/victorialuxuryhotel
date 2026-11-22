@@ -11,7 +11,7 @@ export function Spinner({ className, label = "Loading" }: { className?: string; 
 export function LoadingState({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="delayed-show flex min-h-48 flex-1 items-center justify-center gap-3 text-ink-500">
-      <Spinner className="text-navy-600" />
+      <Spinner className="size-3.5 border-[1.5px] text-navy-700" />
       <span className="text-sm">{label}</span>
     </div>
   );
@@ -20,7 +20,7 @@ export function LoadingState({ label = "Loading…" }: { label?: string }) {
 /** Skeleton rows in the shape of a list, for content that is loading. */
 export function SkeletonRows({ rows = 4, label = "Loading" }: { rows?: number; label?: string }) {
   return (
-    <div role="status" aria-label={label} aria-busy className="delayed-show divide-y divide-ivory-200">
+    <div role="status" aria-label={label} aria-busy className="delayed-show divide-y divide-hairline">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="space-y-2 px-4 py-3.5">
           <div className="h-3.5 w-3/5 animate-pulse rounded bg-ivory-200" />
@@ -34,9 +34,9 @@ export function SkeletonRows({ rows = 4, label = "Loading" }: { rows?: number; l
 /** A heading that states the fact, one line of help, and the action that fills it. */
 export function EmptyState({ title, description, action, icon }: { title: string; description?: string; action?: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-card border border-dashed border-ink-300 px-6 py-12 text-center">
+    <div className="flex flex-col items-center justify-center rounded-card border border-hairline px-6 py-12 text-center">
       {icon ? <div aria-hidden className="mb-2 text-gold-600 [&_svg]:size-7">{icon}</div> : null}
-      <p className="font-medium text-ink-900">{title}</p>
+      <p className="font-display text-[21px] font-semibold text-ink-900">{title}</p>
       {description ? <p className="mt-1 max-w-sm text-sm text-ink-500">{description}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
@@ -45,11 +45,11 @@ export function EmptyState({ title, description, action, icon }: { title: string
 
 export function ErrorState({ title = "Something went wrong", description, onRetry }: { title?: string; description?: string; onRetry?: () => void }) {
   return (
-    <div role="alert" className="flex flex-col items-center justify-center rounded-card border border-danger-600/20 bg-danger-50 px-6 py-12 text-center">
-      <p className="font-medium text-danger-700">{title}</p>
+    <div role="alert" className="flex flex-col items-center justify-center rounded-card border border-danger-700 px-6 py-12 text-center">
+      <p className="font-display text-[21px] font-semibold text-ink-900">{title}</p>
       <p className="mt-1 max-w-sm text-sm text-ink-600">{description ?? "The connection may have dropped. Nothing was changed. Please try again."}</p>
       {onRetry ? (
-        <button type="button" onClick={onRetry} className="mt-4 min-h-11 rounded-md border border-ink-300 bg-white px-4 text-sm font-medium hover:bg-ivory-100">
+        <button type="button" onClick={onRetry} className="mt-4 min-h-11 rounded-md border border-hairline px-4 text-sm hover:bg-ink-900/7">
           Try again
         </button>
       ) : null}

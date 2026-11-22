@@ -32,7 +32,7 @@ export function MapCard({ className, embedClassName }: { className?: string; emb
     <>
       <a
         href={hotel.mapsUrl}
-        className={cn("group block overflow-hidden rounded-card border border-ivory-200 bg-white lg:hidden", className)}
+        className={cn("group block overflow-hidden rounded-card border border-hairline bg-ivory-50 lg:hidden", className)}
         aria-label={`Open ${hotel.name} in Maps: ${address}`}
       >
         <MapMotif />

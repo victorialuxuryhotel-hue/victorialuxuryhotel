@@ -36,7 +36,7 @@ export function RoomStateChips({ rooms, active, hrefFor }: { rooms: RoomTile[]; 
   const chip = (on: boolean) =>
     cn(
       "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm whitespace-nowrap tabular-nums",
-      on ? "border-navy-800 bg-navy-800 text-white" : "border-ink-300 bg-white text-ink-700",
+      on ? "border-navy-800 bg-navy-800 text-white" : "border-ink-300 bg-ivory-50 text-ink-700",
     );
   return (
     <nav aria-label="Filter rooms" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden">
@@ -95,7 +95,7 @@ export function RoomBoard({ rooms, interactive = true }: { rooms: Array<RoomTile
                       </>
                     );
                     const tileClass = cn(
-                      "flex h-full min-h-[76px] w-full min-w-0 flex-col rounded-md border border-l-4 border-ivory-200 bg-white p-3 text-left shadow-sm transition-shadow hover:shadow-md",
+                      "flex h-full min-h-[76px] w-full min-w-0 flex-col rounded-md border border-l-4 border-hairline bg-ivory-50 p-3 text-left shadow-sm transition-shadow hover:shadow-md",
                       accent[r.state],
                     );
                     return interactive ? (

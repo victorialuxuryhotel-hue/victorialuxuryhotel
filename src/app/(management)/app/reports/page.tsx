@@ -28,15 +28,15 @@ const bucketLabel: Record<Bucket, string> = { cash: "cash", transfer: "transfer"
 
 function RangeControl({ tab, range }: { tab: Tab; range: ReportRange }) {
   return (
-    <nav aria-label="Period" className="flex gap-1 rounded-lg bg-ivory-200 p-1 sm:max-w-sm">
+    <nav aria-label="Period" className="flex overflow-hidden rounded-md border border-hairline [&>*+*]:border-l [&>*+*]:border-hairline sm:max-w-sm">
       {(["today", "14d", "month"] as const).map((r) => (
         <Link
           key={r}
           href={`/app/reports?tab=${tab}&range=${r}`}
           aria-current={r === range ? "page" : undefined}
           className={cn(
-            "flex min-h-11 flex-1 items-center justify-center rounded-md px-2 text-sm font-medium",
-            r === range ? "bg-white text-navy-950 shadow-sm" : "text-ink-600 hover:text-ink-900",
+            "flex min-h-11 flex-1 items-center justify-center px-2 text-sm",
+            r === range ? "text-navy-800 shadow-[inset_0_0_0_1px_var(--color-navy-800)]" : "text-ink-900 hover:bg-ink-900/7",
           )}
         >
           {rangeLabel[r]}
@@ -81,7 +81,7 @@ async function Money({ range }: { range: ReportRange }) {
           </a>
         </div>
         {money.daily.length > 1 ? (
-          <div className="border-t border-ivory-200">
+          <div className="border-t border-hairline">
             <Bars items={money.daily.map((d) => ({ day: d.day, value: d.kobo }))} label="Bar chart of money received per day" format={formatNaira} />
           </div>
         ) : null}
@@ -91,7 +91,7 @@ async function Money({ range }: { range: ReportRange }) {
         {cash.length === 0 ? (
           <div className="p-5"><EmptyState title="No payments today yet" /></div>
         ) : (
-          <ul className="divide-y divide-ivory-200 border-t border-ivory-200">
+          <ul className="divide-y divide-hairline border-t border-hairline">
             {cash.map((c) => (
               <li key={c.staffId ?? c.who} className="flex items-center justify-between gap-3 px-5 py-3.5">
                 <span className="min-w-0">
@@ -121,7 +121,7 @@ async function Occupancy({ range }: { range: ReportRange }) {
           <p className="mt-1 text-xs text-ink-500">Rooms with a guest each night, out of {plural(o.roomsInService, "room")} in service today.</p>
         </div>
         {o.nights.length > 1 ? (
-          <div className="border-t border-ivory-200">
+          <div className="border-t border-hairline">
             <Bars items={o.nights.map((n) => ({ day: n.day, value: n.pct }))} label="Bar chart of occupancy per night" format={(v) => `${v}%`} scaleTo={100} />
           </div>
         ) : null}
@@ -131,7 +131,7 @@ async function Occupancy({ range }: { range: ReportRange }) {
         {o.byType.length === 0 ? (
           <div className="p-5"><EmptyState title="No stays in this period" /></div>
         ) : (
-          <ul className="divide-y divide-ivory-200 border-t border-ivory-200">
+          <ul className="divide-y divide-hairline border-t border-hairline">
             {o.byType.map((t) => (
               <li key={t.name} className="flex items-center justify-between gap-3 px-5 py-3.5">
                 <span className="text-ink-900">{t.name}</span>
@@ -153,7 +153,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
   const range = reportRange(str(sp.range));
   return (
     <>
-      <div className="bg-white">
+      <div className="bg-ivory-50">
         <Tabs
           items={[
             { label: "Money", href: `/app/reports?tab=money&range=${range}`, active: tab === "money" },

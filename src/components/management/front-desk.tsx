@@ -33,7 +33,7 @@ export function MovementList({
           <EmptyState title={arrivals ? "No arrivals today" : "No departures today"} />
         </div>
       ) : (
-        <ul className="divide-y divide-ivory-200">
+        <ul className="divide-y divide-hairline">
           {rows.map((r) => {
             const balance = r.totalKobo - r.paidKobo;
             return (

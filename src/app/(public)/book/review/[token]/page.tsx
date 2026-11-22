@@ -45,7 +45,7 @@ async function Review({ params }: { params: Promise<{ token: string }> }) {
           <p className="mt-3 flex items-center gap-2 text-ink-600">
             <Clock className="size-4 text-gold-600" aria-hidden /> Your room is held until {formatDateTime(b.hold_expires_at!)}.
           </p>
-          <dl className="mt-8 divide-y divide-ivory-200 rounded-card bg-white text-sm shadow-card">
+          <dl className="mt-8 divide-y divide-hairline rounded-card bg-ivory-50 text-sm shadow-card">
             {[["Booking reference", b.reference], ["Name", b.guest.full_name], ["Email", b.guest.email ?? ""], ["Phone", b.guest.phone ?? ""], ...(b.special_requests ? [["Special requests", b.special_requests]] : [])].map(([k, v]) => (
               <div key={k} className="flex justify-between gap-6 px-5 py-4"><dt className="text-ink-500">{k}</dt><dd className="text-right break-all text-ink-900">{v}</dd></div>
             ))}

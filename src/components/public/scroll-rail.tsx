@@ -47,7 +47,7 @@ export function ScrollRail({ children, className, label, tone = "light" }: { chi
               key={i}
               className={cn(
                 "h-0.5 w-4.5 transition-colors",
-                i === active ? "bg-gold-500" : tone === "dark" ? "bg-white/25" : "bg-ink-300",
+                i === active ? "bg-gold-500" : tone === "dark" ? "bg-ivory-50/25" : "bg-ink-300",
               )}
             />
           ))}

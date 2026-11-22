@@ -26,7 +26,7 @@ export default function ContactPage() {
 
       <Section className="pt-6 sm:pt-20">
         {/* Phones: compact tap rows. */}
-        <ul className="divide-y divide-ivory-200 border-b border-ivory-200 md:hidden">
+        <ul className="divide-y divide-hairline border-b border-hairline md:hidden">
           {channels.map((c) => (
             <li key={c.label}>
               <a href={c.href} className="flex min-h-16 items-center justify-between gap-3 py-3">
@@ -41,7 +41,7 @@ export default function ContactPage() {
         </ul>
         <div className="hidden gap-6 md:grid md:grid-cols-3">
           {channels.map((c) => (
-            <a key={c.label} href={c.href} className="group rounded-card bg-white p-8 shadow-card transition-shadow hover:shadow-lg">
+            <a key={c.label} href={c.href} className="group rounded-card bg-ivory-50 p-8 shadow-card transition-shadow hover:shadow-lg">
               <span className="flex size-12 items-center justify-center rounded-full bg-gold-50">
                 <c.icon className="size-6 text-gold-600" strokeWidth={1.5} aria-hidden />
               </span>
@@ -52,7 +52,7 @@ export default function ContactPage() {
           ))}
         </div>
 
-        <div className="mt-8 grid overflow-hidden rounded-card bg-white shadow-card sm:mt-12 lg:grid-cols-[1fr_1.4fr]">
+        <div className="mt-8 grid overflow-hidden rounded-card bg-ivory-50 shadow-card sm:mt-12 lg:grid-cols-[1fr_1.4fr]">
           <MapMotif className="lg:hidden" />
           <div className="p-5 sm:p-12">
             <MapPin className="hidden size-8 text-gold-500 lg:block" strokeWidth={1.5} aria-hidden />

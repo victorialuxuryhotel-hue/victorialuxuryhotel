@@ -12,7 +12,7 @@ export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: Pay
   return (
     <>
       {/* Phones: amount and status right-aligned for scanning; the row opens the reservation. */}
-      <ul className="divide-y divide-ivory-200 md:hidden">
+      <ul className="divide-y divide-hairline md:hidden">
         {rows.map((p) => {
           const href = reservationHref?.(p) ?? (p.receiptNumber ? receiptHref(p.receiptNumber) : undefined);
           const body = (
@@ -73,8 +73,8 @@ export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: Pay
 
 export function Receipt({ payment, reservation }: { payment: PaymentRow; reservation: ReservationDetail }) {
   return (
-    <article className="mx-auto max-w-2xl bg-white p-8 shadow-card sm:p-12 print:shadow-none">
-      <header className="flex items-start justify-between gap-6 border-b border-ivory-200 pb-8">
+    <article className="mx-auto max-w-2xl bg-ivory-50 p-8 shadow-card sm:p-12 print:shadow-none">
+      <header className="flex items-start justify-between gap-6 border-b border-hairline pb-8">
         <div className="flex items-center gap-3">
           <Logo className="w-12" />
           <div>
@@ -97,11 +97,11 @@ export function Receipt({ payment, reservation }: { payment: PaymentRow; reserva
       </dl>
 
       <table className="w-full text-sm">
-        <thead className="border-y border-ivory-200 text-left text-xs uppercase tracking-wide text-ink-500">
+        <thead className="border-y border-hairline text-left text-xs uppercase tracking-wide text-ink-500">
           <tr><th className="py-3 font-medium">Description</th><th className="py-3 text-right font-medium">Amount</th></tr>
         </thead>
         <tbody>
-          <tr className="border-b border-ivory-200">
+          <tr className="border-b border-hairline">
             <td className="py-4">
               {reservation.category} · {plural(reservation.nights, "night")}
               <p className="text-xs text-ink-500">{formatDate(reservation.checkIn)} → {formatDate(reservation.checkOut)}</p>
@@ -115,7 +115,7 @@ export function Receipt({ payment, reservation }: { payment: PaymentRow; reserva
         </tfoot>
       </table>
 
-      <footer className="mt-10 flex items-center gap-2 border-t border-ivory-200 pt-6 text-xs text-ink-500">
+      <footer className="mt-10 flex items-center gap-2 border-t border-hairline pt-6 text-xs text-ink-500">
         <ShieldCheck className="size-4 text-success-600" aria-hidden />
         {payment.provider === "paystack" ? "Payment verified with Paystack." : `Payment received and recorded by ${payment.recordedBy}.`} Thank you for staying with us.
       </footer>

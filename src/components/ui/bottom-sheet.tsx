@@ -38,7 +38,7 @@ export function BottomSheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="absolute inset-x-0 bottom-0 max-h-[85vh] animate-[sheet-up_250ms_ease-out] overflow-y-auto rounded-t-2xl bg-white px-4 pt-2.5 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl motion-reduce:animate-none"
+        className="absolute inset-x-0 bottom-0 max-h-[85vh] animate-[sheet-up_250ms_ease-out] overflow-y-auto rounded-t-2xl bg-ivory-50 px-4 pt-2.5 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl motion-reduce:animate-none"
       >
         <div aria-hidden className="mx-auto mb-3 h-1 w-9 rounded-full bg-ink-300" />
         <p className="text-xl font-semibold text-ink-900">{title}</p>

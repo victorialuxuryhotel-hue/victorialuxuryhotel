@@ -59,13 +59,13 @@ export function MobileNav({ items }: { items: ReadonlyArray<{ href: string; labe
                 key={item.href}
                 href={item.href}
                 onClick={close}
-                className="flex min-h-14 items-center border-b border-ivory-200 font-display text-3xl text-navy-950 hover:text-gold-600"
+                className="flex min-h-14 items-center border-b border-hairline font-display text-3xl text-navy-950 hover:text-gold-600"
               >
                 {item.label}
               </Link>
             ))}
           </nav>
-          <div className="space-y-3 border-t border-ivory-200 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="space-y-3 border-t border-hairline p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="grid grid-cols-2 gap-3">
               <a href={`tel:${hotel.phone}`} className={buttonStyles({ variant: "secondary", size: "lg", className: "gap-2" })}>
                 <Phone className="size-4" aria-hidden /> Call

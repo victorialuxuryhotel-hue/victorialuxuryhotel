@@ -11,11 +11,11 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
 }
 
 export function THead(props: HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className="border-b border-ivory-200 bg-ivory-50 text-xs uppercase tracking-wide text-ink-500" {...props} />;
+  return <thead className="border-b border-hairline bg-ivory-50 text-xs uppercase tracking-wide text-ink-500" {...props} />;
 }
 
 export function TBody(props: HTMLAttributes<HTMLTableSectionElement>) {
-  return <tbody className="divide-y divide-ivory-200" {...props} />;
+  return <tbody className="divide-y divide-hairline" {...props} />;
 }
 
 export function TR({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {

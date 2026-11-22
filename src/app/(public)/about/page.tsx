@@ -68,7 +68,7 @@ async function AboutPageContent() {
         <SectionHeading eyebrow="Who we host" title="Welcoming every kind of guest" />
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {guestTypes.map((g) => (
-            <div key={g.title} className="rounded-card bg-white p-6 shadow-card">
+            <div key={g.title} className="rounded-card bg-ivory-50 p-6 shadow-card">
               <h3 className="font-display text-2xl text-navy-950">{g.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-ink-600">{g.text}</p>
             </div>

@@ -83,7 +83,7 @@ function Banner({ shown, onClose, onReplace }: { shown: Shown; onClose: () => vo
             type="button"
             onClick={undo}
             disabled={pending}
-            className="-my-1 inline-flex h-9 shrink-0 items-center rounded-md border border-success-600/30 bg-white px-3 font-medium text-navy-800 tabular-nums hover:bg-ivory-50 disabled:opacity-60"
+            className="-my-1 inline-flex h-9 shrink-0 items-center rounded-md border border-success-600/30 bg-ivory-50 px-3 font-medium text-navy-800 tabular-nums hover:bg-ivory-50 disabled:opacity-60"
           >
             {pending ? "Undoing…" : `Undo · ${left}s`}
           </button>

@@ -15,7 +15,7 @@ export function MobileActionBar({ label, amount, children }: { label: string; am
   const mounted = useSyncExternalStore(noop, () => true, () => false);
   return (
     <>
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ivory-200 bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
         <div className="flex items-center justify-between gap-3">
           <p className="min-w-0 leading-tight">
             <span className="block text-xs text-ink-500">{label}</span>

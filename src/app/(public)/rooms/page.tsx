@@ -35,7 +35,7 @@ async function RoomsPageContent() {
       {/* Phones: a compact list, one row per room type. No availability until dates are chosen. */}
       <Container className="py-10 md:hidden">
         <p className="text-sm text-ink-600">Every room: {included.join(" · ")}</p>
-        <ul className="mt-6 divide-y divide-ivory-200 border-y border-ivory-200">
+        <ul className="mt-6 divide-y divide-hairline border-y border-hairline">
           {categories.map((c) => (
             <li key={c.slug}>
               <Link href={`/rooms/${c.slug}`} className="flex items-center gap-4 py-4">

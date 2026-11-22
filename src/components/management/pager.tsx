@@ -15,7 +15,7 @@ export function Pager({ basePath, params, page, hasMore }: { basePath: string; p
     return s ? `${basePath}?${s}` : basePath;
   };
   return (
-    <nav aria-label="Pages" className="flex items-center justify-between border-t border-ivory-200 px-4 py-3 text-sm">
+    <nav aria-label="Pages" className="flex items-center justify-between border-t border-hairline px-4 py-3 text-sm">
       <span className="text-ink-500">Page {page}</span>
       <div className="flex gap-2">
         {page > 1 ? <Link href={href(page - 1)} className={buttonStyles({ variant: "secondary" })}><ChevronLeft className="size-4" aria-hidden /> Previous</Link> : null}

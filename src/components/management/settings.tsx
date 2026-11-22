@@ -11,7 +11,7 @@ import { formatDateTime } from "@/lib/format";
 export function StaffTable({ rows, manage }: { rows: StaffRow[]; manage?: (s: StaffRow) => ReactNode }) {
   return (
     <>
-      <ul className="divide-y divide-ivory-200 md:hidden">
+      <ul className="divide-y divide-hairline md:hidden">
         {rows.map((s) => (
           <li key={s.id} className="space-y-3 px-4 py-4">
             <div className="flex items-start justify-between gap-3">
@@ -49,7 +49,7 @@ export function StaffTable({ rows, manage }: { rows: StaffRow[]; manage?: (s: St
 export function ActivityList({ rows }: { rows: ActivityRow[] }) {
   if (rows.length === 0) return <div className="p-5"><EmptyState title="No activity yet" /></div>;
   return (
-    <ul className="divide-y divide-ivory-200">
+    <ul className="divide-y divide-hairline">
       {rows.map((a) => (
         <li key={a.id} className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>

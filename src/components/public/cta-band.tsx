@@ -18,13 +18,13 @@ export function CtaBand({ title = "Your stay at Victoria begins here" }: { title
           <p className="mt-2 text-navy-900/80">Book online in minutes, or speak to our front desk.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link href="/book" className={buttonStyles({ size: "lg", className: "bg-navy-950 hover:bg-navy-900" })}>
+          <Link href="/book" className={buttonStyles({ size: "lg", className: "border-navy-950 text-navy-950 hover:bg-navy-950/12" })}>
             Book your stay
           </Link>
-          <a href={`tel:${hotel.phone}`} className={buttonStyles({ variant: "secondary", size: "lg", className: "border-navy-950/20 bg-transparent text-navy-950 hover:bg-white/30" })}>
+          <a href={`tel:${hotel.phone}`} className={buttonStyles({ variant: "secondary", size: "lg", className: "border-navy-950/35 text-navy-950 hover:bg-ivory-50/30" })}>
             <Phone className="size-4" aria-hidden /> Call
           </a>
-          <a href={`https://wa.me/${hotel.whatsapp}`} className={buttonStyles({ variant: "secondary", size: "lg", className: "border-navy-950/20 bg-transparent text-navy-950 hover:bg-white/30" })}>
+          <a href={`https://wa.me/${hotel.whatsapp}`} className={buttonStyles({ variant: "secondary", size: "lg", className: "border-navy-950/35 text-navy-950 hover:bg-ivory-50/30" })}>
             <MessageCircle className="size-4" aria-hidden /> WhatsApp
           </a>
         </div>

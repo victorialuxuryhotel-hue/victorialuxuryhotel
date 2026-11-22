@@ -21,10 +21,10 @@ export default function Page() {
             placeholder="Find a room number"
             filters={<><FilterSelect name="state" label="Status" options={Object.entries(roomBoardState).map(([k, v]) => [k, v.label])} /><FilterSelect name="category" label="Category" options={[["standard", "Standard"], ["deluxe", "Deluxe"], ["suite", "Suite"], ["apartment", "Apartment"]]} /></>}
           />
-          <div className="border-b border-ivory-200 px-4 py-3 md:hidden">
+          <div className="border-b border-hairline px-4 py-3 md:hidden">
             <RoomStateChips rooms={rooms} hrefFor={() => "/preview/app/rooms"} />
           </div>
-          <div className="hidden border-b border-ivory-200 px-5 py-4 md:block"><RoomBoardLegend rooms={rooms} /></div>
+          <div className="hidden border-b border-hairline px-5 py-4 md:block"><RoomBoardLegend rooms={rooms} /></div>
           <div className="p-4 sm:p-5"><RoomBoard rooms={rooms} /></div>
         </Card>
       </div>

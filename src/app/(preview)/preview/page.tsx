@@ -50,9 +50,9 @@ export default function PreviewIndex() {
         <p className="mt-2 text-ink-600">Every page in the platform. Preview screens use sample data.</p>
         <div className="mt-12 grid gap-8 lg:grid-cols-3">
           {groups.map((g) => (
-            <section key={g.title} className="rounded-card bg-white p-6 shadow-card">
+            <section key={g.title} className="rounded-card bg-ivory-50 p-6 shadow-card">
               <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-600">{g.title}</h2>
-              <ul className="mt-4 divide-y divide-ivory-200">
+              <ul className="mt-4 divide-y divide-hairline">
                 {g.screens.map(([href, label]) => (
                   <li key={href}><Link href={href} className="block py-2.5 text-sm text-ink-800 hover:text-navy-700">{label}</Link></li>
                 ))}

@@ -11,7 +11,7 @@ export function GuestTable({ rows, hrefFor }: { rows: GuestRow[]; hrefFor: (g: G
   return (
     <>
       {/* Phones: one tappable row per guest. */}
-      <ul className="divide-y divide-ivory-200 md:hidden">
+      <ul className="divide-y divide-hairline md:hidden">
         {rows.map((g) => (
           <li key={g.id}>
             <Link href={hrefFor(g)} className="flex items-center gap-3 px-4 py-3.5 hover:bg-ivory-50">
@@ -64,7 +64,7 @@ export function GuestProfile({ guest, stays, stayHref }: { guest: GuestRow & { n
   return (
     <div className="grid gap-6 px-4 py-6 lg:grid-cols-[1fr_2fr] lg:px-8">
       <Card>
-        <div className="flex flex-col items-center border-b border-ivory-200 p-6 text-center">
+        <div className="flex flex-col items-center border-b border-hairline p-6 text-center">
           <span className="flex size-16 items-center justify-center rounded-full bg-navy-50 text-xl font-semibold text-navy-800">
             {guest.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
           </span>
