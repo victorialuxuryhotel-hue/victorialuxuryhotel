@@ -85,7 +85,7 @@ function OverrideInline({ id }: { id: string }) {
   return (
     <form action={action} onSubmit={keepValues(action)} className="mt-4 space-y-3 rounded-card border border-hairline p-4">
       <input type="hidden" name="reservationId" value={id} />
-      <Field label="Reason (recorded in the activity log)" htmlFor="ovr-why"><Input id="ovr-why" name="reason" required minLength={5} placeholder="e.g. Company paying on invoice" /></Field>
+      <Field label="Reason" htmlFor="ovr-why"><Input id="ovr-why" name="reason" required minLength={5} placeholder="e.g. Company paying on invoice" /></Field>
       {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
       {state?.ok ? <FormMessage tone="success">Done. The override is recorded.</FormMessage> : null}
       <div className="grid grid-cols-2 gap-2.5">

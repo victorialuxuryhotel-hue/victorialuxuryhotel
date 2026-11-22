@@ -154,7 +154,7 @@ function ManageForm({ s, isSelf, onDone }: { s: StaffRow; isSelf: boolean; onDon
           {s.isActive ? (
             <>
               <Button type="submit" variant="danger" pending={pending} className="w-full">Remove access</Button>
-              <p className="mt-2 text-xs text-ink-500">They&apos;re signed out on their next action. Their name stays on past bookings and the activity log.</p>
+              <p className="mt-2 text-xs text-ink-500">They&apos;re signed out straight away. Their name stays on past records.</p>
             </>
           ) : (
             <Button type="submit" variant="secondary" pending={pending} className="w-full">Restore access</Button>

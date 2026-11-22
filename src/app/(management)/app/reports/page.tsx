@@ -111,7 +111,7 @@ async function Money({ range }: { range: ReportRange }) {
         ) : null}
       </Card>
       <Card>
-        <CardHeader title="Cash-up by staff · today" description="Who took which payments today, for balancing the till." />
+        <CardHeader title="Cash-up by staff · today" description="Payments each person took today." />
         {cash.length === 0 ? (
           <div className="p-5"><EmptyState title="No payments today yet" /></div>
         ) : (
@@ -151,7 +151,7 @@ async function Occupancy({ range }: { range: ReportRange }) {
         ) : null}
       </Card>
       <Card>
-        <CardHeader title="Room-nights sold by type" description="Counted by the room each guest actually stayed in." />
+        <CardHeader title="Room-nights sold by type" />
         {o.byType.length === 0 ? (
           <div className="p-5"><EmptyState title="No stays in this period" /></div>
         ) : (
@@ -223,7 +223,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
 export default function ReportsPage(props: PageProps<"/app/reports">) {
   return (
     <>
-      <PageHeader title="Reports" description="Money, occupancy and the activity log. All times are Lagos time." />
+      <PageHeader title="Reports" description="Money, occupancy and staff activity." />
       <Suspense fallback={<LoadingState />}>
         <Content searchParams={props.searchParams} />
       </Suspense>

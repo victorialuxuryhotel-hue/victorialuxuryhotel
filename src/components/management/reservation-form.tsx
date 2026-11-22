@@ -61,7 +61,6 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
   const [checkIn, setCheckIn] = useState(today);
   const [checkOut, setCheckOut] = useState(addDays(today, 1));
   const [source, setSource] = useState<Source>("walk_in");
-  const [moreSources, setMoreSources] = useState(false);
   const nights = checkIn && checkOut && checkOut > checkIn ? nightsBetween(checkIn, checkOut) : 0;
 
   // Room type: free counts for these dates.
@@ -102,7 +101,7 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
         {state && !state.ok && !state.fieldErrors ? <FormMessage>{state.message}</FormMessage> : null}
 
         <Card>
-          <CardHeader title="Guest" description="Start with the phone number. Returning guests appear as you type." />
+          <CardHeader title="Guest" description="Start with the phone number." />
           <div className="space-y-5 p-5">
             {guest ? (
               <div className="flex items-center gap-3 rounded-md border border-navy-800 bg-navy-50 p-4">
@@ -175,19 +174,16 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
             </Field>
           </div>
           <fieldset className="border-t border-hairline p-5">
-            <legend className="mb-3 text-sm text-ink-700">Received by</legend>
+            <legend className="mb-3 text-sm text-ink-700">Booked by</legend>
             <input type="hidden" name="source" value={source} />
             <input type="hidden" name="roomId" value={room?.id ?? ""} />
             <div className="flex flex-wrap gap-2">
-              {(moreSources || source === "whatsapp" || source === "staff" ? (["walk_in", "phone", "whatsapp", "staff"] as const) : (["walk_in", "phone"] as const)).map((s) => (
+              {(["walk_in", "phone", "whatsapp"] as const).map((s) => (
                 <button key={s} type="button" aria-pressed={source === s} onClick={() => setSource(s)} className={chip(source === s)}>
                   {source === s ? <Check className="size-3.5" aria-hidden /> : null}
                   {bookingSource[s]}
                 </button>
               ))}
-              {!moreSources && source !== "whatsapp" && source !== "staff" ? (
-                <button type="button" onClick={() => setMoreSources(true)} className={chip(false)}>More</button>
-              ) : null}
             </div>
           </fieldset>
         </Card>
@@ -243,7 +239,7 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
         </Card>
 
         <p className="text-sm text-ink-600">
-          Held for {plural(holdHours, "hour")} until payment is recorded. The final price is set by the system when you create it.
+          Held for {plural(holdHours, "hour")} until paid.
         </p>
       </div>
 

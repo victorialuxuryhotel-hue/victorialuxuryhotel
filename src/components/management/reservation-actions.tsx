@@ -158,7 +158,7 @@ export function OverrideForm({ reservationId }: { reservationId: string }) {
       <summary className="cursor-pointer font-medium text-ink-900">Manager options: confirm without full payment, or extend the hold</summary>
       <form action={action} onSubmit={keepValues(action)} className="mt-4 space-y-3">
         <input type="hidden" name="reservationId" value={reservationId} />
-        <Field label="Reason (recorded in the activity log)" htmlFor="override-reason">
+        <Field label="Reason" htmlFor="override-reason">
           <Input id="override-reason" name="reason" required minLength={5} placeholder="e.g. Corporate guest, company paying on invoice" />
         </Field>
         {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}

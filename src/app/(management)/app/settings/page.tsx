@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Booking rules" };
 export default function SettingsPage() {
   return (
     <>
-      <PageHeader title="Booking rules" description="How online and phone bookings are held and paid for." />
+      <PageHeader title="Booking rules" description="Check-in times, holds, cancellations and VAT." />
       <Suspense fallback={<LoadingState />}>
         <SettingsContent />
       </Suspense>
@@ -30,13 +30,13 @@ async function SettingsContent() {
   const [rules, catalogue] = await Promise.all([getBookingRules(), getCatalogueSettings()]);
   return (
     <div className="space-y-6 px-4 py-6 lg:px-8">
-      <SettingsSection title="Booking rules" description="Changes apply to new bookings and are recorded in the activity log.">
+      <SettingsSection title="Booking rules" description="Changes apply to new bookings.">
         <BookingRulesForm rules={rules} />
       </SettingsSection>
       <SettingsSection title="Extras" description="Guests can add these when they book online. Prices include VAT.">
         <ExtrasManager extras={catalogue.extras} />
       </SettingsSection>
-      <SettingsSection title="Promo codes" description="A percentage off the room price, applied when a guest types the code on the website.">
+      <SettingsSection title="Promo codes" description="Percent off the room price when a guest enters the code.">
         <PromoManager promos={catalogue.promos} />
       </SettingsSection>
     </div>

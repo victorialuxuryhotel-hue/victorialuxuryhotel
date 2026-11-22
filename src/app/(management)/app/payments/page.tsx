@@ -46,7 +46,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
           <Pager basePath="/app/payments" params={{}} page={page} hasMore={fetched.length > PAGE_SIZE} />
         </>
       ) : (
-        <div className="p-5"><EmptyState title="No payments yet" description="Verified Paystack payments and recorded offline payments will appear here." /></div>
+        <div className="p-5"><EmptyState title="No payments yet" description="Payments will show here." /></div>
       )}
     </Card>
   );
@@ -55,7 +55,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
 export default function PaymentsPage(props: PageProps<"/app/payments">) {
   return (
     <>
-      <PageHeader title="Payments" description="Payments against reservations, online and offline." />
+      <PageHeader title="Payments" description="Online and desk payments." />
       <div className="px-4 py-6 lg:px-8">
         <Suspense fallback={<LoadingState />}>
           <Content searchParams={props.searchParams} />

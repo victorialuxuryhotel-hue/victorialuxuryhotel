@@ -22,7 +22,7 @@ async function Content() {
 export default function NewReservationPage() {
   return (
     <>
-      <PageHeader title="New reservation" description="Walk-in, phone or WhatsApp. Uses the same availability and pricing as the website." />
+      <PageHeader title="New reservation" description="Walk-in, phone or WhatsApp bookings." />
       <Suspense fallback={<LoadingState />}><Content /></Suspense>
     </>
   );

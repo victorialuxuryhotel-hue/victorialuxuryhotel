@@ -30,7 +30,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   return (
     <div className="space-y-6 px-4 py-6 lg:px-8">
       <Card>
-        <CardHeader title="Record an expense" description="Anything the hotel paid for. Expenses can be voided with a reason, never edited or deleted." />
+        <CardHeader title="Record an expense" description="Mistakes can be voided, not deleted." />
         <ExpenseForm today={today} categories={EXPENSE_CATEGORIES} methods={EXPENSE_METHODS} />
       </Card>
       <nav aria-label="Period" className="flex overflow-hidden rounded-md border border-hairline sm:max-w-sm [&>*+*]:border-l [&>*+*]:border-hairline">

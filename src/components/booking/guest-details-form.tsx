@@ -65,10 +65,10 @@ export function GuestDetailsForm({
           </div>
         </fieldset>
       ) : null}
-      <Field label="Promo code" optional htmlFor="promo" hint="Any discount is applied on the next step." error={err("promoCode")} className="sm:max-w-xs">
+      <Field label="Promo code" optional htmlFor="promo" error={err("promoCode")} className="sm:max-w-xs">
         <Input id="promo" name="promoCode" autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={20} className="h-12 uppercase" />
       </Field>
-      <Field label="Special requests" optional htmlFor="requests" hint="Arrival time, accessibility needs, anything we should know. We'll do our best.">
+      <Field label="Special requests" optional htmlFor="requests" hint="Arrival time or anything we should know.">
         <Textarea id="requests" name="specialRequests" rows={3} maxLength={1000} />
       </Field>
       <section className="rounded-card bg-ivory-100 p-5 text-sm text-ink-700">

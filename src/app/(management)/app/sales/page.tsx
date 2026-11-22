@@ -32,7 +32,7 @@ async function Content() {
       </Card>
       {manage ? (
         <Card>
-          <CardHeader title="Menu" description="Prices include VAT. Taking an item off hides it from the till." />
+          <CardHeader title="Menu" description="Prices include VAT." />
           <MenuManager menu={menu} />
         </Card>
       ) : null}
@@ -43,7 +43,7 @@ async function Content() {
 export default function SalesPage() {
   return (
     <>
-      <PageHeader title="Restaurant & bar" description="Take orders and payments, or charge a staying guest's room." />
+      <PageHeader title="Restaurant & bar" description="Take payment, or charge a guest's room." />
       <Suspense fallback={<LoadingState />}><Content /></Suspense>
     </>
   );

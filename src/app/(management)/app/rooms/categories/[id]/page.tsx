@@ -27,7 +27,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
       <CategoryForm category={c} />
       <div className="px-4 pb-8 lg:px-8">
         <Card>
-          <CardHeader title="Photos" description="Shown on the website. The cover appears on room cards; all photos appear on the room's page and in the gallery." />
+          <CardHeader title="Photos" description="The cover photo shows first." />
           <div className="p-5"><CategoryPhotoManager categoryId={c.id} photos={c.photos} /></div>
         </Card>
       </div>

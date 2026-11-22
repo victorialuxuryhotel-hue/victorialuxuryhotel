@@ -22,11 +22,11 @@ async function Content() {
   return (
     <div className="space-y-6 px-4 py-6 lg:px-8">
       <Card>
-        <CardHeader title="Upcoming" description="Two confirmed events can't share the hall at the same time." />
+        <CardHeader title="Upcoming" />
         <HallBookingList bookings={bookings} today={today} />
       </Card>
       <Card>
-        <CardHeader title="New hall booking" description="Save an enquiry, or confirm it straight away." />
+        <CardHeader title="New hall booking" />
         <HallBookingForm today={today} />
       </Card>
     </div>

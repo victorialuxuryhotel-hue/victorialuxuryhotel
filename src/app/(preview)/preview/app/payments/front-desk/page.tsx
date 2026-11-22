@@ -26,7 +26,7 @@ async function Content({ searchParams }: Props) {
 export default function Page(props: Props) {
   return (
     <>
-      <PageHeader title="Payments" description="Payments against reservations, online and offline." />
+      <PageHeader title="Payments" description="Online and desk payments." />
       <div className="px-4 py-6 lg:px-8"><Suspense><Content {...props} /></Suspense></div>
     </>
   );

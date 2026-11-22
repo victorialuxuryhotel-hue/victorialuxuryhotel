@@ -23,14 +23,14 @@ async function Content() {
       <Card>
         <CardHeader
           title="Photo places"
-          description="Each place on the website, with the shot the photographer brief asks for. Until a photo is added, the website shows a branded placeholder."
+          description="One photo for each place on the website."
         />
         {photoSlots.map((s) => (
           <SitePhotoSlot key={s.slot} slot={s.slot} label={s.label} where={s.where} shape={s.shape} shot={s.shot} photo={bySlot[s.slot]} />
         ))}
       </Card>
       <Card>
-        <CardHeader title="Gallery" description="Extra photos for the Gallery page, by section. Room-type photos are added to the gallery automatically." />
+        <CardHeader title="Gallery" description="Extra photos for the Gallery page." />
         <GalleryManager photos={gallery} groups={galleryGroups} />
       </Card>
       <p className="text-sm text-ink-500">

@@ -73,7 +73,7 @@ export function UploadForm({
       </label>
       {hint ? <p className="text-sm text-warning-700">{hint}</p> : null}
       <div className={cn("grid gap-3", groups ? "sm:grid-cols-[1fr_12rem]" : "")}>
-        <Field label="Describe the photo" htmlFor={`alt-${Object.values(hidden).join("-")}`} hint="Read aloud to visitors using screen readers, e.g. “Deluxe room with king bed and city view”.">
+        <Field label="Describe the photo" htmlFor={`alt-${Object.values(hidden).join("-")}`} hint="Describe the photo, e.g. “Deluxe room with king bed”.">
           <Input id={`alt-${Object.values(hidden).join("-")}`} name="altText" required minLength={3} maxLength={200} />
         </Field>
         {groups ? (

@@ -70,7 +70,7 @@ export default function ReservationsPage(props: PageProps<"/app/reservations">) 
     <>
       <PageHeader
         title="Reservations"
-        description="Website, walk-in, phone and WhatsApp bookings in one place."
+        description="All bookings in one place."
         actions={<Link href="/app/reservations/new" className={buttonStyles()}><CalendarPlus className="size-4" aria-hidden />New reservation</Link>}
       />
       <div className="px-4 py-6 lg:px-8">

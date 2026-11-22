@@ -25,7 +25,7 @@ export default function CategoriesPage() {
     <>
       <PageHeader
         title="Rates & room types"
-        description="What guests book on the website: names, rates, capacity and visibility."
+        description="Room names, prices and how many guests each sleeps."
         actions={<Link href="/app/rooms/categories/new" className={buttonStyles()}>Add room type</Link>}
       />
       <RatesTabs current="types" />
