@@ -63,7 +63,6 @@ export function SiteFooter() {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-xs text-ivory-200/50 sm:flex-row sm:justify-between sm:px-6">
           <p>© {hotel.name}</p>
-          <Link href="/login" className="hover:text-ivory-200">Staff sign in</Link>
         </div>
       </div>
     </footer>
