@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AddRoomForm } from "@/components/management/add-room-form";
 import { PageHeader } from "@/components/management/page-header";
-import { RoomBoard, RoomBoardLegend } from "@/components/management/room-board";
+import { RoomBoard, RoomBoardLegend, RoomStateChips } from "@/components/management/room-board";
+import { roomBoardState, type RoomBoardState } from "@/domain/status";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
@@ -13,16 +14,25 @@ import { listCategories, roomBoard } from "@/server/queries/rooms";
 
 export const metadata: Metadata = { title: "Rooms" };
 
-async function Content() {
+async function Content({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const staff = await requireStaff();
+  const requested = (await searchParams).state;
+  const active = typeof requested === "string" && requested in roomBoardState ? (requested as RoomBoardState) : undefined;
   const configure = can(staff.role, "rooms.configure");
   const [rooms, categories] = await Promise.all([roomBoard(), configure ? listCategories() : Promise.resolve([])]);
   return (
     <div className="space-y-6">
       <Card>
-        <div className="border-b border-ivory-200 px-5 py-4"><RoomBoardLegend rooms={rooms} /></div>
-        <div className="p-5">
-          {rooms.length ? <RoomBoard rooms={rooms} /> : <EmptyState title="No rooms yet" description="Add rooms below, or ask a manager to." />}
+        <div className="border-b border-ivory-200 px-4 py-3 md:hidden">
+          <RoomStateChips rooms={rooms} active={active} hrefFor={(s) => (s ? `/app/rooms?state=${s}` : "/app/rooms")} />
+        </div>
+        <div className="hidden border-b border-ivory-200 px-5 py-4 md:block"><RoomBoardLegend rooms={rooms} /></div>
+        <div className="p-4 sm:p-5">
+          {rooms.length ? (
+            <RoomBoard rooms={active ? rooms.filter((r) => r.state === active) : rooms} />
+          ) : (
+            <EmptyState title="No rooms yet" description="Add rooms below, or ask a manager to." />
+          )}
         </div>
         <p className="border-t border-ivory-200 px-5 py-3 text-xs text-ink-500">Tap a room to update cleaning status or mark it under maintenance.</p>
       </Card>
@@ -36,7 +46,7 @@ async function Content() {
   );
 }
 
-export default function RoomsPage() {
+export default function RoomsPage(props: PageProps<"/app/rooms">) {
   return (
     <>
       <PageHeader
@@ -44,7 +54,7 @@ export default function RoomsPage() {
         description="Live status, readiness and maintenance."
         actions={<Link href="/app/rooms/categories" className={buttonStyles({ variant: "secondary" })}>Categories & rates</Link>}
       />
-      <div className="px-4 py-6 lg:px-8"><Suspense fallback={<LoadingState />}><Content /></Suspense></div>
+      <div className="px-4 py-6 lg:px-8"><Suspense fallback={<LoadingState />}><Content searchParams={props.searchParams} /></Suspense></div>
     </>
   );
 }

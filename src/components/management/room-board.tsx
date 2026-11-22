@@ -3,7 +3,7 @@ import { roomBoardState, type RoomBoardState } from "@/domain/status";
 import type { RoomTile } from "@/domain/views";
 import { cn } from "@/lib/utils/cn";
 import { ReadinessBadge } from "./badges";
-import { RoomQuickActions } from "./room-actions";
+import { RoomTile as InteractiveTile } from "./room-tile";
 
 const accent: Record<RoomBoardState, string> = {
   occupied: "border-l-navy-700",
@@ -28,6 +28,31 @@ export function RoomBoardLegend({ rooms }: { rooms: RoomTile[] }) {
   );
 }
 
+/**
+ * Phones: a sideways-scrolling row of state chips ("All 29", "Needs cleaning 4")
+ * that filter the board via ?state=, so it works without JavaScript.
+ */
+export function RoomStateChips({ rooms, active, hrefFor }: { rooms: RoomTile[]; active?: RoomBoardState; hrefFor: (s?: RoomBoardState) => string }) {
+  const chip = (on: boolean) =>
+    cn(
+      "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm whitespace-nowrap tabular-nums",
+      on ? "border-navy-800 bg-navy-800 text-white" : "border-ink-300 bg-white text-ink-700",
+    );
+  return (
+    <nav aria-label="Filter rooms" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden">
+      <a href={hrefFor()} aria-current={!active ? "page" : undefined} className={chip(!active)}>All {rooms.length}</a>
+      {(Object.keys(roomBoardState) as RoomBoardState[]).map((s) => {
+        const n = rooms.filter((r) => r.state === s).length;
+        return n ? (
+          <a key={s} href={hrefFor(s)} aria-current={active === s ? "page" : undefined} className={chip(active === s)}>
+            {roomBoardState[s].label} {n}
+          </a>
+        ) : null;
+      })}
+    </nav>
+  );
+}
+
 /** Every room at a glance, grouped by floor. Tiles open the room's quick actions. */
 export function RoomBoard({ rooms, interactive = true }: { rooms: Array<RoomTile & { serviceStatus?: string }>; interactive?: boolean }) {
   const floors = [...new Set(rooms.map((r) => r.floor ?? "—"))];
@@ -43,42 +68,49 @@ export function RoomBoard({ rooms, interactive = true }: { rooms: Array<RoomTile
               .filter((r) => (r.floor ?? "—") === floor)
               .map((r) => (
                 <li key={r.id}>
-                  <details className="group relative h-full">
-                  <summary
-                    className={cn(
-                      "flex h-full w-full cursor-pointer list-none flex-col rounded-md border border-l-4 border-ivory-200 bg-white p-3 text-left shadow-sm transition-shadow hover:shadow-md group-open:ring-2 group-open:ring-navy-600/30",
+                  {(() => {
+                    const body = (
+                      <>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-lg font-semibold tabular-nums text-ink-900">{r.number}</span>
+                          <span className="truncate text-xs text-ink-500">{r.category}</span>
+                        </div>
+                        <p className="mt-1 text-xs font-medium text-ink-700">{roomBoardState[r.state].label}</p>
+                        <div className="mt-2 flex min-h-5 min-w-0 items-center gap-1.5 text-xs text-ink-500">
+                          {r.state === "maintenance" ? (
+                            <>
+                              <Wrench className="size-3.5 shrink-0" aria-hidden /> <span className="truncate">{r.note ?? "Out of service"}</span>
+                            </>
+                          ) : r.guestName ? (
+                            <>
+                              <User className="size-3.5 shrink-0" aria-hidden />
+                              <span className="truncate">{r.guestName}</span>
+                            </>
+                          ) : r.readiness !== "ready" ? (
+                            <>
+                              <Sparkles className="size-3.5 shrink-0" aria-hidden /> <ReadinessBadge readiness={r.readiness} />
+                            </>
+                          ) : null}
+                        </div>
+                      </>
+                    );
+                    const tileClass = cn(
+                      "flex h-full min-h-[76px] w-full min-w-0 flex-col rounded-md border border-l-4 border-ivory-200 bg-white p-3 text-left shadow-sm transition-shadow hover:shadow-md",
                       accent[r.state],
-                    )}
-                  >
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-lg font-semibold tabular-nums text-ink-900">{r.number}</span>
-                      <span className="text-xs text-ink-500">{r.category}</span>
-                    </div>
-                    <p className="mt-1 text-xs font-medium text-ink-700">{roomBoardState[r.state].label}</p>
-                    <div className="mt-3 flex min-h-5 items-center gap-1.5 text-xs text-ink-500">
-                      {r.state === "maintenance" ? (
-                        <>
-                          <Wrench className="size-3.5" aria-hidden /> {r.note ?? "Out of service"}
-                        </>
-                      ) : r.guestName ? (
-                        <>
-                          <User className="size-3.5" aria-hidden />
-                          <span className="truncate">{r.guestName}</span>
-                        </>
-                      ) : r.readiness !== "ready" ? (
-                        <>
-                          <Sparkles className="size-3.5" aria-hidden /> <ReadinessBadge readiness={r.readiness} />
-                        </>
-                      ) : null}
-                    </div>
-                  </summary>
-                  {interactive ? (
-                    <div className="absolute top-full left-0 z-20 mt-1 w-60 rounded-card border border-ivory-200 bg-white p-3 shadow-lg">
-                      <p className="mb-2 text-xs font-semibold text-ink-500">Room {r.number}</p>
-                      <RoomQuickActions roomId={r.id} readiness={r.readiness} maintenance={r.serviceStatus === "maintenance" || r.state === "maintenance"} />
-                    </div>
-                  ) : null}
-                  </details>
+                    );
+                    return interactive ? (
+                      <InteractiveTile
+                        key={`${r.state}-${r.readiness}-${r.serviceStatus ?? ""}`}
+                        className={tileClass}
+                        stateLabel={`${roomBoardState[r.state].label}${r.readiness !== "ready" && r.state !== "maintenance" ? ` · ${r.readiness.replace(/_/g, " ")}` : ""}`}
+                        room={{ id: r.id, number: r.number, category: r.category, readiness: r.readiness, maintenance: r.serviceStatus === "maintenance" || r.state === "maintenance" }}
+                      >
+                        {body}
+                      </InteractiveTile>
+                    ) : (
+                      <div className={tileClass}>{body}</div>
+                    );
+                  })()}
                 </li>
               ))}
           </ul>
