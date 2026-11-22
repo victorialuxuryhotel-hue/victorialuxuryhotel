@@ -34,13 +34,13 @@ export function MovementList({
           {rows.map((r) => {
             const balance = r.totalKobo - r.paidKobo;
             return (
-              <li key={r.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5 sm:py-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link href={hrefFor(r)} className="font-medium text-ink-900 hover:text-navy-700">{r.guestName}</Link>
                     <ReservationBadge status={r.status} />
                   </div>
-                  <p className="mt-1 text-sm text-ink-500">
+                  <p className="mt-1 truncate text-sm text-ink-500">
                     {r.category} · {r.roomNumber ? `Room ${r.roomNumber}` : <span className="text-warning-700">no room assigned</span>} ·{" "}
                     {plural(nightsBetween(r.checkIn, r.checkOut), "night")}
                     {arrivals ? "" : ` · since ${formatDate(r.checkIn, { year: false, weekday: false })}`}
@@ -50,9 +50,9 @@ export function MovementList({
                 {/* The one next step for this guest; the server re-checks everything. */}
                 {arrivals ? (
                   r.status === "pending_payment" ? (
-                    <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "secondary" })}>Take payment</Link>
+                    <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "secondary", className: "min-h-10 shrink-0 whitespace-nowrap" })}>Take payment</Link>
                   ) : !r.roomNumber ? (
-                    <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "secondary" })}>Assign room</Link>
+                    <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "secondary", className: "min-h-10 shrink-0 whitespace-nowrap" })}>Assign room</Link>
                   ) : (
                     <CheckInButton reservationId={r.id} />
                   )

@@ -5,7 +5,7 @@ import { MovementList } from "@/components/management/front-desk";
 import { PageHeader } from "@/components/management/page-header";
 import { ReservationTable } from "@/components/management/reservation-table";
 import { buttonStyles } from "@/components/ui/button";
-import { Card, CardHeader, Stat } from "@/components/ui/card";
+import { Card, CardHeader, Stat, StatGrid } from "@/components/ui/card";
 import { formatNaira } from "@/lib/format";
 import { reservations, rooms } from "../_sample";
 
@@ -22,15 +22,15 @@ export default function Page() {
       <PageHeader
         title="Good morning, Kemi"
         description="Tuesday 1 December 2026"
-        actions={<Link href="/preview/app/reservations/new" className={buttonStyles()}><CalendarPlus className="size-4" aria-hidden />New reservation</Link>}
+        actions={<Link href="/preview/app/reservations/new" className={buttonStyles({ className: "size-11 px-0 sm:size-auto sm:px-4" })} aria-label="New reservation"><CalendarPlus className="size-4" aria-hidden /><span className="hidden sm:inline">New reservation</span></Link>}
       />
       <div className="space-y-8 px-4 py-6 lg:px-8">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatGrid>
           <Stat label="Arrivals today" value={arrivals.length} caption="2 still need a room" />
           <Stat label="Departures today" value={1} caption="1 balance outstanding" />
           <Stat label="In house" value={count("occupied")} caption="Guests checked in now" />
           <Stat label="Awaiting payment" value={1} caption="Held, not yet paid" />
-        </div>
+        </StatGrid>
 
         <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
           <MovementList kind="arrivals" rows={arrivals} hrefFor={href} />
@@ -49,11 +49,11 @@ export default function Page() {
 
         <section aria-labelledby="money">
           <h2 id="money" className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">December so far</h2>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <StatGrid className="xl:grid-cols-3">
             <Stat label="Payments received" value={formatNaira(48_650_000)} caption="Verified money in: Paystack + recorded offline" />
             <Stat label="Booked value" value={formatNaira(61_500_000)} caption="Confirmed stays this month. Not cash received" />
             <Stat label="Outstanding" value={formatNaira(12_850_000)} caption="Confirmed stays not yet fully paid" />
-          </div>
+          </StatGrid>
           <Card className="mt-4">
             <CardHeader title="Payments received, last 14 days" description="Daily total of verified payments" />
             <div className="flex h-44 items-end gap-1.5 px-5 pt-4 pb-5" role="img" aria-label="Bar chart of daily payments received over the last 14 days">

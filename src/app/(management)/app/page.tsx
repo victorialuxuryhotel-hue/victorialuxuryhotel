@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/management/page-header";
 import { ReservationTable } from "@/components/management/reservation-table";
 import { RoomBoardLegend } from "@/components/management/room-board";
 import { buttonStyles } from "@/components/ui/button";
-import { Card, CardHeader, Stat } from "@/components/ui/card";
+import { Card, CardHeader, Stat, StatGrid } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
 import { formatDate, formatNaira } from "@/lib/format";
@@ -26,12 +26,12 @@ async function Revenue() {
   return (
     <section aria-labelledby="money">
       <h2 id="money" className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">This month</h2>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StatGrid>
         <Stat label="Received today" value={formatNaira(r.receivedToday)} caption="Verified payments only" />
         <Stat label="Received this month" value={formatNaira(r.receivedMonth)} caption="Verified money in: Paystack + offline, minus refunds" />
         <Stat label="Booked value" value={formatNaira(r.bookedValue)} caption="Stays arriving this month. Not cash received" />
         <Stat label="Outstanding" value={formatNaira(r.outstanding)} caption="Unpaid balances on confirmed stays" />
-      </div>
+      </StatGrid>
       <Card className="mt-4">
         <CardHeader title="Payments received, last 14 days" description="Daily total of verified payments" />
         <div className="flex h-44 items-end gap-1.5 px-5 pt-4 pb-2" role="img" aria-label="Bar chart of daily verified payments over the last 14 days">
@@ -58,12 +58,12 @@ async function Content() {
   return (
     <div className="space-y-8 px-4 py-6 lg:px-8">
       <p className="-mt-2 text-sm text-ink-500">{formatDate(m.today)}</p>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StatGrid>
         <Stat label="Arrivals today" value={m.arrivals.length} caption={noRoom ? `${noRoom} still need a room` : "All have rooms assigned"} />
         <Stat label="Departures due" value={m.departures.length} caption={owing ? `${owing} with a balance outstanding` : "No balances outstanding"} />
         <Stat label="In house" value={m.inHouse.length} caption="Guests checked in now" />
         <Stat label="Awaiting payment" value={awaiting} caption="Held, not yet paid" />
-      </div>
+      </StatGrid>
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         <MovementList kind="arrivals" rows={m.arrivals} hrefFor={href} />
@@ -99,7 +99,7 @@ export default function DashboardPage() {
     <>
       <PageHeader
         title="Dashboard"
-        actions={<Link href="/app/reservations/new" className={buttonStyles()}><CalendarPlus className="size-4" aria-hidden />New reservation</Link>}
+        actions={<Link href="/app/reservations/new" className={buttonStyles({ className: "size-11 px-0 sm:size-auto sm:px-4" })} aria-label="New reservation"><CalendarPlus className="size-4" aria-hidden /><span className="hidden sm:inline">New reservation</span></Link>}
       />
       <Suspense fallback={<LoadingState />}><Content /></Suspense>
     </>
