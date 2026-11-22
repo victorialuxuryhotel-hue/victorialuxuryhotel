@@ -112,4 +112,6 @@ export type AvailabilityOption = {
   nightlyRateKobo: number;
   totalKobo: number;
   nights: number;
+  /** For a type that fits the party but is full: the nearest check-in (±14 days) with the same nights free. */
+  freeFrom?: string;
 };

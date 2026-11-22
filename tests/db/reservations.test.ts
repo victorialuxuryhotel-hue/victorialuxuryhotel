@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { searchAvailability } from "@/server/domain/inventory";
+import { freeNights, searchAvailability } from "@/server/domain/inventory";
 import {
   assignRoom,
   cancelReservation,
@@ -388,5 +388,17 @@ describe("undo (room assignment and status changes)", () => {
     // Someone else takes room 0 for the same nights without touching this booking.
     await insertReservation({ categoryId: c.id, checkIn: day(3), checkOut: day(5), roomId: c.roomIds[0], status: "confirmed" });
     await rejects(undoAction(db, desk, r, move.undoId!), /given to another guest|filled up/);
+  });
+});
+
+describe("free nights (for suggesting other dates)", () => {
+  it("says yes or no per night per type, counting live bookings only", async () => {
+    const c = await makeCategory(1);
+    await insertReservation({ categoryId: c.id, checkIn: day(60), checkOut: day(62), status: "confirmed" });
+    const gone = await insertReservation({ categoryId: c.id, checkIn: day(63), checkOut: day(64), status: "confirmed" });
+    await exec("UPDATE reservations SET status = 'cancelled' WHERE id = ?", gone);
+    const free = (await freeNights(db, [c.slug], day(59), day(65))).get(c.slug)!;
+    expect([59, 60, 61, 62, 63, 64].map((n) => free.get(day(n)))).toEqual([true, false, false, true, true, true]);
+    expect((await freeNights(db, [], day(1), day(2))).size).toBe(0);
   });
 });

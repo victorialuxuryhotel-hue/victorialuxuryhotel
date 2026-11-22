@@ -81,6 +81,31 @@ export async function searchAvailability(db: Db, checkIn: string, checkOut: stri
   }));
 }
 
+/**
+ * Whether each of the given room types has at least one room free on each
+ * night from `from` (inclusive) to `to` (exclusive). Yes/no only: like the
+ * search, no counts leave this function. Used to suggest nearby dates when a
+ * type is full.
+ */
+export async function freeNights(db: Db, slugs: string[], from: string, to: string): Promise<Map<string, Map<string, boolean>>> {
+  const out = new Map<string, Map<string, boolean>>(slugs.map((s) => [s, new Map()]));
+  if (slugs.length === 0 || to <= from) return out;
+  const { results } = await db
+    .prepare(
+      `SELECT c.slug, cal.d,
+         (SELECT count(*) FROM rooms WHERE category_id = c.id AND is_active = 1 AND service_status = 'in_service')
+         > (SELECT count(*) FROM reservations r LEFT JOIN rooms rm ON rm.id = r.room_id
+            WHERE r.check_in <= cal.d AND r.check_out > cal.d AND ${LIVE_SQL}
+              AND coalesce(rm.category_id, r.category_id) = c.id) AS is_free
+       FROM room_categories c JOIN calendar cal ON cal.d >= ?1 AND cal.d < ?2
+       WHERE c.is_active = 1 AND c.slug IN (${slugs.map((_, i) => `?${i + 3}`).join(", ")})`,
+    )
+    .bind(from, to, ...slugs)
+    .all<{ slug: string; d: string; is_free: number }>();
+  for (const r of results) out.get(r.slug)?.set(r.d, r.is_free === 1);
+  return out;
+}
+
 /** Stay rules shared by the website and staff (same messages as before). */
 export function validateStay(checkIn: string | null | undefined, checkOut: string | null | undefined, guests: number | null | undefined, allowPast = false): asserts checkIn is string {
   if (!checkIn || !checkOut || !isIsoDate(checkIn) || !isIsoDate(checkOut)) throw new AppError("VALIDATION", "Choose check-in and check-out dates.");

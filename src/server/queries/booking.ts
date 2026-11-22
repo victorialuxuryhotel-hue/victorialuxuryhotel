@@ -1,11 +1,16 @@
 import "server-only";
 import { connection } from "next/server";
 import { z } from "zod";
+import { nearestFreeStart } from "@/domain/availability";
 import type { AvailabilityOption } from "@/domain/views";
 import { AppError } from "@/lib/errors";
+import { addDays, hotelToday, nightsBetween } from "@/lib/hotel-date";
 import { logger } from "@/lib/logger";
 import { all, first, getDb } from "../db";
-import { searchAvailability } from "../domain/inventory";
+import { freeNights, searchAvailability } from "../domain/inventory";
+
+/** How far either side of the requested dates to look when a room type is full. */
+const SUGGEST_WITHIN_DAYS = 14;
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -27,10 +32,18 @@ export async function searchStay(stay: Stay): Promise<{ ok: true; options: Avail
   // Live data and "today" checks: always at request time, never prerendered.
   await connection();
   try {
-    const rows = await searchAvailability(await getDb(), stay.checkIn, stay.checkOut, stay.guests);
+    const db = await getDb();
+    const rows = await searchAvailability(db, stay.checkIn, stay.checkOut, stay.guests);
+    // Full types that would fit the party: look for the nearest dates that work.
+    const full = rows.filter((c) => !c.is_available && c.max_occupancy >= stay.guests);
+    const nights = nightsBetween(stay.checkIn, stay.checkOut);
+    const today = hotelToday();
+    const from = [addDays(stay.checkIn, -SUGGEST_WITHIN_DAYS), today].sort().at(-1)!;
+    const free = full.length ? await freeNights(db, full.map((c) => c.slug), from, addDays(stay.checkOut, SUGGEST_WITHIN_DAYS)) : new Map();
     return {
       ok: true,
       options: rows.map((c) => ({
+        freeFrom: free.get(c.slug) ? (nearestFreeStart(free.get(c.slug)!, stay.checkIn, nights, today, SUGGEST_WITHIN_DAYS) ?? undefined) : undefined,
         slug: c.slug,
         name: c.name,
         summary: c.short_description ?? "",
