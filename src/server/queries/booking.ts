@@ -1,4 +1,5 @@
 import "server-only";
+import type { PaymentMethod } from "@/domain/status";
 import { connection } from "next/server";
 import { z } from "zod";
 import { nearestFreeStart } from "@/domain/availability";
@@ -124,6 +125,47 @@ export async function getBookingByToken(token: string) {
     logger.error("booking.load_failed", err);
     return null;
   }
+}
+
+/**
+ * The guest's own receipt, reached through the booking's unguessable link
+ * (the same token as the confirmation page) plus the receipt number. Returns
+ * null unless that receipt belongs to that booking.
+ */
+export async function getGuestReceipt(token: string, receiptNumber: string) {
+  await connection();
+  if (!z.uuid().safeParse(token).success || !/^RCT-\d{4}-\d{6}$/.test(receiptNumber)) return null;
+  const db = await getDb();
+  const r = await first<{ id: string; reference: string; check_in: string; check_out: string; nights: number; total_amount_kobo: number; guest: string; category: string }>(
+    db,
+    `SELECT r.id, r.reference, r.check_in, r.check_out, r.nights, r.total_amount_kobo, g.full_name AS guest, c.name AS category
+     FROM reservations r JOIN guests g ON g.id = r.guest_id JOIN room_categories c ON c.id = r.category_id WHERE r.public_token = ?`,
+    token,
+  );
+  if (!r) return null;
+  const [p, paid] = await Promise.all([
+    first<{ receipt_number: string; paid_at: string | null; method: string | null; provider: "paystack" | "offline"; provider_reference: string | null; amount_kobo: number }>(
+      db,
+      "SELECT receipt_number, paid_at, method, provider, provider_reference, amount_kobo FROM payments WHERE reservation_id = ? AND receipt_number = ? AND status = 'successful' AND kind = 'payment'",
+      r.id, receiptNumber,
+    ),
+    first<{ kobo: number }>(
+      db,
+      "SELECT coalesce(sum(CASE WHEN kind = 'payment' THEN amount_kobo ELSE -amount_kobo END), 0) AS kobo FROM payments WHERE reservation_id = ? AND status = 'successful'",
+      r.id,
+    ),
+  ]);
+  if (!p) return null;
+  return {
+    payment: {
+      receiptNumber: p.receipt_number, paidAt: p.paid_at ?? undefined, method: (p.provider === "paystack" ? "card" : (p.method ?? "other")) as PaymentMethod,
+      provider: p.provider, providerReference: p.provider_reference ?? undefined, amountKobo: p.amount_kobo,
+    },
+    reservation: {
+      guestName: r.guest, reference: r.reference, category: r.category, nights: r.nights ?? 0, checkIn: r.check_in, checkOut: r.check_out,
+      totalKobo: r.total_amount_kobo, paidKobo: paid?.kobo ?? 0,
+    },
+  };
 }
 
 /** Booking rules the website needs (public information). */

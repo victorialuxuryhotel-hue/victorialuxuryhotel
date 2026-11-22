@@ -71,25 +71,29 @@ export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: Pay
   );
 }
 
-export function Receipt({ payment, reservation }: { payment: PaymentRow; reservation: ReservationDetail }) {
+export type ReceiptPayment = Pick<PaymentRow, "receiptNumber" | "paidAt" | "method" | "providerReference" | "amountKobo" | "provider" | "recordedBy">;
+export type ReceiptStay = Pick<ReservationDetail, "guestName" | "reference" | "category" | "nights" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo">;
+
+/** A printable receipt. `forGuest` leaves out staff names (the guest's own copy). */
+export function Receipt({ payment, reservation, forGuest = false }: { payment: ReceiptPayment; reservation: ReceiptStay; forGuest?: boolean }) {
   return (
-    <article className="mx-auto max-w-2xl bg-ivory-50 p-8 shadow-card sm:p-12 print:shadow-none">
-      <header className="flex items-start justify-between gap-6 border-b border-hairline pb-8">
+    <article className="mx-auto max-w-2xl rounded-card border border-hairline bg-ivory-50 p-5 sm:p-12 print:border-0">
+      <header className="flex flex-col-reverse gap-4 border-b border-hairline pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:pb-8">
         <div className="flex items-center gap-3">
-          <Logo className="w-12" />
+          <Logo className="w-10 shrink-0 sm:w-12" />
           <div>
-            <p className="font-display text-2xl text-navy-950">{hotel.name}</p>
+            <p className="font-display text-xl text-navy-950 sm:text-2xl">{hotel.name}</p>
             <p className="text-xs text-ink-500">{hotel.address.line1}, {hotel.address.city}</p>
             <p className="text-xs text-ink-500">{hotel.phoneDisplay} · {hotel.email}</p>
           </div>
         </div>
-        <div className="text-right">
+        <div className="flex items-baseline justify-between gap-3 sm:block sm:text-right">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-600">Receipt</p>
-          <p className="mt-1 font-mono text-sm text-ink-900">{payment.receiptNumber}</p>
+          <p className="font-mono text-sm whitespace-nowrap text-ink-900 sm:mt-1">{payment.receiptNumber}</p>
         </div>
       </header>
 
-      <dl className="grid grid-cols-2 gap-6 py-8 text-sm">
+      <dl className="grid grid-cols-2 gap-5 py-6 text-sm sm:gap-6 sm:py-8">
         <div><dt className="text-ink-500">Received from</dt><dd className="mt-1 font-medium text-ink-900">{reservation.guestName}</dd></div>
         <div><dt className="text-ink-500">Date</dt><dd className="mt-1 text-ink-900">{payment.paidAt ? formatDateTime(payment.paidAt) : "—"}</dd></div>
         <div><dt className="text-ink-500">Reservation</dt><dd className="mt-1 font-mono text-ink-900">{reservation.reference}</dd></div>
@@ -117,7 +121,7 @@ export function Receipt({ payment, reservation }: { payment: PaymentRow; reserva
 
       <footer className="mt-10 flex items-center gap-2 border-t border-hairline pt-6 text-xs text-ink-500">
         <ShieldCheck className="size-4 text-success-600" aria-hidden />
-        {payment.provider === "paystack" ? "Payment verified with Paystack." : `Payment received and recorded by ${payment.recordedBy}.`} Thank you for staying with us.
+        {payment.provider === "paystack" ? "Payment verified with Paystack." : forGuest ? "Payment received at the front desk." : `Payment received and recorded by ${payment.recordedBy}.`} Thank you for staying with us.
       </footer>
     </article>
   );

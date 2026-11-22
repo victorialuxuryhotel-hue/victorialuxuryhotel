@@ -24,14 +24,14 @@ const timeLabel = (t: string) => {
   return h === 12 && m === 0 ? "12:00 noon" : `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "pm" : "am"}`;
 };
 
-async function loadStay(db: Db, reservationId: string): Promise<(StayInfo & { email: string | null; source: string; receipt?: string }) | null> {
+async function loadStay(db: Db, reservationId: string): Promise<(StayInfo & { email: string | null; source: string; receipt?: string; token: string }) | null> {
   const [r, settings, payments] = await Promise.all([
     first<{
       reference: string; check_in: string; check_out: string; nights: number; guest_count: number; total_amount_kobo: number;
-      source: string; full_name: string; email: string | null; category: string;
+      source: string; full_name: string; email: string | null; category: string; public_token: string;
     }>(
       db,
-      `SELECT r.reference, r.check_in, r.check_out, r.nights, r.guest_count, r.total_amount_kobo, r.source,
+      `SELECT r.reference, r.check_in, r.check_out, r.nights, r.guest_count, r.total_amount_kobo, r.source, r.public_token,
               g.full_name, g.email, c.name AS category
        FROM reservations r JOIN guests g ON g.id = r.guest_id JOIN room_categories c ON c.id = r.category_id
        WHERE r.id = ?`,
@@ -47,6 +47,7 @@ async function loadStay(db: Db, reservationId: string): Promise<(StayInfo & { em
   if (!r) return null;
   return {
     guestName: r.full_name,
+    token: r.public_token,
     email: r.email,
     reference: r.reference,
     category: r.category,
@@ -82,13 +83,17 @@ async function deliver(db: Db, row: OutboxRow): Promise<"sent" | "skipped" | str
   if (row.kind === "reservation_cancelled") {
     return (await sendEmail({ to: stay.email, ...reservationCancelledEmail(stay, site), idempotencyKey: row.id })) ? "sent" : "Cancellation email could not be sent";
   }
-  const p = await first<{ amount_kobo: number; receipt_number: string | null; method: string | null }>(
+  const p = await first<{ amount_kobo: number; receipt_number: string | null; method: string | null; provider: string; paid_at: string | null }>(
     db,
-    "SELECT amount_kobo, receipt_number, method FROM payments WHERE id = ?",
+    "SELECT amount_kobo, receipt_number, method, provider, paid_at FROM payments WHERE id = ?",
     row.payment_id,
   );
   if (!p?.receipt_number) return "skipped";
-  const email = paymentReceivedEmail({ ...stay, amountKobo: p.amount_kobo, receiptNumber: p.receipt_number, method: paymentMethod[(p.method ?? "other") as keyof typeof paymentMethod] }, site);
+  const method = p.provider === "paystack" ? "Card (online)" : paymentMethod[(p.method ?? "other") as keyof typeof paymentMethod];
+  const email = paymentReceivedEmail(
+    { ...stay, amountKobo: p.amount_kobo, receiptNumber: p.receipt_number, method, paidAt: p.paid_at, receiptUrl: `${site}/book/receipt/${stay.token}/${p.receipt_number}` },
+    site,
+  );
   return (await sendEmail({ to: stay.email, ...email, idempotencyKey: row.id })) ? "sent" : "Payment receipt could not be sent";
 }
 

@@ -6,13 +6,15 @@ import { StickyBookBar } from "@/components/public/sticky-book-bar";
 export default function PublicLayout({ children }: LayoutProps<"/">) {
   return (
     <>
-      <SiteHeader />
+      <div className="contents print:hidden"><SiteHeader /></div>
       <main className="flex flex-1 flex-col">{children}</main>
-      <SiteFooter />
+      <div className="contents print:hidden"><SiteFooter /></div>
       {/* Reads the URL, so it renders at request time inside its own boundary. */}
-      <Suspense fallback={null}>
-        <StickyBookBar />
-      </Suspense>
+      <div className="contents print:hidden">
+        <Suspense fallback={null}>
+          <StickyBookBar />
+        </Suspense>
+      </div>
     </>
   );
 }
