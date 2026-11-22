@@ -1,7 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { MobileBar, Sidebar } from "@/components/management/nav";
+import { DeskTabs, MobileBar, Sidebar } from "@/components/management/nav";
 import { managementNav } from "@/components/management/nav-items";
 import { StaffCard } from "@/components/management/staff-card";
 import { LoadingState } from "@/components/ui/feedback";
@@ -39,6 +39,7 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
       <Sidebar allowed={allowed} footer={footer} />
       <MobileBar allowed={allowed} footer={footer} />
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+      {staff.role === "front_desk" ? <DeskTabs /> : null}
     </>
   );
 }

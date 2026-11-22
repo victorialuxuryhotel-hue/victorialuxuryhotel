@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { BedDouble, CalendarPlus, Menu, Search, Sun, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { useDialog } from "@/lib/use-dialog";
 import { cn } from "@/lib/utils/cn";
@@ -119,5 +119,50 @@ export function MobileBar({ footer, base = "/app", allowed }: NavProps) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+const deskTabs = [
+  { href: "/app/today", label: "Today", icon: Sun },
+  { href: "/app/rooms", label: "Rooms", icon: BedDouble },
+  { href: "/app/reservations", label: "Find guest", icon: Search },
+  { href: "/app/reservations/new", label: "New booking", icon: CalendarPlus },
+] as const;
+
+/**
+ * Front desk, below md: the four things they do all day as a bottom tab bar.
+ * Shown only on those four screens; a reservation's own page has its own
+ * bottom bar (the next step), and two stacked bars would crowd the screen.
+ */
+export function DeskTabs({ base = "/app" }: { base?: string }) {
+  const pathname = usePathname();
+  const tabs = deskTabs.map((t) => ({ ...t, href: t.href.replace(/^\/app/, base) }));
+  if (!tabs.some((t) => t.href === pathname)) return null;
+  return (
+    <>
+      <div aria-hidden className="h-[calc(3.25rem+env(safe-area-inset-bottom))] md:hidden print:hidden" />
+      <nav
+        aria-label="Front desk"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-ivory-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
+      >
+        {tabs.map(({ href, label, icon: Icon }) => {
+          const active = href === pathname;
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "-mt-px flex min-h-13 flex-col items-center justify-center gap-0.5 border-t-2 px-1 text-xs",
+                active ? "border-gold-500 font-medium text-navy-900" : "border-transparent text-ink-500",
+              )}
+            >
+              <Icon className={cn("size-5", active ? "text-navy-800" : "")} aria-hidden />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+    </>
   );
 }
