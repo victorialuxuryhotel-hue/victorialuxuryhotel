@@ -53,7 +53,7 @@ export function StickyBookBar() {
       >
         <div className="flex items-center justify-between gap-3">
           {onRooms ? null : (
-            <p className="leading-tight">
+            <p className="min-w-0 leading-tight">
               <span className="block text-xs text-ink-500">Book direct</span>
               <span className="block text-sm font-medium text-navy-950">Instant confirmation</span>
             </p>
@@ -64,7 +64,7 @@ export function StickyBookBar() {
               Add dates to see what&apos;s free
             </button>
           ) : (
-            <Link href="/book" tabIndex={show ? 0 : -1} className={buttonStyles({ variant: "accent", size: "lg", className: "px-5" })}>
+            <Link href="/book" tabIndex={show ? 0 : -1} className={buttonStyles({ variant: "accent", size: "lg", className: "shrink-0 px-4 whitespace-nowrap min-[360px]:px-5" })}>
               Check availability
             </Link>
           )}
