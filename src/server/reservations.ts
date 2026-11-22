@@ -57,33 +57,37 @@ export async function createReservation(_prev: ActionResult<{ id: string }> | nu
   return result;
 }
 
-export async function assignRoom(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+export type Undoable = { undoId: number | null };
+
+export async function assignRoom(_prev: ActionResult<Undoable> | null, formData: FormData): Promise<ActionResult<Undoable>> {
   return run("reservation.assign_room", async () => {
     const staff = await authorize("reservations.manage");
     const reservationId = id.parse(formData.get("reservationId"));
     const roomId = z.uuid("Choose a room").safeParse(formData.get("roomId"));
     if (!roomId.success) throw new AppError("VALIDATION", "Choose a room");
-    await engine.assignRoom(await getDb(), actorOf(staff), reservationId, roomId.data);
+    const result = await engine.assignRoom(await getDb(), actorOf(staff), reservationId, roomId.data);
     refresh();
+    return result;
   });
 }
 
-export async function checkIn(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+export async function checkIn(_prev: ActionResult<Undoable> | null, formData: FormData): Promise<ActionResult<Undoable>> {
   return run("reservation.check_in", async () => {
     const staff = await authorize("reservations.manage");
     const reservationId = id.parse(formData.get("reservationId"));
-    await engine.checkInReservation(await getDb(), actorOf(staff), reservationId);
+    const result = await engine.checkInReservation(await getDb(), actorOf(staff), reservationId);
     refresh();
+    return result;
   });
 }
 
-export async function checkOut(_prev: ActionResult<{ balanceKobo: number }> | null, formData: FormData): Promise<ActionResult<{ balanceKobo: number }>> {
+export async function checkOut(_prev: ActionResult<{ balanceKobo: number } & Undoable> | null, formData: FormData): Promise<ActionResult<{ balanceKobo: number } & Undoable>> {
   return run("reservation.check_out", async () => {
     const staff = await authorize("reservations.manage");
     const reservationId = id.parse(formData.get("reservationId"));
-    const balanceKobo = await engine.checkOutReservation(await getDb(), actorOf(staff), reservationId);
+    const { balance, undoId } = await engine.checkOutReservation(await getDb(), actorOf(staff), reservationId);
     refresh();
-    return { balanceKobo };
+    return { balanceKobo: balance, undoId };
   });
 }
 
@@ -98,12 +102,13 @@ export async function cancelReservation(_prev: ActionResult | null, formData: Fo
   });
 }
 
-export async function markNoShow(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+export async function markNoShow(_prev: ActionResult<Undoable> | null, formData: FormData): Promise<ActionResult<Undoable>> {
   return run("reservation.no_show", async () => {
     const staff = await authorize("reservations.manage");
     const reservationId = id.parse(formData.get("reservationId"));
-    await engine.markNoShow(await getDb(), actorOf(staff), reservationId);
+    const result = await engine.markNoShow(await getDb(), actorOf(staff), reservationId);
     refresh();
+    return result;
   });
 }
 
@@ -171,5 +176,16 @@ export async function resolveAttention(_prev: ActionResult | null, formData: For
     const reservationId = id.parse(formData.get("reservationId"));
     await engine.resolveAttention(await getDb(), actorOf(staff), reservationId, String(formData.get("note") ?? ""));
     refresh();
+  });
+}
+
+/** Undo a room assignment or status change made moments ago (see engine.undoAction). */
+export async function undoChange(reservationId: string, undoId: number): Promise<ActionResult<{ message: string }>> {
+  return run("reservation.undo", async () => {
+    const staff = await authorize("reservations.manage");
+    id.parse(reservationId);
+    const result = await engine.undoAction(await getDb(), actorOf(staff), reservationId, z.number().int().positive().parse(undoId));
+    refresh();
+    return result;
   });
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { searchAvailability } from "@/server/domain/inventory";
 import {
   assignRoom,
@@ -11,6 +11,8 @@ import {
   expireUnpaidReservations,
   markNoShow,
   overridePaymentRequirement,
+  undoAction,
+  UNDO_WINDOW_MS,
   updateReservationDetails,
   updateRoomStatus,
 } from "@/server/domain/reservations";
@@ -176,7 +178,7 @@ describe("front desk lifecycle", () => {
     await assignRoom(db, desk, r, c.roomIds[0]!);
     await checkInReservation(db, desk, r);
     expect(await status(r)).toBe("checked_in");
-    const balance = await checkOutReservation(db, desk, r);
+    const { balance } = await checkOutReservation(db, desk, r);
     expect(balance).toBe(10_000_000);
     expect(await status(r)).toBe("checked_out");
     expect((await q1<{ readiness: string }>("SELECT readiness FROM rooms WHERE id = ?", c.roomIds[0])).readiness).toBe("needs_cleaning");
@@ -310,5 +312,81 @@ describe("concurrent staff actions", () => {
     expect(["cancelled", "confirmed"]).toContain(final);
     const rejected = results.find((x) => x.status === "rejected") as PromiseRejectedResult;
     expect(rejected.reason.message).toMatch(/Only upcoming|Only reservations awaiting payment/);
+  });
+});
+
+describe("undo (room assignment and status changes)", () => {
+  it("undoes a check-in and a check-out, restoring the room's readiness", async () => {
+    const c = await makeCategory(1);
+    const r = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2), status: "confirmed" });
+    await assignRoom(db, desk, r, c.roomIds[0]!);
+    const inn = await checkInReservation(db, desk, r);
+    expect((await undoAction(db, desk, r, inn.undoId!)).message).toBe("Check-in undone.");
+    expect(await status(r)).toBe("confirmed");
+    expect((await q1<{ checked_in_at: string | null }>("SELECT checked_in_at FROM reservations WHERE id = ?", r)).checked_in_at).toBeNull();
+
+    await checkInReservation(db, desk, r);
+    const out = await checkOutReservation(db, desk, r);
+    expect((await q1<{ readiness: string }>("SELECT readiness FROM rooms WHERE id = ?", c.roomIds[0])).readiness).toBe("needs_cleaning");
+    await undoAction(db, desk, r, out.undoId!);
+    expect(await status(r)).toBe("checked_in");
+    expect((await q1<{ readiness: string }>("SELECT readiness FROM rooms WHERE id = ?", c.roomIds[0])).readiness).toBe("ready");
+    const h = await q1<{ reason: string; changed_by: string }>(
+      "SELECT reason, changed_by FROM reservation_status_history WHERE reservation_id = ? ORDER BY id DESC LIMIT 1", r);
+    expect(h).toEqual({ reason: "Undone", changed_by: desk!.id });
+  });
+
+  it("undoes a room assignment and a no-show", async () => {
+    const c = await makeCategory(2);
+    const r = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
+    const a = await assignRoom(db, desk, r, c.roomIds[0]!);
+    await undoAction(db, desk, r, a.undoId!);
+    expect((await q1<{ room_id: string | null }>("SELECT room_id FROM reservations WHERE id = ?", r)).room_id).toBeNull();
+    const ns = await markNoShow(db, desk, r);
+    await undoAction(db, desk, r, ns.undoId!);
+    expect(await status(r)).toBe("confirmed");
+  });
+
+  it("only the same person, only straight away, and only if nothing happened since", async () => {
+    const c = await makeCategory(2);
+    const r = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2), status: "confirmed" });
+    const a = await assignRoom(db, desk, r, c.roomIds[0]!);
+    await rejects(undoAction(db, gm, r, a.undoId!), /Only the person who made a change/, "FORBIDDEN");
+    await updateReservationDetails(db, desk, r, 1, "Late arrival");
+    await rejects(undoAction(db, desk, r, a.undoId!), /can no longer be undone/);
+
+    const b = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
+    const late = await assignRoom(db, desk, b, c.roomIds[1]!);
+    // The log is append-only, so move the clock instead of backdating the entry.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + UNDO_WINDOW_MS + 1_000);
+    try {
+      await rejects(undoAction(db, desk, b, late.undoId!), /can no longer be undone/);
+    } finally {
+      vi.useRealTimers();
+    }
+    await rejects(undoAction(db, desk, b, 999_999_999), /can no longer be undone/);
+  });
+
+  it("never reverses a cancellation, and the database refuses backwards moves that aren't undos", async () => {
+    const c = await makeCategory(1);
+    const r = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2), status: "confirmed" });
+    await assignRoom(db, desk, r, c.roomIds[0]!);
+    await checkInReservation(db, desk, r);
+    await rejects(exec("UPDATE reservations SET status = 'confirmed' WHERE id = ?", r), /invalid_transition/);
+    const x = await insertReservation({ categoryId: c.id, checkIn: day(5), checkOut: day(6) });
+    await cancelReservation(db, desk, x, "Guest changed plans");
+    const log = await q1<{ id: number }>("SELECT id FROM activity_log WHERE entity_id = ? AND action = 'reservation.cancelled'", x);
+    await rejects(undoAction(db, desk, x, log.id), /can no longer be undone/);
+  });
+
+  it("can't undo a room assignment if the old room has been taken since", async () => {
+    const c = await makeCategory(2);
+    const r = await insertReservation({ categoryId: c.id, checkIn: day(3), checkOut: day(5), status: "confirmed" });
+    await assignRoom(db, desk, r, c.roomIds[0]!);
+    const move = await assignRoom(db, desk, r, c.roomIds[1]!);
+    // Someone else takes room 0 for the same nights without touching this booking.
+    await insertReservation({ categoryId: c.id, checkIn: day(3), checkOut: day(5), roomId: c.roomIds[0], status: "confirmed" });
+    await rejects(undoAction(db, desk, r, move.undoId!), /given to another guest|filled up/);
   });
 });

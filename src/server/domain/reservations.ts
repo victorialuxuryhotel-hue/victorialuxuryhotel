@@ -225,9 +225,9 @@ type RoomRow = { id: string; room_number: string; category_id: string; service_s
 const loadRoom = (db: Db, id: string) =>
   first<RoomRow>(db, "SELECT id, room_number, category_id, service_status, readiness, is_active, version FROM rooms WHERE id = ?", id);
 
-export async function assignRoom(db: Db, actor: Actor, reservationId: string, roomId: string): Promise<void> {
+export async function assignRoom(db: Db, actor: Actor, reservationId: string, roomId: string): Promise<{ undoId: number | null }> {
   requireRole(actor, ALL_STAFF);
-  await retryOnStale(async () => {
+  return retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
     if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) {
       throw new AppError("INVALID_TRANSITION", "Rooms can only be assigned to upcoming or in-house reservations.");
@@ -235,12 +235,13 @@ export async function assignRoom(db: Db, actor: Actor, reservationId: string, ro
     const room = await loadRoom(db, roomId);
     if (!room || !room.is_active) throw new AppError("NOT_FOUND", "Room not found.");
     if (room.service_status !== "in_service") throw new AppError("UNAVAILABLE", `Room ${room.room_number} is under maintenance.`);
-    if (res.room_id === roomId) return;
+    if (res.room_id === roomId) return { undoId: null };
 
     // The reservation counts against its assigned room's category, or the
     // booked one. Moving it to a room in another category (an upgrade, or
     // back) uses that category's inventory: check it.
-    const currentCategory = res.room_id ? ((await loadRoom(db, res.room_id))?.category_id ?? res.category_id) : res.category_id;
+    const oldRoom = res.room_id ? await loadRoom(db, res.room_id) : null;
+    const currentCategory = oldRoom?.category_id ?? res.category_id;
     if (room.category_id !== currentCategory) {
       const from = res.check_in > hotelToday() ? res.check_in : hotelToday();
       if ((await freeUnits(db, room.category_id, from, res.check_out, res.id)) <= 0) {
@@ -261,10 +262,12 @@ export async function assignRoom(db: Db, actor: Actor, reservationId: string, ro
       activity(db, "reservation.room_assigned", "reservation", res.id, `Room ${room.room_number} assigned to ${res.reference}`, {
         room_id: roomId,
         previous_room_id: res.room_id,
+        previous_room_readiness: oldRoom?.readiness ?? null,
       }),
     );
     try {
-      await writeBatch(db, actor, stmts);
+      const results = await writeBatch(db, actor, stmts);
+      return { undoId: results.at(-1)?.meta.last_row_id ?? null };
     } catch (err) {
       rethrow(err, {
         room_overlap: new AppError("CONFLICT", `Room ${room.room_number} is already booked for some of these nights.`),
@@ -278,9 +281,9 @@ export async function assignRoom(db: Db, actor: Actor, reservationId: string, ro
 // Front desk lifecycle
 // ---------------------------------------------------------------------------
 
-export async function checkInReservation(db: Db, actor: Actor, reservationId: string): Promise<void> {
+export async function checkInReservation(db: Db, actor: Actor, reservationId: string): Promise<{ undoId: number | null }> {
   requireRole(actor, ALL_STAFF);
-  await retryOnStale(async () => {
+  return retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
     if (res.status !== "confirmed") {
       throw new AppError(
@@ -300,31 +303,35 @@ export async function checkInReservation(db: Db, actor: Actor, reservationId: st
     if (room.service_status !== "in_service") throw new AppError("UNAVAILABLE", `Room ${room.room_number} is under maintenance. Assign another room.`);
     if (room.readiness !== "ready") throw new AppError("UNAVAILABLE", `Room ${room.room_number} is not marked ready yet.`);
 
-    await writeBatch(db, actor, [
+    const results = await writeBatch(db, actor, [
       assertVersion(db, "reservations", res.id, res.version),
       assertVersion(db, "rooms", room.id, room.version),
       db.prepare("UPDATE reservations SET status = 'checked_in' WHERE id = ?").bind(res.id),
       activity(db, "reservation.checked_in", "reservation", res.id, `${res.reference} checked in to room ${room.room_number}`),
     ]);
+    return { undoId: results.at(-1)?.meta.last_row_id ?? null };
   });
 }
 
-/** Returns the balance still owed (the UI shows it). */
-export async function checkOutReservation(db: Db, actor: Actor, reservationId: string): Promise<number> {
+/** Returns the balance still owed (the UI shows it) and the undo id. */
+export async function checkOutReservation(db: Db, actor: Actor, reservationId: string): Promise<{ balance: number; undoId: number | null }> {
   requireRole(actor, ALL_STAFF);
   return retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
     if (res.status !== "checked_in") throw new AppError("INVALID_TRANSITION", "Only checked-in guests can be checked out.");
     const balance = res.total_amount_kobo - (await netPaid(db, res.id));
-    await writeBatch(db, actor, [
+    const room = res.room_id ? await loadRoom(db, res.room_id) : null;
+    const results = await writeBatch(db, actor, [
       assertVersion(db, "reservations", res.id, res.version),
       db.prepare("UPDATE reservations SET status = 'checked_out' WHERE id = ?").bind(res.id),
       db.prepare("UPDATE rooms SET readiness = 'needs_cleaning' WHERE id = ?").bind(res.room_id),
       activity(db, "reservation.checked_out", "reservation", res.id, `${res.reference} checked out${balance > 0 ? ` with ${naira(balance)} outstanding` : ""}`, {
         balance_kobo: balance,
+        room_id: res.room_id,
+        previous_room_readiness: room?.readiness ?? null,
       }),
     ]);
-    return balance;
+    return { balance, undoId: results.at(-1)?.meta.last_row_id ?? null };
   });
 }
 
@@ -348,17 +355,18 @@ export async function cancelReservation(db: Db, actor: Actor, reservationId: str
   });
 }
 
-export async function markNoShow(db: Db, actor: Actor, reservationId: string): Promise<void> {
+export async function markNoShow(db: Db, actor: Actor, reservationId: string): Promise<{ undoId: number | null }> {
   requireRole(actor, ALL_STAFF);
-  await retryOnStale(async () => {
+  return retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
     if (res.status !== "confirmed") throw new AppError("INVALID_TRANSITION", "Only confirmed reservations can be marked as no-show.");
     if (res.check_in > hotelToday()) throw new AppError("VALIDATION", "The guest isn't due yet.");
-    await writeBatch(db, actor, [
+    const results = await writeBatch(db, actor, [
       assertVersion(db, "reservations", res.id, res.version),
       db.prepare("UPDATE reservations SET status = 'no_show' WHERE id = ?").bind(res.id),
       activity(db, "reservation.no_show", "reservation", res.id, `${res.reference} marked as no-show`),
     ]);
+    return { undoId: results.at(-1)?.meta.last_row_id ?? null };
   });
 }
 
@@ -376,6 +384,78 @@ export async function updateReservationDetails(db: Db, actor: Actor, reservation
       db.prepare("UPDATE reservations SET guest_count = ?, special_requests = ? WHERE id = ?").bind(guests, specialRequests?.trim() || null, res.id),
       activity(db, "reservation.updated", "reservation", res.id, `${res.reference} details updated`, { guest_count: guests }),
     ]);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Undo: room assignment and status changes, within a short window.
+// Never payments (a manager records a correction) and never cancellations
+// (the guest has already been emailed).
+// ---------------------------------------------------------------------------
+
+export const UNDO_WINDOW_MS = 30_000; // the UI offers 10 s; the server allows for slow networks
+const UNDOABLE = ["reservation.room_assigned", "reservation.checked_in", "reservation.checked_out", "reservation.no_show"] as const;
+
+export async function undoAction(db: Db, actor: Actor, reservationId: string, activityId: number): Promise<{ message: string }> {
+  requireRole(actor, ALL_STAFF);
+  return retryOnStale(async () => {
+    const entry = await first<{ id: number; action: string; actor_id: string | null; entity_id: string; metadata: string; created_at: string }>(
+      db,
+      "SELECT id, action, actor_id, entity_id, metadata, created_at FROM activity_log WHERE id = ?",
+      activityId,
+    );
+    const tooLate = new AppError("CONFLICT", "That can no longer be undone. Make the change again from the reservation.");
+    if (!entry || entry.entity_id !== reservationId || !(UNDOABLE as readonly string[]).includes(entry.action)) throw tooLate;
+    if (entry.actor_id !== actor.id) throw new AppError("FORBIDDEN", "Only the person who made a change can undo it.");
+    if (Date.now() - Date.parse(entry.created_at) > UNDO_WINDOW_MS) throw tooLate;
+    // Nothing else may have happened to this booking since.
+    const later = await first(db, "SELECT 1 FROM activity_log WHERE entity_id = ? AND id > ?", reservationId, activityId);
+    if (later) throw tooLate;
+
+    const res = await loadReservation(db, reservationId);
+    const meta = JSON.parse(entry.metadata) as { previous_room_id?: string | null; previous_room_readiness?: string | null; room_id?: string | null };
+    const stmts: Stmt[] = [assertVersion(db, "reservations", res.id, res.version)];
+    let message: string;
+
+    switch (entry.action) {
+      case "reservation.room_assigned": {
+        if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) throw tooLate;
+        stmts.push(db.prepare("UPDATE reservations SET room_id = ? WHERE id = ?").bind(meta.previous_room_id ?? null, res.id));
+        // A mid-stay move had marked the old room for cleaning: put it back as it was.
+        if (res.status === "checked_in" && meta.previous_room_id && meta.previous_room_readiness) {
+          stmts.push(db.prepare("UPDATE rooms SET readiness = ? WHERE id = ?").bind(meta.previous_room_readiness, meta.previous_room_id));
+        }
+        message = meta.previous_room_id ? "Room change undone." : "Room assignment undone.";
+        break;
+      }
+      case "reservation.checked_in":
+        if (res.status !== "checked_in") throw tooLate;
+        stmts.push(db.prepare("UPDATE reservations SET status = 'confirmed', checked_in_at = NULL WHERE id = ?").bind(res.id));
+        message = "Check-in undone.";
+        break;
+      case "reservation.checked_out":
+        if (res.status !== "checked_out") throw tooLate;
+        stmts.push(db.prepare("UPDATE reservations SET status = 'checked_in', checked_out_at = NULL WHERE id = ?").bind(res.id));
+        if (meta.room_id && meta.previous_room_readiness) {
+          stmts.push(db.prepare("UPDATE rooms SET readiness = ? WHERE id = ?").bind(meta.previous_room_readiness, meta.room_id));
+        }
+        message = "Check-out undone.";
+        break;
+      default: // reservation.no_show
+        if (res.status !== "no_show") throw tooLate;
+        stmts.push(db.prepare("UPDATE reservations SET status = 'confirmed' WHERE id = ?").bind(res.id));
+        message = "No-show undone.";
+    }
+    stmts.push(activity(db, "reservation.undone", "reservation", res.id, `${res.reference}: ${message.replace(/\.$/, "").toLowerCase()}`, { undid: entry.action, activity_id: entry.id }));
+    try {
+      await writeBatch(db, actor, stmts, "Undone");
+    } catch (err) {
+      rethrow(err, {
+        room_overlap: new AppError("CONFLICT", "The previous room has been given to another guest, so this can't be undone."),
+        no_capacity: new AppError("UNAVAILABLE", "This room type has filled up since, so this can't be undone."),
+      });
+    }
+    return { message };
   });
 }
 
