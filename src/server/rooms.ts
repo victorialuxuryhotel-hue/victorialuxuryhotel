@@ -3,6 +3,8 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { MIN_NIGHTLY_RATE_KOBO } from "@/domain/pricing";
+import { formatNaira } from "@/lib/format";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize } from "./auth";
@@ -60,7 +62,10 @@ const categorySchema = z.object({
   shortDescription: z.string().trim().max(200),
   description: z.string().trim().max(4000),
   amenities: z.string().max(2000),
-  nightlyRate: z.coerce.number().positive("Enter the nightly rate").max(100_000_000),
+  nightlyRate: z.coerce
+    .number({ error: "Enter the nightly rate" })
+    .min(MIN_NIGHTLY_RATE_KOBO / 100, `The minimum rate is ${formatNaira(MIN_NIGHTLY_RATE_KOBO)} a night`)
+    .max(100_000_000),
   maxOccupancy: z.coerce.number().int().min(1).max(20),
   sortOrder: z.coerce.number().int().min(0).max(1000).default(0),
   isActive: z.literal("on").optional(),

@@ -266,10 +266,10 @@ describe("payment override (managers only, reason required, audited)", () => {
 
 describe("date changes", () => {
   it("re-prices at the agreed rate and checks availability", async () => {
-    const c = await makeCategory(1, { rateKobo: 1_000_000 });
+    const c = await makeCategory(1, { rateKobo: 4_000_000 });
     const r = await staffBooking(c.id, day(40), day(41));
     await changeReservationDates(db, desk, r.id, day(40), day(43));
-    expect((await q1<{ total_amount_kobo: number }>("SELECT total_amount_kobo FROM reservations WHERE id = ?", r.id)).total_amount_kobo).toBe(3_000_000);
+    expect((await q1<{ total_amount_kobo: number }>("SELECT total_amount_kobo FROM reservations WHERE id = ?", r.id)).total_amount_kobo).toBe(12_000_000);
     await staffBooking(c.id, day(45), day(46));
     await rejects(changeReservationDates(db, desk, r.id, day(44), day(46)), /No availability for the new dates/);
   });

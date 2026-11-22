@@ -263,3 +263,12 @@ describe("activity log and staff", () => {
     await rejects(exec("DELETE FROM room_categories WHERE id = ?", c.id), /delete_forbidden/);
   });
 });
+
+describe("minimum room rate", () => {
+  it("refuses a room type priced below ₦40,000 a night, on insert and on update", async () => {
+    await rejects(makeCategory(0, { rateKobo: 3_999_999 }), /rate_below_minimum/);
+    const c = await makeCategory(0, { rateKobo: 4_000_000 });
+    await rejects(exec("UPDATE room_categories SET nightly_rate_kobo = 3500000 WHERE id = ?", c.id), /rate_below_minimum/);
+    await exec("UPDATE room_categories SET nightly_rate_kobo = 4500000 WHERE id = ?", c.id);
+  });
+});

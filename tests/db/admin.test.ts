@@ -27,7 +27,7 @@ const category = (over: Partial<Parameters<typeof saveCategory>[2]> = {}) => ({
   shortDescription: null,
   description: null,
   amenities: ["Wi-Fi"],
-  nightlyRateKobo: 3_000_000,
+  nightlyRateKobo: 5_000_000,
   maxOccupancy: 2,
   sortOrder: 0,
   isActive: true,
