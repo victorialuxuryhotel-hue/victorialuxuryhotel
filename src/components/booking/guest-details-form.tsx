@@ -53,8 +53,8 @@ export function GuestDetailsForm({
         </p>
       </section>
       <div>
-        <label className="flex items-start gap-3 text-sm text-ink-700">
-          <input type="checkbox" name="acceptTerms" required className="mt-0.5 size-4 accent-navy-800" />
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 py-1 text-sm text-ink-700">
+          <input type="checkbox" name="acceptTerms" required className="size-5 shrink-0 accent-navy-800" />
           I agree to the cancellation policy and booking terms.
         </label>
         {err("acceptTerms") ? <p className="mt-1 text-sm text-danger-700">{err("acceptTerms")}</p> : null}
