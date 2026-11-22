@@ -48,9 +48,13 @@ export function MobileNav({ items }: { items: ReadonlyArray<{ href: string; labe
       }
     };
     document.addEventListener("keydown", onKey);
+    // Browser back/forward is a route change too: close.
+    const onPop = () => setOpen(false);
+    window.addEventListener("popstate", onPop);
     return () => {
       document.body.style.overflow = "";
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("popstate", onPop);
     };
   }, [open]);
 
@@ -102,7 +106,7 @@ export function MobileNav({ items }: { items: ReadonlyArray<{ href: string; labe
                 <MessageCircle className="size-4" aria-hidden /> WhatsApp
               </a>
             </div>
-            <Link href="/book" onClick={close} className={buttonStyles({ size: "lg", className: "w-full" })}>
+            <Link href="/book" onClick={close} className={buttonStyles({ variant: "accent", size: "lg", className: "w-full" })}>
               Book your stay
             </Link>
             <a href={hotel.mapsUrl} className="flex items-center justify-center gap-1.5 py-1 text-xs text-ink-500">

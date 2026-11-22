@@ -41,7 +41,7 @@ export function RoomPriceBar({ price, targetId }: { price: string; targetId: str
     <>
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-30 border-t border-ivory-200 bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-300 lg:hidden",
+          "fixed inset-x-0 bottom-0 z-40 border-t border-ivory-200 bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden",
           formVisible ? "pointer-events-none translate-y-full" : "translate-y-0",
         )}
       >
@@ -52,13 +52,13 @@ export function RoomPriceBar({ price, targetId }: { price: string; targetId: str
               {price} <span className="text-xs text-ink-500">/ night</span>
             </span>
           </p>
-          <button type="button" onClick={chooseDates} tabIndex={formVisible ? -1 : 0} className={buttonStyles({ size: "lg", className: "px-6" })}>
+          <button type="button" onClick={chooseDates} tabIndex={formVisible ? -1 : 0} className={buttonStyles({ variant: "accent", size: "lg", className: "px-6" })}>
             Choose dates
           </button>
         </div>
       </div>
       {/* Room at the very end of the page so the bar never covers the footer. */}
-      {mounted ? createPortal(<div aria-hidden className="h-20 shrink-0 bg-navy-950 lg:hidden" />, document.body) : null}
+      {mounted ? createPortal(<div aria-hidden className="h-20 shrink-0 bg-navy-950 md:hidden" />, document.body) : null}
     </>
   );
 }

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Inter } from "next/font/google";
 import { hotel } from "@/config/hotel";
 import "./globals.css";
@@ -13,6 +13,10 @@ const sans = Inter({
   variable: "--font-sans-base",
   subsets: ["latin"],
 });
+
+// viewport-fit=cover lets pinned bottom bars clear the iPhone home indicator
+// (env(safe-area-inset-bottom)).
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),

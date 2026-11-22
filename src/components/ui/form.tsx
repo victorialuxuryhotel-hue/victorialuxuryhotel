@@ -2,7 +2,7 @@ import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTML
 import { cn } from "@/lib/utils/cn";
 
 const control =
-  "block w-full rounded-md border border-ink-300 bg-white px-3 text-sm text-ink-900 placeholder:text-ink-400 focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/20 disabled:bg-ivory-100 aria-invalid:border-danger-600";
+  "block w-full rounded-md border border-ink-300 bg-white px-3 text-base text-ink-900 md:text-sm placeholder:text-ink-400 focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/20 disabled:bg-ivory-100 aria-invalid:border-danger-600";
 
 /**
  * Label + control + hint/error, wired for accessibility. Pass the control as
@@ -34,12 +34,12 @@ export function Field({ label, htmlFor, hint, error, required, children, classNa
 }
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(control, "h-10", className)} {...props} />;
+  return <input className={cn(control, "h-11.5 md:h-10", className)} {...props} />;
 }
 
 export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cn(control, "h-10 pr-8", className)} {...props}>
+    <select className={cn(control, "h-11.5 pr-8 md:h-10", className)} {...props}>
       {children}
     </select>
   );

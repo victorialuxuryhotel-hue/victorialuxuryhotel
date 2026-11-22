@@ -36,10 +36,10 @@ export function StickyBookBar() {
   return (
     <>
       {/* Room at the end of the page so the bar never covers the footer. */}
-      <div aria-hidden className="h-20 bg-navy-950 sm:hidden" />
+      <div aria-hidden className="h-20 bg-navy-950 md:hidden" />
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-30 border-t border-ivory-200 bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-300 sm:hidden",
+          "fixed inset-x-0 bottom-0 z-40 border-t border-ivory-200 bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden",
           show ? "translate-y-0" : "pointer-events-none translate-y-full",
         )}
         aria-hidden={!show}
@@ -49,7 +49,7 @@ export function StickyBookBar() {
             <span className="block text-xs text-ink-500">Book direct</span>
             <span className="block text-sm font-medium text-navy-950">Instant confirmation</span>
           </p>
-          <Link href="/book" tabIndex={show ? 0 : -1} className={buttonStyles({ size: "lg", className: "px-5" })}>
+          <Link href="/book" tabIndex={show ? 0 : -1} className={buttonStyles({ variant: "accent", size: "lg", className: "px-5" })}>
             Check availability
           </Link>
         </div>
