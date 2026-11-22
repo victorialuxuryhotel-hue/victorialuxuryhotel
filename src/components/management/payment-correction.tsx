@@ -45,7 +45,7 @@ export function CorrectPaymentForm({
             <Field label="Amount to take off (₦)" htmlFor={`${prefix}-amount`} hint={`Up to ${formatNaira(correctableKobo)}`} error={err("amount")}>
               <Input id={`${prefix}-amount`} name="amount" inputMode="decimal" required />
             </Field>
-            <Field label="What was wrong" htmlFor={`${prefix}-reason`} hint="Recorded in the history." error={err("reason")}>
+            <Field label="What was wrong" htmlFor={`${prefix}-reason`} error={err("reason")}>
               <Input id={`${prefix}-reason`} name="reason" required minLength={5} maxLength={500} placeholder="e.g. Typed ₦100,000, guest paid ₦90,000" />
             </Field>
           </div>

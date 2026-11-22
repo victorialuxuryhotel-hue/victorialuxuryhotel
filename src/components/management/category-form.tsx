@@ -8,7 +8,6 @@ import type { ActionResult } from "@/lib/errors";
 import { saveCategory } from "@/server/rooms";
 import { keepValues } from "@/lib/forms";
 import { MIN_NIGHTLY_RATE_KOBO } from "@/domain/pricing";
-import { formatNaira } from "@/lib/format";
 
 export type CategoryFormValues = {
   id?: string;
@@ -42,7 +41,7 @@ export function CategoryForm({ category, action = saveCategory }: { category?: C
             <Field label="Full description" htmlFor="cdesc" className="sm:col-span-2" error={err("description")}>
               <Textarea id="cdesc" name="description" rows={5} defaultValue={category?.description} maxLength={4000} />
             </Field>
-            <Field label="Amenities" htmlFor="camen" hint="One per line, e.g. King bed. Only list what the room really has." className="sm:col-span-2">
+            <Field label="Amenities" htmlFor="camen" hint="One per line, e.g. King bed." className="sm:col-span-2">
               <Textarea id="camen" name="amenities" rows={4} defaultValue={category?.amenities.join("\n")} />
             </Field>
           </div>
@@ -52,7 +51,7 @@ export function CategoryForm({ category, action = saveCategory }: { category?: C
         <Card>
           <CardHeader title="Pricing & capacity" />
           <div className="space-y-5 p-5">
-            <Field label="Nightly rate (₦)" htmlFor="crate" required hint={`At least ${formatNaira(MIN_NIGHTLY_RATE_KOBO)}. Applies to new bookings only; existing bookings keep their price.`} error={err("nightlyRate")}>
+            <Field label="Nightly rate (₦)" htmlFor="crate" required error={err("nightlyRate")}>
               <Input id="crate" name="nightlyRate" inputMode="decimal" min={MIN_NIGHTLY_RATE_KOBO / 100} defaultValue={category?.nightlyRateKobo ? String(category.nightlyRateKobo / 100) : ""} required />
             </Field>
             <Field label="Maximum guests" htmlFor="cocc" required error={err("maxOccupancy")}>

@@ -139,7 +139,7 @@ export function CancelForm({ reservationId }: { reservationId: string }) {
       </summary>
       <form action={action} onSubmit={keepValues(action)} className="absolute right-0 z-20 mt-2 w-80 space-y-3 rounded-card border border-ivory-200 bg-white p-4 shadow-lg">
         <input type="hidden" name="reservationId" value={reservationId} />
-        <Field label="Reason for cancelling" htmlFor="cancel-reason" hint="Recorded in the reservation history.">
+        <Field label="Reason for cancelling" htmlFor="cancel-reason">
           <Textarea id="cancel-reason" name="reason" rows={2} required minLength={3} />
         </Field>
         {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}

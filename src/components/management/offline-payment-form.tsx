@@ -65,7 +65,7 @@ export function OfflinePaymentForm({
       {state && !state.ok && !state.fieldErrors ? <FormMessage>{state.message}</FormMessage> : null}
       <div hidden={Boolean(review)} className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Amount received (₦)" htmlFor="amount" required hint="Defaults to the balance due." error={err("amount")}>
+        <Field label="Amount received (₦)" htmlFor="amount" required error={err("amount")}>
           <Input id="amount" name="amount" inputMode="decimal" defaultValue={String(balance / 100)} required />
         </Field>
         <Field label="Method" htmlFor="method" required error={err("method")}>

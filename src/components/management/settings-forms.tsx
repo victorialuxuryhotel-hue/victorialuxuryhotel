@@ -82,7 +82,7 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
       <Field label="Direct booking hold (hours)" htmlFor="shold" hint="Phone and WhatsApp bookings awaiting payment." error={err("staffHoldHours")}>
         <Input id="shold" name="staffHoldHours" type="number" min={1} max={336} defaultValue={rules.staffHoldHours} />
       </Field>
-      <Field label="Cancellation policy" htmlFor="cpol" hint="Shown to guests before they pay. Leave empty until the hotel confirms the wording." error={err("cancellationPolicy")} className="md:col-span-2">
+      <Field label="Cancellation policy" htmlFor="cpol" hint="Shown to guests before they pay." error={err("cancellationPolicy")} className="md:col-span-2">
         <Textarea id="cpol" name="cancellationPolicy" rows={3} maxLength={2000} defaultValue={rules.cancellationPolicy ?? ""} />
       </Field>
       <div className="flex justify-end md:col-span-2"><Button type="submit" pending={pending}>Save rules</Button></div>
