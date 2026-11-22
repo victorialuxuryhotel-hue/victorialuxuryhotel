@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
+import { useDialog } from "@/lib/use-dialog";
 import { cn } from "@/lib/utils/cn";
 import { managementNav } from "./nav-items";
 
@@ -36,7 +37,7 @@ function NavLinks({ onNavigate, base, allowed }: { onNavigate?: () => void; base
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+              "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
               active ? "bg-white/10 text-white" : "text-ivory-200/70 hover:bg-white/5 hover:text-white",
             )}
           >
@@ -73,25 +74,47 @@ export function Sidebar({ footer, base = "/app", allowed }: NavProps) {
   );
 }
 
+/**
+ * Phones and tablets: a top bar that stays put while scrolling, and a full
+ * menu. While the menu is open the page behind doesn't scroll, Tab stays in
+ * the menu, and Escape or any navigation closes it.
+ */
 export function MobileBar({ footer, base = "/app", allowed }: NavProps) {
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  // The page the menu was opened on: navigating anywhere closes it.
+  const [openOn, setOpenOn] = useState<string | null>(null);
+  const open = openOn === pathname;
+  const close = useCallback(() => setOpenOn(null), []);
+  const panel = useRef<HTMLDivElement>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
+  useDialog(open, close, panel, toggle);
+
   return (
-    <div className="lg:hidden print:hidden">
-      <div className="flex h-14 items-center justify-between bg-navy-950 pr-2">
+    <div className="sticky top-0 z-40 lg:hidden print:hidden">
+      <div className="flex h-14 items-center justify-between bg-navy-950 pr-1.5">
         <Brand base={base} />
         <button
+          ref={toggle}
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpenOn(open ? null : pathname)}
           aria-expanded={open}
+          aria-controls="management-menu"
           aria-label={open ? "Close menu" : "Open menu"}
-          className="rounded-md p-2 text-ivory-100 hover:bg-white/10"
+          className="flex size-11 items-center justify-center rounded-md text-ivory-100 hover:bg-white/10"
         >
-          {open ? <X className="size-6" /> : <Menu className="size-6" />}
+          {open ? <X className="size-6" aria-hidden /> : <Menu className="size-6" aria-hidden />}
         </button>
       </div>
       {open ? (
-        <div className="fixed inset-x-0 top-14 bottom-0 z-50 flex flex-col bg-navy-950 py-4">
-          <NavLinks base={base} allowed={allowed} onNavigate={() => setOpen(false)} />
+        <div
+          ref={panel}
+          id="management-menu"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+          className="fixed inset-x-0 top-14 bottom-0 z-50 flex flex-col overflow-y-auto bg-navy-950 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+        >
+          <NavLinks base={base} allowed={allowed} onNavigate={close} />
           {footer ? <div className="mt-auto border-t border-white/10 px-5 pt-5">{footer}</div> : null}
         </div>
       ) : null}

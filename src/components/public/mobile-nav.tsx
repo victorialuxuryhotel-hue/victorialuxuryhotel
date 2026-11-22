@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { MapPin, Menu, MessageCircle, Phone, X } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
+import { useDialog } from "@/lib/use-dialog";
 
 /**
  * Phone menu. Full screen below the header, with large 56px rows; Call and
@@ -23,42 +24,9 @@ export function MobileNav({ items }: { items: ReadonlyArray<{ href: string; labe
   const panel = useRef<HTMLDivElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    const focusables = () => Array.from(panel.current?.querySelectorAll<HTMLElement>("a[href], button") ?? []).concat(toggle.current ? [toggle.current] : []);
-    focusables()[0]?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        toggle.current?.focus();
-        return;
-      }
-      if (e.key !== "Tab") return;
-      const els = focusables();
-      const first = els[0];
-      const last = els[els.length - 1];
-      if (!first || !last) return;
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    // Browser back/forward is a route change too: close.
-    const onPop = () => setOpen(false);
-    window.addEventListener("popstate", onPop);
-    return () => {
-      document.body.style.overflow = "";
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("popstate", onPop);
-    };
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useDialog(open, close, panel, toggle);
 
-  const close = () => setOpen(false);
   // Portals need the DOM: render the panel only after hydration.
   const mounted = useSyncExternalStore(noop, () => true, () => false);
 
