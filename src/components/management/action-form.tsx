@@ -21,6 +21,7 @@ export function ActionButton<T>({
   className,
   confirm,
   successMessage,
+  onSuccess,
 }: {
   action: Action<T>;
   fields: Record<string, string>;
@@ -31,8 +32,17 @@ export function ActionButton<T>({
   /** Native confirmation prompt for irreversible actions. */
   confirm?: string;
   successMessage?: (data: T) => string | null;
+  /** Called after the action succeeds (e.g. to show page-level feedback with Undo). */
+  onSuccess?: (data: T) => void;
 }) {
-  const [state, formAction, pending] = useActionState<ActionResult<T> | null, FormData>(action, null);
+  const run: Action<T> = onSuccess
+    ? async (prev, formData) => {
+        const result = await action(prev, formData);
+        if (result.ok) onSuccess(result.data);
+        return result;
+      }
+    : action;
+  const [state, formAction, pending] = useActionState<ActionResult<T> | null, FormData>(run, null);
   return (
     <form
       action={formAction}

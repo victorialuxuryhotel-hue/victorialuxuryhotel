@@ -1,17 +1,19 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { LogIn, LogOut, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { formatNaira } from "@/lib/format";
 import { assignRoom, cancelReservation, changeDates, checkIn, checkOut, markNoShow, overridePayment, resolveAttention, updateReservationDetails } from "@/server/reservations";
 import { ActionButton } from "./action-form";
+import { useActionFeedback, withFeedback } from "./action-feedback";
 import { keepValues } from "@/lib/forms";
 
 export type RoomOption = { id: string; number: string; category: string; ready: boolean };
 
-export function CheckInButton({ reservationId, disabledReason }: { reservationId: string; disabledReason?: string }) {
+export function CheckInButton({ reservationId, roomNumber, disabledReason }: { reservationId: string; roomNumber?: string; disabledReason?: string }) {
+  const feedback = useActionFeedback();
   if (disabledReason) {
     return (
       <Button disabled title={disabledReason}>
@@ -20,13 +22,21 @@ export function CheckInButton({ reservationId, disabledReason }: { reservationId
     );
   }
   return (
-    <ActionButton action={checkIn} fields={{ reservationId }}>
+    <ActionButton
+      action={checkIn}
+      fields={{ reservationId }}
+      onSuccess={(d) => feedback({
+        message: roomNumber ? `Checked in to Room ${roomNumber}. Hand over the key.` : "Checked in.",
+        undo: d.undoId ? { reservationId, undoId: d.undoId } : undefined,
+      })}
+    >
       <LogIn className="size-4" aria-hidden /> Check in
     </ActionButton>
   );
 }
 
 export function CheckOutButton({ reservationId, balanceKobo, size }: { reservationId: string; balanceKobo: number; size?: "sm" | "md" }) {
+  const feedback = useActionFeedback();
   return (
     <ActionButton
       action={checkOut}
@@ -34,7 +44,10 @@ export function CheckOutButton({ reservationId, balanceKobo, size }: { reservati
       size={size}
       variant={size === "sm" ? "secondary" : "primary"}
       confirm={balanceKobo > 0 ? `${formatNaira(balanceKobo)} is still outstanding. Check out anyway?` : undefined}
-      successMessage={(d) => (d.balanceKobo > 0 ? `Checked out with ${formatNaira(d.balanceKobo)} outstanding.` : null)}
+      onSuccess={(d) => feedback({
+        message: `Checked out. The room is marked for cleaning.${d.balanceKobo > 0 ? ` ${formatNaira(d.balanceKobo)} is still outstanding.` : ""}`,
+        undo: d.undoId ? { reservationId, undoId: d.undoId } : undefined,
+      })}
     >
       <LogOut className="size-4" aria-hidden /> Check out
     </ActionButton>
@@ -42,15 +55,33 @@ export function CheckOutButton({ reservationId, balanceKobo, size }: { reservati
 }
 
 export function NoShowButton({ reservationId }: { reservationId: string }) {
+  const feedback = useActionFeedback();
   return (
-    <ActionButton action={markNoShow} fields={{ reservationId }} variant="ghost" confirm="Mark this guest as a no-show? This can't be undone.">
+    <ActionButton
+      action={markNoShow}
+      fields={{ reservationId }}
+      variant="ghost"
+      confirm="Mark this guest as a no-show? The room is released for tonight."
+      onSuccess={(d) => feedback({ message: "Marked as a no-show. The room is released.", undo: d.undoId ? { reservationId, undoId: d.undoId } : undefined })}
+    >
       No-show
     </ActionButton>
   );
 }
 
 export function AssignRoomForm({ reservationId, current, rooms, booked }: { reservationId: string; current?: string; rooms: RoomOption[]; booked: string }) {
-  const [state, action, pending] = useActionState(assignRoom, null);
+  const feedback = useActionFeedback();
+  const [chosen, setChosen] = useState("");
+  const [state, action, pending] = useActionState(
+    withFeedback(assignRoom, (d) => {
+      const number = rooms.find((r) => r.id === chosen)?.number;
+      feedback({
+        message: number ? `${current ? "Moved to" : "Assigned"} Room ${number}.` : "Room updated.",
+        undo: d.undoId ? { reservationId, undoId: d.undoId } : undefined,
+      });
+    }),
+    null,
+  );
   const sameCategory = rooms.filter((r) => r.category === booked);
   const others = rooms.filter((r) => r.category !== booked);
   const label = (r: RoomOption) => `Room ${r.number}${r.ready ? "" : " (not ready yet)"}`;
@@ -59,7 +90,7 @@ export function AssignRoomForm({ reservationId, current, rooms, booked }: { rese
       <input type="hidden" name="reservationId" value={reservationId} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <Field label={current ? `Change room (now ${current})` : "Assign a room"} htmlFor="room" className="flex-1">
-          <Select id="room" name="roomId" defaultValue="" required>
+          <Select id="room" name="roomId" value={chosen} onChange={(e) => setChosen(e.target.value)} required>
             <option value="" disabled>
               {rooms.length ? `Choose a room` : "No free rooms for these dates"}
             </option>
@@ -76,7 +107,6 @@ export function AssignRoomForm({ reservationId, current, rooms, booked }: { rese
         <Button type="submit" variant="secondary" pending={pending}>{current ? "Change" : "Assign"}</Button>
       </div>
       {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
-      {state?.ok ? <FormMessage tone="success">Room updated.</FormMessage> : null}
     </form>
   );
 }

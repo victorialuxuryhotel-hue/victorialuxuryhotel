@@ -20,6 +20,7 @@ import {
   ResolveAttentionForm,
   type RoomOption,
 } from "./reservation-actions";
+import { ActionFeedbackProvider } from "./action-feedback";
 import { NextStepBar } from "./reservation-guide";
 import { reservationSteps, StepList } from "./reservation-steps";
 
@@ -72,6 +73,7 @@ export function ReservationDetailView({
     r.status !== "confirmed" ? undefined : !r.roomNumber ? "Assign a room first" : r.checkIn > today ? `Arrival is ${formatDate(r.checkIn)}` : undefined;
 
   return (
+    <ActionFeedbackProvider>
     <div className="px-4 py-6 lg:px-8">
       <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-900">
         <ArrowLeft className="size-4" aria-hidden /> Reservations
@@ -111,7 +113,7 @@ export function ReservationDetailView({
           ) : null}
         </div>
         <div className="hidden flex-wrap items-start gap-2 lg:flex">
-          {r.status === "confirmed" ? <CheckInButton reservationId={r.id} disabledReason={checkInBlocker} /> : null}
+          {r.status === "confirmed" ? <CheckInButton reservationId={r.id} roomNumber={r.roomNumber} disabledReason={checkInBlocker} /> : null}
           {r.status === "checked_in" ? <CheckOutButton reservationId={r.id} balanceKobo={balance} /> : null}
           {balance > 0 && r.status !== "cancelled" && r.status !== "expired" ? (
             <Link href={paymentsHref} className={buttonStyles({ variant: "secondary" })}>
@@ -269,5 +271,6 @@ export function ReservationDetailView({
       {/* Phones and tablets: the next step pinned to the bottom. Reset when the status changes. */}
       <NextStepBar key={r.status} r={r} today={today} paymentsHref={paymentsHref} canOverride={canOverride} />
     </div>
+    </ActionFeedbackProvider>
   );
 }

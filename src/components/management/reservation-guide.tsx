@@ -10,6 +10,7 @@ import { keepValues } from "@/lib/forms";
 import { formatDate, formatNaira } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 import { cancelReservation, markNoShow, overridePayment } from "@/server/reservations";
+import { useActionFeedback, withFeedback } from "./action-feedback";
 import { CheckInButton, CheckOutButton } from "./reservation-actions";
 
 type R = Pick<
@@ -56,12 +57,18 @@ function CancelConfirm({ r, onKeep }: { r: R; onKeep: () => void }) {
 }
 
 function NoShowConfirm({ r, onKeep }: { r: R; onKeep: () => void }) {
-  const [state, action, pending] = useActionState(markNoShow, null);
+  const feedback = useActionFeedback();
+  const [state, action, pending] = useActionState(
+    withFeedback(markNoShow, (d) =>
+      feedback({ message: "Marked as a no-show. The room is released.", undo: d.undoId ? { reservationId: r.id, undoId: d.undoId } : undefined }),
+    ),
+    null,
+  );
   return (
     <form action={action} className="mt-4 space-y-3 rounded-card border border-gold-500 p-4">
       <input type="hidden" name="reservationId" value={r.id} />
       <p className="text-lg font-semibold text-ink-900">Mark {r.guestName.split(" ")[0]} as a no-show?</p>
-      <p className="text-sm text-ink-700">The booking closes and the room is released for tonight. This can&apos;t be undone.</p>
+      <p className="text-sm text-ink-700">The booking closes and the room is released for tonight. You can undo this for a few seconds afterwards.</p>
       {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
       <div className="grid grid-cols-2 gap-2.5">
         <Button type="button" variant="secondary" size="lg" onClick={onKeep} className="whitespace-nowrap px-3">Keep booking</Button>
@@ -112,7 +119,7 @@ export function NextStepBar({ r, today, paymentsHref, canOverride }: { r: R; tod
     primary = blocker ? (
       <Button size="lg" disabled className="w-full">Check in · {blocker}</Button>
     ) : (
-      <div className={full}><CheckInButton reservationId={r.id} /></div>
+      <div className={full}><CheckInButton reservationId={r.id} roomNumber={r.roomNumber} /></div>
     );
   } else if (r.status === "checked_in") {
     primary = <div className={full}><CheckOutButton reservationId={r.id} balanceKobo={balance} /></div>;
