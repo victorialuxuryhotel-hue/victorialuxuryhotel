@@ -4,7 +4,10 @@ import { Suspense } from "react";
 import { Download } from "lucide-react";
 import { AccessDenied } from "@/components/management/access-denied";
 import { PageHeader } from "@/components/management/page-header";
-import { ActivityList } from "@/components/management/settings";
+import { ActivityLog } from "@/components/management/activity-log";
+import { activityCategory } from "@/server/domain/activity";
+import { hotelToday } from "@/lib/hotel-date";
+import { pageFrom } from "@/components/management/pager";
 import { Tabs } from "@/components/management/toolbar";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -14,8 +17,7 @@ import { formatDate, formatNaira, plural } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 import { requireStaff } from "@/server/auth";
 import { reportRange, type Bucket, type ReportRange } from "@/server/domain/reports";
-import { moneyPageData, occupancyPageData } from "@/server/queries/reports";
-import { recentActivity } from "@/server/queries/settings";
+import { activityPageData, moneyPageData, occupancyPageData } from "@/server/queries/reports";
 
 export const metadata: Metadata = { title: "Reports" };
 
@@ -145,6 +147,22 @@ async function Occupancy({ range }: { range: ReportRange }) {
   );
 }
 
+const ACTIVITY_PAGE = 20;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function Activity({ sp }: { sp: Record<string, string | string[] | undefined> }) {
+  const who = str(sp.who);
+  const p = {
+    range: str(sp.range) ? reportRange(str(sp.range)) : ("today" as const),
+    cat: activityCategory(str(sp.cat)),
+    who: who && UUID.test(who) ? who : undefined,
+    routine: str(sp.routine) === "1",
+    page: pageFrom(sp.page),
+  };
+  const data = await activityPageData({ range: p.range, category: p.cat, actorId: p.who, routine: p.routine, page: p.page, size: ACTIVITY_PAGE });
+  return <ActivityLog p={p} rows={data.rows} total={data.total} people={data.people} today={hotelToday()} size={ACTIVITY_PAGE} />;
+}
+
 async function Content({ searchParams }: { searchParams: SP }) {
   const staff = await requireStaff();
   if (!can(staff.role, "reports.view")) return <AccessDenied />;
@@ -165,10 +183,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
       <div className="space-y-5 px-4 py-6 lg:px-8">
         {tab === "activity" ? (
           can(staff.role, "activity.view") ? (
-            <Card>
-              <CardHeader title="Activity log" description="Important staff and system actions, newest first. Read-only." />
-              <ActivityList rows={await recentActivity()} />
-            </Card>
+            <Activity sp={sp} />
           ) : (
             <AccessDenied />
           )

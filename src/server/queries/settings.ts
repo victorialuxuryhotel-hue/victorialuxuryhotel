@@ -1,7 +1,7 @@
 import "server-only";
 import { clerkClient } from "@clerk/nextjs/server";
 import type { BookingRules } from "@/components/management/settings-forms";
-import type { ActivityRow, StaffRow } from "@/domain/views";
+import type { StaffRow } from "@/domain/views";
 import { logger } from "@/lib/logger";
 import { hotelToday } from "@/lib/hotel-date";
 import { actorOf, authorizeRead } from "../auth";
@@ -52,24 +52,6 @@ export async function listStaff(): Promise<StaffRow[]> {
   }));
 }
 
-/** Managers only. */
-export async function recentActivity(limit = 50): Promise<ActivityRow[]> {
-  await authorizeRead("activity.view");
-  const rows = await all<{ id: number; created_at: string; action: string; summary: string; actor_type: string; actor: string | null }>(
-    await getDb(),
-    `SELECT a.id, a.created_at, a.action, a.summary, a.actor_type, s.full_name AS actor
-     FROM activity_log a LEFT JOIN staff_profiles s ON s.id = a.actor_id
-     ORDER BY a.created_at DESC, a.id DESC LIMIT ?`,
-    limit,
-  );
-  return rows.map((a) => ({
-    id: String(a.id),
-    at: a.created_at,
-    action: a.action,
-    summary: a.summary,
-    actor: a.actor ?? (a.actor_type === "system" ? "System" : "Staff"),
-  }));
-}
 
 /** Front desk: which manager to ask for a manager-only action (name, role, phone). Signed-in staff only. */
 export async function managerToAskForDesk() {
