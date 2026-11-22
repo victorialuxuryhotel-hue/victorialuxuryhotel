@@ -207,6 +207,8 @@ export type StaffRecord = {
 
 export async function createStaffProfile(db: Db, actor: Actor, v: { fullName: string; email: string; role: StaffRole; phone?: string | null }): Promise<string> {
   requireRole(actor, OWNER);
+  // Owner access is never granted by invitation; it's a separate, confirmed step (promoteToOwner).
+  if (v.role === "owner") throw new AppError("VALIDATION", "Invite as general manager or front desk. Make them owner afterwards.");
   const id = uuid();
   try {
     await writeBatch(db, actor, [
@@ -240,6 +242,10 @@ export async function updateStaffProfile(
 ): Promise<StaffRecord> {
   requireRole(actor, OWNER);
   if (v.staffId === actor.id && !v.isActive) throw new AppError("VALIDATION", "You can't deactivate your own account.");
+  if (v.role === "owner") {
+    const current = await first<{ role: StaffRole }>(db, "SELECT role FROM staff_profiles WHERE id = ?", v.staffId);
+    if (current && current.role !== "owner") throw new AppError("VALIDATION", "Use “Make owner” to give someone owner access.");
+  }
   const [result] = await writeBatch(db, actor, [
     v.phone === undefined
       ? db.prepare("UPDATE staff_profiles SET role = ?, is_active = ? WHERE id = ?").bind(v.role, v.isActive ? 1 : 0, v.staffId)
@@ -250,6 +256,22 @@ export async function updateStaffProfile(
   });
   if (!result?.meta.changes) throw new AppError("NOT_FOUND", "Staff member not found.");
   return (await first<StaffRecord>(db, "SELECT id, clerk_user_id, full_name, email, role, is_active FROM staff_profiles WHERE id = ?", v.staffId))!;
+}
+
+/**
+ * Gives an active staff member owner access: the separate, confirmed action
+ * on their row (never part of an invite or an ordinary role change). The
+ * audit trigger logs it with the owner's name.
+ */
+export async function promoteToOwner(db: Db, actor: Actor, staffId: string): Promise<StaffRecord> {
+  requireRole(actor, OWNER);
+  const current = await first<{ role: StaffRole; is_active: number }>(db, "SELECT role, is_active FROM staff_profiles WHERE id = ?", staffId);
+  if (!current) throw new AppError("NOT_FOUND", "Staff member not found.");
+  if (!current.is_active) throw new AppError("VALIDATION", "Restore their access before making them owner.");
+  if (current.role !== "owner") {
+    await writeBatch(db, actor, [db.prepare("UPDATE staff_profiles SET role = 'owner' WHERE id = ? AND is_active = 1").bind(staffId)]);
+  }
+  return (await first<StaffRecord>(db, "SELECT id, clerk_user_id, full_name, email, role, is_active FROM staff_profiles WHERE id = ?", staffId))!;
 }
 
 /** Links a Clerk user to the invited staff record with the same (verified) email, on first sign-in. */

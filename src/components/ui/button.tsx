@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils/cn";
 import { Spinner } from "./feedback";
 
@@ -33,7 +33,7 @@ export function buttonStyles({ variant = "primary", size = "md", className }: { 
   );
 }
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size; pending?: boolean };
+type ButtonProps = ComponentProps<"button"> & { variant?: Variant; size?: Size; pending?: boolean };
 
 export function Button({ variant, size, pending, className, children, disabled, type = "button", ...rest }: ButtonProps) {
   return (

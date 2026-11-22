@@ -85,9 +85,10 @@ export const guests: GuestRow[] = [
 ];
 
 export const staff: StaffRow[] = [
-  { id: "s1", name: "Victoria Owner", email: "owner@example.com", role: "owner", isActive: true, lastSignIn: "2026-12-01T08:02:00Z" },
-  { id: "s2", name: "Kemi Ade", email: "gm@example.com", role: "general_manager", isActive: true, lastSignIn: "2026-12-01T07:45:00Z" },
-  { id: "s3", name: "Bisi Lawal", email: "frontdesk1@example.com", role: "front_desk", isActive: true, lastSignIn: "2026-12-01T06:58:00Z" },
+  { id: "s1", name: "Victoria Owner", email: "owner@example.com", role: "owner", isActive: true, lastSignIn: "2026-12-01T08:02:00Z", lastSeen: "2026-12-01T08:02:00Z" },
+  { id: "s2", name: "Kemi Ade", email: "gm@example.com", role: "general_manager", isActive: true, lastSignIn: "2026-11-28T07:45:00Z", lastSeen: "2026-11-28T07:45:00Z" },
+  { id: "s3", name: "Bisi Lawal", email: "frontdesk1@example.com", role: "front_desk", isActive: true, lastSignIn: "2026-12-01T06:58:00Z", lastSeen: "2026-12-01T06:58:00Z" },
+  { id: "s5", name: "Tunde Bello", email: "frontdesk3@example.com", role: "front_desk", isActive: true, invited: true },
   { id: "s4", name: "Femi Ojo", email: "frontdesk2@example.com", role: "front_desk", isActive: false },
 ];
 

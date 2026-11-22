@@ -2,81 +2,13 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
-import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
-import { staffRole, type StaffRole } from "@/domain/status";
+import { Field, FormMessage, Input, Textarea } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/errors";
 import { updateBookingRules } from "@/server/settings";
-import { inviteStaff, updateStaff } from "@/server/staff";
 import { keepValues } from "@/lib/forms";
 
 const fieldError = (state: ActionResult<unknown> | null, name: string) =>
   state && !state.ok ? state.fieldErrors?.[name]?.[0] : undefined;
-
-export function InviteStaffForm() {
-  const [state, action, pending] = useActionState(inviteStaff, null);
-  return (
-    <form action={action} onSubmit={keepValues(action)} className="space-y-4 p-5">
-      {state?.ok ? <FormMessage tone="success">Invitation sent to {state.data.email}. They&apos;ll set their own password.</FormMessage> : null}
-      {state && !state.ok && !state.fieldErrors ? <FormMessage>{state.message}</FormMessage> : null}
-      <div className="grid gap-4 sm:grid-cols-2 sm:items-start xl:grid-cols-[1fr_1fr_11rem_auto_auto]">
-        <Field label="Full name" htmlFor="sname" error={fieldError(state, "fullName")}>
-          <Input id="sname" name="fullName" required aria-invalid={Boolean(fieldError(state, "fullName"))} />
-        </Field>
-        <Field label="Email" htmlFor="semail" error={fieldError(state, "email")}>
-          <Input id="semail" name="email" type="email" required aria-invalid={Boolean(fieldError(state, "email"))} />
-        </Field>
-        <Field label="Phone" optional htmlFor="sphone" error={fieldError(state, "phone")}>
-          <Input id="sphone" name="phone" type="tel" inputMode="tel" autoComplete="off" aria-invalid={Boolean(fieldError(state, "phone"))} />
-        </Field>
-        <Field label="Role" htmlFor="srole">
-          <Select id="srole" name="role" defaultValue="front_desk">
-            {(Object.keys(staffRole) as StaffRole[]).map((r) => <option key={r} value={r}>{staffRole[r]}</option>)}
-          </Select>
-        </Field>
-        <Button type="submit" pending={pending} className="sm:mt-7">Send invite</Button>
-      </div>
-      <p className="text-xs text-ink-500">
-        A manager&apos;s phone is shown only to signed-in staff, when front desk needs to ask a manager. Never to guests.
-      </p>
-    </form>
-  );
-}
-
-export function StaffAccessForm({
-  staffId,
-  role,
-  isActive,
-  isSelf,
-  phone,
-}: {
-  staffId: string;
-  role: StaffRole;
-  isActive: boolean;
-  isSelf: boolean;
-  phone?: string;
-}) {
-  const [state, action, pending] = useActionState(updateStaff, null);
-  return (
-    <form action={action} onSubmit={keepValues(action)} className="flex flex-wrap items-center justify-end gap-2">
-      <input type="hidden" name="staffId" value={staffId} />
-      <label className="sr-only" htmlFor={`phone-${staffId}`}>Phone</label>
-      <Input id={`phone-${staffId}`} name="phone" type="tel" inputMode="tel" defaultValue={phone ?? ""} placeholder="Phone" className="h-8 w-36 text-xs" />
-      <label className="sr-only" htmlFor={`role-${staffId}`}>Role</label>
-      <Select id={`role-${staffId}`} name="role" defaultValue={role} className="h-8 w-auto text-xs">
-        {(Object.keys(staffRole) as StaffRole[]).map((r) => <option key={r} value={r}>{staffRole[r]}</option>)}
-      </Select>
-      <label className="sr-only" htmlFor={`active-${staffId}`}>Access</label>
-      <Select id={`active-${staffId}`} name="isActive" defaultValue={String(isActive)} disabled={isSelf} className="h-8 w-auto text-xs">
-        <option value="true">Active</option>
-        <option value="false">Deactivated</option>
-      </Select>
-      {isSelf ? <input type="hidden" name="isActive" value="true" /> : null}
-      <Button type="submit" size="sm" variant="secondary" pending={pending}>Save</Button>
-      {state && !state.ok ? <p role="alert" className="w-full text-right text-xs text-danger-700">{state.message}</p> : null}
-      {state?.ok ? <p role="status" className="w-full text-right text-xs text-success-700">Saved</p> : null}
-    </form>
-  );
-}
 
 export type BookingRules = {
   checkInTime: string;

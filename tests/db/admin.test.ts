@@ -11,6 +11,7 @@ import {
   saveCategory,
   setCoverPhoto,
   updateBookingRules,
+  promoteToOwner,
   updateStaffProfile,
 } from "@/server/domain/admin";
 import { updateGuest } from "@/server/domain/reservations";
@@ -126,6 +127,21 @@ describe("owner and staff", () => {
     expect(logs.map((l) => l.action)).toEqual(["staff.created", "staff.updated", "staff.updated"]);
     expect(logs.every((l) => l.actor_id === owner!.id)).toBe(true);
     await rejects(createStaffProfile(db, owner, { fullName: "Dup", email: "ada.front@example.com", role: "front_desk" }), /already has an account/);
+  });
+
+  it("grants owner only through the separate Make owner step, logged", async () => {
+    await rejects(createStaffProfile(db, owner, { fullName: "Want Owner", email: `own-${crypto.randomUUID().slice(0, 6)}@example.com`, role: "owner" }), /Make them owner afterwards/);
+    const id = await createStaffProfile(db, owner, { fullName: "Next Owner", email: `next-${crypto.randomUUID().slice(0, 6)}@example.com`, role: "general_manager" });
+    await rejects(updateStaffProfile(db, owner, { staffId: id, role: "owner", isActive: true }), /Make owner/);
+    await rejects(promoteToOwner(db, gm, id), /role does not allow/);
+    expect((await promoteToOwner(db, owner, id)).role).toBe("owner");
+    // Once an owner, ordinary saves (e.g. a phone change) keep the role.
+    await updateStaffProfile(db, owner, { staffId: id, role: "owner", isActive: true, phone: "+234 803 000 0000" });
+    const logs = await q<{ action: string }>("SELECT action FROM activity_log WHERE entity_id = ? ORDER BY id", id);
+    expect(logs.map((l) => l.action)).toEqual(["staff.created", "staff.updated"]);
+    // Step back down so the shared database keeps its usual owners.
+    await updateStaffProfile(db, owner, { staffId: id, role: "general_manager", isActive: false });
+    await rejects(promoteToOwner(db, owner, id), /Restore their access/);
   });
 
   it("cannot remove the last active owner or deactivate themselves", async () => {

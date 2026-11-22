@@ -95,7 +95,7 @@ export type GuestRow = {
   totalPaidKobo: number;
 };
 
-export type StaffRow = { id: string; name: string; email: string; phone?: string; role: StaffRole; isActive: boolean; lastSignIn?: string };
+export type StaffRow = { id: string; name: string; email: string; phone?: string; role: StaffRole; isActive: boolean; lastSignIn?: string; lastSeen?: string; invited?: boolean };
 
 export type ActivityRow = { id: string; at: string; actor: string; action: string; summary: string };
 

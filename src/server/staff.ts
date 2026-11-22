@@ -8,7 +8,7 @@ import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize } from "./auth";
 import { first, getDb } from "./db";
-import { createStaffProfile, updateStaffProfile } from "./domain/admin";
+import { createStaffProfile, promoteToOwner, updateStaffProfile } from "./domain/admin";
 
 const roleSchema = z.enum(["owner", "general_manager", "front_desk"]);
 
@@ -23,7 +23,8 @@ const phoneSchema = z
 const inviteSchema = z.object({
   fullName: z.string().trim().min(2, "Enter the person's full name").max(120),
   email: z.email("Enter a valid email").transform((e) => e.toLowerCase()),
-  role: roleSchema,
+  // Owner is never chosen in an invite (6e); see makeOwner.
+  role: z.enum(["general_manager", "front_desk"], "Choose a role"),
   phone: phoneSchema,
 });
 
@@ -111,6 +112,21 @@ export async function updateStaff(_prev: ActionResult | null, formData: FormData
     return ok(undefined);
   } catch (err) {
     if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("staff.update_failed", err);
+    return toActionError(err);
+  }
+}
+
+/** The separate, confirmed "Make owner" action on a staff row (owner only, logged). */
+export async function makeOwner(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  try {
+    const me = await authorize("staff.manage");
+    const parsed = z.object({ staffId: z.uuid(), confirm: z.literal("yes") }).safeParse(Object.fromEntries(formData));
+    if (!parsed.success) throw new AppError("VALIDATION", "Confirm before making someone owner.");
+    await promoteToOwner(await getDb(), actorOf(me), parsed.data.staffId);
+    refresh();
+    return ok(undefined);
+  } catch (err) {
+    if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("staff.make_owner_failed", err);
     return toActionError(err);
   }
 }

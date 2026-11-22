@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AccessDenied } from "@/components/management/access-denied";
 import { PageHeader } from "@/components/management/page-header";
-import { SettingsSection, StaffTable } from "@/components/management/settings";
-import { InviteStaffForm, StaffAccessForm } from "@/components/management/settings-forms";
+import { StaffAccess } from "@/components/management/staff-access";
 import { LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
 import { requireStaff } from "@/server/auth";
+import { hotelToday } from "@/server/queries/reservations";
 import { listStaff } from "@/server/queries/settings";
 
 export const metadata: Metadata = { title: "Staff & access" };
@@ -26,15 +26,10 @@ export default function StaffPage() {
 async function Content() {
   const staff = await requireStaff();
   if (!can(staff.role, "staff.manage")) return <AccessDenied />;
-  const team = await listStaff();
+  const [team, today] = await Promise.all([listStaff(), hotelToday()]);
   return (
-    <div className="space-y-6 px-4 py-6 lg:px-8">
-      <SettingsSection title="Invite someone" description="They get an email to set a password, then sign in with the role you choose.">
-        <InviteStaffForm />
-      </SettingsSection>
-      <SettingsSection title="Team" description="Only the owner can change roles or remove access.">
-        <StaffTable rows={team} manage={(s) => <StaffAccessForm staffId={s.id} role={s.role} isActive={s.isActive} isSelf={s.id === staff.id} phone={s.phone} />} />
-      </SettingsSection>
+    <div className="mx-auto w-full max-w-3xl px-4 py-6 lg:px-8">
+      <StaffAccess rows={team} selfId={staff.id} today={today} />
     </div>
   );
 }

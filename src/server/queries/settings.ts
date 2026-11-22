@@ -29,7 +29,7 @@ export async function listStaff(): Promise<StaffRow[]> {
   await authorizeRead("staff.manage");
   const staff = await all<StaffRecord & { phone: string | null }>(
     await getDb(),
-    "SELECT id, clerk_user_id, full_name, email, role, is_active, phone FROM staff_profiles ORDER BY full_name",
+    "SELECT id, clerk_user_id, full_name, email, role, is_active, phone, last_seen_at FROM staff_profiles ORDER BY is_active DESC, full_name",
   );
   const linked = staff.map((s) => s.clerk_user_id).filter((id): id is string => Boolean(id));
   const lastSignIn = new Map<string, string | undefined>();
@@ -49,9 +49,14 @@ export async function listStaff(): Promise<StaffRow[]> {
     isActive: s.is_active === 1,
     phone: s.phone ?? undefined,
     lastSignIn: s.clerk_user_id ? lastSignIn.get(s.clerk_user_id) : undefined,
+    // Last time they used the app (recorded at most hourly), else their last sign-in.
+    lastSeen: latest(s.last_seen_at ?? undefined, s.clerk_user_id ? lastSignIn.get(s.clerk_user_id) : undefined),
+    invited: !s.clerk_user_id,
   }));
 }
 
+
+const latest = (a?: string, b?: string) => (!a ? b : !b ? a : a > b ? a : b);
 
 /** Front desk: which manager to ask for a manager-only action (name, role, phone). Signed-in staff only. */
 export async function managerToAskForDesk() {
