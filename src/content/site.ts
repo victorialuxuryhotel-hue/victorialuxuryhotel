@@ -21,6 +21,7 @@ import {
   Wine,
   Zap,
   Presentation,
+  Music,
 } from "lucide-react";
 
 /**
@@ -71,6 +72,7 @@ export const highlights: Array<{ title: string; text: string; icon: LucideIcon }
 export const facilities: Array<{ name: string; text: string; icon: LucideIcon }> = [
   { name: "Restaurant", text: "Dining on site for breakfast, lunch and dinner.", icon: UtensilsCrossed },
   { name: "Lounge & bar", text: "Drinks and conversation in a relaxed lounge.", icon: Wine },
+  { name: "Club", text: "Indoor and outdoor lounge.", icon: Music },
   { name: "Indoor swimming pool", text: "An exclusive indoor pool for hotel guests.", icon: Waves },
   { name: "Spa", text: "Heated room and body scrub treatments in house.", icon: Sparkles },
   { name: "Conference room", text: "A room for meetings, trainings and corporate events.", icon: Presentation },

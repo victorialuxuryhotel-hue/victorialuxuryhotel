@@ -11,10 +11,10 @@
 -- =============================================================================
 
 INSERT OR IGNORE INTO room_categories (id, slug, name, nightly_rate_kobo, max_occupancy, sort_order) VALUES
-  ('00000000-0000-4000-8000-000000000001', 'standard',  'Standard',  4000000, 2, 1),
-  ('00000000-0000-4000-8000-000000000002', 'deluxe',    'Deluxe',    5500000, 2, 2),
-  ('00000000-0000-4000-8000-000000000003', 'suite',     'Suite',     8500000, 3, 3),
-  ('00000000-0000-4000-8000-000000000004', 'apartment', 'Apartment', 12000000, 4, 4);
+  ('00000000-0000-4000-8000-000000000001', 'standard',  'Standard',  5500000, 2, 1),
+  ('00000000-0000-4000-8000-000000000002', 'deluxe',    'Deluxe',    7500000, 2, 2),
+  ('00000000-0000-4000-8000-000000000003', 'suite',     'Suite',    10800000, 2, 3),
+  ('00000000-0000-4000-8000-000000000004', 'apartment', 'Apartment', 23000000, 4, 4);
 
 -- 29 rooms: Standard 101–112, Deluxe 201–209, Suite 301–305, Apartment 401–403.
 WITH RECURSIVE n(x) AS (SELECT 101 UNION ALL SELECT x + 1 FROM n WHERE x < 403),
