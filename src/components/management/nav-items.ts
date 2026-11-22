@@ -1,4 +1,4 @@
-import { BedDouble, CalendarCheck, CreditCard, LayoutDashboard, Settings, ShieldCheck, Sun, Tags, Users } from "lucide-react";
+import { BarChart3, BedDouble, CalendarCheck, CreditCard, LayoutDashboard, Settings, ShieldCheck, Sun, Tags, Users } from "lucide-react";
 import type { Permission } from "@/lib/auth/permissions";
 
 /**
@@ -26,6 +26,7 @@ export const managementNavGroups: readonly NavGroup[] = [
     items: [
       { href: "/app", label: "Dashboard", icon: LayoutDashboard, permission: ["reports.view"] },
       { href: "/app/rooms/categories", label: "Rates & room types", icon: Tags, permission: ["categories.manage"] },
+      { href: "/app/reports", label: "Reports", icon: BarChart3, permission: ["reports.view"] },
       { href: "/app/settings", label: "Booking rules", icon: Settings, permission: ["settings.manage"] },
     ],
   },

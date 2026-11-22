@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { CalendarPlus } from "lucide-react";
+import { ArrowRight, CalendarPlus } from "lucide-react";
 import { MovementList } from "@/components/management/front-desk";
 import { PageHeader } from "@/components/management/page-header";
 import { ReservationTable } from "@/components/management/reservation-table";
@@ -23,7 +23,6 @@ const href = (r: { id: string }) => `/app/reservations/${r.id}`;
 
 async function Revenue() {
   const r = await revenueSummary();
-  const max = Math.max(1, ...r.daily.map((d) => d.kobo));
   return (
     <section aria-labelledby="money">
       <h2 id="money" className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">This month</h2>
@@ -33,20 +32,9 @@ async function Revenue() {
         <Stat label="Booked value" value={formatNaira(r.bookedValue)} caption="Stays arriving this month. Not cash received" />
         <Stat label="Outstanding" value={formatNaira(r.outstanding)} caption="Unpaid balances on confirmed stays" />
       </StatGrid>
-      <Card className="mt-4">
-        <CardHeader title="Payments received, last 14 days" description="Daily total of verified payments" />
-        <div className="flex h-44 items-end gap-1.5 px-5 pt-4 pb-2" role="img" aria-label="Bar chart of daily verified payments over the last 14 days">
-          {r.daily.map((d) => (
-            <div key={d.day} className="group relative flex-1" title={`${formatDate(d.day, { year: false })}: ${formatNaira(d.kobo)}`}>
-              <div className="rounded-t bg-navy-700 transition-colors group-hover:bg-gold-500" style={{ height: `${Math.max(2, (d.kobo / max) * 140)}px` }} />
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-between px-5 pb-4 text-xs text-ink-500">
-          <span>{formatDate(r.daily[0]!.day, { year: false })}</span>
-          <span>Today</span>
-        </div>
-      </Card>
+      <Link href="/app/reports" className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-navy-800 hover:text-gold-600">
+        Daily figures, cash-up and occupancy in Reports <ArrowRight className="size-4" aria-hidden />
+      </Link>
     </section>
   );
 }

@@ -15,7 +15,7 @@ describe("menu by role", () => {
   it("the general manager also runs the hotel, but has no staff section", () => {
     const groups = visible("general_manager");
     expect(groups.map((g) => g.label)).toEqual(["Daily work", "Running the hotel"]);
-    expect(groups[1]!.items).toEqual(["Dashboard", "Rates & room types", "Booking rules"]);
+    expect(groups[1]!.items).toEqual(["Dashboard", "Rates & room types", "Reports", "Booking rules"]);
   });
   it("the owner also manages staff", () => {
     expect(visible("owner").at(-1)).toEqual({ label: "Owner", items: ["Staff & access"] });
