@@ -3,6 +3,9 @@ import { effectivePaymentView, type PaymentView } from "@/lib/auth/permissions";
 import { hotelToday } from "@/lib/hotel-date";
 import { ALL_STAFF, all, first, requireRole, type Actor, type Db } from "../db";
 
+/** Desk staff take payments; finance reads them all. */
+const PAYMENT_READERS = [...ALL_STAFF, "finance"] as const;
+
 /**
  * Who may see which payments on the Payments page.
  *
@@ -45,7 +48,7 @@ export async function listPaymentsFor(
   actor: Actor,
   opts: { view?: string; page?: number; size?: number; today?: string },
 ): Promise<{ view: PaymentView; rows: ListedPayment[] }> {
-  requireRole(actor, ALL_STAFF);
+  requireRole(actor, PAYMENT_READERS);
   const view = effectivePaymentView(actor.role, opts.view);
   const size = opts.size ?? 50;
   const page = Math.max(1, opts.page ?? 1);
@@ -71,7 +74,7 @@ export type FrontDeskSummary = {
 
 /** Counts and today's takings for the front-desk Payments page. */
 export async function frontDeskSummary(db: Db, actor: Actor, today = hotelToday()): Promise<FrontDeskSummary> {
-  requireRole(actor, ALL_STAFF);
+  requireRole(actor, PAYMENT_READERS);
   const t = paymentScopeSql("today", actor.id, today);
   const m = paymentScopeSql("mine", actor.id, today);
   const [counts, totals] = await Promise.all([

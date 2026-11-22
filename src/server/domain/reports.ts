@@ -1,5 +1,5 @@
 import { addDays, hotelToday } from "@/lib/hotel-date";
-import { MANAGERS, all, first, requireRole, type Actor, type Db } from "../db";
+import { FINANCE, all, first, requireRole, type Actor, type Db } from "../db";
 
 /**
  * Reports for managers and the owner. Every range is in hotel (Lagos) dates,
@@ -29,7 +29,7 @@ const BUCKET = `CASE WHEN p.provider = 'paystack' THEN 'cardOnline' WHEN p.metho
 export type Bucket = "cash" | "transfer" | "cardOnline" | "pos" | "other";
 
 export async function moneyReport(db: Db, actor: Actor, range: ReportRange, today = hotelToday()) {
-  requireRole(actor, MANAGERS);
+  requireRole(actor, FINANCE);
   const { from, to, days } = rangeDates(range, today);
   const rows = await all<{ day: string; kobo: number }>(
     db,
@@ -47,7 +47,7 @@ export type CashUpRow = { who: string; staffId: string | null; counts: Record<Bu
 
 /** Who took what on one Lagos day: count of payments by method and the net total, per staff member (or Website). */
 export async function cashUp(db: Db, actor: Actor, day = hotelToday()): Promise<CashUpRow[]> {
-  requireRole(actor, MANAGERS);
+  requireRole(actor, FINANCE);
   const rows = await all<{ staff_id: string | null; who: string | null; online: number; bucket: Bucket; n: number; kobo: number }>(
     db,
     `SELECT CASE WHEN p.provider = 'paystack' THEN NULL ELSE p.recorded_by END AS staff_id, s.full_name AS who,
@@ -81,7 +81,7 @@ const STAYING = "r.status IN ('confirmed', 'checked_in', 'checked_out')";
  * the room actually assigned (upgrades count where the guest slept).
  */
 export async function occupancyReport(db: Db, actor: Actor, range: ReportRange, today = hotelToday()) {
-  requireRole(actor, MANAGERS);
+  requireRole(actor, FINANCE);
   const { from, to } = rangeDates(range, today);
   const [rooms, nights, byType] = await Promise.all([
     first<{ n: number }>(db, "SELECT count(*) AS n FROM rooms WHERE is_active = 1 AND service_status = 'in_service'"),
@@ -125,7 +125,7 @@ export type PaymentCsvRow = {
 
 /** Successful payments and corrections in the range, oldest first, for the CSV download. */
 export async function paymentsForCsv(db: Db, actor: Actor, range: ReportRange, today = hotelToday()): Promise<PaymentCsvRow[]> {
-  requireRole(actor, MANAGERS);
+  requireRole(actor, FINANCE);
   const { from, to } = rangeDates(range, today);
   return all<PaymentCsvRow>(
     db,

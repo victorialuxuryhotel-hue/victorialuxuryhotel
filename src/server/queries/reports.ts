@@ -2,14 +2,15 @@ import "server-only";
 import { actorOf, authorizeRead } from "../auth";
 import { getDb } from "../db";
 import { activityPeople, listActivity, type ActivityFilter } from "../domain/activity";
+import { financeSummary } from "../domain/finance";
 import { cashUp, moneyReport, occupancyReport, type ReportRange } from "../domain/reports";
 
 /** Reports page data. Managers and the owner only; ranges are Lagos dates. */
 export async function moneyPageData(range: ReportRange) {
   const staff = await authorizeRead("reports.view");
   const db = await getDb();
-  const [money, cash] = await Promise.all([moneyReport(db, actorOf(staff), range), cashUp(db, actorOf(staff))]);
-  return { money, cash };
+  const [money, cash, finance] = await Promise.all([moneyReport(db, actorOf(staff), range), cashUp(db, actorOf(staff)), financeSummary(db, actorOf(staff), range)]);
+  return { money, cash, finance };
 }
 
 export async function occupancyPageData(range: ReportRange) {

@@ -68,9 +68,31 @@ function Bars({ items, label, format, scaleTo }: { items: { day: string; value: 
 }
 
 async function Money({ range }: { range: ReportRange }) {
-  const { money, cash } = await moneyPageData(range);
+  const { money, cash, finance } = await moneyPageData(range);
+  const line = (label: string, kobo: number, strong = false) => (
+    <div className={cn("flex justify-between gap-4 py-2", strong && "border-t border-hairline pt-3 font-semibold text-ink-900")}>
+      <dt className={strong ? "" : "text-ink-600"}>{label}</dt>
+      <dd className="tabular-nums">{formatNaira(kobo)}</dd>
+    </div>
+  );
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader title="Income and expenses" description={`${rangeLabel[range]} · all departments`} />
+        <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
+          <div>
+            {line("Rooms", finance.income.rooms)}
+            {line("Restaurant & bar", finance.income.restaurantBar)}
+            {line("Conference hall", finance.income.hall)}
+            {line("Total income", finance.incomeTotal, true)}
+          </div>
+          <div>
+            {line("Expenses", finance.expensesKobo)}
+            {line(`VAT included in income (${finance.vatRateBp / 100}%)`, finance.vatKobo)}
+            {line("Income after expenses", finance.netKobo, true)}
+          </div>
+        </dl>
+      </Card>
       <Card>
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between">
           <div>

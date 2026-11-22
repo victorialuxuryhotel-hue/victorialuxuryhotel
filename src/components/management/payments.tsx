@@ -6,6 +6,7 @@ import { hotel } from "@/config/hotel";
 import { paymentMethod } from "@/domain/status";
 import type { PaymentRow, ReservationDetail } from "@/domain/views";
 import { formatDate, formatDateTime, formatNaira, plural } from "@/lib/format";
+import { vatIncluded } from "@/lib/vat";
 import { PaymentBadge } from "./badges";
 
 export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: PaymentRow[]; receiptHref: (n: string) => string; reservationHref?: (p: PaymentRow) => string }) {
@@ -75,7 +76,7 @@ export type ReceiptPayment = Pick<PaymentRow, "receiptNumber" | "paidAt" | "meth
 export type ReceiptStay = Pick<ReservationDetail, "guestName" | "reference" | "category" | "nights" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo"> & { room?: string };
 
 /** A printable receipt. `forGuest` leaves out staff names (the guest's own copy). */
-export function Receipt({ payment, reservation, forGuest = false }: { payment: ReceiptPayment; reservation: ReceiptStay; forGuest?: boolean }) {
+export function Receipt({ payment, reservation, forGuest = false, vatRateBp }: { payment: ReceiptPayment; reservation: ReceiptStay; forGuest?: boolean; vatRateBp?: number }) {
   return (
     <article className="mx-auto max-w-2xl rounded-card border border-hairline bg-ivory-50 p-5 sm:p-12 print:border-0">
       <header className="flex flex-col-reverse gap-4 border-b border-hairline pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:pb-8">
@@ -115,6 +116,9 @@ export function Receipt({ payment, reservation, forGuest = false }: { payment: R
         </tbody>
         <tfoot>
           <tr><td className="pt-4 text-ink-500">This payment</td><td className="pt-4 text-right text-lg font-semibold tabular-nums">{formatNaira(payment.amountKobo)}</td></tr>
+          {vatRateBp ? (
+            <tr><td className="pt-1 text-ink-500">Includes VAT ({vatRateBp / 100}%)</td><td className="pt-1 text-right tabular-nums">{formatNaira(vatIncluded(payment.amountKobo, vatRateBp))}</td></tr>
+          ) : null}
           <tr><td className="pt-1 text-ink-500">Balance remaining</td><td className="pt-1 text-right tabular-nums">{formatNaira(reservation.totalKobo - reservation.paidKobo)}</td></tr>
         </tfoot>
       </table>

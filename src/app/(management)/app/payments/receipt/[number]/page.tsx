@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/management/page-header";
 import { Receipt } from "@/components/management/payments";
 import { PrintButton } from "@/components/management/print-button";
 import { LoadingState } from "@/components/ui/feedback";
+import { getBookingRules } from "@/server/queries/settings";
 import { requireStaff } from "@/server/auth";
 import { getReservation, reservationIdForReceipt } from "@/server/queries/reservations";
 
@@ -19,7 +20,8 @@ async function Content({ params }: { params: Promise<{ number: string }> }) {
   const r = await getReservation(reservationId);
   const payment = r?.payments.find((x) => x.receiptNumber === number);
   if (!r || !payment) notFound();
-  return <Receipt payment={payment} reservation={r} />;
+  const rules = await getBookingRules();
+  return <Receipt payment={payment} reservation={r} vatRateBp={rules.vatRateBp} />;
 }
 
 export default function ReceiptPage(props: PageProps<"/app/payments/receipt/[number]">) {

@@ -23,7 +23,7 @@ async function Content({ params }: { params: Promise<{ token: string; number: st
         </Link>
         <PrintButton />
       </div>
-      <Receipt payment={data.payment} reservation={data.reservation} forGuest />
+      <Receipt payment={data.payment} reservation={data.reservation} forGuest vatRateBp={data.vatRateBp} />
     </>
   );
 }
