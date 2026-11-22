@@ -20,7 +20,7 @@ async function Review({ params }: { params: Promise<{ token: string }> }) {
 
   const option = {
     slug: b.category.slug, name: b.category.name, summary: b.category.short_description ?? "", maxOccupancy: b.category.max_occupancy,
-    isAvailable: true, nightlyRateKobo: b.nightly_rate_kobo, totalKobo: b.total_amount_kobo, nights: b.nights ?? 0,
+    isAvailable: true, nightlyRateKobo: b.nightly_rate_kobo, totalKobo: b.total_amount_kobo, nights: b.nights ?? 0, photo: b.photo,
   };
   const stay = { checkIn: b.check_in, checkOut: b.check_out, guests: b.guest_count };
 
@@ -71,7 +71,7 @@ async function Review({ params }: { params: Promise<{ token: string }> }) {
           <div className="rounded-md border border-hairline p-4">
             <p className="text-sm text-ink-900">Pay securely with Paystack</p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {["Card", "Bank transfer", "USSD"].map((m) => <span key={m} className="rounded-[3px] bg-ivory-200 px-2.5 py-0.5 text-[11px] text-ink-700">{m}</span>)}
+              {["Card", "Bank transfer", "USSD"].map((m) => <span key={m} className="rounded-[3px] bg-ivory-200 px-2.5 py-0.5 text-xs text-ink-700">{m}</span>)}
             </div>
             <p className="mt-2.5 text-xs leading-relaxed text-ink-500">You&apos;ll be taken to Paystack and back. We never see your card details.</p>
           </div>

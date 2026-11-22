@@ -10,6 +10,7 @@ import { roomLabel } from "@/lib/format";
 import { logger } from "@/lib/logger";
 import { all, first, getDb } from "../db";
 import { freeNights, searchAvailability } from "../domain/inventory";
+import { coverPhotos } from "./catalogue";
 
 /** How far either side of the requested dates to look when a room type is full. */
 const SUGGEST_WITHIN_DAYS = 14;
@@ -41,7 +42,10 @@ export async function searchStay(stay: Stay): Promise<{ ok: true; options: Avail
     const nights = nightsBetween(stay.checkIn, stay.checkOut);
     const today = hotelToday();
     const from = [addDays(stay.checkIn, -SUGGEST_WITHIN_DAYS), today].sort().at(-1)!;
-    const free = full.length ? await freeNights(db, full.map((c) => c.slug), from, addDays(stay.checkOut, SUGGEST_WITHIN_DAYS)) : new Map();
+    const [free, photos] = await Promise.all([
+      full.length ? freeNights(db, full.map((c) => c.slug), from, addDays(stay.checkOut, SUGGEST_WITHIN_DAYS)) : Promise.resolve(new Map<string, Map<string, boolean>>()),
+      coverPhotos(db),
+    ]);
     return {
       ok: true,
       options: rows.map((c) => ({
@@ -54,6 +58,7 @@ export async function searchStay(stay: Stay): Promise<{ ok: true; options: Avail
         nightlyRateKobo: c.nightly_rate_kobo,
         totalKobo: c.total_kobo,
         nights: c.nights,
+        photo: photos.get(c.slug),
       })),
     };
   } catch (err) {
@@ -94,6 +99,7 @@ export async function getBookingByToken(token: string) {
       token,
     );
     if (!r) return null;
+    const photos = await coverPhotos(db);
     const payments = await all<{ provider: string; provider_reference: string | null; status: string; amount_kobo: number; kind: string; receipt_number: string | null; created_at: string }>(
       db,
       "SELECT provider, provider_reference, status, amount_kobo, kind, receipt_number, created_at FROM payments WHERE reservation_id = ? ORDER BY created_at DESC",
@@ -118,6 +124,7 @@ export async function getBookingByToken(token: string) {
       special_requests: r.special_requests,
       attention_reason: r.attention_reason,
       guest: { full_name: r.guest_full_name, email: r.guest_email, phone: r.guest_phone },
+      photo: photos.get(r.category_slug),
       category: { slug: r.category_slug, name: r.category_name, short_description: r.category_short_description, max_occupancy: r.category_max_occupancy },
       // The specific room, once assigned (automatically on payment, or by staff).
       room: r.room_number ? roomLabel(r.room_number, r.room_floor) : undefined,

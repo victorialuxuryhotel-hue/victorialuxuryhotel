@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MessageCircle, Phone, Users } from "lucide-react";
+import { ChevronRight, MessageCircle, Phone, Users } from "lucide-react";
 import { Photo } from "@/components/public/photo";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
@@ -23,12 +23,15 @@ function OptionCard({ o, stay, selectHref }: { o: AvailabilityOption; stay: Stay
         full ? "border-2 border-dashed border-ivory-300 bg-ivory-50" : "bg-ivory-50 shadow-card",
       )}
     >
-      <Photo photo={{ alt: o.name }} className={cn("aspect-video sm:aspect-auto sm:h-full", full && "opacity-60")} sizes="(min-width: 640px) 16rem, 100vw" />
+      <Photo photo={o.photo ?? { alt: o.name }} className={cn("aspect-video sm:aspect-auto sm:h-full", full && "opacity-60")} sizes="(min-width: 640px) 16rem, 100vw" />
       <div className="flex flex-col gap-4 p-5 sm:p-6 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0">
           <h3 className={cn("font-display text-3xl", full ? "text-ink-500" : "text-navy-950")}>{o.name}</h3>
           {o.summary ? <p className="mt-1 text-sm text-ink-600">{o.summary}</p> : null}
           <p className="mt-2 flex items-center gap-2 text-sm text-ink-500"><Users className="size-4" aria-hidden /> Sleeps {o.maxOccupancy}</p>
+          <Link href={`/rooms/${o.slug}`} className="-ml-1 mt-1 inline-flex min-h-11 items-center gap-1 px-1 text-sm text-navy-800 underline-offset-2 hover:underline">
+            Room details, photos and amenities <ChevronRight className="size-4" aria-hidden />
+          </Link>
         </div>
         {full ? (
           <div className="shrink-0 md:text-right">

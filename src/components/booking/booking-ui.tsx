@@ -28,8 +28,8 @@ export function Steps({ current }: { current: number }) {
             <span className={cn("flex items-center gap-2", active || done ? "text-navy-950" : "text-ink-400")}>
               <span
                 className={cn(
-                  "flex size-6 items-center justify-center rounded-full text-xs",
-                  done ? "bg-gold-500 text-white" : active ? "bg-navy-900 text-white" : "bg-ivory-200 text-ink-500",
+                  "flex size-6 items-center justify-center rounded-full border text-xs",
+                  done ? "border-gold-500 text-gold-700" : active ? "border-navy-800 text-navy-800 shadow-[inset_0_0_0_1px_var(--color-navy-800)]" : "border-ink-300 text-ink-500",
                 )}
               >
                 {done ? <Check className="size-3.5" aria-hidden /> : i + 1}
@@ -74,7 +74,7 @@ export function CompactSummary({ option, search, holdMinutes }: { option: Availa
 export function BookingSummary({ option, search, children, className }: { option: AvailabilityOption; search: StaySearch; children?: React.ReactNode; className?: string }) {
   return (
     <aside className={cn("overflow-hidden rounded-card bg-ivory-50 shadow-card lg:sticky lg:top-28", className)}>
-      <Photo photo={{ alt: option.name }} className="aspect-[16/9]" sizes="24rem" />
+      <Photo photo={option.photo ?? { alt: option.name }} className="aspect-[16/9]" sizes="24rem" />
       <div className="p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-600">Your stay</p>
         <h2 className="mt-2 font-display text-3xl text-navy-950">{option.name}</h2>

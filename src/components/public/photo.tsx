@@ -9,6 +9,9 @@ import type { Photo as PhotoContent } from "@/content/site";
  *
  * Positioning (relative/absolute) is left to the caller via `className`.
  */
+/** The "photograph to come" label helps while building; guests never see it. */
+const showPlaceholderLabel = process.env.NODE_ENV !== "production";
+
 export function Photo({
   photo,
   className,
@@ -34,7 +37,7 @@ export function Photo({
   return (
     <div
       role="img"
-      aria-label={`${photo.alt} (photograph to come)`}
+      aria-label={showPlaceholderLabel ? `${photo.alt} (photograph to come)` : photo.alt}
       className={cn(
         "overflow-hidden",
         !/\babsolute\b/.test(className ?? "") && "relative",
@@ -51,14 +54,16 @@ export function Photo({
       >
         V
       </span>
-      <span
-        className={cn(
-          "absolute bottom-3 left-3 rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] backdrop-blur",
-          dark ? "bg-ivory-50/10 text-white/60" : "bg-ivory-50/60 text-ink-500",
-        )}
-      >
-        {photo.alt}
-      </span>
+      {showPlaceholderLabel ? (
+        <span
+          className={cn(
+            "absolute bottom-3 left-3 rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] backdrop-blur",
+            dark ? "bg-ivory-50/10 text-white/60" : "bg-ivory-50/60 text-ink-500",
+          )}
+        >
+          {photo.alt}
+        </span>
+      ) : null}
     </div>
   );
 }

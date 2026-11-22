@@ -114,4 +114,6 @@ export type AvailabilityOption = {
   nights: number;
   /** For a type that fits the party but is full: the nearest check-in (±14 days) with the same nights free. */
   freeFrom?: string;
+  /** The type's first real photo, when the hotel has uploaded one. */
+  photo?: { image: string; alt: string };
 };

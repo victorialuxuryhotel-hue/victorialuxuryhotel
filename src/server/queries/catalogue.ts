@@ -2,7 +2,7 @@ import "server-only";
 import { connection } from "next/server";
 import { cache } from "react";
 import { mediaUrl } from "@/lib/media";
-import { all, getDb } from "../db";
+import { all, getDb, type Db } from "../db";
 
 /**
  * Public catalogue: what website visitors see about room types and photos.
@@ -81,3 +81,16 @@ export const getSitePhotos = cache(async (): Promise<SitePhotos> => {
   }
   return { slots, gallery };
 });
+
+/** Each room type's first real photo (the cover, else the first), by slug. */
+export async function coverPhotos(db: Db): Promise<Map<string, PublicPhoto>> {
+  const rows = await all<{ slug: string; storage_path: string; alt_text: string }>(
+    db,
+    `SELECT c.slug, i.storage_path, i.alt_text FROM room_category_images i
+     JOIN room_categories c ON c.id = i.category_id
+     ORDER BY i.is_cover DESC, i.sort_order, i.created_at`,
+  );
+  const out = new Map<string, PublicPhoto>();
+  for (const r of rows) if (!out.has(r.slug)) out.set(r.slug, { image: mediaUrl(r.storage_path), alt: r.alt_text });
+  return out;
+}
