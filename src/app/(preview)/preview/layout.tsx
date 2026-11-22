@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 /**
  * Design preview: every screen rendered with SAMPLE data, before its

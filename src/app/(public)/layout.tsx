@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { HotelSchema } from "@/components/public/hotel-schema";
 import { SiteFooter } from "@/components/public/site-footer";
 import { SiteHeader } from "@/components/public/site-header";
 import { StickyBookBar } from "@/components/public/sticky-book-bar";
@@ -15,6 +16,9 @@ export default function PublicLayout({ children }: LayoutProps<"/">) {
           <StickyBookBar />
         </Suspense>
       </div>
+      <Suspense fallback={null}>
+        <HotelSchema />
+      </Suspense>
     </>
   );
 }

@@ -12,6 +12,7 @@ import { getSitePhotos } from "@/server/queries/catalogue";
 export const metadata: Metadata = {
   title: "Facilities",
   description: "Indoor pool, spa, restaurant, lounge and bar, conference room and more at Victoria Luxury Hotel, Akure.",
+  alternates: { canonical: "/facilities" },
 };
 
 async function FacilitiesPageContent() {

@@ -15,6 +15,7 @@ import { getPublicCategories } from "@/server/queries/catalogue";
 export const metadata: Metadata = {
   title: "Rooms & apartments",
   description: "Rooms, suites and apartments at Victoria Luxury Hotel, Alagbaka GRA, Akure.",
+  alternates: { canonical: "/rooms" },
 };
 
 // Shared by every room type; all are facilities the hotel offers.

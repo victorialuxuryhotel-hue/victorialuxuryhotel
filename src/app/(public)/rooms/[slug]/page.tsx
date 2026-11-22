@@ -16,9 +16,15 @@ import { getPublicCategories, getPublicCategory } from "@/server/queries/catalog
 const included = ["Free Wi-Fi", "24/7 power", "Access to the indoor pool", "On-site parking", "Laundry service", "Airport shuttle on request"];
 
 export async function generateMetadata({ params }: PageProps<"/rooms/[slug]">): Promise<Metadata> {
-  // Derived from the URL so metadata needs no database read.
-  const name = (await params).slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-  return { title: name, description: `${name} at ${hotel.name}, Akure. Check availability and book online.` };
+  const { slug } = await params;
+  const name = slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  const c = await getPublicCategory(slug).catch(() => null);
+  const facts = c ? ` Sleeps ${c.maxOccupancy}, from ${formatNaira(c.fromRateKobo)} a night.` : "";
+  return {
+    title: `${c?.name ?? name} room`,
+    description: `${c?.name ?? name} at ${hotel.name}, Alagbaka GRA, Akure.${facts} Book direct online.`,
+    alternates: { canonical: `/rooms/${slug}` },
+  };
 }
 
 export default function RoomTypePage(props: PageProps<"/rooms/[slug]">) {

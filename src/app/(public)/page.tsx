@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowRight, ArrowUpRight, MapPin, MessageCircle, Navigation, Phone } from "lucide-react";
@@ -14,6 +15,11 @@ import { sitePhoto } from "@/components/public/site-photo";
 import { facilities, guestTypes, highlights, home } from "@/content/site";
 import { formatNaira } from "@/lib/format";
 import { getPublicCategories, getSitePhotos } from "@/server/queries/catalogue";
+
+export const metadata: Metadata = {
+  title: { absolute: "Victoria Luxury Hotel and Apartment, Akure | Hotel in Alagbaka GRA" },
+  alternates: { canonical: "/" },
+};
 
 async function HomePageContent() {
   const [categories, photos] = await Promise.all([getPublicCategories(), getSitePhotos()]);

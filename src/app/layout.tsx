@@ -22,8 +22,19 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, view
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: { default: hotel.name, template: `%s · ${hotel.shortName}` },
-  description: `${hotel.name}, ${hotel.address.line1}, ${hotel.address.city}. Book your stay online.`,
+  title: { default: `${hotel.name}, Akure`, template: `%s · ${hotel.name}` },
+  description: `${hotel.name}: rooms, suites and apartments in Alagbaka GRA, Akure, with an indoor pool, spa, restaurant, lounge and bar. Book direct online.`,
+  applicationName: hotel.name,
+  openGraph: {
+    type: "website",
+    siteName: hotel.name,
+    locale: "en_NG",
+    title: `${hotel.name}, Akure`,
+    description: "Rooms, suites and apartments in Alagbaka GRA, Akure, with an indoor pool, spa, restaurant, lounge and bar.",
+    images: [{ url: "/brand/logo-full.png", alt: hotel.name }],
+  },
+  twitter: { card: "summary", title: `${hotel.name}, Akure` },
+  formatDetection: { telephone: true, address: true, email: true },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

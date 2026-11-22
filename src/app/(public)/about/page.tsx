@@ -13,6 +13,7 @@ import { getSitePhotos } from "@/server/queries/catalogue";
 export const metadata: Metadata = {
   title: "About the hotel",
   description: "Victoria Luxury Hotel and Apartment, Alagbaka GRA, Akure: our story and what we stand for.",
+  alternates: { canonical: "/about" },
 };
 
 const values = [

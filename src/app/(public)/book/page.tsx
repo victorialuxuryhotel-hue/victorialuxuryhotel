@@ -14,6 +14,7 @@ import { searchStay, staySchema } from "@/server/queries/booking";
 export const metadata: Metadata = {
   title: "Book your stay",
   description: `Check availability and book online at ${hotel.name}.`,
+  alternates: { canonical: "/book" },
 };
 
 type SP = Promise<Record<string, string | string[] | undefined>>;

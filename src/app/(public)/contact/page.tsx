@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
+import { Suspense } from "react";
 import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { MapMotif } from "@/components/public/map-card";
@@ -6,10 +8,13 @@ import { PageHero } from "@/components/public/page-hero";
 import { Section } from "@/components/public/section";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
+import { faqJsonLd, hotelFaqs, ldJson } from "@/lib/seo";
+import { publicBookingRules } from "@/server/queries/booking";
 
 export const metadata: Metadata = {
   title: "Contact & location",
   description: `Call, WhatsApp or email ${hotel.name}. ${hotel.address.line1}, ${hotel.address.city}.`,
+  alternates: { canonical: "/contact" },
 };
 
 const channels: Array<{ icon: LucideIcon; label: string; value: string; href: string; action: string; short: string }> = [
@@ -75,6 +80,31 @@ export default function ContactPage() {
           />
         </div>
       </Section>
+      <Suspense fallback={null}>
+        <GoodToKnow />
+      </Suspense>
     </>
+  );
+}
+
+/** Short answers to common questions, shown on the page and given to search engines as FAQ data. */
+async function GoodToKnow() {
+  await connection();
+  const rules = await publicBookingRules().catch(() => null);
+  if (!rules) return null;
+  const faqs = hotelFaqs(rules, rules.cancellationPolicy ?? "Please contact the hotel.");
+  return (
+    <Section tone="ivory">
+      <h2 className="font-display text-4xl text-navy-950">Good to know</h2>
+      <dl className="mt-8 grid gap-x-10 gap-y-6 md:grid-cols-2">
+        {faqs.map((f) => (
+          <div key={f.q} className="border-t border-hairline pt-4">
+            <dt className="font-medium text-navy-950">{f.q}</dt>
+            <dd className="mt-1 text-sm leading-relaxed text-ink-700">{f.a}</dd>
+          </div>
+        ))}
+      </dl>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson(faqJsonLd(faqs)) }} />
+    </Section>
   );
 }

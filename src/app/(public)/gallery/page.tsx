@@ -13,6 +13,7 @@ import { getPublicCategories, getSitePhotos } from "@/server/queries/catalogue";
 export const metadata: Metadata = {
   title: "Gallery",
   description: "Photographs of the rooms, pool, spa and dining at Victoria Luxury Hotel, Akure.",
+  alternates: { canonical: "/gallery" },
 };
 
 // Varied tile shapes give an editorial rhythm on large screens.
