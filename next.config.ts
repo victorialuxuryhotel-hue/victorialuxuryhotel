@@ -1,4 +1,6 @@
 import type { NextConfig } from "next";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
 const nextConfig: NextConfig = {
@@ -28,6 +30,10 @@ const nextConfig: NextConfig = {
 
 export default nextConfig;
 
-// `next dev` gets the same bindings as the Worker (local D1 and R2 under
-// .wrangler/state), so the app runs locally exactly as on Cloudflare.
-if (process.env.NODE_ENV === "development") void initOpenNextCloudflareForDev();
+// `next dev` gets the same bindings as the Worker (local D1 and R2), so the
+// app runs locally exactly as on Cloudflare. The local data lives OUTSIDE the
+// project folder: every database write touches its files, and inside the
+// project that made the dev file watcher reload the page in a loop. The
+// `db:*` scripts use the same folder.
+const LOCAL_STATE = join(homedir(), ".cache", "victoria-hotel", "wrangler");
+if (process.env.NODE_ENV === "development") void initOpenNextCloudflareForDev({ persist: { path: join(LOCAL_STATE, "v3") } });
