@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { CalendarDays, Users } from "lucide-react";
+import { CalendarDays, Minus, Plus, Users } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
@@ -19,10 +19,18 @@ function addDays(iso: string, days: number) {
   return isoDate(d);
 }
 
+const MIN_GUESTS = 1;
+const MAX_GUESTS = 6;
+
 /**
- * Availability search. Submits a plain GET to /book so it works without
- * JavaScript and the search is shareable. Validation of dates and capacity
- * happens on the server; this only guides the guest.
+ * Availability search. Submits a plain GET to /book so the search is
+ * shareable. Validation of dates and capacity happens on the server; this
+ * only guides the guest.
+ *
+ * Phones: the two dates share a row, and the guest stepper sits beside the
+ * Search button (about 120px tall in all). From `sm` up: one row of four.
+ * The form is marked `data-booking-search` so the sticky booking bar knows
+ * when it is on screen.
  */
 export function BookingBar({
   variant = "floating",
@@ -35,26 +43,31 @@ export function BookingBar({
   const today = useSyncExternalStore(noopSubscribe, () => isoDate(new Date()), () => "");
   const [checkInValue, setCheckIn] = useState(defaults?.checkIn ?? "");
   const [checkOutValue, setCheckOut] = useState(defaults?.checkOut ?? "");
+  const [guests, setGuests] = useState(() => Math.min(MAX_GUESTS, Math.max(MIN_GUESTS, Number(defaults?.guests) || 2)));
   const checkIn = checkInValue || today;
   const checkOut = checkOutValue || addDays(checkIn, 1);
+  const row = variant !== "stacked";
 
-  const label = "text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500";
-  const field =
-    "mt-1 block w-full border-0 bg-transparent p-0 text-base font-medium text-navy-950 focus:outline-none focus:ring-0";
+  const label = "text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500 sm:text-[11px] sm:tracking-[0.18em]";
+  const field = "mt-0.5 block w-full min-w-0 border-0 bg-transparent p-0 text-base font-medium text-navy-950 focus:outline-none focus:ring-0 sm:mt-1";
+  const cell = "flex min-w-0 items-center gap-3 bg-white px-3 py-2.5 sm:px-5 sm:py-4";
+  const stepButton =
+    "flex size-11 items-center justify-center rounded-md text-gold-600 hover:bg-ivory-100 disabled:text-ink-300 disabled:hover:bg-transparent";
 
   return (
     <form
       action="/book"
       method="get"
+      data-booking-search
       className={cn(
-        "grid gap-px overflow-hidden rounded-card bg-ivory-200",
-        variant !== "stacked" && "sm:grid-cols-[1fr_1fr_0.7fr_auto]",
-        variant === "floating" && "shadow-[0_20px_50px_-12px_rgb(1_18_72/0.35)]",
+        "grid grid-cols-2 gap-px overflow-hidden rounded-card bg-ivory-200",
+        row && "sm:grid-cols-[1fr_1fr_0.8fr_auto]",
+        variant === "floating" && "sm:shadow-[0_20px_50px_-12px_rgb(1_18_72/0.35)]",
       )}
     >
-      <label className="flex items-center gap-3 bg-white px-5 py-4">
-        <CalendarDays className="size-5 shrink-0 text-gold-500" aria-hidden />
-        <span className="flex-1">
+      <label className={cell}>
+        <CalendarDays className="hidden size-5 shrink-0 text-gold-500 sm:block" aria-hidden />
+        <span className="min-w-0 flex-1">
           <span className={label}>Check-in</span>
           <input
             type="date"
@@ -71,9 +84,9 @@ export function BookingBar({
           />
         </span>
       </label>
-      <label className="flex items-center gap-3 bg-white px-5 py-4">
-        <CalendarDays className="size-5 shrink-0 text-gold-500" aria-hidden />
-        <span className="flex-1">
+      <label className={cell}>
+        <CalendarDays className="hidden size-5 shrink-0 text-gold-500 sm:block" aria-hidden />
+        <span className="min-w-0 flex-1">
           <span className={label}>Check-out</span>
           <input
             type="date"
@@ -86,22 +99,34 @@ export function BookingBar({
           />
         </span>
       </label>
-      <label className="flex items-center gap-3 bg-white px-5 py-4">
-        <Users className="size-5 shrink-0 text-gold-500" aria-hidden />
-        <span className="flex-1">
-          <span className={label}>Guests</span>
-          <select name="guests" defaultValue={defaults?.guests ?? "2"} className={field}>
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <option key={n} value={n}>
-                {n} {n === 1 ? "guest" : "guests"}
-              </option>
-            ))}
-          </select>
-        </span>
-      </label>
-      <button type="submit" className={buttonStyles({ variant: "accent", size: "lg", className: "h-auto rounded-none px-8 py-4 text-base" })}>
-        Check availability
-      </button>
+      {/* Phones: guests + Search share the second row; from sm they are grid cells. */}
+      <div className={cn("col-span-2 grid grid-cols-[1fr_auto] gap-px", row && "sm:col-span-1 sm:contents")}>
+        <div className={cn(cell, "justify-between py-1 pr-1 sm:py-4 sm:pr-2")} role="group" aria-labelledby="guests-label">
+          <Users className="hidden size-5 shrink-0 text-gold-500 sm:block" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span id="guests-label" className={label}>Guests</span>
+            <output className="block text-base font-medium text-navy-950" aria-live="polite">
+              {guests} {guests === 1 ? "guest" : "guests"}
+            </output>
+          </span>
+          <input type="hidden" name="guests" value={guests} />
+          <span className="flex shrink-0">
+            <button type="button" className={stepButton} aria-label="Fewer guests" disabled={guests <= MIN_GUESTS} onClick={() => setGuests((g) => Math.max(MIN_GUESTS, g - 1))}>
+              <Minus className="size-4" aria-hidden />
+            </button>
+            <button type="button" className={stepButton} aria-label="More guests" disabled={guests >= MAX_GUESTS} onClick={() => setGuests((g) => Math.min(MAX_GUESTS, g + 1))}>
+              <Plus className="size-4" aria-hidden />
+            </button>
+          </span>
+        </div>
+        <button
+          type="submit"
+          className={buttonStyles({ variant: "accent", size: "lg", className: "h-auto min-h-12 rounded-none px-5 text-base sm:px-8 sm:py-4" })}
+        >
+          <span className="sm:hidden">Search</span>
+          <span className="hidden sm:inline">Check availability</span>
+        </button>
+      </div>
     </form>
   );
 }

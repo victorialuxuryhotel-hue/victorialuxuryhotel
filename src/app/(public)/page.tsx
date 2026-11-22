@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowRight, ArrowUpRight, MapPin } from "lucide-react";
 import { BookingBar } from "@/components/public/booking-bar";
+import { MapCard } from "@/components/public/map-card";
+import { ScrollRail } from "@/components/public/scroll-rail";
 import { PageSkeleton } from "@/components/public/page-skeleton";
 import { CtaBand } from "@/components/public/cta-band";
 import { Photo } from "@/components/public/photo";
@@ -13,10 +15,6 @@ import { facilities, guestTypes, highlights, home } from "@/content/site";
 import { formatNaira } from "@/lib/format";
 import { getPublicCategories, getSitePhotos } from "@/server/queries/catalogue";
 
-/** Horizontal swipe on phones, grid from `sm` up: keeps mobile pages short. */
-const rail = "-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:overflow-visible sm:px-0 sm:pb-0";
-const railItem = "w-[78%] shrink-0 snap-start sm:w-auto";
-
 async function HomePageContent() {
   const [categories, photos] = await Promise.all([getPublicCategories(), getSitePhotos()]);
   const experienceSlots = ["pool", "spa", "bar"];
@@ -27,11 +25,11 @@ async function HomePageContent() {
         <Photo photo={sitePhoto(photos, "hero", home.hero)} tone="dark" priority sizes="100vw" className="absolute inset-0 -z-10" />
         <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_80%_0%,rgb(4_48_160/0.55),transparent_55%)]" />
         <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-navy-950 via-navy-950/40 to-transparent" />
-        <Container className="pt-20 pb-32 sm:pt-32 sm:pb-44">
+        <Container className="pt-12 pb-16 sm:pt-32 sm:pb-44">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold-300">{home.eyebrow}</p>
-          <h1 className="mt-5 max-w-3xl font-display text-[2.75rem] leading-[1.02] sm:text-7xl">{home.title}</h1>
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-ivory-200/80 sm:text-lg">{home.intro}</p>
-          <div className="mt-9 flex flex-wrap gap-3">
+          <h1 className="mt-4 max-w-3xl font-display text-[2.4rem] leading-[1.04] text-balance sm:mt-5 sm:text-7xl sm:leading-[1.02]">{home.title}</h1>
+          <p className="mt-4 max-w-xl text-sm leading-relaxed text-ivory-200/80 sm:mt-6 sm:text-lg">{home.intro}</p>
+          <div className="mt-9 hidden flex-wrap gap-3 sm:flex">
             <Link href="/rooms" className={buttonStyles({ variant: "accent", size: "lg" })}>
               Explore rooms
             </Link>
@@ -42,9 +40,12 @@ async function HomePageContent() {
         </Container>
       </section>
 
-      <Container className="relative z-10 -mt-16 sm:-mt-12">
-        <BookingBar />
-      </Container>
+      {/* Phones: the search sits below the hero (not over it). Larger screens: it floats over the hero's edge. */}
+      <div className="border-b border-ivory-200 bg-ivory-50 py-4 sm:border-0 sm:bg-transparent sm:py-0">
+        <Container className="relative z-10 sm:-mt-12">
+          <BookingBar />
+        </Container>
+      </div>
 
       {/* Welcome */}
       <Section className="pt-20 sm:pt-28">
@@ -86,13 +87,16 @@ async function HomePageContent() {
       <Section tone="ivory">
         <div className="flex items-end justify-between gap-6">
           <SectionHeading eyebrow="Stay" title="Rooms, suites & apartments" />
-          <Link href="/rooms" className="hidden shrink-0 items-center gap-2 text-sm font-semibold text-navy-800 hover:text-gold-600 sm:inline-flex">
-            View all <ArrowRight className="size-4" aria-hidden />
+          <Link href="/rooms" className="inline-flex min-h-11 shrink-0 items-center gap-2 text-sm font-semibold text-navy-800 hover:text-gold-600">
+            <span>
+              View all<span className="sm:hidden"> {categories.length}</span>
+            </span>
+            <ArrowRight className="size-4" aria-hidden />
           </Link>
         </div>
-        <div className={`mt-10 sm:grid-cols-2 lg:grid-cols-4 ${rail}`}>
+        <ScrollRail label="Room types" className="mt-8 sm:mt-10 sm:grid-cols-2 lg:grid-cols-4">
           {categories.map((c) => (
-            <Link key={c.slug} href={`/rooms/${c.slug}`} className={`group ${railItem}`}>
+            <Link key={c.slug} href={`/rooms/${c.slug}`} className="group">
               <div className="overflow-hidden rounded-card">
                 <Photo photo={c.photos[0] ?? { alt: c.name }} className="aspect-[4/5] transition-transform duration-700 group-hover:scale-[1.04]" sizes="(min-width: 1024px) 25vw, 80vw" />
               </div>
@@ -106,22 +110,22 @@ async function HomePageContent() {
               </div>
             </Link>
           ))}
-        </div>
+        </ScrollRail>
       </Section>
 
       {/* Experiences */}
       <Section tone="navy">
         <SectionHeading invert eyebrow="Experiences" title="Unwind without leaving the hotel" />
-        <div className={`mt-12 sm:grid-cols-3 ${rail}`}>
+        <ScrollRail label="Experiences" tone="dark" className="mt-10 sm:mt-12 sm:grid-cols-3">
           {highlights.map((h, i) => (
-            <article key={h.title} className={railItem}>
+            <article key={h.title}>
               <Photo photo={sitePhoto(photos, experienceSlots[i]!, h)} tone="dark" className="aspect-[4/5] rounded-card ring-1 ring-white/10" sizes="(min-width: 640px) 33vw, 80vw" />
               <h.icon className="mt-6 size-6 text-gold-400" strokeWidth={1.5} aria-hidden />
               <h3 className="mt-3 font-display text-2xl">{h.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-ivory-200/70">{h.text}</p>
             </article>
           ))}
-        </div>
+        </ScrollRail>
       </Section>
 
       {/* Facilities */}
@@ -173,13 +177,9 @@ async function HomePageContent() {
               <Link href="/contact" className={buttonStyles({ variant: "secondary" })}>Contact us</Link>
             </div>
           </div>
-          <iframe
-            title={`Map showing ${hotel.name}`}
-            src={`https://www.google.com/maps?q=${encodeURIComponent(`${hotel.address.line1}, ${hotel.address.city}, ${hotel.address.state}`)}&output=embed`}
-            className="h-72 w-full border-0 lg:h-full lg:min-h-96"
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-          />
+          <div className="px-4 pb-4 sm:px-12 sm:pb-12 lg:contents">
+            <MapCard embedClassName="lg:h-full lg:min-h-96" />
+          </div>
         </div>
       </Section>
 
