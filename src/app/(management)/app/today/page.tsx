@@ -21,6 +21,7 @@ async function Content() {
       needs={needsYouNow(m.arrivals, rooms)}
       arrivals={m.arrivals}
       departures={m.departures}
+      inHouse={m.inHouse}
       counts={roomCounts(rooms)}
       links={{
         reservation: (id) => `/app/reservations/${id}`,

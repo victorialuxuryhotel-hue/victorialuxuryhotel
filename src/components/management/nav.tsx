@@ -7,13 +7,7 @@ import { BedDouble, CalendarPlus, Menu, Search, Sun, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { useDialog } from "@/lib/use-dialog";
 import { cn } from "@/lib/utils/cn";
-import { managementNav } from "./nav-items";
-
-
-
-function isActive(pathname: string, href: string, base: string) {
-  return href === base ? pathname === base : pathname === href || pathname.startsWith(`${href}/`);
-}
+import { activeHref, managementNavGroups } from "./nav-items";
 
 type NavProps = {
   footer?: React.ReactNode;
@@ -25,27 +19,40 @@ type NavProps = {
 
 function NavLinks({ onNavigate, base, allowed }: { onNavigate?: () => void; base: string; allowed?: readonly string[] }) {
   const pathname = usePathname();
+  const groups = managementNavGroups
+    .map((g) => ({
+      label: g.label,
+      items: g.items.filter((i) => !allowed || allowed.includes(i.href)).map((i) => ({ ...i, href: i.href.replace(/^\/app/, base) })),
+    }))
+    .filter((g) => g.items.length > 0);
+  const active = activeHref(pathname, groups.flatMap((g) => g.items.map((i) => i.href)), base);
+  // One group (front desk): no heading needed.
+  const headings = groups.length > 1;
   return (
-    <nav aria-label="Management" className="flex flex-col gap-1 px-3">
-      {managementNav.filter((item) => !allowed || allowed.includes(item.href)).map(({ href: appHref, label, icon: Icon }) => {
-        const href = appHref.replace(/^\/app/, base);
-        const active = isActive(pathname, href, base);
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-              active ? "bg-white/10 text-white" : "text-ivory-200/70 hover:bg-white/5 hover:text-white",
-            )}
-          >
-            <Icon className={cn("size-[18px]", active ? "text-gold-400" : "")} aria-hidden />
-            {label}
-          </Link>
-        );
-      })}
+    <nav aria-label="Management" className="flex flex-col gap-5 px-3">
+      {groups.map((g) => (
+        <div key={g.label} role="group" aria-label={g.label} className="flex flex-col gap-1">
+          {headings ? <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-ivory-200/45">{g.label}</p> : null}
+          {g.items.map(({ href, label, icon: Icon }) => {
+            const current = href === active;
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={onNavigate}
+                aria-current={current ? "page" : undefined}
+                className={cn(
+                  "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                  current ? "bg-white/10 text-white" : "text-ivory-200/70 hover:bg-white/5 hover:text-white",
+                )}
+              >
+                <Icon className={cn("size-[18px]", current ? "text-gold-400" : "")} aria-hidden />
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }
@@ -66,7 +73,7 @@ export function Sidebar({ footer, base = "/app", allowed }: NavProps) {
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-navy-950 py-6 lg:flex print:hidden">
       <Brand base={base} />
-      <div className="mt-8 flex-1">
+      <div className="mt-8 min-h-0 flex-1 overflow-y-auto pb-4">
         <NavLinks base={base} allowed={allowed} />
       </div>
       {footer ? <div className="border-t border-white/10 px-5 pt-5">{footer}</div> : null}
@@ -90,7 +97,7 @@ export function MobileBar({ footer, base = "/app", allowed }: NavProps) {
   useDialog(open, close, panel, toggle);
 
   return (
-    <div className="sticky top-0 z-40 lg:hidden print:hidden">
+    <div className="sticky top-0 z-50 lg:hidden print:hidden">
       <div className="flex h-14 items-center justify-between bg-navy-950 pr-1.5">
         <Brand base={base} />
         <button

@@ -17,6 +17,7 @@ export default function Page() {
       needs={needsYouNow(arrivals, board)}
       arrivals={arrivals}
       departures={departures}
+      inHouse={reservations.filter((r) => r.status === "checked_in")}
       counts={roomCounts(board)}
       links={{ reservation: () => detail, pay: () => "/preview/app/payments/record", rooms: (s) => (s ? `/preview/app/rooms?state=${s}` : "/preview/app/rooms") }}
     />

@@ -6,7 +6,7 @@ import { activity, staff } from "../../_sample";
 export default function Page() {
   return (
     <>
-      <PageHeader title="Settings" description="Staff access, booking rules and the activity log." />
+      <PageHeader title="Booking rules" description="Booking rules and the activity log." />
       <div className="space-y-6 px-4 py-6 lg:px-8">
         <SettingsSection title="Staff" description="Only the owner can invite, change roles or deactivate staff.">
           <InviteStaffForm />

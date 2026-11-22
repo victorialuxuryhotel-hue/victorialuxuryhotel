@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { CheckCircle2, ChevronRight } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/feedback";
 import type { NeedsYou, RoomCounts } from "@/domain/today";
 import type { ReservationRow } from "@/domain/views";
 import { formatDate, formatNaira } from "@/lib/format";
 import { ActionFeedbackProvider } from "./action-feedback";
 import { MovementList } from "./front-desk";
+import { ReservationTable } from "./reservation-table";
 
 export type TodayLinks = {
   reservation: (id: string) => string;
@@ -51,6 +53,7 @@ export function TodayView({
   needs,
   arrivals,
   departures,
+  inHouse,
   counts,
   links,
 }: {
@@ -60,6 +63,7 @@ export function TodayView({
   needs: NeedsYou[];
   arrivals: ReservationRow[];
   departures: ReservationRow[];
+  inHouse: ReservationRow[];
   counts: RoomCounts;
   links: TodayLinks;
 }) {
@@ -114,6 +118,15 @@ export function TodayView({
           <MovementList kind="arrivals" title="Coming in today" rows={arrivals} hrefFor={href} />
           <MovementList kind="departures" title="Leaving today" rows={departures} hrefFor={href} />
         </div>
+
+        <Card>
+          <CardHeader
+            title="In house"
+            description="Guests checked in now."
+            action={<span className="rounded-full bg-ivory-200 px-2.5 py-0.5 text-sm font-semibold tabular-nums">{inHouse.length}</span>}
+          />
+          {inHouse.length ? <ReservationTable rows={inHouse} hrefFor={href} /> : <div className="p-5"><EmptyState title="No guests checked in" /></div>}
+        </Card>
 
         <section aria-label="Rooms">
           <Card>

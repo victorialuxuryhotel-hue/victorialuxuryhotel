@@ -25,7 +25,7 @@ const groups: Array<{ title: string; screens: Array<[string, string]> }> = [
     screens: [
       ["/login", "Staff sign in"],
       ["/preview/app", "Dashboard"],
-      ["/preview/app/front-desk", "Front desk: arrivals & departures"],
+      ["/preview/app/today", "Today: needs you now, arrivals, departures, in house"],
       ["/preview/app/reservations", "Reservations"],
       ["/preview/app/reservations/new", "New reservation"],
       ["/preview/app/reservations/vl-7kq3pm", "Reservation detail"],
@@ -37,7 +37,7 @@ const groups: Array<{ title: string; screens: Array<[string, string]> }> = [
       ["/preview/app/payments", "Payments"],
       ["/preview/app/payments/record", "Record offline payment"],
       ["/preview/app/payments/receipt", "Receipt"],
-      ["/preview/app/settings", "Settings: staff, rules, activity"],
+      ["/preview/app/settings", "Booking rules and activity log"],
     ],
   },
 ];

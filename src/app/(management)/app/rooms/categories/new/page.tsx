@@ -17,7 +17,7 @@ async function Content() {
 export default function NewCategoryPage() {
   return (
     <>
-      <PageHeader title="New room category" />
+      <PageHeader title="New room type" />
       <Suspense fallback={<LoadingState />}><Content /></Suspense>
     </>
   );
