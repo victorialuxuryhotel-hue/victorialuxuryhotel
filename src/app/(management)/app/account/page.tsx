@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/management/page-header";
-import { Card, CardHeader } from "@/components/ui/card";
 import { staffRole } from "@/domain/status";
 import { requireStaff } from "@/server/auth";
 import { AccountSecurity } from "./account-security";
@@ -22,10 +21,9 @@ async function AccountContent() {
     <>
       <PageHeader title="Your account" description={`${staff.fullName} · ${staffRole[staff.role]} · ${staff.email}`} />
       <div className="px-4 py-6 lg:px-8">
-        <Card className="max-w-xl">
-          <CardHeader title="Password and security" description="Change your password, or sign out of other devices." />
+        <div className="max-w-5xl">
           <AccountSecurity />
-        </Card>
+        </div>
       </div>
     </>
   );
