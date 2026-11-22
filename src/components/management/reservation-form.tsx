@@ -126,7 +126,7 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
                       <li key={m.id} className="flex items-center gap-3 px-4 py-3">
                         <div className="min-w-0 flex-1">
                           <p className="text-[15px] text-ink-900">{m.name}</p>
-                          <p className="truncate text-xs text-ink-500">{[m.phone, m.stays ? plural(m.stays, "stay") : "No stays yet"].join(" · ")}</p>
+                          <p className="text-xs break-words text-ink-500">{["Returning", m.stays ? plural(m.stays, "stay") : "no stays yet", m.email].filter(Boolean).join(" · ")}</p>
                         </div>
                         <Button variant="secondary" size="sm" onClick={() => pickGuest(m)}>Use</Button>
                       </li>
