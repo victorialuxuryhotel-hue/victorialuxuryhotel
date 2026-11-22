@@ -4,7 +4,7 @@ import type { HistoryEntry, PaymentRow, ReservationDetail, ReservationRow } from
 import { formatNaira } from "@/lib/format";
 import { hotelToday as today } from "@/lib/hotel-date";
 import { reservationStatus } from "@/domain/status";
-import { authorize } from "../auth";
+import { authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
 import { cleanSearch } from "../db-errors";
 
@@ -67,7 +67,7 @@ const tabWhere: Record<ReservationTab, string> = {
 };
 
 export async function listReservations(opts: { tab?: ReservationTab; q?: string; status?: string; source?: string; guestId?: string; page?: number; pageSize?: number } = {}) {
-  await authorize();
+  await authorizeRead();
   const db = await getDb();
   const tab = opts.tab ?? "upcoming";
   const size = opts.pageSize ?? 50;
@@ -103,7 +103,7 @@ export async function listReservations(opts: { tab?: ReservationTab; q?: string;
 }
 
 export async function tabCounts(): Promise<Record<Exclude<ReservationTab, "all">, number>> {
-  await authorize();
+  await authorizeRead();
   const row = await first<Record<Exclude<ReservationTab, "all">, number>>(
     await getDb(),
     `SELECT
@@ -119,7 +119,7 @@ export async function tabCounts(): Promise<Record<Exclude<ReservationTab, "all">
 
 /** Arrivals (due today, not yet in) and departures (in house, due out today or overdue). */
 export async function movements(day?: string) {
-  await authorize();
+  await authorizeRead();
   const db = await getDb();
   const d = day ?? today();
   const [arrivals, departures, inHouse] = await Promise.all([
@@ -133,7 +133,7 @@ export async function movements(day?: string) {
 export async function getReservation(
   id: string,
 ): Promise<(ReservationDetail & { categoryId: string; roomId?: string; guestId: string; maxGuests: number; publicToken: string }) | null> {
-  await authorize();
+  await authorizeRead();
   const db = await getDb();
   const r = await first<
     ListRow & {
@@ -215,7 +215,7 @@ export async function getReservation(
 
 /** Which reservation a receipt number belongs to. */
 export async function reservationIdForReceipt(receiptNumber: string): Promise<string | null> {
-  await authorize();
+  await authorizeRead();
   const row = await first<{ reservation_id: string }>(await getDb(), "SELECT reservation_id FROM payments WHERE receipt_number = ?", receiptNumber);
   return row?.reservation_id ?? null;
 }

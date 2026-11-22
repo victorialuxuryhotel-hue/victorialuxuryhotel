@@ -1,12 +1,12 @@
 import "server-only";
 import type { ManagedPhoto } from "@/components/management/photo-manager";
 import { mediaUrl } from "@/lib/media";
-import { authorize } from "../auth";
+import { authorizeRead } from "../auth";
 import { all, getDb } from "../db";
 
 /** Website photos for the management screen. */
 export async function listSitePhotos(): Promise<{ bySlot: Record<string, ManagedPhoto>; gallery: ManagedPhoto[] }> {
-  await authorize("categories.manage");
+  await authorizeRead("categories.manage");
   const rows = await all<{ id: string; slot: string; gallery_group: string | null; storage_path: string; alt_text: string }>(
     await getDb(),
     "SELECT id, slot, gallery_group, storage_path, alt_text FROM site_photos ORDER BY sort_order, created_at",

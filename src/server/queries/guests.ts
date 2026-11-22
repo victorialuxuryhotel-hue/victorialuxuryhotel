@@ -1,6 +1,6 @@
 import "server-only";
 import type { GuestRow } from "@/domain/views";
-import { authorize } from "../auth";
+import { authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
 import { cleanSearch } from "../db-errors";
 import { listReservations } from "./reservations";
@@ -28,7 +28,7 @@ function toGuest(g: G): GuestRow & { notes?: string } {
 }
 
 export async function listGuests(q?: string, page = 1, size = 50): Promise<GuestRow[]> {
-  await authorize();
+  await authorizeRead();
   const term = cleanSearch(q);
   const like = `%${term}%`;
   const rows = await all<G>(
@@ -44,7 +44,7 @@ export async function listGuests(q?: string, page = 1, size = 50): Promise<Guest
 }
 
 export async function getGuest(id: string) {
-  await authorize();
+  await authorizeRead();
   const g = await first<G>(await getDb(), `SELECT ${COLUMNS} FROM guests g WHERE g.id = ?`, id);
   if (!g) return null;
   return { guest: toGuest(g), stays: await listReservations({ tab: "all", guestId: id, pageSize: 500 }) };

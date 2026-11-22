@@ -1,7 +1,7 @@
 import "server-only";
 import type { PaymentRow } from "@/domain/views";
 import { addDays, hotelDateOf, hotelToday } from "@/lib/hotel-date";
-import { actorOf, authorize } from "../auth";
+import { actorOf, authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
 import { frontDeskSummary, listPaymentsFor } from "../domain/payment-list";
 
@@ -12,7 +12,7 @@ import { frontDeskSummary, listPaymentsFor } from "../domain/payment-list";
  *  - outstanding: unpaid balances on confirmed / in-house / completed stays
  */
 export async function revenueSummary() {
-  await authorize("reports.view");
+  await authorizeRead("reports.view");
   const db = await getDb();
   const today = hotelToday();
   const monthStart = `${today.slice(0, 7)}-01`;
@@ -57,7 +57,7 @@ export async function revenueSummary() {
 }
 
 export async function awaitingPaymentCount() {
-  await authorize();
+  await authorizeRead();
   const row = await first<{ n: number }>(
     await getDb(),
     "SELECT count(*) AS n FROM reservations WHERE status = 'pending_payment' AND hold_expires_at > ?",
@@ -81,7 +81,7 @@ const toPayment = (p: P): PaymentRow => ({
  * gets today's payments (Lagos time) or their own, whatever view is asked for.
  */
 export async function listPayments(opts: { view?: string; page?: number; size?: number }) {
-  const staff = await authorize();
+  const staff = await authorizeRead();
   const { view, rows } = await listPaymentsFor(await getDb(), actorOf(staff), opts);
   return {
     view,
@@ -96,6 +96,6 @@ export async function listPayments(opts: { view?: string; page?: number; size?: 
 
 /** Front desk: counts for the two views and today's takings by method. */
 export async function frontDeskPayments() {
-  const staff = await authorize();
+  const staff = await authorizeRead();
   return frontDeskSummary(await getDb(), actorOf(staff));
 }

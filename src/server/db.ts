@@ -25,7 +25,8 @@ export async function getDb(): Promise<Db> {
 }
 
 /** Who is acting. `null` = the system (webhook, scheduled job) or a website guest. */
-export type Actor = { id: string; role: StaffRole } | null;
+/** Who is acting. `readOnly` is set while an owner views the app as front desk: every write refuses. */
+export type Actor = { id: string; role: StaffRole; readOnly?: boolean } | null;
 export type StaffRole = "owner" | "general_manager" | "front_desk";
 
 export const now = () => new Date().toISOString();
@@ -38,6 +39,7 @@ export const uuid = () => crypto.randomUUID();
  * violations are translated into AppErrors with messages safe to show.
  */
 export async function writeBatch(db: Db, actor: Actor, stmts: Stmt[], reason?: string | null): Promise<D1Result[]> {
+  if (actor?.readOnly) throw new AppError("FORBIDDEN", VIEW_AS_READ_ONLY);
   const batch = [
     db.prepare("INSERT OR REPLACE INTO _ctx (id, actor_id, reason) VALUES (1, ?, ?)").bind(actor?.id ?? null, reason ?? null),
     ...stmts,
@@ -117,3 +119,6 @@ export function requireRole(actor: Actor, roles: readonly StaffRole[]): asserts 
 export const ALL_STAFF = ["owner", "general_manager", "front_desk"] as const;
 export const MANAGERS = ["owner", "general_manager"] as const;
 export const OWNER = ["owner"] as const;
+
+/** Shown when a change is attempted while viewing as front desk. */
+export const VIEW_AS_READ_ONLY = "You're viewing as front desk, which is read-only. Exit view to make changes.";

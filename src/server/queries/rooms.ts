@@ -3,7 +3,7 @@ import type { RoomBoardState } from "@/domain/status";
 import type { CategoryRow, RoomTile } from "@/domain/views";
 import { hotelToday } from "@/lib/hotel-date";
 import { mediaUrl } from "@/lib/media";
-import { authorize } from "../auth";
+import { authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
 
 export type BoardRoom = RoomTile & { categoryId: string; serviceStatus: "in_service" | "maintenance"; reservationId?: string };
@@ -13,7 +13,7 @@ export type BoardRoom = RoomTile & { categoryId: string; serviceStatus: "in_serv
  * only maintenance and readiness are stored on the room itself.
  */
 export async function roomBoard(): Promise<BoardRoom[]> {
-  await authorize();
+  await authorizeRead();
   const db = await getDb();
   const today = hotelToday();
   const [rooms, stays] = await Promise.all([
@@ -65,7 +65,7 @@ export async function roomBoard(): Promise<BoardRoom[]> {
 
 /** In-service rooms of any category that are free for the given nights. */
 export async function assignableRooms(reservationId: string, checkIn: string, checkOut: string) {
-  await authorize();
+  await authorizeRead();
   const rows = await all<{ id: string; room_number: string; readiness: string; category_name: string }>(
     await getDb(),
     `SELECT rm.id, rm.room_number, rm.readiness, c.name AS category_name
@@ -85,7 +85,7 @@ export async function assignableRooms(reservationId: string, checkIn: string, ch
 }
 
 export async function listCategories(): Promise<CategoryRow[]> {
-  await authorize();
+  await authorizeRead();
   const rows = await all<{ id: string; name: string; slug: string; nightly_rate_kobo: number; max_occupancy: number; is_active: number; rooms: number; images: number }>(
     await getDb(),
     `SELECT c.id, c.name, c.slug, c.nightly_rate_kobo, c.max_occupancy, c.is_active,
@@ -105,7 +105,7 @@ export type CategoryDetail = CategoryRow & {
 };
 
 export async function getCategory(id: string): Promise<CategoryDetail | null> {
-  await authorize();
+  await authorizeRead();
   const db = await getDb();
   const c = await first<{
     id: string; name: string; slug: string; nightly_rate_kobo: number; max_occupancy: number; is_active: number; short_description: string | null;
