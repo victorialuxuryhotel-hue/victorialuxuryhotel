@@ -16,7 +16,7 @@ async function Content() {
   const staff = await requireStaff();
   if (!can(staff.role, "reservations.manage")) return <AccessDenied />;
   const [categories, today, rules] = await Promise.all([listCategories(), hotelToday(), getBookingRules()]);
-  return <ReservationForm categories={categories} today={today} holdHours={rules.staffHoldHours} />;
+  return <ReservationForm categories={categories} today={today} holdHours={rules.staffHoldHours} aboveTabs={staff.role === "front_desk"} />;
 }
 
 export default function NewReservationPage() {

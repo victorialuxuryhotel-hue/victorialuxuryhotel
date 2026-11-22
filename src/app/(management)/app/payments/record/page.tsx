@@ -30,8 +30,15 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   }
   const [r, today] = await Promise.all([getReservation(id), hotelToday()]);
   if (!r) notFound();
+  const created = (await searchParams).created === "1";
   return (
     <Card className="max-w-2xl p-6">
+      {created ? (
+        <p role="status" className="mb-5 rounded-md border border-success-600/20 bg-success-50 px-4 py-3 text-sm text-success-700">
+          Reservation {r.reference} created and held. Record the payment to confirm it, or{" "}
+          <Link href={`/app/reservations/${r.id}`} className="underline underline-offset-2">open the reservation</Link>.
+        </p>
+      ) : null}
       <OfflinePaymentForm reservation={r} today={today} />
     </Card>
   );

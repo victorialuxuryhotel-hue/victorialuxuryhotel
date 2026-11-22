@@ -6,9 +6,10 @@ import { after } from "next/server";
 import { z } from "zod";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { actorOf, authorize } from "./auth";
+import { actorOf, authorize, authorizeRead } from "./auth";
 import { getDb } from "./db";
 import * as engine from "./domain/reservations";
+import { availabilityForStay, findGuestsByPhone, type PhoneMatch, type TypeAvailability } from "./domain/staff-booking";
 import { deliverEmails } from "./notifications";
 
 /** Runs an action body with consistent error handling and logging. */
@@ -37,10 +38,12 @@ const createSchema = z.object({
   phone: z.string().trim().min(7, "Enter a phone number").max(30),
   email: z.union([z.literal(""), z.email("Enter a valid email")]).optional(),
   specialRequests: z.string().max(1000).optional(),
+  guestId: z.union([z.literal(""), z.uuid()]).optional(),
+  next: z.enum(["payment", "reservation"]).optional(),
 });
 
 /** Direct booking (walk-in, phone, WhatsApp) through the same engine as the website. */
-export async function createReservation(_prev: ActionResult<{ id: string }> | null, formData: FormData): Promise<ActionResult<{ id: string }>> {
+export async function createReservation(_prev: ActionResult<{ id: string; next: string }> | null, formData: FormData): Promise<ActionResult<{ id: string; next: string }>> {
   const result = await run("reservation.create", async () => {
     const staff = await authorize("reservations.manage");
     const parsed = createSchema.safeParse(Object.fromEntries(formData));
@@ -49,11 +52,13 @@ export async function createReservation(_prev: ActionResult<{ id: string }> | nu
     const res = await engine.createStaffReservation(await getDb(), actorOf(staff), {
       categoryId: v.categoryId, checkIn: v.checkIn, checkOut: v.checkOut, guests: v.guests, source: v.source,
       fullName: v.fullName, phone: v.phone, email: v.email || null, specialRequests: v.specialRequests || null,
+      guestId: v.guestId || null,
     });
     refresh();
-    return { id: res.id };
+    return { id: res.id, next: v.next ?? "reservation" };
   });
-  if (result.ok) redirect(`/app/reservations/${result.data.id}?created=1`);
+  // "Create & take payment" goes straight to recording the payment (6d).
+  if (result.ok) redirect(result.data.next === "payment" ? `/app/payments/record?reservation=${result.data.id}&created=1` : `/app/reservations/${result.data.id}?created=1`);
   return result;
 }
 
@@ -188,4 +193,25 @@ export async function undoChange(reservationId: string, undoId: number): Promise
     refresh();
     return result;
   });
+}
+
+/** New reservation form: returning guests whose phone matches what's typed (7+ digits). Read-only. */
+export async function lookupGuestsByPhone(phone: string): Promise<PhoneMatch[]> {
+  try {
+    const staff = await authorizeRead("reservations.manage");
+    return await findGuestsByPhone(await getDb(), actorOf(staff), String(phone).slice(0, 30));
+  } catch (err) {
+    logger.warn("guest.phone_lookup_failed", { error: err instanceof Error ? err.message : "error" });
+    return [];
+  }
+}
+
+/** New reservation form: free rooms per type for the chosen dates. Read-only. */
+export async function stayAvailability(checkIn: string, checkOut: string): Promise<TypeAvailability[] | null> {
+  try {
+    const staff = await authorizeRead("reservations.manage");
+    return await availabilityForStay(await getDb(), actorOf(staff), String(checkIn), String(checkOut));
+  } catch {
+    return null;
+  }
 }
