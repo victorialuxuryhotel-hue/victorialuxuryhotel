@@ -42,3 +42,20 @@ const matrix: Record<StaffRole, ReadonlySet<Permission>> = {
 export function can(role: StaffRole, permission: Permission): boolean {
   return matrix[role].has(permission);
 }
+
+/**
+ * Payments list. Roles that see revenue see every payment ("all"). Front desk
+ * sees today's payments (Lagos time) or the ones they recorded ("mine"),
+ * enforced in the query (src/server/domain/payment-list.ts).
+ */
+export type PaymentView = "all" | "today" | "mine";
+
+export function allowedPaymentViews(role: StaffRole): readonly PaymentView[] {
+  return can(role, "reports.view") ? ["all"] : ["today", "mine"];
+}
+
+/** The view actually used: anything the role may not use falls back to its first allowed view. */
+export function effectivePaymentView(role: StaffRole, requested: string | undefined): PaymentView {
+  const allowed = allowedPaymentViews(role);
+  return allowed.includes(requested as PaymentView) ? (requested as PaymentView) : allowed[0]!;
+}

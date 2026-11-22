@@ -1,8 +1,9 @@
 import "server-only";
 import type { PaymentRow } from "@/domain/views";
 import { addDays, hotelDateOf, hotelToday } from "@/lib/hotel-date";
-import { authorize } from "../auth";
+import { actorOf, authorize } from "../auth";
 import { all, first, getDb } from "../db";
+import { frontDeskSummary, listPaymentsFor } from "../domain/payment-list";
 
 /**
  * Basic revenue visibility (not accounting). Three different measures, never mixed:
@@ -69,19 +70,32 @@ type P = {
   id: string; amount_kobo: number; method: string | null; provider: "paystack" | "offline"; provider_reference: string | null; status: PaymentRow["status"];
   paid_at: string | null; receipt_number: string | null; reservation_id: string; reference: string; guest_name: string; recorder: string | null;
 };
-const PAYMENT_SELECT = `SELECT p.id, p.amount_kobo, p.method, p.provider, p.provider_reference, p.status, p.paid_at, p.receipt_number,
-    p.reservation_id, r.reference, g.full_name AS guest_name, s.full_name AS recorder
-  FROM payments p JOIN reservations r ON r.id = p.reservation_id JOIN guests g ON g.id = r.guest_id
-  LEFT JOIN staff_profiles s ON s.id = p.recorded_by`;
-
 const toPayment = (p: P): PaymentRow => ({
   id: p.id, reservationId: p.reservation_id, reservationReference: p.reference, guestName: p.guest_name, amountKobo: p.amount_kobo,
   method: (p.method ?? "other") as PaymentRow["method"], provider: p.provider, providerReference: p.provider_reference ?? undefined,
   status: p.status, paidAt: p.paid_at ?? undefined, receiptNumber: p.receipt_number ?? undefined, recordedBy: p.recorder ?? undefined,
 });
 
-export async function listPayments(page = 1, size = 50): Promise<PaymentRow[]> {
-  await authorize();
-  const rows = await all<P>(await getDb(), `${PAYMENT_SELECT} ORDER BY p.created_at DESC, p.id LIMIT ? OFFSET ?`, size + 1, (page - 1) * size);
-  return rows.map(toPayment);
+/**
+ * The Payments page. Scope is decided in the data layer by role: front desk
+ * gets today's payments (Lagos time) or their own, whatever view is asked for.
+ */
+export async function listPayments(opts: { view?: string; page?: number; size?: number }) {
+  const staff = await authorize();
+  const { view, rows } = await listPaymentsFor(await getDb(), actorOf(staff), opts);
+  return {
+    view,
+    rows: rows.map((p): PaymentRow & { at: string; recordedById?: string; kind: "payment" | "refund" } => ({
+      ...toPayment({ ...p, method: p.method }),
+      at: p.paid_at ?? p.created_at,
+      recordedById: p.recorded_by ?? undefined,
+      kind: p.kind,
+    })),
+  };
+}
+
+/** Front desk: counts for the two views and today's takings by method. */
+export async function frontDeskPayments() {
+  const staff = await authorize();
+  return frontDeskSummary(await getDb(), actorOf(staff));
 }

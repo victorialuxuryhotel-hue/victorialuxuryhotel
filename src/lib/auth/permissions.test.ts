@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { can } from "./permissions";
+import { allowedPaymentViews, can, effectivePaymentView } from "./permissions";
 
 describe("role permissions", () => {
   it("front desk runs daily operations but cannot configure or see revenue", () => {
@@ -20,5 +20,16 @@ describe("role permissions", () => {
   it("owner can do everything", () => {
     expect(can("owner", "staff.manage")).toBe(true);
     expect(can("owner", "payments.override")).toBe(true);
+  });
+});
+
+describe("payments list scope", () => {
+  it("front desk gets today's and their own payments; roles that see revenue get everything", () => {
+    expect(allowedPaymentViews("front_desk")).toEqual(["today", "mine"]);
+    expect(allowedPaymentViews("general_manager")).toEqual(["all"]);
+    expect(allowedPaymentViews("owner")).toEqual(["all"]);
+    expect(effectivePaymentView("front_desk", "all")).toBe("today");
+    expect(effectivePaymentView("front_desk", "mine")).toBe("mine");
+    expect(effectivePaymentView("general_manager", "mine")).toBe("all");
   });
 });
