@@ -1,17 +1,20 @@
 "use client";
 
-import { useActionState } from "react";
+import { startTransition, useActionState, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { paymentMethod } from "@/domain/status";
 import { formatNaira } from "@/lib/format";
-import { keepValues } from "@/lib/forms";
 import { recordOfflinePayment } from "@/server/payments";
 
 /**
  * Offline payment. The confirmation checkbox is required by the server and the
  * database: staff must have actually received the money (cash in hand, or a
  * transfer visible in the hotel's bank account). A guest's screenshot is not proof.
+ *
+ * Saving takes two steps: "Record payment" shows a review ("Record ₦85,000
+ * cash for Tunde Bakare?") and only "Yes, record it" saves. Payments can't be
+ * edited afterwards; a manager records a correction instead.
  */
 export function OfflinePaymentForm({
   reservation,
@@ -21,10 +24,36 @@ export function OfflinePaymentForm({
   today: string;
 }) {
   const [state, action, pending] = useActionState(recordOfflinePayment, null);
+  const [review, setReview] = useState<null | { amount: string; method: string; paidOn: string; reference: string }>(null);
+  // A server reply (e.g. a refused amount) returns to the form so the error shows next to its field.
+  const [seen, setSeen] = useState(state);
+  if (state !== seen) {
+    setSeen(state);
+    setReview(null);
+  }
   const err = (n: string) => (state && !state.ok ? state.fieldErrors?.[n]?.[0] : undefined);
   const balance = reservation.totalKobo - reservation.paidKobo;
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    if (!review) {
+      // Step 1: show what is about to be saved. Fields stay in the form (hidden).
+      const amount = Number(String(data.get("amount") ?? "").replace(/[,\s₦]/g, ""));
+      setReview({
+        amount: Number.isFinite(amount) && amount > 0 ? formatNaira(Math.round(amount * 100)) : String(data.get("amount")),
+        method: paymentMethod[(data.get("method") as keyof typeof paymentMethod) ?? "other"],
+        paidOn: String(data.get("paidOn") ?? ""),
+        reference: String(data.get("reference") ?? "").trim(),
+      });
+      return;
+    }
+    // Step 2: save (keeping the typed values if the server refuses).
+    startTransition(() => action(data));
+  }
+
   return (
-    <form action={action} onSubmit={keepValues(action)} className="space-y-5">
+    <form action={action} onSubmit={onSubmit} className="space-y-5">
       <input type="hidden" name="reservationId" value={reservation.id} />
       <div className="rounded-md bg-ivory-100 p-4 text-sm">
         <p className="font-medium text-ink-900">{reservation.guestName} · <span className="font-mono">{reservation.reference}</span></p>
@@ -34,6 +63,7 @@ export function OfflinePaymentForm({
         </p>
       </div>
       {state && !state.ok && !state.fieldErrors ? <FormMessage>{state.message}</FormMessage> : null}
+      <div hidden={Boolean(review)} className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Amount received (₦)" htmlFor="amount" required hint="Defaults to the balance due." error={err("amount")}>
           <Input id="amount" name="amount" inputMode="decimal" defaultValue={String(balance / 100)} required />
@@ -62,8 +92,26 @@ export function OfflinePaymentForm({
         {err("confirmReceived") ? <p className="mt-1 text-sm text-danger-700">{err("confirmReceived")}</p> : null}
       </div>
       <div className="flex justify-end">
-        <Button type="submit" pending={pending}>Record payment</Button>
+        <Button type="submit" className="w-full sm:w-auto">Record payment</Button>
       </div>
+      </div>
+      {review ? (
+        <div role="alertdialog" aria-labelledby="pay-review-title" className="space-y-4 rounded-card border border-gold-300 bg-gold-50 p-5">
+          <p id="pay-review-title" className="text-lg font-semibold text-ink-900">
+            Record {review.amount} {review.method.toLowerCase()} for {reservation.guestName}?
+          </p>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt className="text-ink-500">Booking</dt><dd className="font-mono">{reservation.reference}</dd>
+            <dt className="text-ink-500">Received on</dt><dd>{review.paidOn}</dd>
+            {review.reference ? (<><dt className="text-ink-500">Reference</dt><dd>{review.reference}</dd></>) : null}
+          </dl>
+          <p className="text-sm text-ink-600">Payments can&apos;t be edited once saved. If something is wrong later, a manager records a correction.</p>
+          <div className="grid grid-cols-2 gap-2.5 sm:flex sm:justify-end">
+            <Button type="button" variant="secondary" size="lg" onClick={() => setReview(null)} disabled={pending}>Go back</Button>
+            <Button type="submit" size="lg" pending={pending}>Yes, record it</Button>
+          </div>
+        </div>
+      ) : null}
     </form>
   );
 }
