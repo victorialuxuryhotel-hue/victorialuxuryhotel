@@ -96,6 +96,8 @@ type CreateInput = {
   checkOut: string;
   guests: number;
   guestId?: string | null;
+  /** Staff only: the specific room, checked against the type and the dates. */
+  roomId?: string | null;
   fullName?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -118,6 +120,12 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
   if (input.guests > cat.max_occupancy) throw new AppError("VALIDATION", `${cat.name} sleeps up to ${cat.max_occupancy} guests.`);
   const unavailable = new AppError("UNAVAILABLE", `Sorry, ${cat.name} is no longer available for those dates.`);
   if ((await freeUnits(db, cat.id, input.checkIn, input.checkOut)) <= 0) throw unavailable;
+
+  if (input.roomId) {
+    const room = await loadRoom(db, input.roomId);
+    if (!room || !room.is_active || room.category_id !== cat.id) throw new AppError("VALIDATION", `Choose a ${cat.name} room.`);
+    if (room.service_status !== "in_service") throw new AppError("UNAVAILABLE", `Room ${room.room_number} is under maintenance.`);
+  }
 
   const email = input.email?.trim().toLowerCase() || null;
   const phone = input.phone?.trim() || null;
@@ -162,12 +170,12 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
     stmts.push(
       db
         .prepare(
-          `INSERT INTO reservations (id, reference, public_token, guest_id, category_id, check_in, check_out, guest_count,
+          `INSERT INTO reservations (id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count,
              nightly_rate_kobo, total_amount_kobo, status, source, special_requests, hold_expires_at, created_by)
-           VALUES (?, ?, ?, ${guestExpr}, ?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ${guestExpr}, ?, ?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?, ?, ?)`,
         )
         .bind(
-          id, reference, publicToken, guestParam, cat.id, input.checkIn, input.checkOut, input.guests,
+          id, reference, publicToken, guestParam, cat.id, input.roomId || null, input.checkIn, input.checkOut, input.guests,
           cat.nightly_rate_kobo, total, input.source, input.specialRequests?.trim() || null, holdExpiresAt, input.createdBy,
         ),
       activity(db, "reservation.created", "reservation", id, `Reservation ${reference} created: ${cat.name}, ${input.checkIn} → ${input.checkOut}`, {
@@ -181,7 +189,7 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
     } catch (err) {
       const collided = err instanceof AppError && dbErrorToken(err.cause) === "unique" && /reservations\.(reference|public_token)/.test(String((err.cause as Error)?.message));
       if (collided && attempt < 3) continue;
-      rethrow(err, { no_capacity: unavailable });
+      rethrow(err, { no_capacity: unavailable, room_overlap: new AppError("CONFLICT", "That room was just booked for some of these nights. Choose another.") });
     }
   }
 }
