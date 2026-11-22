@@ -6,6 +6,7 @@ import { nearestFreeStart } from "@/domain/availability";
 import type { AvailabilityOption } from "@/domain/views";
 import { AppError } from "@/lib/errors";
 import { addDays, hotelToday, nightsBetween } from "@/lib/hotel-date";
+import { roomLabel } from "@/lib/format";
 import { logger } from "@/lib/logger";
 import { all, first, getDb } from "../db";
 import { freeNights, searchAvailability } from "../domain/inventory";
@@ -71,6 +72,7 @@ type BookingRow = {
   nightly_rate_kobo: number; total_amount_kobo: number; hold_expires_at: string | null; special_requests: string | null; attention_reason: string | null;
   guest_full_name: string; guest_email: string | null; guest_phone: string | null;
   category_slug: string; category_name: string; category_short_description: string | null; category_max_occupancy: number;
+  room_number: string | null; room_floor: string | null; room_category: string | null;
 };
 
 /** Loads a held booking by its unguessable token, for the guest's review and confirmation pages. */
@@ -84,8 +86,10 @@ export async function getBookingByToken(token: string) {
       `SELECT r.id, r.reference, r.status, r.check_in, r.check_out, r.nights, r.guest_count, r.nightly_rate_kobo, r.total_amount_kobo,
               r.hold_expires_at, r.special_requests, r.attention_reason,
               g.full_name AS guest_full_name, g.email AS guest_email, g.phone AS guest_phone,
-              c.slug AS category_slug, c.name AS category_name, c.short_description AS category_short_description, c.max_occupancy AS category_max_occupancy
+              c.slug AS category_slug, c.name AS category_name, c.short_description AS category_short_description, c.max_occupancy AS category_max_occupancy,
+              rm.room_number, rm.floor AS room_floor, rc.name AS room_category
        FROM reservations r JOIN guests g ON g.id = r.guest_id JOIN room_categories c ON c.id = r.category_id
+       LEFT JOIN rooms rm ON rm.id = r.room_id LEFT JOIN room_categories rc ON rc.id = rm.category_id
        WHERE r.public_token = ?`,
       token,
     );
@@ -115,6 +119,10 @@ export async function getBookingByToken(token: string) {
       attention_reason: r.attention_reason,
       guest: { full_name: r.guest_full_name, email: r.guest_email, phone: r.guest_phone },
       category: { slug: r.category_slug, name: r.category_name, short_description: r.category_short_description, max_occupancy: r.category_max_occupancy },
+      // The specific room, once assigned (automatically on payment, or by staff).
+      room: r.room_number ? roomLabel(r.room_number, r.room_floor) : undefined,
+      // An upgrade puts the guest in another type: show the room's own type.
+      roomCategory: r.room_category ?? r.category_name,
       payments,
       holdActive,
       latestAttempt: paystack[0],
@@ -136,10 +144,12 @@ export async function getGuestReceipt(token: string, receiptNumber: string) {
   await connection();
   if (!z.uuid().safeParse(token).success || !/^RCT-\d{4}-\d{6}$/.test(receiptNumber)) return null;
   const db = await getDb();
-  const r = await first<{ id: string; reference: string; check_in: string; check_out: string; nights: number; total_amount_kobo: number; guest: string; category: string }>(
+  const r = await first<{ id: string; reference: string; check_in: string; check_out: string; nights: number; total_amount_kobo: number; guest: string; category: string; room_number: string | null; room_floor: string | null }>(
     db,
-    `SELECT r.id, r.reference, r.check_in, r.check_out, r.nights, r.total_amount_kobo, g.full_name AS guest, c.name AS category
-     FROM reservations r JOIN guests g ON g.id = r.guest_id JOIN room_categories c ON c.id = r.category_id WHERE r.public_token = ?`,
+    `SELECT r.id, r.reference, r.check_in, r.check_out, r.nights, r.total_amount_kobo, g.full_name AS guest,
+            coalesce(rc.name, c.name) AS category, rm.room_number, rm.floor AS room_floor
+     FROM reservations r JOIN guests g ON g.id = r.guest_id JOIN room_categories c ON c.id = r.category_id
+     LEFT JOIN rooms rm ON rm.id = r.room_id LEFT JOIN room_categories rc ON rc.id = rm.category_id WHERE r.public_token = ?`,
     token,
   );
   if (!r) return null;
@@ -162,7 +172,7 @@ export async function getGuestReceipt(token: string, receiptNumber: string) {
       provider: p.provider, providerReference: p.provider_reference ?? undefined, amountKobo: p.amount_kobo,
     },
     reservation: {
-      guestName: r.guest, reference: r.reference, category: r.category, nights: r.nights ?? 0, checkIn: r.check_in, checkOut: r.check_out,
+      guestName: r.guest, reference: r.reference, category: r.category, room: r.room_number ? roomLabel(r.room_number, r.room_floor) : undefined, nights: r.nights ?? 0, checkIn: r.check_in, checkOut: r.check_out,
       totalKobo: r.total_amount_kobo, paidKobo: paid?.kobo ?? 0,
     },
   };

@@ -39,7 +39,7 @@ async function Outcome({ params }: { params: Promise<{ token: string }> }) {
     return (
       <BookingConfirmed
         stay={{
-          reference: b.reference, guestName: b.guest.full_name, email: b.guest.email ?? "", category: b.category.name,
+          reference: b.reference, guestName: b.guest.full_name, email: b.guest.email ?? "", category: b.roomCategory, room: b.room,
           checkIn: b.check_in, checkOut: b.check_out, nights: b.nights ?? 0, guests: b.guest_count, paidKobo: b.paidKobo,
           receiptNumber: b.receipt ?? "", checkInTime: timeLabel(rules.checkInTime), checkOutTime: timeLabel(rules.checkOutTime),
           token, siteUrl: publicEnv().NEXT_PUBLIC_SITE_URL,

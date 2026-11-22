@@ -22,6 +22,13 @@ describe("guest emails (6f / 6g)", () => {
     if (process.env.EMAIL_OUT) writeFileSync(`${process.env.EMAIL_OUT}/email-6f-confirmed.html`, e.html);
   });
 
+  it("shows the assigned room number and floor once there is one", () => {
+    const e = bookingConfirmedEmail({ ...stay, room: "Room 204 · Floor 2" }, site);
+    expect(e.html).toContain("Room 204 · Floor 2 · Deluxe");
+    expect(e.text).toContain("Room 204 · Floor 2 · Deluxe");
+    expect(bookingConfirmedEmail(stay, site).text).not.toContain("Floor");
+  });
+
   it("payment receipt: amount box with method and time, balance, receipt link", () => {
     const e = paymentReceivedEmail(
       { ...stay, totalKobo: 8_500_000, paidKobo: 8_500_000, category: "Suite", nights: 1, amountKobo: 8_500_000, receiptNumber: "RCT-2026-000418", method: "Cash", paidAt: "2026-12-01T08:14:00.000Z", receiptUrl: `${site}/book/receipt/token/RCT-2026-000418` },

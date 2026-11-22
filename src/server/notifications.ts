@@ -2,6 +2,7 @@ import "server-only";
 import { alert } from "@/lib/alert";
 import { publicEnv } from "@/lib/env";
 import { serverEnv } from "@/lib/env.server";
+import { roomLabel } from "@/lib/format";
 import { logger } from "@/lib/logger";
 import { paymentMethod } from "@/domain/status";
 import { all, first, getDb, type Db } from "./db";
@@ -29,11 +30,13 @@ async function loadStay(db: Db, reservationId: string): Promise<(StayInfo & { em
     first<{
       reference: string; check_in: string; check_out: string; nights: number; guest_count: number; total_amount_kobo: number;
       source: string; full_name: string; email: string | null; category: string; public_token: string;
+      room_number: string | null; room_floor: string | null;
     }>(
       db,
       `SELECT r.reference, r.check_in, r.check_out, r.nights, r.guest_count, r.total_amount_kobo, r.source, r.public_token,
-              g.full_name, g.email, c.name AS category
+              g.full_name, g.email, coalesce(rc.name, c.name) AS category, rm.room_number, rm.floor AS room_floor
        FROM reservations r JOIN guests g ON g.id = r.guest_id JOIN room_categories c ON c.id = r.category_id
+       LEFT JOIN rooms rm ON rm.id = r.room_id LEFT JOIN room_categories rc ON rc.id = rm.category_id
        WHERE r.id = ?`,
       reservationId,
     ),
@@ -51,6 +54,7 @@ async function loadStay(db: Db, reservationId: string): Promise<(StayInfo & { em
     email: r.email,
     reference: r.reference,
     category: r.category,
+    room: r.room_number ? roomLabel(r.room_number, r.room_floor) : undefined,
     checkIn: r.check_in,
     checkOut: r.check_out,
     nights: r.nights ?? 0,

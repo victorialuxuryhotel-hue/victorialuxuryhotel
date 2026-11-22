@@ -37,6 +37,27 @@ describe("Paystack payments", () => {
     expect(pay.receipt_number).toMatch(/^RCT-\d{4}-\d{6}$/);
   });
 
+  it("confirming gives the guest a free room of their type, logged; taken rooms are skipped", async () => {
+    const b = await heldBooking(2);
+    // Another confirmed guest already has the first room for these nights.
+    await insertReservation({ categoryId: b.category.id, checkIn: day(31), checkOut: day(33), roomId: b.category.roomIds[0], status: "confirmed" });
+    const p = await beginPaystackPayment(db, b.publicToken);
+    expect(await success(p.reference, p.amountKobo)).toBe("confirmed");
+    const r = await q1<{ room_id: string | null }>("SELECT room_id FROM reservations WHERE id = ?", b.id);
+    expect(r.room_id).toBe(b.category.roomIds[1]);
+    const log = await q<{ action: string; actor_type: string }>("SELECT action, actor_type FROM activity_log WHERE entity_id = ? AND action = 'reservation.room_auto_assigned'", b.id);
+    expect(log).toEqual([{ action: "reservation.room_auto_assigned", actor_type: "system" }]);
+  });
+
+  it("confirming keeps a room staff already assigned", async () => {
+    const b = await heldBooking(2);
+    await exec("UPDATE reservations SET room_id = ? WHERE id = ?", b.category.roomIds[1], b.id);
+    const p = await beginPaystackPayment(db, b.publicToken);
+    await success(p.reference, p.amountKobo);
+    expect((await q1<{ room_id: string }>("SELECT room_id FROM reservations WHERE id = ?", b.id)).room_id).toBe(b.category.roomIds[1]);
+    expect(await q("SELECT 1 FROM activity_log WHERE entity_id = ? AND action = 'reservation.room_auto_assigned'", b.id)).toEqual([]);
+  });
+
   it("duplicate notifications are no-ops", async () => {
     const b = await heldBooking();
     const p = await beginPaystackPayment(db, b.publicToken);

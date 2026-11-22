@@ -19,6 +19,8 @@ export type ConfirmedStay = {
   /** From hotel settings, e.g. "2:00 pm". */
   checkInTime: string;
   checkOutTime: string;
+  /** The specific room, e.g. "Room 204 · Floor 2" (assigned on payment). */
+  room?: string;
   /** The booking's private link token, for the calendar file and sharing. */
   token: string;
   siteUrl: string;
@@ -29,7 +31,7 @@ export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
   const link = `${stay.siteUrl}/book/confirmation/${stay.token}`;
   const share = `https://wa.me/?text=${encodeURIComponent(`My stay at ${hotel.shortName}: ${stay.category}, ${formatDate(stay.checkIn)} to ${formatDate(stay.checkOut)}. Reference ${stay.reference}. ${link}`)}`;
   const rows: Array<[string, string]> = [
-    ["Room", `${stay.category} · ${plural(stay.guests, "guest")}`],
+    ["Room", `${stay.room ? `${stay.room} · ` : ""}${stay.category} · ${plural(stay.guests, "guest")}`],
     ["Check-in", `${formatDate(stay.checkIn)}, from ${stay.checkInTime}`],
     ["Check-out", `${formatDate(stay.checkOut)}, by ${stay.checkOutTime}`],
     ["Paid", formatNaira(stay.paidKobo)],

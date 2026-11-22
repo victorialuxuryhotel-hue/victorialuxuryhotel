@@ -45,3 +45,13 @@ const words = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "E
 export function numberWord(n: number): string {
   return words[n] ?? String(n);
 }
+
+/**
+ * A guest-facing room label, e.g. "Room 204 · Floor 2". Floors are stored as
+ * text ("2", or a name like "Ground"); numbers get the word "Floor".
+ */
+export function roomLabel(roomNumber: string, floor?: string | null): string {
+  const f = floor?.trim();
+  if (!f) return `Room ${roomNumber}`;
+  return `Room ${roomNumber} · ${/^\d+$/.test(f) ? `Floor ${f}` : /floor/i.test(f) ? f : `${f} floor`}`;
+}

@@ -1,6 +1,6 @@
 import { AppError } from "@/lib/errors";
 import { addDays, hotelToday, isIsoDate, nightsBetween } from "@/lib/hotel-date";
-import { first, type Db } from "../db";
+import { first, type Db, type Stmt } from "../db";
 
 /**
  * Inventory: how many units of a room type are free across a stay.
@@ -115,4 +115,41 @@ export function validateStay(checkIn: string | null | undefined, checkOut: strin
   if (!allowPast && checkIn < today) throw new AppError("VALIDATION", "Check-in can't be in the past.");
   if (checkIn > addDays(today, 730)) throw new AppError("VALIDATION", "Bookings open up to two years ahead.");
   if (guests == null || !Number.isInteger(guests) || guests < 1 || guests > 20) throw new AppError("VALIDATION", "Enter the number of guests.");
+}
+
+/**
+ * Statements that give a just-confirmed reservation a specific room of its
+ * booked type, if it has none: a free, in-service room for every night of the
+ * stay, ready rooms first, then by room number. Runs inside the confirming
+ * batch, so the room-overlap trigger settles any race. If no single room is
+ * free for the whole stay (rare: the nights are split across rooms), the
+ * booking stays unassigned and staff assign it as before.
+ */
+export function autoAssignRoomStatements(db: Db, reservationId: string): Stmt[] {
+  return [
+    db
+      .prepare(
+        `UPDATE reservations SET room_id = (
+           SELECT rm.id FROM rooms rm
+           WHERE rm.category_id = reservations.category_id AND rm.is_active = 1 AND rm.service_status = 'in_service'
+             AND NOT EXISTS (
+               SELECT 1 FROM reservations o WHERE o.room_id = rm.id AND o.id <> reservations.id
+                 AND o.status IN ('pending_payment', 'confirmed', 'checked_in')
+                 AND o.check_in < reservations.check_out AND reservations.check_in < o.check_out)
+           ORDER BY rm.readiness = 'ready' DESC, length(rm.room_number), rm.room_number
+           LIMIT 1)
+         WHERE id = ? AND room_id IS NULL`,
+      )
+      .bind(reservationId),
+    db
+      .prepare(
+        `INSERT INTO activity_log (actor_id, actor_type, action, entity_type, entity_id, summary, metadata)
+         SELECT NULL, 'system', 'reservation.room_auto_assigned', 'reservation', r.id,
+                'Room ' || rm.room_number || ' assigned automatically to ' || r.reference || ' on payment',
+                json_object('room_id', rm.id)
+         FROM reservations r JOIN rooms rm ON rm.id = r.room_id
+         WHERE r.id = ?`,
+      )
+      .bind(reservationId),
+  ];
 }

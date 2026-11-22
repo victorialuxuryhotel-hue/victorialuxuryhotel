@@ -80,6 +80,8 @@ export type StayInfo = {
   guestName: string;
   reference: string;
   category: string;
+  /** The specific room once assigned, e.g. "Room 204 · Floor 2". */
+  room?: string;
   checkIn: string;
   checkOut: string;
   nights: number;
@@ -90,9 +92,12 @@ export type StayInfo = {
   checkOutTime: string;
 };
 
+/** "Room 204 · Floor 2 · Deluxe" once a room is assigned, else just the type. */
+const roomText = (s: { category: string; room?: string }) => (s.room ? `${s.room} · ${s.category}` : s.category);
+
 const stayRows = (s: StayInfo): Array<[string, string]> => [
   ["Booking reference", s.reference],
-  ["Room", s.category],
+  ["Room", roomText(s)],
   ["Check-in", `${formatDate(s.checkIn)}, from ${s.checkInTime}`],
   ["Check-out", `${formatDate(s.checkOut)}, by ${s.checkOutTime}`],
   ["Guests", String(s.guests)],
@@ -113,7 +118,7 @@ export function bookingConfirmedEmail(s: StayInfo & { receiptNumber?: string }, 
   const rows: Array<[string, string]> = [
     ["Check-in", `${formatDate(s.checkIn)}, from ${s.checkInTime}`],
     ["Check-out", `${formatDate(s.checkOut)}, by ${s.checkOutTime}`],
-    ["Room", `${s.category} · ${plural(s.guests, "guest")}`],
+    ["Room", `${roomText(s)} · ${plural(s.guests, "guest")}`],
     [balance > 0 ? "Paid so far" : "Total paid", formatNaira(s.paidKobo)],
     ...(balance > 0 ? [["Balance due", formatNaira(balance)] as [string, string]] : []),
     ...(s.receiptNumber ? [["Receipt", s.receiptNumber] as [string, string]] : []),
@@ -139,7 +144,7 @@ export function paymentReceivedEmail(
   const rows: Array<[string, string]> = [
     ["Receipt", s.receiptNumber],
     ["Booking", s.reference],
-    ["Room", `${s.category} · ${plural(s.nights, "night")}`],
+    ["Room", `${roomText(s)} · ${plural(s.nights, "night")}`],
     ["Total", formatNaira(s.totalKobo)],
     ["Balance due", formatNaira(balance)],
   ];

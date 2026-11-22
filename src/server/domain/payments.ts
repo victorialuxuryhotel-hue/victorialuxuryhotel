@@ -3,7 +3,7 @@ import { formatNaira } from "@/lib/format";
 import { addDays, hotelInstant, hotelTimeNow, hotelToday } from "@/lib/hotel-date";
 import { dbErrorToken, StaleStateError } from "../db-errors";
 import { activity, ALL_STAFF, assertVersion, first, MANAGERS, now, requireRole, retryOnStale, uuid, writeBatch, type Actor, type Db, type Stmt } from "../db";
-import { freeUnits } from "./inventory";
+import { autoAssignRoomStatements, freeUnits } from "./inventory";
 import { loadReservation, netPaid, type ReservationRow } from "./reservations";
 
 /**
@@ -61,7 +61,13 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number):
   const stmts: Stmt[] = [];
   let outcome: SettleOutcome;
   let reason: string | undefined;
-  const confirm = () => stmts.push(db.prepare("UPDATE reservations SET status = 'confirmed' WHERE id = ?").bind(res.id));
+  // Confirming also gives the guest a specific room of their type (shown on
+  // their confirmation, email and receipt), unless one is already assigned.
+  const confirm = () =>
+    stmts.push(
+      db.prepare("UPDATE reservations SET status = 'confirmed' WHERE id = ?").bind(res.id),
+      ...(res.room_id ? [] : autoAssignRoomStatements(db, res.id)),
+    );
   const flag = (text: string) => stmts.push(db.prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?").bind(text, res.id));
 
   if (paidAfter < res.total_amount_kobo) {

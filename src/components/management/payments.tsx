@@ -72,7 +72,7 @@ export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: Pay
 }
 
 export type ReceiptPayment = Pick<PaymentRow, "receiptNumber" | "paidAt" | "method" | "providerReference" | "amountKobo" | "provider" | "recordedBy">;
-export type ReceiptStay = Pick<ReservationDetail, "guestName" | "reference" | "category" | "nights" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo">;
+export type ReceiptStay = Pick<ReservationDetail, "guestName" | "reference" | "category" | "nights" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo"> & { room?: string };
 
 /** A printable receipt. `forGuest` leaves out staff names (the guest's own copy). */
 export function Receipt({ payment, reservation, forGuest = false }: { payment: ReceiptPayment; reservation: ReceiptStay; forGuest?: boolean }) {
@@ -107,7 +107,7 @@ export function Receipt({ payment, reservation, forGuest = false }: { payment: R
         <tbody>
           <tr className="border-b border-hairline">
             <td className="py-4">
-              {reservation.category} · {plural(reservation.nights, "night")}
+              {reservation.room ? `${reservation.room} · ` : ""}{reservation.category} · {plural(reservation.nights, "night")}
               <p className="text-xs text-ink-500">{formatDate(reservation.checkIn)} → {formatDate(reservation.checkOut)}</p>
             </td>
             <td className="py-4 text-right tabular-nums">{formatNaira(reservation.totalKobo)}</td>

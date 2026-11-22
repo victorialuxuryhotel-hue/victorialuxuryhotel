@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatNaira, nightsBetween, numberWord } from "./format";
+import { formatDate, formatNaira, nightsBetween, numberWord, roomLabel } from "./format";
 
 describe("format", () => {
+  it("labels a room with its floor", () => {
+    expect(roomLabel("204", "2")).toBe("Room 204 · Floor 2");
+    expect(roomLabel("G1", "Ground")).toBe("Room G1 · Ground floor");
+    expect(roomLabel("301", "Top floor")).toBe("Room 301 · Top floor");
+    expect(roomLabel("12", null)).toBe("Room 12");
+  });
+
   it("formats kobo as whole naira", () => {
     expect(formatNaira(4_000_000)).toMatch(/40,000/);
     expect(formatNaira(4_000_000)).toMatch(/₦|NGN/);
