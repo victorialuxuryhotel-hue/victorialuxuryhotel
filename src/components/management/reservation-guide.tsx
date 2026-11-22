@@ -1,0 +1,174 @@
+"use client";
+
+import Link from "next/link";
+import { useActionState, useRef, useState } from "react";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { Button, buttonStyles } from "@/components/ui/button";
+import { Field, FormMessage, Input, Select } from "@/components/ui/form";
+import type { ReservationDetail } from "@/domain/views";
+import { keepValues } from "@/lib/forms";
+import { formatDate, formatNaira } from "@/lib/format";
+import { cn } from "@/lib/utils/cn";
+import { cancelReservation, markNoShow, overridePayment } from "@/server/reservations";
+import { CheckInButton, CheckOutButton } from "./reservation-actions";
+
+type R = Pick<
+  ReservationDetail,
+  "id" | "status" | "guestName" | "category" | "roomNumber" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo" | "source" | "createdAt"
+>;
+
+const reasons = ["Guest called to cancel", "Guest changed travel plans", "Booked by mistake", "Duplicate booking"];
+
+/** "Cancel this booking?" with the result in the guest's terms. The safe choice comes first. */
+function CancelConfirm({ r, onKeep }: { r: R; onKeep: () => void }) {
+  const [state, action, pending] = useActionState(cancelReservation, null);
+  const [reason, setReason] = useState(reasons[0]!);
+  const first = r.guestName.split(" ")[0];
+  return (
+    <form action={action} onSubmit={keepValues(action)} className="mt-4 space-y-3 rounded-card border border-gold-500 p-4">
+      <input type="hidden" name="reservationId" value={r.id} />
+      <p className="text-lg font-semibold text-ink-900">Cancel this booking?</p>
+      <p className="text-sm leading-relaxed text-ink-700">
+        The {r.category} is released for {formatDate(r.checkIn, { year: false })} → {formatDate(r.checkOut, { year: false })}.{" "}
+        {r.paidKobo > 0
+          ? `${first} has paid ${formatNaira(r.paidKobo)}: arrange any refund under the cancellation policy.`
+          : `${first} hasn't paid, so there's nothing to refund.`}{" "}
+        This can&apos;t be undone.
+      </p>
+      <Field label="Reason" htmlFor="cancel-why">
+        <Select id="cancel-why" value={reason} onChange={(e) => setReason(e.target.value)}>
+          {reasons.map((x) => <option key={x}>{x}</option>)}
+          <option value="">Something else…</option>
+        </Select>
+      </Field>
+      {reason === "" ? (
+        <Field label="What happened?" htmlFor="cancel-other"><Input id="cancel-other" name="reason" required minLength={3} /></Field>
+      ) : (
+        <input type="hidden" name="reason" value={reason} />
+      )}
+      {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
+      <div className="grid grid-cols-2 gap-2.5">
+        <Button type="button" variant="secondary" size="lg" onClick={onKeep} className="whitespace-nowrap px-3">Keep booking</Button>
+        <Button type="submit" variant="danger" size="lg" pending={pending}>Yes, cancel</Button>
+      </div>
+    </form>
+  );
+}
+
+function NoShowConfirm({ r, onKeep }: { r: R; onKeep: () => void }) {
+  const [state, action, pending] = useActionState(markNoShow, null);
+  return (
+    <form action={action} className="mt-4 space-y-3 rounded-card border border-gold-500 p-4">
+      <input type="hidden" name="reservationId" value={r.id} />
+      <p className="text-lg font-semibold text-ink-900">Mark {r.guestName.split(" ")[0]} as a no-show?</p>
+      <p className="text-sm text-ink-700">The booking closes and the room is released for tonight. This can&apos;t be undone.</p>
+      {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
+      <div className="grid grid-cols-2 gap-2.5">
+        <Button type="button" variant="secondary" size="lg" onClick={onKeep} className="whitespace-nowrap px-3">Keep booking</Button>
+        <Button type="submit" variant="danger" size="lg" pending={pending}>Yes, no-show</Button>
+      </div>
+    </form>
+  );
+}
+
+function OverrideInline({ id }: { id: string }) {
+  const [state, action, pending] = useActionState(overridePayment, null);
+  return (
+    <form action={action} onSubmit={keepValues(action)} className="mt-4 space-y-3 rounded-card border border-ivory-200 p-4">
+      <input type="hidden" name="reservationId" value={id} />
+      <Field label="Reason (recorded in the activity log)" htmlFor="ovr-why"><Input id="ovr-why" name="reason" required minLength={5} placeholder="e.g. Company paying on invoice" /></Field>
+      {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
+      {state?.ok ? <FormMessage tone="success">Done. The override is recorded.</FormMessage> : null}
+      <div className="grid grid-cols-2 gap-2.5">
+        <Button type="submit" name="action" value="extend" variant="secondary" size="lg" pending={pending}>Hold 24h more</Button>
+        <Button type="submit" name="action" value="confirm" size="lg" pending={pending}>Confirm now</Button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Phones and tablets: the one next step pinned to the bottom, worded as the
+ * action, with everything else under "Other options".
+ */
+export function NextStepBar({ r, today, paymentsHref, canOverride }: { r: R; today: string; paymentsHref: string; canOverride: boolean }) {
+  const [sheet, setSheet] = useState<null | "menu" | "cancel" | "noshow" | "override">(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
+  const balance = r.totalKobo - r.paidKobo;
+  const open = r.status === "pending_payment" || r.status === "confirmed";
+  const closed = ["cancelled", "expired", "no_show", "checked_out"].includes(r.status);
+  const canPay = balance > 0 && r.status !== "cancelled" && r.status !== "expired";
+  const full = "w-full [&_form]:w-full [&_form]:items-stretch [&_button]:h-12 [&_button]:w-full [&_button]:text-base";
+
+  let primary: React.ReactNode = null;
+  let primaryIsPayment = false;
+  if (r.status === "pending_payment" && canPay) {
+    primary = <Link href={paymentsHref} className={buttonStyles({ size: "lg", className: "w-full" })}>Take payment · {formatNaira(balance)}</Link>;
+    primaryIsPayment = true;
+  } else if (r.status === "confirmed" && !r.roomNumber) {
+    primary = <a href="#change-stay" className={buttonStyles({ size: "lg", className: "w-full" })}>Assign a room</a>;
+  } else if (r.status === "confirmed") {
+    const blocker = r.checkIn > today ? `Arrives ${formatDate(r.checkIn, { year: false })}` : undefined;
+    primary = blocker ? (
+      <Button size="lg" disabled className="w-full">Check in · {blocker}</Button>
+    ) : (
+      <div className={full}><CheckInButton reservationId={r.id} /></div>
+    );
+  } else if (r.status === "checked_in") {
+    primary = <div className={full}><CheckOutButton reservationId={r.id} balanceKobo={balance} /></div>;
+  } else if (canPay) {
+    primary = <Link href={paymentsHref} className={buttonStyles({ size: "lg", className: "w-full" })}>Record payment · {formatNaira(balance)}</Link>;
+    primaryIsPayment = true;
+  }
+
+  const options: Array<{ label: string; hint: string; onSelect?: () => void; href?: string; disabled?: boolean }> = [];
+  if (canPay && !primaryIsPayment) options.push({ label: "Record a payment", hint: `${formatNaira(balance)} still owed`, href: paymentsHref });
+  if (!closed) options.push({ label: "Change dates or room", hint: "Price updates automatically", href: "#change-stay" });
+  if (r.status === "confirmed") {
+    const due = r.checkIn <= today;
+    options.push({ label: "Mark as no-show", hint: due ? "Closes the booking and releases the room" : `Available from ${formatDate(r.checkIn, { year: false })}`, onSelect: () => setSheet("noshow"), disabled: !due });
+  }
+  if (r.status === "pending_payment" && canOverride) options.push({ label: "Confirm without payment", hint: "Managers only · reason recorded", onSelect: () => setSheet("override") });
+  if (open) options.push({ label: "Cancel booking", hint: "Releases the room", onSelect: () => setSheet("cancel") });
+
+  if (!primary && options.length === 0) return null;
+  const subtitle = `${r.guestName} · ${r.category}${r.roomNumber ? ` · Room ${r.roomNumber}` : ""}`;
+
+  return (
+    <>
+      <div className="fixed inset-x-0 bottom-0 z-40 space-y-1 border-t border-ivory-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+        {primary}
+        {options.length ? (
+          <button ref={moreRef} type="button" onClick={() => setSheet("menu")} className="flex min-h-10 w-full items-center justify-center text-sm text-ink-700">
+            Other options
+          </button>
+        ) : null}
+      </div>
+      <div aria-hidden className="h-32 lg:hidden" />
+      <BottomSheet open={sheet !== null} onClose={() => setSheet(null)} title="Other options" subtitle={subtitle} trigger={moreRef}>
+        {sheet === "menu" ? (
+          <ul className="divide-y divide-ivory-200 border-y border-ivory-200">
+            {options.map((o) => (
+              <li key={o.label}>
+                {o.href ? (
+                  <a href={o.href} onClick={() => setSheet(null)} className="flex min-h-14 flex-col justify-center py-2">
+                    <span className="text-base text-ink-900">{o.label}</span>
+                    <span className="text-sm text-ink-500">{o.hint}</span>
+                  </a>
+                ) : (
+                  <button type="button" disabled={o.disabled} onClick={o.onSelect} className="flex min-h-14 w-full flex-col justify-center py-2 text-left disabled:opacity-60">
+                    <span className={cn("text-base", o.label.startsWith("Cancel") ? "text-danger-700" : "text-ink-900")}>{o.label}</span>
+                    <span className="text-sm text-ink-500">{o.hint}</span>
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {sheet === "cancel" ? <CancelConfirm r={r} onKeep={() => setSheet("menu")} /> : null}
+        {sheet === "noshow" ? <NoShowConfirm r={r} onKeep={() => setSheet("menu")} /> : null}
+        {sheet === "override" ? <OverrideInline id={r.id} /> : null}
+      </BottomSheet>
+    </>
+  );
+}

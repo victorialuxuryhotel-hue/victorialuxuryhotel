@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowLeft, BedDouble, CalendarDays, Clock, Mail, Phone, Printer, Users, Wallet } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
+import { Collapsible } from "@/components/ui/collapsible";
 import { FormMessage } from "@/components/ui/form";
 import { bookingSource, paymentMethod } from "@/domain/status";
 import type { ReservationDetail as Detail } from "@/domain/views";
@@ -19,6 +20,8 @@ import {
   ResolveAttentionForm,
   type RoomOption,
 } from "./reservation-actions";
+import { NextStepBar } from "./reservation-guide";
+import { reservationSteps, StepList } from "./reservation-steps";
 
 function Fact({ icon: Icon, label, children }: { icon: typeof CalendarDays; label: string; children: React.ReactNode }) {
   return (
@@ -64,6 +67,7 @@ export function ReservationDetailView({
 }) {
   const balance = r.totalKobo - r.paidKobo;
   const open = r.status === "confirmed" || r.status === "pending_payment";
+  const steps = reservationSteps(r, today);
   const checkInBlocker =
     r.status !== "confirmed" ? undefined : !r.roomNumber ? "Assign a room first" : r.checkIn > today ? `Arrival is ${formatDate(r.checkIn)}` : undefined;
 
@@ -93,7 +97,7 @@ export function ReservationDetailView({
       <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold text-ink-900">{r.guestName}</h1>
+            <h1 className="text-[1.75rem] leading-tight font-semibold text-ink-900 sm:text-2xl">{r.guestName}</h1>
             <ReservationBadge status={r.status} />
           </div>
           <p className="mt-1 text-sm text-ink-500">
@@ -106,7 +110,7 @@ export function ReservationDetailView({
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-start gap-2">
+        <div className="hidden flex-wrap items-start gap-2 lg:flex">
           {r.status === "confirmed" ? <CheckInButton reservationId={r.id} disabledReason={checkInBlocker} /> : null}
           {r.status === "checked_in" ? <CheckOutButton reservationId={r.id} balanceKobo={balance} /> : null}
           {balance > 0 && r.status !== "cancelled" && r.status !== "expired" ? (
@@ -119,7 +123,9 @@ export function ReservationDetailView({
         </div>
       </div>
 
-      {r.status === "pending_payment" && canOverride ? <OverrideForm reservationId={r.id} /> : null}
+      {steps ? <div className="mt-5 lg:max-w-md"><StepList steps={steps} /></div> : null}
+
+      {r.status === "pending_payment" && canOverride ? <div className="hidden lg:block"><OverrideForm reservationId={r.id} /></div> : null}
 
       {r.attention ? (
         <div role="alert" className="mt-6 flex gap-3 rounded-card border border-warning-600/30 bg-warning-50 p-4 text-sm text-warning-700">
@@ -136,7 +142,7 @@ export function ReservationDetailView({
         <div className="space-y-6">
           <Card>
             <CardHeader title="Stay" />
-            <div className="grid gap-6 p-5 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5 p-4 sm:gap-6 sm:p-5">
               <Fact icon={CalendarDays} label="Dates">
                 {formatDate(r.checkIn)} → {formatDate(r.checkOut)}
                 <p className="text-sm text-ink-500">{plural(r.nights, "night")}</p>
@@ -154,11 +160,13 @@ export function ReservationDetailView({
               </div>
             ) : null}
             {open || r.status === "checked_in" ? (
-              <>
-                <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
-                <ChangeDatesForm reservationId={r.id} checkIn={r.checkIn} checkOut={r.checkOut} inHouse={r.status === "checked_in"} />
-                <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} />
-              </>
+              <div className="border-t border-ivory-200 xl:border-0">
+                <Collapsible id="change-stay" title="Change dates or room">
+                  <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
+                  <ChangeDatesForm reservationId={r.id} checkIn={r.checkIn} checkOut={r.checkOut} inHouse={r.status === "checked_in"} />
+                  <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} />
+                </Collapsible>
+              </div>
             ) : null}
           </Card>
 
@@ -169,19 +177,19 @@ export function ReservationDetailView({
                 <Link href={paymentsHref} className="text-sm font-medium text-navy-800 hover:text-navy-600">Record payment</Link>
               ) : undefined}
             />
-            <div className="grid gap-4 border-b border-ivory-200 p-5 sm:grid-cols-3">
+            <div className="grid grid-cols-3 gap-3 border-b border-ivory-200 p-4 sm:gap-4 sm:p-5">
               <div>
                 <p className="text-xs text-ink-500">Total for stay</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums">{formatNaira(r.totalKobo)}</p>
+                <p className="mt-1 text-base sm:text-lg font-semibold tabular-nums">{formatNaira(r.totalKobo)}</p>
                 <p className="text-xs text-ink-500">{formatNaira(r.nightlyRateKobo)} × {plural(r.nights, "night")}</p>
               </div>
               <div>
                 <p className="text-xs text-ink-500">Received</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-success-700">{formatNaira(r.paidKobo)}</p>
+                <p className="mt-1 text-base sm:text-lg font-semibold tabular-nums text-success-700">{formatNaira(r.paidKobo)}</p>
               </div>
               <div>
                 <p className="text-xs text-ink-500">Balance</p>
-                <p className={`mt-1 text-lg font-semibold tabular-nums ${balance > 0 ? "text-warning-700" : "text-ink-900"}`}>{formatNaira(Math.max(0, balance))}</p>
+                <p className={`mt-1 text-base font-semibold tabular-nums sm:text-lg ${balance > 0 ? "text-warning-700" : "text-ink-900"}`}>{formatNaira(Math.max(0, balance))}</p>
                 <PaidProgress paidKobo={r.paidKobo} totalKobo={r.totalKobo} format={formatNaira} />
               </div>
             </div>
@@ -215,7 +223,11 @@ export function ReservationDetailView({
 
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Guest" action={guestHref ? <Link href={guestHref} className="text-sm font-medium text-navy-800">Profile</Link> : undefined} />
+            <Collapsible
+              id="guest"
+              title="Guest · contact details"
+              wideHeader={<CardHeader title="Guest" action={guestHref ? <Link href={guestHref} className="text-sm font-medium text-navy-800">Profile</Link> : undefined} />}
+            >
             <div className="space-y-3 p-5 text-sm">
               <p className="text-base font-medium text-ink-900">{r.guestName}</p>
               {r.guestPhone ? (
@@ -228,11 +240,13 @@ export function ReservationDetailView({
                   <Mail className="size-4 text-ink-400" aria-hidden /> {r.guestEmail}
                 </a>
               ) : null}
+              {guestHref ? <Link href={guestHref} className="inline-flex min-h-10 items-center text-sm font-medium text-navy-800 xl:hidden">Guest profile</Link> : null}
             </div>
+            </Collapsible>
           </Card>
 
           <Card>
-            <CardHeader title="History" />
+            <Collapsible id="history" title={`History · ${plural(r.history.length, "event")}`} wideHeader={<CardHeader title="History" />}>
             <ol className="relative space-y-5 p-5 before:absolute before:top-7 before:bottom-7 before:left-[1.6rem] before:w-px before:bg-ivory-200">
               {r.history.map((h, i) => (
                 <li key={i} className="relative flex gap-4">
@@ -248,9 +262,12 @@ export function ReservationDetailView({
                 </li>
               ))}
             </ol>
+            </Collapsible>
           </Card>
         </div>
       </div>
+      {/* Phones and tablets: the next step pinned to the bottom. Reset when the status changes. */}
+      <NextStepBar key={r.status} r={r} today={today} paymentsHref={paymentsHref} canOverride={canOverride} />
     </div>
   );
 }
