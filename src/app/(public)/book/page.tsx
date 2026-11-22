@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { MessageCircle, Phone } from "lucide-react";
-import { RoomOptions, SearchSummary, Steps } from "@/components/booking/booking-ui";
+import { Steps } from "@/components/booking/booking-ui";
+import { RoomResults } from "@/components/booking/room-results";
+import { StaySummaryBar } from "@/components/booking/stay-summary-bar";
 import { BookingBar } from "@/components/public/booking-bar";
 import { Container } from "@/components/public/section";
 import { buttonStyles } from "@/components/ui/button";
@@ -51,7 +53,9 @@ async function Results({ searchParams }: { searchParams: SP }) {
     <>
       <Steps current={1} />
       <h1 className="mt-8 font-display text-4xl text-navy-950 sm:text-5xl">Choose your room</h1>
-      <div className="mt-6"><SearchSummary search={stay} editHref={`/book?guests=${stay.guests}`} /></div>
+      <div className="mt-4">
+        <StaySummaryBar checkIn={stay.checkIn} checkOut={stay.checkOut} guests={stay.guests} nights={result.options[0]?.nights ?? 1} />
+      </div>
       {!anyAvailable ? (
         <div className="mt-8 rounded-card border border-gold-300/60 bg-gold-50 p-6">
           <p className="font-medium text-navy-950">We&apos;re fully booked for those dates</p>
@@ -62,7 +66,7 @@ async function Results({ searchParams }: { searchParams: SP }) {
           </div>
         </div>
       ) : null}
-      <div className="mt-8"><RoomOptions options={result.options} selectHref={(o) => `/book/details?${qs(o.slug)}`} /></div>
+      <div className="mt-6"><RoomResults options={result.options} stay={stay} selectHref={(o) => `/book/details?${qs(o.slug)}`} /></div>
     </>
   );
 }

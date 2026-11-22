@@ -1,7 +1,5 @@
-import Link from "next/link";
-import { Check, CalendarDays, Lock, Users } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 import { Photo } from "@/components/public/photo";
-import { buttonStyles } from "@/components/ui/button";
 import type { AvailabilityOption } from "@/domain/views";
 import { formatDate, formatNaira, plural } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
@@ -50,49 +48,6 @@ export function Steps({ current }: { current: number }) {
 export type StaySearch = { checkIn: string; checkOut: string; guests: number };
 
 /** Search criteria strip with an edit link: guests always see what they searched. */
-export function SearchSummary({ search, editHref }: { search: StaySearch; editHref: string }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-card bg-white px-5 py-4 shadow-card">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-700">
-        <span className="flex items-center gap-2"><CalendarDays className="size-4 text-gold-500" aria-hidden />{formatDate(search.checkIn)} → {formatDate(search.checkOut)}</span>
-        <span className="flex items-center gap-2"><Users className="size-4 text-gold-500" aria-hidden />{plural(search.guests, "guest")}</span>
-      </div>
-      <Link href={editHref} className="text-sm font-medium text-navy-800 hover:text-gold-600">Change</Link>
-    </div>
-  );
-}
-
-/** Availability results. No inventory counts are shown to guests. */
-export function RoomOptions({ options, selectHref }: { options: AvailabilityOption[]; selectHref: (o: AvailabilityOption) => string }) {
-  return (
-    <ul className="space-y-5">
-      {options.map((o) => (
-        <li key={o.slug} className={cn("grid overflow-hidden rounded-card bg-white shadow-card sm:grid-cols-[minmax(0,16rem)_1fr]", !o.isAvailable && "opacity-60")}>
-          <Photo photo={{ alt: o.name }} className="aspect-[16/10] sm:aspect-auto sm:h-full" sizes="(min-width: 640px) 16rem, 100vw" />
-          <div className="flex flex-col gap-5 p-6 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h3 className="font-display text-3xl text-navy-950">{o.name}</h3>
-              <p className="mt-1 text-sm text-ink-600">{o.summary}</p>
-              <p className="mt-3 flex items-center gap-2 text-sm text-ink-500"><Users className="size-4" aria-hidden /> Sleeps up to {o.maxOccupancy}</p>
-            </div>
-            <div className="shrink-0 md:text-right">
-              {o.isAvailable ? (
-                <>
-                  <p className="text-2xl font-semibold tabular-nums text-navy-950">{formatNaira(o.totalKobo)}</p>
-                  <p className="text-xs text-ink-500">{formatNaira(o.nightlyRateKobo)} × {plural(o.nights, "night")}</p>
-                  <Link href={selectHref(o)} className={buttonStyles({ className: "mt-4 w-full md:w-auto" })}>Select</Link>
-                </>
-              ) : (
-                <p className="rounded-full bg-ivory-200 px-3 py-1.5 text-sm font-medium text-ink-600">Not available for these dates</p>
-              )}
-            </div>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /**
  * Phones and tablets: the stay and its total ABOVE the form, collapsible, so
  * the price is visible before the guest types anything. The full summary
