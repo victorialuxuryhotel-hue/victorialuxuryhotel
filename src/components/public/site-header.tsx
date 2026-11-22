@@ -48,7 +48,8 @@ export function SiteHeader() {
             <Logo className="w-9 md:w-11" priority />
             <span className="leading-none">
               <span className="block font-display text-xl font-semibold tracking-wide text-navy-950 md:text-2xl">Victoria Luxury</span>
-              <span className="mt-1 block text-[10px] font-medium uppercase tracking-[0.3em] text-gold-600">Hotel &amp; Apartment</span>
+              {/* Phones: the name alone, so it never crowds the menu button. */}
+              <span className="mt-1 hidden text-[10px] font-medium uppercase tracking-[0.3em] text-gold-600 sm:block">Hotel &amp; Apartment</span>
             </span>
           </Link>
           <nav aria-label="Main" className="hidden items-center gap-8 text-sm font-medium text-ink-700 md:flex">
