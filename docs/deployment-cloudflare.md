@@ -1,153 +1,128 @@
 # Deploying to Cloudflare
 
-The app runs as a **Cloudflare Worker**, built with the
-[OpenNext Cloudflare adapter](https://opennext.js.org/cloudflare). The database,
-auth and photo storage stay on **Supabase**; Paystack and Resend are called from
-the Worker.
-
-> Use **Workers** (Workers & Pages → Create → Worker → Import a repository),
-> not a static Pages project. A plain `next build` on Pages cannot run server
-> actions, payment webhooks or the scheduled job.
+The whole app runs on Cloudflare as one **Worker**, built with the
+[OpenNext Cloudflare adapter](https://opennext.js.org/cloudflare). Staff sign-in
+is **Clerk**; Paystack and Resend are called from the Worker.
 
 ## How the pieces fit
 
 | Concern | Where it runs |
 | --- | --- |
-| Pages, server actions, API routes (webhook, callback, health) | The Worker (`worker.ts` → `.open-next/worker.js`) |
-| Static files (JS, CSS, fonts, logo) | Workers static assets |
-| Prerendered page shells | Read-only cache in the Worker's static assets (no R2 or D1 needed) |
+| Pages, server actions, API routes (webhook, callback, health) | Worker `victorialuxuryhotel` |
+| Database | D1 `victoria-hotel-db` (binding `DB`), schema in `migrations/` |
+| Hotel photos | R2 bucket `victorialuxuryhotel` (binding `PHOTOS`), served from `/media/…` |
+| Static files, prerendered shells | Workers static assets |
 | Image resizing (`next/image`) | Cloudflare Images binding |
-| Housekeeping every 10 minutes | Cron Trigger → `/api/cron/expire-reservations` (in `wrangler.jsonc`) |
-| Data, auth, photos | Supabase (production project) |
+| Housekeeping every 10 minutes | Cron Trigger (in `wrangler.jsonc`) |
+| Staff sign-in, invitations | Clerk application "Victorialluxuryhotel" (`app_3MSHeclH3V96qrLoldTYJuc6kER`) |
+| Booking emails | Resend, sending from `victorialuxuryhotel.com` |
 
-## 1. Supabase production project
+Cloudflare account: `victorialuxuryhotel@gmail.com`. Domain registrar: Namecheap.
 
-1. Create a project at supabase.com (region close to Nigeria, e.g. EU West).
-2. Apply the schema from this repo:
-   ```bash
-   pnpm exec supabase link --project-ref <project-ref>
-   pnpm exec supabase db push        # applies supabase/migrations in order
-   ```
-   Do **not** run `seed.sql` or `demo.sql` in production.
-3. Authentication → Providers / Settings:
-   - **Disable sign-ups** (staff are invited by the owner).
-   - Minimum password length **10**.
-   - Site URL: `https://<your-domain>`; Redirect URLs: `https://<your-domain>/auth/confirm`.
-   - SMTP: use Resend's SMTP so invite and password emails come from the hotel.
-4. Authentication → Email templates: copy `supabase/templates/invite.html` and
-   `supabase/templates/recovery.html` (they link to `/auth/confirm`).
-5. Create the first owner (sends an invitation email):
-   ```bash
-   node --env-file=.env.production.local scripts/create-staff.mts \
-     --email owner@hotel.com --name "Full Name" --role owner
-   ```
+## Status (22 Nov 2026)
 
-## 2. Cloudflare resources
-
-None to create by hand. The Worker, its static assets, the Images binding and
-the Cron Trigger are all created by the first deploy from `wrangler.jsonc`.
-R2 does not need to be enabled on the account (see "Caching" below).
-
-## 3. Connect the repository (Workers Builds)
-
-Workers & Pages → Create → **Worker** → Import repository → this repo, branch `main`.
-
-| Setting | Value |
+| Step | Status |
 | --- | --- |
-| Build command | `pnpm opennextjs-cloudflare build` |
-| Deploy command | `pnpm opennextjs-cloudflare deploy` |
-| Root directory | `/` |
+| D1 migrations 0001–0007 applied to production | Done |
+| Starter room types and 29 rooms loaded (`db/starter.sql`) | Done. Edit in the management app |
+| Deployed to `https://victorialuxuryhotel.victorialuxuryhotel.workers.dev` | Done, `/api/health` returns `{"ok":true}` |
+| Domain nameservers moved from Namecheap to Cloudflare | Done at the registry; waiting for Cloudflare to mark the zone Active |
+| Resend DNS records copied to Cloudflare | Done, but **`resend._domainkey` must hold the full key** (see below) |
+| Custom domain on the Worker, site URL switched, redeploy | To do once the zone is Active |
+| First owner account | To do: needs the owner's name and email |
+| Resend sending from `bookings@victorialuxuryhotel.com` | To do once Resend shows the domain verified |
+| Paystack keys | To do: test keys first, live keys only with the hotel's approval |
+| Clerk production instance (removes the "Development mode" badge) | To do once the domain is live |
+| Email forwarding for @victorialuxuryhotel.com | Re-create in Cloudflare Email Routing if it is used (Namecheap forwarding stops after the nameserver move) |
 
-**Build variables** (needed at build time; `NEXT_PUBLIC_*` are compiled into the site):
-
-| Variable | Value |
-| --- | --- |
-| `NEXT_PUBLIC_SITE_URL` | `https://<your-domain>` |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API → URL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase → API keys → Publishable key |
-
-**Runtime variables and secrets** (Worker → Settings → Variables and Secrets; mark keys as *Secret*):
-
-| Variable | Notes |
-| --- | --- |
-| `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Same values as the build variables |
-| `SUPABASE_SECRET_KEY` | Secret. Supabase → API keys → Secret key |
-| `PAYSTACK_SECRET_KEY` | Secret. `sk_test_…` until the live account is approved |
-| `RESEND_API_KEY` | Secret |
-| `EMAIL_FROM` | e.g. `Victoria Luxury Hotel <bookings@hotel-domain>` (verified in Resend) |
-| `CRON_SECRET` | Secret. 32+ random characters (`openssl rand -hex 24`) |
-| `RATE_LIMIT_SALT` | Secret. Random; used to hash visitor IPs |
-| `HOTEL_NOTIFY_EMAIL` | Optional: hotel inbox for new-booking copies |
-| `ALERT_WEBHOOK_URL` | Optional: Slack/Discord incoming webhook for alerts |
-
-Never set `PAYSTACK_BASE_URL` or `RESEND_BASE_URL` in production (they exist
-only for the local mock). A live Paystack key ignores the override anyway.
-
-## 4. Domain
-
-Worker → Settings → Domains & Routes → **Add custom domain** (the domain's DNS
-must be on Cloudflare). Update `NEXT_PUBLIC_SITE_URL` and Supabase's Site URL /
-Redirect URL if the domain changes.
-
-## 5. Paystack
-
-Paystack dashboard → Settings → API Keys & Webhooks:
-- **Webhook URL:** `https://<your-domain>/api/webhooks/paystack`
-- Test mode first: book with Paystack's test cards (success, then a declined
-  card), and check the booking, receipt and email.
-- Live: only after the account is approved and test mode has passed. Switch the
-  secret key and set the live webhook URL, then run one real low-value booking
-  end to end.
-
-## 6. Check the deployment
-
-- `https://<your-domain>/api/health` → `{"ok":true}` (point an uptime monitor at it).
-- Sign in as the owner, invite a staff member, upload a photo, make a test booking.
-- Worker → Logs: `cron.run` entries every 10 minutes.
-
-## Local preview of the Cloudflare build
+## Deploying
 
 ```bash
-pnpm db:start && pnpm db:fresh      # local Supabase with demo data
-pnpm mock:integrations              # local Paystack/Resend stand-in
-pnpm cf:preview                     # builds, then serves the Worker on :3000 (workerd)
-pnpm test:e2e                       # full browser suite against the preview
+pnpm db:migrate:remote      # apply any new migrations to production D1
+pnpm cf:deploy              # build with OpenNext and deploy
+curl https://victorialuxuryhotel.com/api/health
 ```
 
-`pnpm dev` remains the fast inner loop; run `pnpm cf:preview` + `pnpm test:e2e`
-before deploying.
+### Environment: read this before deploying
 
-## Cloudflare-specific notes
+OpenNext **compiles every `.env` file into the Worker**, including `.env.local`,
+whose values point at local mocks (fake Paystack/Resend servers, `localhost`).
+Production overrides live in the git-ignored **`.env.production.local`**, which
+takes priority over `.env.local`:
 
-- **Nothing that holds I/O is shared between requests.** Workers reject a
-  promise created by one request and awaited by another, so the Supabase admin
-  client is created per use (`src/lib/supabase/admin.ts`).
-- **Server actions call `refresh()`, not `revalidatePath()`.** Management pages
-  are dynamic; revalidating a path made the Worker regenerate it in a way that
-  failed on later requests.
-- **Public pages read room types and photos per request** (not Next's data
-  cache), so staff changes show on the next page view and no cache
-  regeneration is needed.
-- **Caching.** The only cached output is what `next build` prerenders, served
-  read-only from static assets (`open-next.config.ts`). This works because the
-  app uses no `"use cache"`, `revalidatePath`/`revalidateTag` or ISR.
+```
+NEXT_PUBLIC_SITE_URL=https://victorialuxuryhotel.victorialuxuryhotel.workers.dev   # → https://victorialuxuryhotel.com after the domain move
+PAYSTACK_BASE_URL=
+RESEND_BASE_URL=
+ALERT_WEBHOOK_URL=
+HOTEL_NOTIFY_EMAIL=
+RATE_LIMIT_HOLDS_PER_HOUR=6        # must be set: an empty value means a limit of 0
+RATE_LIMIT_PAYMENTS_PER_HOUR=20
+EMAIL_FROM="Victoria Luxury Hotel <bookings@victorialuxuryhotel.com>"
+```
 
-### If caching is added later
+`NEXT_PUBLIC_*` values are fixed at build time, so changing the site URL means
+rebuilding. At runtime, **Worker secrets win** over anything compiled in from
+`.env` files. Secrets set on the Worker today: `CRON_SECRET`, `RATE_LIMIT_SALT`.
+Production keys (Paystack, Clerk production) should be set as secrets with
+`pnpm exec wrangler secret put NAME`, never written into `.env` files.
 
-If any of those are introduced, a read-only cache will silently serve stale
-pages. Switch to a writable cache first:
+### Data
 
-1. Enable R2 on the account, then create the storage:
-   ```bash
-   pnpm exec wrangler r2 bucket create victoria-hotel-opennext-cache
-   pnpm exec wrangler d1 create victoria-hotel-tag-cache   # copy the database_id
-   ```
-2. In `open-next.config.ts`, use `r2IncrementalCache`, `d1NextTagCache` and
-   `memoryQueue` (from `@opennextjs/cloudflare/overrides/...`).
-3. Add the `r2_buckets` (`NEXT_INC_CACHE_R2_BUCKET`) and `d1_databases`
-   (`NEXT_TAG_CACHE_D1`) bindings to `wrangler.jsonc`.
-- **The session proxy (`src/proxy.ts`) uses OpenNext's Node middleware support,
-  which OpenNext marks experimental.** Sign-in, session refresh and role access
-  are covered by the browser tests run against the Cloudflare preview.
-- Logs may show `TypeError: Unable to enqueue` on sign-in requests. Sign-in
-  works; it appears when the browser drops a response stream after the redirect.
+- `db/seed.sql` is **local only**: placeholder staff and descriptions.
+- `db/starter.sql` is the production starting point (room types, rates, rooms;
+  no staff, no descriptions). Already loaded; safe to run again.
+- The first owner: `CLERK_SECRET_KEY=… NEXT_PUBLIC_SITE_URL=https://victorialuxuryhotel.com pnpm staff:create-owner --email … --name "…"`.
+  Everyone else is invited from Settings → Staff.
+
+## Moving the domain to Cloudflare
+
+Done once; kept here for reference.
+
+1. **Cloudflare → Add a domain** → `victorialuxuryhotel.com` → Free plan. Cloudflare
+   imports the existing records and assigns nameservers:
+   `lewis.ns.cloudflare.com` and `suzanne.ns.cloudflare.com`.
+2. **Namecheap → Domain List → Manage → Domain tab → NAMESERVERS** → change
+   "Namecheap BasicDNS" to **Custom DNS**, enter the two Cloudflare nameservers,
+   click the green ✓. (Not "Advanced DNS → Personal DNS Server", which is for
+   registering your own nameservers.)
+3. Keep **DNSSEC off** at Namecheap until Cloudflare is Active.
+4. Cloudflare → **Check nameservers now**, wait for **Active** (usually under an
+   hour, up to 24).
+
+### DNS records to keep in Cloudflare
+
+Email-related records must be **DNS only (grey cloud)**.
+
+| Type | Name | Content | Purpose |
+| --- | --- | --- | --- |
+| TXT | `resend._domainkey` | `p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDCUbu7itoqkzJTg3bBWwh42etQ7ia69A5QSZ9JSVok4talRZiO6SCDS9tQ6l7TWuc1P4+7yFXYNa15A041wXHFxbpKlbqAbVwHsZT/uXQ2uD4QgAcmGZhqCEJLOpC9O7zOciv7GWbi/2wItV2lpeapd3/aQpMOz35he0VgH0vDAQIDAQAB` | Resend DKIM (public key) |
+| CNAME | `send` | `send.forge.rmta.net` | Resend |
+| CNAME | `rsend` | `rsend-euw1.forge.rmta.net` | Resend |
+| TXT | `_dmarc` | `v=DMARC1; p=none;` | DMARC |
+| MX / TXT (SPF) | `@` | Namecheap `eforward…` / `v=spf1 include:spf.efwd.registrar-servers.com ~all` | Old Namecheap email forwarding: replace with Cloudflare Email Routing if used |
+
+The Namecheap `www → parkingpage.namecheap.com` CNAME and the `@` URL redirect are
+replaced when the domain is attached to the Worker.
+
+## Attaching the domain to the Worker (once Active)
+
+Add to `wrangler.jsonc`, set `NEXT_PUBLIC_SITE_URL=https://victorialuxuryhotel.com`
+in `.env.production.local`, then `pnpm cf:deploy`:
+
+```jsonc
+"routes": [
+  { "pattern": "victorialuxuryhotel.com", "custom_domain": true },
+  { "pattern": "www.victorialuxuryhotel.com", "custom_domain": true }
+]
+```
+
+A custom domain can't be created over an existing DNS record of the same name,
+so delete the old `www` CNAME first. Cloudflare issues the HTTPS certificate
+automatically.
+
+## Checks after each deploy
+
+- `/api/health` returns `{"ok":true}`.
+- `/`, `/rooms`, `/book` load; `/app` redirects to `/login`.
+- Worker logs show the cron run every 10 minutes.
