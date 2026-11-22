@@ -39,7 +39,7 @@ export function MobileNav({ items }: { items: ReadonlyArray<{ href: string; labe
         aria-controls="mobile-menu"
         aria-label={open ? "Close menu" : "Open menu"}
         onClick={() => setOpen((v) => !v)}
-        className="-mr-2 flex size-11 items-center justify-center rounded-md text-navy-950 hover:bg-ivory-200"
+        className="-mr-1.5 flex size-11 items-center justify-center rounded-md text-navy-950 hover:bg-ivory-200"
       >
         {open ? <X className="size-6" aria-hidden /> : <Menu className="size-6" aria-hidden />}
       </button>

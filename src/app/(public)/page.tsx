@@ -27,7 +27,7 @@ async function HomePageContent() {
         <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-navy-950 via-navy-950/40 to-transparent" />
         <Container className="pt-12 pb-16 sm:pt-32 sm:pb-44">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold-300">{home.eyebrow}</p>
-          <h1 className="mt-4 max-w-3xl font-display text-[2.4rem] leading-[1.04] text-balance sm:mt-5 sm:text-7xl sm:leading-[1.02]">{home.title}</h1>
+          <h1 className="mt-4 max-w-3xl font-display text-[2.375rem] leading-[1.04] text-balance sm:mt-5 sm:text-7xl sm:leading-[1.02]">{home.title}</h1>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-ivory-200/80 sm:mt-6 sm:text-lg">{home.intro}</p>
           <div className="mt-9 hidden flex-wrap gap-3 sm:flex">
             <Link href="/rooms" className={buttonStyles({ variant: "accent", size: "lg" })}>
