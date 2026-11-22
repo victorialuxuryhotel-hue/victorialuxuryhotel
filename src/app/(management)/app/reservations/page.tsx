@@ -45,6 +45,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
         placeholder="Search by reference, guest name or phone"
         defaultQuery={q}
         hidden={{ tab }}
+        filtersActive={Boolean(one(sp.status) || one(sp.source))}
         filters={
           <>
             <FilterSelect name="status" label="Status" value={one(sp.status)} options={Object.entries(reservationStatus).map(([k, v]) => [k, v.label])} />

@@ -8,8 +8,28 @@ import type { PaymentRow, ReservationDetail } from "@/domain/views";
 import { formatDate, formatDateTime, formatNaira, plural } from "@/lib/format";
 import { PaymentBadge } from "./badges";
 
-export function PaymentTable({ rows, receiptHref }: { rows: PaymentRow[]; receiptHref: (n: string) => string }) {
+export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: PaymentRow[]; receiptHref: (n: string) => string; reservationHref?: (p: PaymentRow) => string }) {
   return (
+    <>
+      {/* Phones: amount and status right-aligned for scanning; the row opens the reservation. */}
+      <ul className="divide-y divide-ivory-200 md:hidden">
+        {rows.map((p) => {
+          const href = reservationHref?.(p) ?? (p.receiptNumber ? receiptHref(p.receiptNumber) : undefined);
+          const body = (
+            <span className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 px-4 py-3.5">
+              <span className="truncate text-base text-ink-900">{p.guestName}</span>
+              <span className="text-right text-base font-medium text-ink-900 tabular-nums">{formatNaira(p.amountKobo)}</span>
+              <span className="truncate text-xs text-ink-500 tabular-nums">
+                {p.reservationReference} · {paymentMethod[p.method]}
+                {p.paidAt ? ` · ${formatDate(p.paidAt.slice(0, 10), { weekday: false, year: false })}` : ""}
+              </span>
+              <span className="justify-self-end"><PaymentBadge status={p.status} /></span>
+            </span>
+          );
+          return <li key={p.id}>{href ? <Link href={href} className="block hover:bg-ivory-50">{body}</Link> : body}</li>;
+        })}
+      </ul>
+      <div className="hidden md:block">
     <Table>
       <THead>
         <tr>
@@ -46,6 +66,8 @@ export function PaymentTable({ rows, receiptHref }: { rows: PaymentRow[]; receip
         ))}
       </TBody>
     </Table>
+      </div>
+    </>
   );
 }
 

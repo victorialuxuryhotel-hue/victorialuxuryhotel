@@ -30,6 +30,7 @@ export type ReservationRow = {
 
 export type PaymentRow = {
   id: string;
+  reservationId?: string;
   reservationReference: string;
   guestName: string;
   amountKobo: number;

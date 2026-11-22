@@ -19,7 +19,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     <Card>
       {rows.length ? (
         <>
-          <PaymentTable rows={rows} receiptHref={(n) => `/app/payments/receipt/${n}`} />
+          <PaymentTable rows={rows} receiptHref={(n) => `/app/payments/receipt/${n}`} reservationHref={(p) => `/app/reservations/${p.reservationId}`} />
           <Pager basePath="/app/payments" params={{}} page={page} hasMore={fetched.length > PAGE_SIZE} />
         </>
       ) : (

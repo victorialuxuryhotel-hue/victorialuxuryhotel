@@ -1,14 +1,34 @@
 import Link from "next/link";
-import { Mail, Phone } from "lucide-react";
+import { ChevronRight, Mail, Phone } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 import type { GuestRow, ReservationRow } from "@/domain/views";
-import { formatDate, formatNaira } from "@/lib/format";
+import { formatDate, formatNaira, plural } from "@/lib/format";
 import { GuestEditForm } from "./guest-form";
 import { ReservationTable } from "./reservation-table";
 
 export function GuestTable({ rows, hrefFor }: { rows: GuestRow[]; hrefFor: (g: GuestRow) => string }) {
   return (
+    <>
+      {/* Phones: one tappable row per guest. */}
+      <ul className="divide-y divide-ivory-200 md:hidden">
+        {rows.map((g) => (
+          <li key={g.id}>
+            <Link href={hrefFor(g)} className="flex items-center gap-3 px-4 py-3.5 hover:bg-ivory-50">
+              <span className="min-w-0 flex-1">
+                <span className="block text-base text-ink-900">{g.name}</span>
+                <span className="block text-sm text-ink-500 tabular-nums">{g.phone ?? g.email ?? "No contact details"}</span>
+                <span className="mt-1.5 block text-xs text-ink-500 tabular-nums">
+                  {plural(g.stays, "stay")}
+                  {g.lastStay ? ` · last ${formatDate(g.lastStay, { weekday: false })}` : ""}
+                </span>
+              </span>
+              <ChevronRight className="size-5 shrink-0 text-ink-400" aria-hidden />
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden md:block">
     <Table>
       <THead>
         <tr><TH>Guest</TH><TH>Contact</TH><TH>Stays</TH><TH>Last stay</TH><TH className="text-right">Total paid</TH></tr>
@@ -35,6 +55,8 @@ export function GuestTable({ rows, hrefFor }: { rows: GuestRow[]; hrefFor: (g: G
         ))}
       </TBody>
     </Table>
+      </div>
+    </>
   );
 }
 

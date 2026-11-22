@@ -67,15 +67,15 @@ export async function awaitingPaymentCount() {
 
 type P = {
   id: string; amount_kobo: number; method: string | null; provider: "paystack" | "offline"; provider_reference: string | null; status: PaymentRow["status"];
-  paid_at: string | null; receipt_number: string | null; reference: string; guest_name: string; recorder: string | null;
+  paid_at: string | null; receipt_number: string | null; reservation_id: string; reference: string; guest_name: string; recorder: string | null;
 };
 const PAYMENT_SELECT = `SELECT p.id, p.amount_kobo, p.method, p.provider, p.provider_reference, p.status, p.paid_at, p.receipt_number,
-    r.reference, g.full_name AS guest_name, s.full_name AS recorder
+    p.reservation_id, r.reference, g.full_name AS guest_name, s.full_name AS recorder
   FROM payments p JOIN reservations r ON r.id = p.reservation_id JOIN guests g ON g.id = r.guest_id
   LEFT JOIN staff_profiles s ON s.id = p.recorded_by`;
 
 const toPayment = (p: P): PaymentRow => ({
-  id: p.id, reservationReference: p.reference, guestName: p.guest_name, amountKobo: p.amount_kobo,
+  id: p.id, reservationId: p.reservation_id, reservationReference: p.reference, guestName: p.guest_name, amountKobo: p.amount_kobo,
   method: (p.method ?? "other") as PaymentRow["method"], provider: p.provider, providerReference: p.provider_reference ?? undefined,
   status: p.status, paidAt: p.paid_at ?? undefined, receiptNumber: p.receipt_number ?? undefined, recordedBy: p.recorder ?? undefined,
 });

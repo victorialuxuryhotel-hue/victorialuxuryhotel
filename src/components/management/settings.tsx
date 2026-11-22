@@ -10,6 +10,23 @@ import { formatDateTime } from "@/lib/format";
 /** `manage` renders the per-row controls (owner only). */
 export function StaffTable({ rows, manage }: { rows: StaffRow[]; manage?: (s: StaffRow) => ReactNode }) {
   return (
+    <>
+      <ul className="divide-y divide-ivory-200 md:hidden">
+        {rows.map((s) => (
+          <li key={s.id} className="space-y-3 px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-base font-medium text-ink-900">{s.name}</p>
+                <p className="truncate text-sm text-ink-500">{s.email}</p>
+                <p className="mt-1 text-xs text-ink-500">{staffRole[s.role]} · last sign-in {s.lastSignIn ? formatDateTime(s.lastSignIn) : "never"}</p>
+              </div>
+              {s.isActive ? <Badge tone="success">Active</Badge> : <Badge>Deactivated</Badge>}
+            </div>
+            {manage ? manage(s) : null}
+          </li>
+        ))}
+      </ul>
+      <div className="hidden md:block">
     <Table>
       <THead><tr><TH>Name</TH><TH>Role</TH><TH>Last sign-in</TH><TH>Access</TH>{manage ? <TH className="text-right">Change</TH> : null}</tr></THead>
       <TBody>
@@ -24,6 +41,8 @@ export function StaffTable({ rows, manage }: { rows: StaffRow[]; manage?: (s: St
         ))}
       </TBody>
     </Table>
+      </div>
+    </>
   );
 }
 

@@ -2,18 +2,44 @@ import type { ReactNode } from "react";
 import { Search } from "lucide-react";
 import { Input, Select } from "@/components/ui/form";
 import { cn } from "@/lib/utils/cn";
+import { FiltersToggle } from "./filters-toggle";
 
-/** Search + filters row that sits on top of list cards. Submits as GET params. */
-export function ListToolbar({ placeholder, filters, className, defaultQuery, hidden }: { placeholder: string; filters?: ReactNode; className?: string; defaultQuery?: string; hidden?: Record<string, string> }) {
+/**
+ * Search + filters row that sits on top of list cards. Submits as GET params.
+ * Phones: pinned below the top bar while the list scrolls; filters fold away.
+ */
+export function ListToolbar({
+  placeholder,
+  filters,
+  className,
+  defaultQuery,
+  hidden,
+  filtersActive,
+}: {
+  placeholder: string;
+  filters?: ReactNode;
+  className?: string;
+  defaultQuery?: string;
+  hidden?: Record<string, string>;
+  /** A filter is in use: show the filters open on phones. */
+  filtersActive?: boolean;
+}) {
   return (
-    <form method="get" className={cn("flex flex-col gap-3 border-b border-ivory-200 p-4 md:flex-row md:items-center", className)}>
+    <form
+      method="get"
+      className={cn(
+        "sticky top-14 z-10 grid grid-cols-[1fr_auto] gap-2 border-b border-ivory-200 bg-white p-3 md:static md:flex md:items-center md:gap-3 md:p-4 lg:top-0",
+        !filters && "grid-cols-1",
+        className,
+      )}
+    >
       {Object.entries(hidden ?? {}).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       <label className="relative flex-1">
         <span className="sr-only">Search</span>
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
-        <Input type="search" name="q" placeholder={placeholder} defaultValue={defaultQuery} className="pl-9" />
+        <Input type="search" name="q" placeholder={placeholder} defaultValue={defaultQuery} className="h-11 pl-9 md:h-10" />
       </label>
-      {filters ? <div className="grid grid-cols-2 gap-2 md:flex">{filters}</div> : null}
+      {filters ? <FiltersToggle initiallyOpen={filtersActive}>{filters}</FiltersToggle> : null}
     </form>
   );
 }
