@@ -38,3 +38,10 @@ export function nightsBetween(checkIn: string, checkOut: string): number {
 export function plural(n: number, one: string, many = `${one}s`) {
   return `${n} ${n === 1 ? one : many}`;
 }
+
+const words = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+
+/** "Four" for 4; digits above ten, where words get clumsy. */
+export function numberWord(n: number): string {
+  return words[n] ?? String(n);
+}

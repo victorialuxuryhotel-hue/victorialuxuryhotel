@@ -32,6 +32,13 @@ export function StickyBookBar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [hidden, pathname]);
 
+  const onRooms = pathname === "/rooms";
+  function openSearch() {
+    const form = document.querySelector<HTMLElement>("[data-booking-search]");
+    form?.scrollIntoView({ behavior: "smooth", block: "center" });
+    form?.querySelector<HTMLInputElement>("input:not([type=hidden])")?.focus({ preventScroll: true });
+  }
+
   if (hidden) return null;
   return (
     <>
@@ -45,13 +52,22 @@ export function StickyBookBar() {
         aria-hidden={!show}
       >
         <div className="flex items-center justify-between gap-3">
-          <p className="leading-tight">
-            <span className="block text-xs text-ink-500">Book direct</span>
-            <span className="block text-sm font-medium text-navy-950">Instant confirmation</span>
-          </p>
-          <Link href="/book" tabIndex={show ? 0 : -1} className={buttonStyles({ variant: "accent", size: "lg", className: "px-5" })}>
-            Check availability
-          </Link>
+          {onRooms ? null : (
+            <p className="leading-tight">
+              <span className="block text-xs text-ink-500">Book direct</span>
+              <span className="block text-sm font-medium text-navy-950">Instant confirmation</span>
+            </p>
+          )}
+          {onRooms ? (
+            // The rooms list shows no availability until there are dates: take the guest to the search on this page.
+            <button type="button" tabIndex={show ? 0 : -1} onClick={openSearch} className={buttonStyles({ variant: "accent", size: "lg", className: "w-full px-4" })}>
+              Add dates to see what&apos;s free
+            </button>
+          ) : (
+            <Link href="/book" tabIndex={show ? 0 : -1} className={buttonStyles({ variant: "accent", size: "lg", className: "px-5" })}>
+              Check availability
+            </Link>
+          )}
         </div>
       </div>
     </>

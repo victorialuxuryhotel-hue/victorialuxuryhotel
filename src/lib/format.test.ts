@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatNaira, nightsBetween } from "./format";
+import { formatDate, formatNaira, nightsBetween, numberWord } from "./format";
 
 describe("format", () => {
   it("formats kobo as whole naira", () => {
@@ -13,5 +13,11 @@ describe("format", () => {
 
   it("counts nights, including across a month end", () => {
     expect(nightsBetween("2026-11-29", "2026-12-02")).toBe(3);
+  });
+});
+
+describe("numberWord", () => {
+  it("spells out small counts and falls back to digits", () => {
+    expect([numberWord(1), numberWord(4), numberWord(10), numberWord(12)]).toEqual(["One", "Four", "Ten", "12"]);
   });
 });
