@@ -10,7 +10,7 @@ import { actorOf, authorize } from "./auth";
 import { first, getDb } from "./db";
 import { createStaffProfile, promoteToOwner, updateStaffProfile } from "./domain/admin";
 
-const roleSchema = z.enum(["owner", "general_manager", "front_desk"]);
+const roleSchema = z.enum(["owner", "general_manager", "front_desk", "finance", "restaurant_bar"]);
 
 /** Optional staff phone (shown only to signed-in staff, e.g. "ask a manager"). */
 const phoneSchema = z
@@ -24,7 +24,7 @@ const inviteSchema = z.object({
   fullName: z.string().trim().min(2, "Enter the person's full name").max(120),
   email: z.email("Enter a valid email").transform((e) => e.toLowerCase()),
   // Owner is never chosen in an invite (6e); see makeOwner.
-  role: z.enum(["general_manager", "front_desk"], "Choose a role"),
+  role: z.enum(["general_manager", "front_desk", "finance", "restaurant_bar"], "Choose a role"),
   phone: phoneSchema,
 });
 

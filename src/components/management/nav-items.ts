@@ -1,4 +1,4 @@
-import { BarChart3, BedDouble, CalendarCheck, CreditCard, LayoutDashboard, Settings, ShieldCheck, Sun, Tags, Users } from "lucide-react";
+import { BarChart3, BedDouble, CalendarCheck, CreditCard, LayoutDashboard, Package, Presentation, Receipt, Settings, ShieldCheck, Sun, Tags, Users, UtensilsCrossed } from "lucide-react";
 import type { Permission } from "@/lib/auth/permissions";
 
 /**
@@ -14,11 +14,14 @@ export const managementNavGroups: readonly NavGroup[] = [
   {
     label: "Daily work",
     items: [
-      { href: "/app/today", label: "Today", icon: Sun },
-      { href: "/app/reservations", label: "Reservations", icon: CalendarCheck },
-      { href: "/app/rooms", label: "Rooms", icon: BedDouble },
-      { href: "/app/guests", label: "Guests", icon: Users },
-      { href: "/app/payments", label: "Payments", icon: CreditCard },
+      { href: "/app/today", label: "Today", icon: Sun, permission: ["reservations.manage"] },
+      { href: "/app/reservations", label: "Reservations", icon: CalendarCheck, permission: ["reservations.manage"] },
+      { href: "/app/rooms", label: "Rooms", icon: BedDouble, permission: ["rooms.status"] },
+      { href: "/app/guests", label: "Guests", icon: Users, permission: ["guests.manage"] },
+      { href: "/app/payments", label: "Payments", icon: CreditCard, permission: ["payments.record", "reports.view"] },
+      { href: "/app/sales", label: "Restaurant & bar", icon: UtensilsCrossed, permission: ["pos.sell"] },
+      { href: "/app/events", label: "Hall bookings", icon: Presentation, permission: ["events.manage"] },
+      { href: "/app/stock", label: "Stock", icon: Package, permission: ["inventory.use"] },
     ],
   },
   {
@@ -27,6 +30,7 @@ export const managementNavGroups: readonly NavGroup[] = [
       { href: "/app", label: "Dashboard", icon: LayoutDashboard, permission: ["reports.view"] },
       { href: "/app/rooms/categories", label: "Rates & room types", icon: Tags, permission: ["categories.manage"] },
       { href: "/app/reports", label: "Reports", icon: BarChart3, permission: ["reports.view"] },
+      { href: "/app/expenses", label: "Expenses", icon: Receipt, permission: ["expenses.manage"] },
       { href: "/app/settings", label: "Booking rules", icon: Settings, permission: ["settings.manage"] },
     ],
   },

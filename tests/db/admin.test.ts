@@ -15,7 +15,7 @@ import {
   updateStaffProfile,
 } from "@/server/domain/admin";
 import { updateGuest } from "@/server/domain/reservations";
-import { db, desk, gm, makeCategory, makeGuest, owner, q, q1, rejects } from "./helpers";
+import { db, desk, exec, gm, makeCategory, makeGuest, owner, q, q1, rejects } from "./helpers";
 
 /**
  * Role limits at the data layer (the app's authorize() checks the same matrix
@@ -127,6 +127,20 @@ describe("owner and staff", () => {
     expect(logs.map((l) => l.action)).toEqual(["staff.created", "staff.updated", "staff.updated"]);
     expect(logs.every((l) => l.actor_id === owner!.id)).toBe(true);
     await rejects(createStaffProfile(db, owner, { fullName: "Dup", email: "ada.front@example.com", role: "front_desk" }), /already has an account/);
+  });
+
+  it("finance and restaurant & bar are stored as a department on a front-desk record", async () => {
+    const email = `fin-${crypto.randomUUID().slice(0, 6)}@example.com`;
+    const id = await createStaffProfile(db, owner, { fullName: "Fola Finance", email, role: "finance" });
+    expect(await q1("SELECT role, department FROM staff_profiles WHERE id = ?", id)).toEqual({ role: "front_desk", department: "finance" });
+    expect((await linkClerkUser(db, `user_${email}`, email))?.role).toBe("finance");
+    await updateStaffProfile(db, owner, { staffId: id, role: "restaurant_bar", isActive: true });
+    expect(await q1("SELECT role, department FROM staff_profiles WHERE id = ?", id)).toEqual({ role: "front_desk", department: "restaurant_bar" });
+    await updateStaffProfile(db, owner, { staffId: id, role: "general_manager", isActive: true });
+    expect(await q1("SELECT role, department FROM staff_profiles WHERE id = ?", id)).toEqual({ role: "general_manager", department: null });
+    // The database refuses a department on anything but front desk.
+    await rejects(exec("UPDATE staff_profiles SET department = 'finance' WHERE id = ?", id), /department_needs_front_desk/);
+    await updateStaffProfile(db, owner, { staffId: id, role: "front_desk", isActive: false });
   });
 
   it("grants owner only through the separate Make owner step, logged", async () => {

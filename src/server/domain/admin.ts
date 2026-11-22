@@ -201,6 +201,18 @@ export async function updateBookingRules(
 // Staff (owner only). Identity is Clerk; role and access live here.
 // ---------------------------------------------------------------------------
 
+/**
+ * The role the app uses. Finance and Restaurant & bar are stored as a
+ * department on a front-desk record (see migration 0009), so every staff
+ * lookup reads role through this expression.
+ */
+export const ROLE = "coalesce(department, role)";
+
+/** How a role is stored: departments sit on a front-desk record. */
+export function storedRole(role: StaffRole): { role: "owner" | "general_manager" | "front_desk"; department: "finance" | "restaurant_bar" | null } {
+  return role === "finance" || role === "restaurant_bar" ? { role: "front_desk", department: role } : { role, department: null };
+}
+
 export type StaffRecord = {
   id: string; clerk_user_id: string | null; full_name: string; email: string; role: StaffRole; is_active: number; last_seen_at?: string | null;
 };
@@ -213,8 +225,8 @@ export async function createStaffProfile(db: Db, actor: Actor, v: { fullName: st
   try {
     await writeBatch(db, actor, [
       db
-        .prepare("INSERT INTO staff_profiles (id, full_name, email, role, phone) VALUES (?, ?, ?, ?, ?)")
-        .bind(id, v.fullName.trim(), v.email.trim().toLowerCase(), v.role, v.phone?.trim() || null),
+        .prepare("INSERT INTO staff_profiles (id, full_name, email, role, department, phone) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(id, v.fullName.trim(), v.email.trim().toLowerCase(), storedRole(v.role).role, storedRole(v.role).department, v.phone?.trim() || null),
     ]);
   } catch (err) {
     conflictOnUnique(err, "Someone with this email already has an account.");
@@ -243,19 +255,21 @@ export async function updateStaffProfile(
   requireRole(actor, OWNER);
   if (v.staffId === actor.id && !v.isActive) throw new AppError("VALIDATION", "You can't deactivate your own account.");
   if (v.role === "owner") {
-    const current = await first<{ role: StaffRole }>(db, "SELECT role FROM staff_profiles WHERE id = ?", v.staffId);
+    const current = await first<{ role: StaffRole }>(db, `SELECT ${ROLE} AS role FROM staff_profiles WHERE id = ?`, v.staffId);
     if (current && current.role !== "owner") throw new AppError("VALIDATION", "Use “Make owner” to give someone owner access.");
   }
   const [result] = await writeBatch(db, actor, [
     v.phone === undefined
-      ? db.prepare("UPDATE staff_profiles SET role = ?, is_active = ? WHERE id = ?").bind(v.role, v.isActive ? 1 : 0, v.staffId)
-      : db.prepare("UPDATE staff_profiles SET role = ?, is_active = ?, phone = ? WHERE id = ?").bind(v.role, v.isActive ? 1 : 0, v.phone?.trim() || null, v.staffId),
+      ? db.prepare("UPDATE staff_profiles SET role = ?, department = ?, is_active = ? WHERE id = ?").bind(storedRole(v.role).role, storedRole(v.role).department, v.isActive ? 1 : 0, v.staffId)
+      : db
+          .prepare("UPDATE staff_profiles SET role = ?, department = ?, is_active = ?, phone = ? WHERE id = ?")
+          .bind(storedRole(v.role).role, storedRole(v.role).department, v.isActive ? 1 : 0, v.phone?.trim() || null, v.staffId),
   ]).catch((err: unknown) => {
     if (err instanceof AppError && dbErrorToken(err.cause) === "last_owner") throw new AppError("CONFLICT", "The hotel must always have at least one active owner.");
     throw err;
   });
   if (!result?.meta.changes) throw new AppError("NOT_FOUND", "Staff member not found.");
-  return (await first<StaffRecord>(db, "SELECT id, clerk_user_id, full_name, email, role, is_active FROM staff_profiles WHERE id = ?", v.staffId))!;
+  return (await first<StaffRecord>(db, `SELECT id, clerk_user_id, full_name, email, ${ROLE} AS role, is_active FROM staff_profiles WHERE id = ?`, v.staffId))!;
 }
 
 /**
@@ -265,13 +279,13 @@ export async function updateStaffProfile(
  */
 export async function promoteToOwner(db: Db, actor: Actor, staffId: string): Promise<StaffRecord> {
   requireRole(actor, OWNER);
-  const current = await first<{ role: StaffRole; is_active: number }>(db, "SELECT role, is_active FROM staff_profiles WHERE id = ?", staffId);
+  const current = await first<{ role: StaffRole; is_active: number }>(db, `SELECT ${ROLE} AS role, is_active FROM staff_profiles WHERE id = ?`, staffId);
   if (!current) throw new AppError("NOT_FOUND", "Staff member not found.");
   if (!current.is_active) throw new AppError("VALIDATION", "Restore their access before making them owner.");
   if (current.role !== "owner") {
-    await writeBatch(db, actor, [db.prepare("UPDATE staff_profiles SET role = 'owner' WHERE id = ? AND is_active = 1").bind(staffId)]);
+    await writeBatch(db, actor, [db.prepare("UPDATE staff_profiles SET role = 'owner', department = NULL WHERE id = ? AND is_active = 1").bind(staffId)]);
   }
-  return (await first<StaffRecord>(db, "SELECT id, clerk_user_id, full_name, email, role, is_active FROM staff_profiles WHERE id = ?", staffId))!;
+  return (await first<StaffRecord>(db, `SELECT id, clerk_user_id, full_name, email, ${ROLE} AS role, is_active FROM staff_profiles WHERE id = ?`, staffId))!;
 }
 
 /** Links a Clerk user to the invited staff record with the same (verified) email, on first sign-in. */
@@ -280,7 +294,7 @@ export async function linkClerkUser(db: Db, clerkUserId: string, email: string):
     .prepare("UPDATE staff_profiles SET clerk_user_id = ? WHERE email = ? AND clerk_user_id IS NULL")
     .bind(clerkUserId, email.trim().toLowerCase())
     .run();
-  return first<StaffRecord>(db, "SELECT id, clerk_user_id, full_name, email, role, is_active FROM staff_profiles WHERE clerk_user_id = ?", clerkUserId);
+  return first<StaffRecord>(db, `SELECT id, clerk_user_id, full_name, email, ${ROLE} AS role, is_active FROM staff_profiles WHERE clerk_user_id = ?`, clerkUserId);
 }
 
 

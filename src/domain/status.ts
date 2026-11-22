@@ -53,6 +53,8 @@ export const staffRole = {
   owner: "Owner",
   general_manager: "General manager",
   front_desk: "Front desk",
+  finance: "Finance",
+  restaurant_bar: "Restaurant & bar",
 } as const;
 export type StaffRole = keyof typeof staffRole;
 

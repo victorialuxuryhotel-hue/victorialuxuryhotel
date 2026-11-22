@@ -17,12 +17,19 @@ export type Permission =
   | "rooms.status" // readiness and maintenance
   | "rooms.configure" // add rooms, change category
   | "categories.manage" // names, rates, photos, visibility
-  | "settings.manage" // booking rules
+  | "settings.manage" // booking rules, extras, promo codes, VAT
   | "reports.view" // revenue summaries
   | "activity.view"
-  | "staff.manage";
+  | "staff.manage"
+  | "expenses.manage" // record and void expenses
+  | "pos.sell" // restaurant and bar sales
+  | "pos.settle" // take payment for room charges (front desk, at check-out)
+  | "pos.manage" // menu, voids
+  | "inventory.use" // record stock used
+  | "inventory.manage" // stock items, deliveries, adjustments
+  | "events.manage"; // conference hall bookings and payments
 
-const frontDesk: Permission[] = ["reservations.manage", "guests.manage", "payments.record", "rooms.status"];
+const frontDesk: Permission[] = ["reservations.manage", "guests.manage", "payments.record", "rooms.status", "pos.settle", "events.manage"];
 const manager: Permission[] = [
   ...frontDesk,
   "payments.override",
@@ -31,12 +38,21 @@ const manager: Permission[] = [
   "settings.manage",
   "reports.view",
   "activity.view",
+  "expenses.manage",
+  "pos.sell",
+  "pos.manage",
+  "inventory.use",
+  "inventory.manage",
 ];
 
 const matrix: Record<StaffRole, ReadonlySet<Permission>> = {
   front_desk: new Set(frontDesk),
   general_manager: new Set(manager),
   owner: new Set<Permission>([...manager, "staff.manage"]),
+  // Money only: reports, payments and expenses. No bookings or rooms.
+  finance: new Set<Permission>(["reports.view", "expenses.manage"]),
+  // The till, and recording stock they use.
+  restaurant_bar: new Set<Permission>(["pos.sell", "inventory.use"]),
 };
 
 export function can(role: StaffRole, permission: Permission): boolean {

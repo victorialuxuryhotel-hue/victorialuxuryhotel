@@ -17,9 +17,12 @@ import { inviteStaff, makeOwner, updateStaff } from "@/server/staff";
 const fieldError = (state: ActionResult<unknown> | null, name: string) => (state && !state.ok ? state.fieldErrors?.[name]?.[0] : undefined);
 
 const ROLE_HELP: Record<Exclude<StaffRole, "owner">, string> = {
-  front_desk: "Bookings, check-in and out, taking payments and room status.",
-  general_manager: "Everything front desk does, plus rooms and prices, reports, refunds and corrections.",
+  front_desk: "Bookings, check-in and out, taking payments, room status and hall bookings.",
+  general_manager: "Everything front desk does, plus prices, reports, refunds, discounts, expenses, the menu and stock.",
+  finance: "Reports, payments and expenses. No bookings or rooms.",
+  restaurant_bar: "The restaurant and bar till, and recording stock used.",
 };
+const ASSIGNABLE = ["front_desk", "restaurant_bar", "finance", "general_manager"] as const;
 
 const initials = (name: string) =>
   name
@@ -50,7 +53,7 @@ function RoleRadios({ name, value, onChange }: { name: string; value: Exclude<St
     <fieldset>
       <legend className="mb-1.5 text-[13px] text-ink-700">Role</legend>
       <div className="divide-y divide-hairline rounded-md border border-hairline">
-        {(["front_desk", "general_manager"] as const).map((r) => (
+        {ASSIGNABLE.map((r) => (
           <label key={r} className="flex min-h-14 cursor-pointer items-start gap-3 px-4 py-3 has-[:checked]:bg-navy-50">
             <input type="radio" name={name} value={r} checked={value === r} onChange={() => onChange(r)} className="mt-0.5 size-5 shrink-0 accent-navy-800" />
             <span>

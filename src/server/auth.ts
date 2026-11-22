@@ -10,7 +10,7 @@ import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { verifyViewAs } from "@/lib/auth/view-as-token";
 import { first, getDb, VIEW_AS_READ_ONLY, type Actor } from "./db";
-import { LAST_SEEN_EVERY_MS, linkClerkUser, touchLastSeen, type StaffRecord } from "./domain/admin";
+import { LAST_SEEN_EVERY_MS, linkClerkUser, ROLE, touchLastSeen, type StaffRecord } from "./domain/admin";
 
 /**
  * `viewAs` is true while an owner views the app as front desk: `role` is then
@@ -47,7 +47,7 @@ export const getCurrentStaff = cache(async (): Promise<Staff | null> => {
   const db = await getDb();
   let record = await first<StaffRecord>(
     db,
-    "SELECT id, clerk_user_id, full_name, email, role, is_active, last_seen_at FROM staff_profiles WHERE clerk_user_id = ?",
+    `SELECT id, clerk_user_id, full_name, email, ${ROLE} AS role, is_active, last_seen_at FROM staff_profiles WHERE clerk_user_id = ?`,
     userId,
   );
   if (!record) {

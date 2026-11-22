@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger";
 import { hotelToday } from "@/lib/hotel-date";
 import { actorOf, authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
-import { managerToAsk, type StaffRecord } from "../domain/admin";
+import { managerToAsk, ROLE, type StaffRecord } from "../domain/admin";
 
 export async function getBookingRules(): Promise<BookingRules> {
   await authorizeRead();
@@ -29,7 +29,7 @@ export async function listStaff(): Promise<StaffRow[]> {
   await authorizeRead("staff.manage");
   const staff = await all<StaffRecord & { phone: string | null }>(
     await getDb(),
-    "SELECT id, clerk_user_id, full_name, email, role, is_active, phone, last_seen_at FROM staff_profiles ORDER BY is_active DESC, full_name",
+    `SELECT id, clerk_user_id, full_name, email, ${ROLE} AS role, is_active, phone, last_seen_at FROM staff_profiles ORDER BY is_active DESC, full_name`,
   );
   const linked = staff.map((s) => s.clerk_user_id).filter((id): id is string => Boolean(id));
   const lastSignIn = new Map<string, string | undefined>();
