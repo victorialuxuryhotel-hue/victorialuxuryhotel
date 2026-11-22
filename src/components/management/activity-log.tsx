@@ -135,7 +135,7 @@ export function ActivityLog({ p, rows, total, people, today, size }: {
         ) : (
           days.map((d) => (
             <section key={d.day} aria-labelledby={`day-${d.day}`}>
-              <h3 id={`day-${d.day}`} className="border-b border-hairline bg-ivory-100 px-4 py-2 font-sans text-[11px] font-normal tracking-[0.2em] text-ink-500 uppercase sm:px-5">
+              <h3 id={`day-${d.day}`} className="border-b border-hairline bg-ivory-100 px-4 py-2 font-sans text-xs font-normal tracking-[0.2em] text-ink-500 uppercase sm:px-5">
                 {dayHeading(d.day, today)}
               </h3>
               <ul className="divide-y divide-hairline">

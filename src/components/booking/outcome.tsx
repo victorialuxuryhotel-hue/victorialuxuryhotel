@@ -21,15 +21,16 @@ export type ConfirmedStay = {
   checkOutTime: string;
   /** The specific room, e.g. "Room 204 · Floor 2" (assigned on payment). */
   room?: string;
-  /** The booking's private link token, for the calendar file and sharing. */
+  /** The booking's private link token, for the calendar file (never shared). */
   token: string;
   siteUrl: string;
 };
 
 /** Shown only after the server has verified payment with Paystack (6b). */
 export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
-  const link = `${stay.siteUrl}/book/confirmation/${stay.token}`;
-  const share = `https://wa.me/?text=${encodeURIComponent(`My stay at ${hotel.shortName}: ${stay.category}, ${formatDate(stay.checkIn)} to ${formatDate(stay.checkOut)}. Reference ${stay.reference}. ${link}`)}`;
+  // Shared with friends or family: the stay and the hotel only. The private
+  // booking link (which opens the receipt) and the reference stay with the guest.
+  const share = `https://wa.me/?text=${encodeURIComponent(`I'm staying at ${hotel.name}, ${formatDate(stay.checkIn)} to ${formatDate(stay.checkOut)}. ${stay.siteUrl}`)}`;
   const rows: Array<[string, string]> = [
     ["Room", `${stay.room ? `${stay.room} · ` : ""}${stay.category} · ${plural(stay.guests, "guest")}`],
     ["Check-in", `${formatDate(stay.checkIn)}, from ${stay.checkInTime}`],
@@ -47,7 +48,7 @@ export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
         </p>
         <div className="mt-5 inline-flex items-center gap-3 rounded-md border border-hairline py-1.5 pr-1.5 pl-4 text-left">
           <span>
-            <span className="block text-[10px] tracking-[0.16em] text-ink-500 uppercase">Reference</span>
+            <span className="block text-xs tracking-[0.16em] text-ink-500 uppercase">Reference</span>
             <span className="block text-lg tracking-[0.06em] text-navy-950 tabular-nums">{stay.reference}</span>
           </span>
           <CopyButton text={stay.reference} />
@@ -70,7 +71,7 @@ export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
       </div>
 
       <section aria-labelledby="next-steps" className="mt-8">
-        <h2 id="next-steps" className="font-sans text-[11px] font-normal tracking-[0.2em] text-ink-500 uppercase">What happens next</h2>
+        <h2 id="next-steps" className="font-sans text-xs font-normal tracking-[0.2em] text-ink-500 uppercase">What happens next</h2>
         <ol className="mt-1.5">
           {[
             stay.email ? "Your confirmation and receipt are in your email." : "Keep your booking reference; you'll need it at the front desk.",

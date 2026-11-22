@@ -32,7 +32,7 @@ function NavLinks({ onNavigate, base, allowed }: { onNavigate?: () => void; base
     <nav aria-label="Management" className="flex flex-col gap-5 px-3">
       {groups.map((g) => (
         <div key={g.label} role="group" aria-label={g.label} className="flex flex-col gap-1">
-          {headings ? <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-ivory-200/45">{g.label}</p> : null}
+          {headings ? <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-[0.18em] text-ivory-200/45">{g.label}</p> : null}
           {g.items.map(({ href, label, icon: Icon }) => {
             const current = href === active;
             return (
@@ -63,7 +63,7 @@ function Brand({ base }: { base: string }) {
       <Logo className="w-8" />
       <span className="leading-none">
         <span className="block font-display text-lg text-ivory-50">Victoria Luxury</span>
-        <span className="mt-0.5 block text-[10px] uppercase tracking-[0.25em] text-gold-300">Management</span>
+        <span className="mt-0.5 block text-xs uppercase tracking-[0.25em] text-gold-300">Management</span>
       </span>
     </Link>
   );

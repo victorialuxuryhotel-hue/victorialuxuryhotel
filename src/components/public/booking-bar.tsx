@@ -48,7 +48,7 @@ export function BookingBar({
   const checkOut = checkOutValue || addDays(checkIn, 1);
   const row = variant !== "stacked";
 
-  const label = "text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500 sm:text-[11px] sm:tracking-[0.18em]";
+  const label = "text-xs font-semibold uppercase tracking-[0.16em] text-ink-500 sm:text-xs sm:tracking-[0.18em]";
   const field = "mt-0.5 block w-full min-w-0 border-0 bg-transparent p-0 text-base font-medium text-navy-950 focus:outline-none focus:ring-0 sm:mt-1";
   const cell = "flex min-w-0 items-center gap-3 bg-ivory-50 px-3 py-2.5 sm:px-5 sm:py-4";
   const stepButton =

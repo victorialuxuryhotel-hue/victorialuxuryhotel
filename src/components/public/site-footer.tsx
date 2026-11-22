@@ -13,7 +13,7 @@ export function SiteFooter() {
             <Logo className="w-12" />
             <span className="leading-none">
               <span className="block font-display text-2xl text-ivory-50">Victoria Luxury</span>
-              <span className="mt-1 block text-[10px] uppercase tracking-[0.3em] text-gold-300">Hotel &amp; Apartment</span>
+              <span className="mt-1 block text-xs uppercase tracking-[0.3em] text-gold-300">Hotel &amp; Apartment</span>
             </span>
           </div>
           <p className="mt-6 max-w-sm text-sm leading-relaxed text-ivory-200/70">

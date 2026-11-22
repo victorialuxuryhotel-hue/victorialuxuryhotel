@@ -61,8 +61,8 @@ async function Results({ searchParams }: { searchParams: SP }) {
           <p className="font-medium text-navy-950">We&apos;re fully booked for those dates</p>
           <p className="mt-1 text-sm text-ink-700">Try different dates, or contact us and we&apos;ll do our best to help.</p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <a href={`tel:${hotel.phone}`} className={buttonStyles({ size: "sm" })}><Phone className="size-4" aria-hidden /> Call</a>
-            <a href={`https://wa.me/${hotel.whatsapp}`} className={buttonStyles({ size: "sm", variant: "secondary" })}><MessageCircle className="size-4" aria-hidden /> WhatsApp</a>
+            <a href={`tel:${hotel.phone}`} className={buttonStyles({ className: "h-11 min-w-28" })}><Phone className="size-4" aria-hidden /> Call</a>
+            <a href={`https://wa.me/${hotel.whatsapp}`} className={buttonStyles({ variant: "secondary", className: "h-11 min-w-28" })}><MessageCircle className="size-4" aria-hidden /> WhatsApp</a>
           </div>
         </div>
       ) : null}
