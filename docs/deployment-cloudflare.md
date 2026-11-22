@@ -29,7 +29,7 @@ Cloudflare account: `victorialuxuryhotel@gmail.com`. Domain registrar: Namecheap
 | Domain nameservers moved from Namecheap to Cloudflare | Done |
 | Resend DNS records in Cloudflare (DNS only) | Done; domain Verified in Resend |
 | Custom domains on the Worker, site URL switched | Done |
-| Test accounts, one per role (Clerk development instance) | Done: `owner@`, `manager@`, `frontdesk@victorialuxuryhotel.com` (usernames `owner`, `manager`, `frontdesk`); passwords in git-ignored `.test-accounts.local`. Mail to these addresses needs Cloudflare Email Routing (forward to the hotel Gmail) until Google Workspace. Replace with real staff on Clerk production |
+| Test accounts, one per role (Clerk development instance) | Done: usernames `owner`, `manager`, `frontdesk` (emails `…+clerk_test@victorialuxuryhotel.com`, Clerk test addresses: code `424242`, no inbox needed); passwords in git-ignored `.test-accounts.local`. Replace with real staff on Clerk production |
 | First owner account | To do: needs the owner's name and email |
 | Resend sending from `bookings@victorialuxuryhotel.com` | To do once Resend shows the domain verified |
 | Paystack keys | To do: test keys first, live keys only with the hotel's approval |
