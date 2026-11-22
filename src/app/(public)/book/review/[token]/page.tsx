@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Clock } from "lucide-react";
-import { BookingSummary, CompactSummary, Steps } from "@/components/booking/booking-ui";
+import { BookingSummary, Steps } from "@/components/booking/booking-ui";
+import { HoldBanner } from "@/components/booking/hold-banner";
 import { Container } from "@/components/public/section";
 import { PayButton } from "@/components/booking/pay-button";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
-import { formatDateTime, formatNaira } from "@/lib/format";
-import { getBookingByToken } from "@/server/queries/booking";
+import { formatDate, formatNaira } from "@/lib/format";
+import { getBookingByToken, publicBookingRules } from "@/server/queries/booking";
 
 export const metadata: Metadata = { title: "Review and pay", robots: { index: false, follow: false } };
 
@@ -35,27 +35,50 @@ async function Review({ params }: { params: Promise<{ token: string }> }) {
     );
   }
 
+  const rules = await publicBookingRules();
+  const rows: Array<[string, string]> = [
+    ["Room", b.category.name],
+    ["Dates", `${formatDate(b.check_in, { year: false })} → ${formatDate(b.check_out, { year: false })}`],
+    ["Nights", `${b.nights ?? 0} × ${formatNaira(b.nightly_rate_kobo)}`],
+    ["Guests", String(b.guest_count)],
+    ["Guest", b.guest.full_name],
+    ...(b.guest.email ? [["Confirmation to", b.guest.email] as [string, string]] : []),
+  ];
+
   return (
     <>
       <Steps current={3} />
       <div className="mt-5 grid gap-6 sm:mt-10 lg:grid-cols-[1fr_24rem] lg:gap-16">
-        <CompactSummary option={option} search={stay} />
-        <div>
-          <h1 className="font-display text-[2.125rem] leading-tight text-navy-950 sm:text-5xl">Review and pay</h1>
-          <p className="mt-3 flex items-center gap-2 text-ink-600">
-            <Clock className="size-4 text-gold-600" aria-hidden /> Your room is held until {formatDateTime(b.hold_expires_at!)}.
-          </p>
-          <dl className="mt-8 divide-y divide-hairline rounded-card bg-ivory-50 text-sm shadow-card">
-            {[["Booking reference", b.reference], ["Name", b.guest.full_name], ["Email", b.guest.email ?? ""], ["Phone", b.guest.phone ?? ""], ...(b.special_requests ? [["Special requests", b.special_requests]] : [])].map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-6 px-5 py-4"><dt className="text-ink-500">{k}</dt><dd className="text-right break-all text-ink-900">{v}</dd></div>
-            ))}
-          </dl>
-          <p className="mt-6 text-sm text-ink-600">
-            You&apos;ll pay securely with Paystack by card, bank transfer or USSD. Your booking is confirmed as soon as Paystack confirms your payment.
-          </p>
+        <div className="space-y-6">
+          <HoldBanner category={b.category.name} expiresAt={b.hold_expires_at!} againHref={`/book?checkIn=${b.check_in}&checkOut=${b.check_out}&guests=${b.guest_count}`} />
+          <div>
+            <h1 className="font-display text-[1.875rem] leading-tight text-navy-950 sm:text-5xl">Review and pay</h1>
+            <dl className="mt-4 grid grid-cols-[auto_1fr] border-t border-hairline text-sm">
+              {rows.map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="border-b border-hairline py-2.5 pr-4 text-ink-500">{k}</dt>
+                  <dd className="border-b border-hairline py-2.5 text-right break-all text-ink-900 tabular-nums">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="flex items-baseline justify-between py-3.5 tabular-nums">
+              <span className="text-[15px] text-ink-900">Total to pay</span>
+              <span className="font-display text-3xl text-navy-950">{formatNaira(b.total_amount_kobo)}</span>
+            </div>
+            {rules.cancellationPolicy ? <p className="text-sm leading-relaxed text-ink-700">{rules.cancellationPolicy}</p> : null}
+          </div>
+
+          <div className="rounded-md border border-hairline p-4">
+            <p className="text-sm text-ink-900">Pay securely with Paystack</p>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {["Card", "Bank transfer", "USSD"].map((m) => <span key={m} className="rounded-[3px] bg-ivory-200 px-2.5 py-0.5 text-[11px] text-ink-700">{m}</span>)}
+            </div>
+            <p className="mt-2.5 text-xs leading-relaxed text-ink-500">You&apos;ll be taken to Paystack and back. We never see your card details.</p>
+          </div>
+
           <PayButton token={token} total={formatNaira(b.total_amount_kobo)} />
-          <p className="mt-3 text-sm text-ink-500">
-            Prefer to pay another way? Call {hotel.phoneDisplay} and quote <span className="font-mono">{b.reference}</span>.
+          <p className="text-sm text-ink-500">
+            Prefer to pay another way? Call {hotel.phoneDisplay} and quote <span className="tabular-nums">{b.reference}</span>.
           </p>
         </div>
         <BookingSummary option={option} search={stay} className="hidden lg:block" />
