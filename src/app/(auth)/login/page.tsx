@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { hotel } from "@/config/hotel";
 import { auth } from "@clerk/nextjs/server";
 import { AccessDenied, SignInPanel } from "./sign-in-panel";
 
-export const metadata: Metadata = { title: "Staff sign in", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Staff sign-in", robots: { index: false, follow: false } };
 
 async function FormWithNext({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
@@ -32,14 +32,23 @@ export default function LoginPage(props: PageProps<"/login">) {
       <div className="flex flex-col justify-center px-4 py-12 sm:px-12">
         <div className="mx-auto w-full max-w-sm">
           <Logo className="w-14 lg:hidden" />
-          <h1 className="mt-6 font-display text-4xl text-navy-950 lg:mt-0">Staff sign in</h1>
-          <p className="mt-2 text-sm text-ink-500">Use the account your manager created for you.</p>
+          <h1 className="mt-6 font-display text-4xl text-navy-950 lg:mt-0">Staff sign-in</h1>
+          <p className="mt-2 text-sm text-ink-500">We&apos;ll email you a code. No password needed.</p>
           <div className="mt-8">
             <Suspense fallback={<div className="h-56" />}>
               <FormWithNext searchParams={props.searchParams} />
             </Suspense>
           </div>
-          <Link href="/" className="mt-10 inline-flex items-center gap-2 text-sm text-ink-500 hover:text-navy-800">
+          <div className="mt-8 space-y-3 border-t border-hairline pt-6 text-sm text-ink-600">
+            <p>New here? Use the invitation email the owner sent you. There&apos;s no public sign-up.</p>
+            <p>
+              Can&apos;t get in?{" "}
+              <a href={`https://wa.me/${hotel.whatsapp}`} className="inline-flex min-h-11 items-center gap-1.5 text-navy-800 underline underline-offset-2">
+                <MessageCircle className="size-4" aria-hidden /> WhatsApp the manager
+              </a>
+            </p>
+          </div>
+          <Link href="/" className="mt-6 inline-flex items-center gap-2 text-sm text-ink-500 hover:text-navy-800">
             <ArrowLeft className="size-4" aria-hidden /> Back to the website
           </Link>
         </div>
