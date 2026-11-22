@@ -52,3 +52,4 @@ supabase/.temp
 /.wrangler/
 .dev.vars*
 /.tmp/
+.clerk/
