@@ -8,7 +8,7 @@ import { AppError, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize } from "./auth";
 import { getDb } from "./db";
-import { recordOfflinePayment as record } from "./domain/payments";
+import { recordOfflinePayment as record, recordPaymentCorrection } from "./domain/payments";
 import { deliverEmails } from "./notifications";
 
 const schema = z.object({
@@ -48,4 +48,27 @@ export async function recordOfflinePayment(_prev: ActionResult | null, formData:
     return toActionError(err);
   }
   redirect(target);
+}
+
+const correctionSchema = z.object({
+  paymentId: z.uuid(),
+  reservationId: z.uuid(),
+  amount: z.coerce.number({ error: "Enter the amount to correct" }).positive("Enter the amount to correct").max(100_000_000),
+  reason: z.string().trim().min(5, "Say what was wrong").max(500),
+});
+
+/** Managers: correct a recorded payment (never edit it). */
+export async function correctPayment(_prev: ActionResult<{ receiptNumber: string }> | null, formData: FormData): Promise<ActionResult<{ receiptNumber: string }>> {
+  try {
+    const staff = await authorize("payments.override");
+    const parsed = correctionSchema.safeParse(Object.fromEntries(formData));
+    if (!parsed.success) throw new AppError("VALIDATION", "Check the highlighted fields", { fieldErrors: z.flattenError(parsed.error).fieldErrors });
+    const v = parsed.data;
+    const result = await recordPaymentCorrection(await getDb(), actorOf(staff), { paymentId: v.paymentId, amountKobo: Math.round(v.amount * 100), reason: v.reason });
+    refresh();
+    return { ok: true, data: { receiptNumber: result.receiptNumber } };
+  } catch (err) {
+    if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("payment.correct_failed", err);
+    return toActionError(err);
+  }
 }

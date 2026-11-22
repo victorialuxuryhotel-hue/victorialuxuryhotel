@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyPaystackResult, beginPaystackPayment, recordOfflinePayment } from "@/server/domain/payments";
+import { applyPaystackResult, beginPaystackPayment, recordOfflinePayment, recordPaymentCorrection } from "@/server/domain/payments";
 import { cancelReservation, changeReservationDates, createWebsiteReservation, overridePaymentRequirement, resolveAttention } from "@/server/domain/reservations";
 import { claimOutbox, finishOutbox, hitRateLimit } from "@/server/domain/system";
 import { day, db, desk, exec, gm, insertReservation, iso, lapseHold, makeCategory, q, q1, rejects, status } from "./helpers";
@@ -272,5 +272,42 @@ describe("rate limiting", () => {
     for (let i = 0; i < 4; i++) results.push(await hitRateLimit(db, key, 3, 3600));
     expect(results).toEqual([true, true, true, false]);
     expect(await hitRateLimit(db, `other:${crypto.randomUUID()}`, 3, 3600)).toBe(true);
+  });
+});
+
+describe("payment corrections (payments are never edited)", () => {
+  it("records a linked correction with its own receipt, adjusts the balance and flags money owed", async () => {
+    const b = await heldBooking(1, 5_000_000);
+    const pay = await offline(b.id, 10_000_000); // confirms
+    const fix = await recordPaymentCorrection(db, gm, { paymentId: pay.paymentId, amountKobo: 1_000_000, reason: "Typed 100k instead of 90k" });
+    expect(fix.receiptNumber).toMatch(/^RCT-/);
+    expect(fix.balanceKobo).toBe(1_000_000);
+    const row = await q1<{ kind: string; corrects_payment_id: string; recorded_by: string }>(
+      "SELECT kind, corrects_payment_id, recorded_by FROM payments WHERE receipt_number = ?", fix.receiptNumber);
+    expect(row).toEqual({ kind: "refund", corrects_payment_id: pay.paymentId, recorded_by: gm!.id });
+    expect((await q1<{ amount_kobo: number }>("SELECT amount_kobo FROM payments WHERE id = ?", pay.paymentId)).amount_kobo).toBe(10_000_000);
+    expect((await q1<{ attention_reason: string }>("SELECT attention_reason FROM reservations WHERE id = ?", b.id)).attention_reason).toMatch(/now owed/);
+  });
+
+  it("can't exceed the original payment, needs a reason, and is managers only", async () => {
+    const b = await heldBooking(1, 5_000_000);
+    const pay = await offline(b.id, 4_000_000);
+    await rejects(recordPaymentCorrection(db, desk, { paymentId: pay.paymentId, amountKobo: 100, reason: "Wrong amount" }), /role does not allow/);
+    await rejects(recordPaymentCorrection(db, gm, { paymentId: pay.paymentId, amountKobo: 100, reason: "x" }), /Say what was wrong/);
+    await recordPaymentCorrection(db, gm, { paymentId: pay.paymentId, amountKobo: 3_000_000, reason: "Partly wrong" });
+    await rejects(recordPaymentCorrection(db, gm, { paymentId: pay.paymentId, amountKobo: 1_000_100, reason: "Wrong again" }), /At most .* can still be corrected/);
+  });
+
+  it("the database refuses an unlinked or oversized correction", async () => {
+    const b = await heldBooking(1, 5_000_000);
+    const pay = await offline(b.id, 1_000_000);
+    await rejects(
+      exec(
+        `INSERT INTO payments (id, reservation_id, kind, amount_kobo, provider, method, status, paid_at, verified_at, recorded_by, corrects_payment_id)
+         VALUES (?, ?, 'refund', 2000000, 'offline', 'cash', 'successful', ?, ?, ?, ?)`,
+        crypto.randomUUID(), b.id, iso(0), iso(0), desk!.id, pay.paymentId,
+      ),
+      /invalid_correction/,
+    );
   });
 });

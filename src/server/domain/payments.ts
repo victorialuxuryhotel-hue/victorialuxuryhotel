@@ -2,7 +2,7 @@ import { AppError } from "@/lib/errors";
 import { formatNaira } from "@/lib/format";
 import { addDays, hotelInstant, hotelTimeNow, hotelToday } from "@/lib/hotel-date";
 import { dbErrorToken, StaleStateError } from "../db-errors";
-import { activity, ALL_STAFF, assertVersion, first, now, requireRole, retryOnStale, uuid, writeBatch, type Actor, type Db, type Stmt } from "../db";
+import { activity, ALL_STAFF, assertVersion, first, MANAGERS, now, requireRole, retryOnStale, uuid, writeBatch, type Actor, type Db, type Stmt } from "../db";
 import { freeUnits } from "./inventory";
 import { loadReservation, netPaid, type ReservationRow } from "./reservations";
 
@@ -296,5 +296,67 @@ export async function recordOfflinePayment(
     }
     const row = await first<{ receipt_number: string }>(db, "SELECT receipt_number FROM payments WHERE id = ?", paymentId);
     return { paymentId, receiptNumber: row!.receipt_number, outcome: settle.outcome };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Corrections. Payments are never edited: a manager records a correction, a
+// new linked row (kind 'refund') with its own receipt number and a reason.
+// ---------------------------------------------------------------------------
+
+export async function recordPaymentCorrection(
+  db: Db,
+  actor: Actor,
+  input: { paymentId: string; amountKobo: number; reason: string },
+): Promise<{ receiptNumber: string; balanceKobo: number }> {
+  requireRole(actor, MANAGERS);
+  const why = (input.reason ?? "").trim();
+  if (why.length < 5) throw new AppError("VALIDATION", "Say what was wrong (it is kept with the payment).");
+  if (!Number.isInteger(input.amountKobo) || input.amountKobo <= 0) throw new AppError("VALIDATION", "Enter the amount to correct.");
+
+  return retryOnStale(async () => {
+    const original = await first<{ id: string; reservation_id: string; amount_kobo: number; kind: string; status: string; method: string | null; receipt_number: string | null }>(
+      db,
+      "SELECT id, reservation_id, amount_kobo, kind, status, method, receipt_number FROM payments WHERE id = ?",
+      input.paymentId,
+    );
+    if (!original || original.kind !== "payment" || original.status !== "successful") throw new AppError("NOT_FOUND", "Only a successful payment can be corrected.");
+    const corrected = await first<{ total: number }>(
+      db,
+      "SELECT coalesce(sum(amount_kobo), 0) AS total FROM payments WHERE corrects_payment_id = ? AND status = 'successful'",
+      original.id,
+    );
+    const left = original.amount_kobo - (corrected?.total ?? 0);
+    if (input.amountKobo > left) throw new AppError("VALIDATION", `At most ${naira(left)} of this payment can still be corrected.`);
+
+    const res = await loadReservation(db, original.reservation_id);
+    const paid = await netPaid(db, res.id);
+    const balance = res.total_amount_kobo - (paid - input.amountKobo);
+    const id = uuid();
+    const stmts: Stmt[] = [
+      assertVersion(db, "reservations", res.id, res.version),
+      assertNetPaid(db, res.id, paid),
+      db
+        .prepare(
+          `INSERT INTO payments (id, reservation_id, kind, amount_kobo, provider, method, status, paid_at, verified_at, recorded_by, notes, corrects_payment_id)
+           VALUES (?, ?, 'refund', ?, 'offline', ?, 'successful', ?, ?, ?, ?, ?)`,
+        )
+        .bind(id, res.id, input.amountKobo, original.method ?? "other", now(), now(), actor.id, why, original.id),
+    ];
+    if (balance > 0 && (res.status === "confirmed" || res.status === "checked_in")) {
+      stmts.push(
+        db.prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?").bind(`A payment was corrected: ${naira(balance)} is now owed.`, res.id),
+      );
+    }
+    stmts.push(
+      activity(db, "payment.corrected", "reservation", res.id, `Payment ${original.receipt_number ?? ""} corrected by ${naira(input.amountKobo)} for ${res.reference}: ${why}`, {
+        payment_id: original.id,
+        correction_id: id,
+        amount_kobo: input.amountKobo,
+      }),
+    );
+    await writeBatch(db, actor, stmts);
+    const row = await first<{ receipt_number: string }>(db, "SELECT receipt_number FROM payments WHERE id = ?", id);
+    return { receiptNumber: row!.receipt_number, balanceKobo: Math.max(0, balance) };
   });
 }
