@@ -29,12 +29,12 @@ Cloudflare account: `victorialuxuryhotel@gmail.com`. Domain registrar: Namecheap
 | Domain nameservers moved from Namecheap to Cloudflare | Done |
 | Resend DNS records in Cloudflare (DNS only) | Done; domain Verified in Resend |
 | Custom domains on the Worker, site URL switched | Done |
-| Test accounts, one per role (Clerk development instance) | Done: `test.owner` / `test.manager` / `test.frontdesk` `+clerk_test@example.com`; passwords in git-ignored `.test-accounts.local`; code `424242`. **Deactivate before launch**; they disappear with the switch to Clerk production anyway |
+| Test accounts, one per role (Clerk development instance) | Done: `owner@`, `manager@`, `frontdesk@victorialuxuryhotel.com` (usernames `owner`, `manager`, `frontdesk`); passwords in git-ignored `.test-accounts.local`. Mail to these addresses needs Cloudflare Email Routing (forward to the hotel Gmail) until Google Workspace. Replace with real staff on Clerk production |
 | First owner account | To do: needs the owner's name and email |
 | Resend sending from `bookings@victorialuxuryhotel.com` | To do once Resend shows the domain verified |
 | Paystack keys | To do: test keys first, live keys only with the hotel's approval |
 | Clerk production instance (removes the "Development mode" badge) | To do once the domain is live |
-| Email forwarding for @victorialuxuryhotel.com | Re-create in Cloudflare Email Routing if it is used (Namecheap forwarding stops after the nameserver move) |
+| Email for @victorialuxuryhotel.com | Cloudflare Email Routing → hotel Gmail (owner@, manager@, frontdesk@, bookings@) until Google Workspace replaces it; keep a single SPF record |
 
 ## Deploying
 
