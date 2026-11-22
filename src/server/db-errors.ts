@@ -23,6 +23,16 @@ const tokens: Record<string, [ErrorCode, string]> = {
   last_owner: ["CONFLICT", "At least one active owner is required."],
   staff_delete_forbidden: ["FORBIDDEN", "Staff accounts are deactivated, not deleted."],
   delete_forbidden: ["CONFLICT", "This can't be deleted because bookings refer to it. Deactivate it instead."],
+  department_needs_front_desk: ["VALIDATION", "Finance and Restaurant & bar are separate roles."],
+  discount_too_large: ["VALIDATION", "The discount can't be more than the room price."],
+  promo_invalid: ["VALIDATION", "That promo code can no longer be used."],
+  expense_immutable: ["CONFLICT", "Expenses can't be changed or deleted. Void it with a reason instead."],
+  sale_immutable: ["CONFLICT", "Sales can't be changed or deleted. A manager can void one with a reason."],
+  room_charge_not_in_house: ["VALIDATION", "Only guests staying now can charge to their room."],
+  unsettled_charges: ["VALIDATION", "Restaurant & bar charges are unpaid. Settle them before check-out."],
+  stock_move_immutable: ["CONFLICT", "Stock records can't be changed or deleted. Record an adjustment instead."],
+  hall_overlap: ["CONFLICT", "The hall is already booked at that time."],
+  hall_booking_delete_forbidden: ["FORBIDDEN", "Hall bookings are cancelled, not deleted."],
 };
 
 /** The trigger token or constraint description inside a D1 error message. */

@@ -5,7 +5,10 @@ import { z } from "zod";
 import { ReservationDetailView } from "@/components/management/reservation-detail";
 import { LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
-import { requireStaff } from "@/server/auth";
+import { RoomCharges } from "@/components/management/room-charges";
+import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
+import { getDb } from "@/server/db";
+import { chargesFor } from "@/server/domain/pos";
 import { getReservation, hotelToday } from "@/server/queries/reservations";
 import { assignableRooms } from "@/server/queries/rooms";
 import { managerToAskForDesk } from "@/server/queries/settings";
@@ -24,7 +27,10 @@ async function Content({ params, searchParams }: PageProps<"/app/reservations/[i
     canOverride ? Promise.resolve(null) : managerToAskForDesk(),
   ]);
   const sp = await searchParams;
+  const reader = await authorizeRead();
+  const charges = can(staff.role, "pos.settle") ? await chargesFor(await getDb(), actorOf(reader), r.id) : [];
   return (
+    <>
     <ReservationDetailView
       r={r}
       today={today}
@@ -39,6 +45,8 @@ async function Content({ params, searchParams }: PageProps<"/app/reservations/[i
       justCreated={sp.created === "1"}
       paidReceipt={typeof sp.paid === "string" && /^RCT-\d{4}-\d{6}$/.test(sp.paid) ? sp.paid : undefined}
     />
+    {charges.length ? <div className="px-4 pb-8 lg:px-8"><RoomCharges reservationId={r.id} charges={charges} canSettle={can(staff.role, "pos.settle")} /></div> : null}
+    </>
   );
 }
 
