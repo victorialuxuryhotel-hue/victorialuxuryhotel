@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
+import { Stepper } from "@/components/ui/stepper";
 import { bookingSource } from "@/domain/status";
 import type { CategoryRow } from "@/domain/views";
 import { formatNaira, nightsBetween, plural } from "@/lib/format";
@@ -32,16 +33,16 @@ export function ReservationForm({ categories, today, holdHours }: { categories: 
         <Card>
           <CardHeader title="Stay" />
           <div className="grid gap-5 p-5 sm:grid-cols-2 lg:grid-cols-4">
-            <Field label="Check-in" htmlFor="nci" required error={err("checkIn")}>
+            <Field label="Check-in" htmlFor="nci" error={err("checkIn")}>
               <Input id="nci" name="checkIn" type="date" min={today} value={checkIn} onChange={(e) => setCheckIn(e.target.value)} required />
             </Field>
-            <Field label="Check-out" htmlFor="nco" required error={err("checkOut")}>
+            <Field label="Check-out" htmlFor="nco" error={err("checkOut")}>
               <Input id="nco" name="checkOut" type="date" min={checkIn || today} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} required />
             </Field>
-            <Field label="Guests" htmlFor="ng" required error={err("guests")}>
-              <Input id="ng" name="guests" type="number" min={1} max={cat?.maxOccupancy ?? 20} defaultValue={1} required />
+            <Field label="Guests" htmlFor="ng" error={err("guests")}>
+              <Stepper id="ng" name="guests" max={cat?.maxOccupancy ?? 20} unit={["guest", "guests"]} />
             </Field>
-            <Field label="Received by" htmlFor="nsrc" required>
+            <Field label="Received by" htmlFor="nsrc">
               <Select id="nsrc" name="source" defaultValue="walk_in">
                 {(["walk_in", "phone", "whatsapp", "staff"] as const).map((s) => <option key={s} value={s}>{bookingSource[s]}</option>)}
               </Select>
@@ -68,10 +69,10 @@ export function ReservationForm({ categories, today, holdHours }: { categories: 
         <Card>
           <CardHeader title="Guest" description="Returning guests are matched by email automatically." />
           <div className="grid gap-5 p-5 sm:grid-cols-2">
-            <Field label="Full name" htmlFor="gn" required error={err("fullName")}><Input id="gn" name="fullName" autoComplete="off" required /></Field>
-            <Field label="Phone" htmlFor="gp" required error={err("phone")}><Input id="gp" name="phone" type="tel" placeholder="+234" required /></Field>
-            <Field label="Email" htmlFor="ge" hint="Needed to email a confirmation." error={err("email")}><Input id="ge" name="email" type="email" /></Field>
-            <Field label="Special requests" htmlFor="gr" className="sm:col-span-2"><Textarea id="gr" name="specialRequests" rows={2} maxLength={1000} /></Field>
+            <Field label="Full name" htmlFor="gn" error={err("fullName")}><Input id="gn" name="fullName" autoComplete="off" required /></Field>
+            <Field label="Phone" htmlFor="gp" error={err("phone")}><Input id="gp" name="phone" type="tel" placeholder="+234" required /></Field>
+            <Field label="Email" optional htmlFor="ge" hint="Needed to email a confirmation." error={err("email")}><Input id="ge" name="email" type="email" /></Field>
+            <Field label="Special requests" optional htmlFor="gr" className="sm:col-span-2"><Textarea id="gr" name="specialRequests" rows={2} maxLength={1000} /></Field>
           </div>
         </Card>
       </div>

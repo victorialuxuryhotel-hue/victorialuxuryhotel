@@ -89,3 +89,8 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Loading indicators appear only after 300ms, so fast responses don't flash. */
+@keyframes delayed-show { from { opacity: 0; } to { opacity: 1; } }
+.delayed-show { animation: delayed-show 150ms ease-out 300ms both; }
+@media (prefers-reduced-motion: reduce) { .delayed-show { animation-duration: 1ms; } }

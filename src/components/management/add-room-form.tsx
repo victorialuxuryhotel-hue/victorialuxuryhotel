@@ -21,7 +21,7 @@ export function AddRoomForm({ categories }: { categories: Array<{ id: string; na
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         </Field>
-        <Field label="Floor" htmlFor="rfloor"><Input id="rfloor" name="floor" maxLength={10} /></Field>
+        <Field label="Floor" optional htmlFor="rfloor"><Input id="rfloor" name="floor" maxLength={10} /></Field>
         <Button type="submit" variant="secondary" pending={pending} className="sm:mt-7">Add room</Button>
       </div>
     </form>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 
-export const PAGE_SIZE = 50;
+export const PAGE_SIZE = 20;
 
 /** Previous / next links that keep the current search and filters. */
 export function Pager({ basePath, params, page, hasMore }: { basePath: string; params: Record<string, string | undefined>; page: number; hasMore: boolean }) {
@@ -18,8 +18,8 @@ export function Pager({ basePath, params, page, hasMore }: { basePath: string; p
     <nav aria-label="Pages" className="flex items-center justify-between border-t border-ivory-200 px-4 py-3 text-sm">
       <span className="text-ink-500">Page {page}</span>
       <div className="flex gap-2">
-        {page > 1 ? <Link href={href(page - 1)} className={buttonStyles({ variant: "secondary", size: "sm" })}><ChevronLeft className="size-4" aria-hidden /> Previous</Link> : null}
-        {hasMore ? <Link href={href(page + 1)} className={buttonStyles({ variant: "secondary", size: "sm" })}>Next <ChevronRight className="size-4" aria-hidden /></Link> : null}
+        {page > 1 ? <Link href={href(page - 1)} className={buttonStyles({ variant: "secondary" })}><ChevronLeft className="size-4" aria-hidden /> Previous</Link> : null}
+        {hasMore ? <Link href={href(page + 1)} className={buttonStyles({ variant: "secondary" })}>Next <ChevronRight className="size-4" aria-hidden /></Link> : null}
       </div>
     </nav>
   );

@@ -15,8 +15,8 @@ const variants: Record<Variant, string> = {
 
 const sizes: Record<Size, string> = {
   sm: "h-8 px-3 text-sm",
-  md: "h-10 px-4 text-sm",
-  lg: "h-12 px-6 text-base",
+  md: "h-11.5 px-4 text-base md:h-10 md:text-sm",
+  lg: "h-12.5 px-6 text-base",
 };
 
 /** Class string for buttons and for links styled as buttons. */

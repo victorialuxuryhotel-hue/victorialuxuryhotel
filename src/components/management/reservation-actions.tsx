@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { LogIn, LogOut, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Stepper } from "@/components/ui/stepper";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { formatNaira } from "@/lib/format";
 import { assignRoom, cancelReservation, changeDates, checkIn, checkOut, markNoShow, overridePayment, resolveAttention, updateReservationDetails } from "@/server/reservations";
@@ -176,9 +177,9 @@ export function DetailsForm({ reservationId, guests, specialRequests, maxGuests 
   return (
     <form action={action} onSubmit={keepValues(action)} className="space-y-3 border-t border-ivory-200 px-5 py-4">
       <input type="hidden" name="reservationId" value={reservationId} />
-      <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
-        <Field label="Guests" htmlFor="d-guests"><Input id="d-guests" name="guests" type="number" min={1} max={maxGuests} defaultValue={guests} /></Field>
-        <Field label="Special requests" htmlFor="d-req"><Input id="d-req" name="specialRequests" defaultValue={specialRequests} maxLength={1000} /></Field>
+      <div className="grid gap-3 sm:grid-cols-[11rem_1fr]">
+        <Field label="Guests" htmlFor="d-guests"><Stepper id="d-guests" name="guests" max={maxGuests} defaultValue={guests} unit={["guest", "guests"]} /></Field>
+        <Field label="Special requests" optional htmlFor="d-req"><Input id="d-req" name="specialRequests" defaultValue={specialRequests} maxLength={1000} /></Field>
       </div>
       {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
       {state?.ok ? <FormMessage tone="success">Saved.</FormMessage> : null}

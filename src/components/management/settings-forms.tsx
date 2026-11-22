@@ -25,7 +25,7 @@ export function InviteStaffForm() {
         <Field label="Email" htmlFor="semail" error={fieldError(state, "email")}>
           <Input id="semail" name="email" type="email" required aria-invalid={Boolean(fieldError(state, "email"))} />
         </Field>
-        <Field label="Phone (optional)" htmlFor="sphone" error={fieldError(state, "phone")}>
+        <Field label="Phone" optional htmlFor="sphone" error={fieldError(state, "phone")}>
           <Input id="sphone" name="phone" type="tel" inputMode="tel" autoComplete="off" aria-invalid={Boolean(fieldError(state, "phone"))} />
         </Field>
         <Field label="Role" htmlFor="srole">

@@ -65,22 +65,22 @@ export function OfflinePaymentForm({
       {state && !state.ok && !state.fieldErrors ? <FormMessage>{state.message}</FormMessage> : null}
       <div hidden={Boolean(review)} className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Amount received (₦)" htmlFor="amount" required error={err("amount")}>
+        <Field label="Amount received (₦)" htmlFor="amount" error={err("amount")}>
           <Input id="amount" name="amount" inputMode="decimal" defaultValue={String(balance / 100)} required />
         </Field>
-        <Field label="Method" htmlFor="method" required error={err("method")}>
+        <Field label="Method" htmlFor="method" error={err("method")}>
           <Select id="method" name="method" defaultValue="cash">
             {(["cash", "bank_transfer", "pos_terminal", "other"] as const).map((m) => <option key={m} value={m}>{paymentMethod[m]}</option>)}
           </Select>
         </Field>
-        <Field label="Date received" htmlFor="paidOn" required error={err("paidOn")}>
+        <Field label="Date received" htmlFor="paidOn" error={err("paidOn")}>
           <Input id="paidOn" name="paidOn" type="date" defaultValue={today} max={today} required />
         </Field>
-        <Field label="Reference" htmlFor="ref" hint="Transfer narration or POS slip number." error={err("reference")}>
+        <Field label="Reference" optional htmlFor="ref" hint="Transfer narration or POS slip number." error={err("reference")}>
           <Input id="ref" name="reference" maxLength={100} />
         </Field>
       </div>
-      <Field label="Note" htmlFor="note"><Textarea id="note" name="notes" rows={2} maxLength={1000} /></Field>
+      <Field label="Note" optional htmlFor="note"><Textarea id="note" name="notes" rows={2} maxLength={1000} /></Field>
       <div>
         <label className="flex gap-3 rounded-md border border-gold-300 bg-gold-50 p-4 text-sm text-ink-800">
           <input type="checkbox" name="confirmReceived" required className="mt-0.5 size-4 accent-navy-800" />

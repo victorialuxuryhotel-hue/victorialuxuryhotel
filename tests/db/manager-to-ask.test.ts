@@ -6,14 +6,14 @@ import { db, desk, exec, gm, q1, rejects } from "./helpers";
 /** 5e: front desk is pointed at a manager to ask, preferring the general manager seen most recently. */
 describe("manager to ask", () => {
   it("names the most recently seen general manager, active today, with their phone", async () => {
-    await exec("UPDATE staff_profiles SET phone = ? WHERE id = ?", "+234 803 000 0000", gm.id);
-    await touchLastSeen(db, gm.id, new Date(Date.now() + 60_000).toISOString());
+    await exec("UPDATE staff_profiles SET phone = ? WHERE id = ?", "+234 803 000 0000", gm!.id);
+    await touchLastSeen(db, gm!.id, new Date(Date.now() + 60_000).toISOString());
     const m = await managerToAsk(db, desk, hotelToday());
     expect(m).toMatchObject({ name: "Dev Manager", role: "general_manager", phone: "+234 803 000 0000", activeToday: true });
   });
 
   it("is not 'active today' when last seen on an earlier Lagos day", async () => {
-    await touchLastSeen(db, gm.id, new Date(Date.now() + 60_000).toISOString());
+    await touchLastSeen(db, gm!.id, new Date(Date.now() + 60_000).toISOString());
     const m = await managerToAsk(db, desk, addDays(hotelToday(), 1));
     expect(m?.activeToday).toBe(false);
   });

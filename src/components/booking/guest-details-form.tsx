@@ -32,18 +32,18 @@ export function GuestDetailsForm({
         <h2 className="font-display text-[1.875rem] text-navy-950 sm:text-3xl">Your details</h2>
         <p className="mt-1 text-sm text-ink-500">We&apos;ll send your confirmation to this email.</p>
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          <Field label="Full name" htmlFor="name" required error={err("fullName")} className="sm:col-span-2">
+          <Field label="Full name" htmlFor="name" error={err("fullName")} className="sm:col-span-2">
             <Input id="name" name="fullName" autoComplete="name" required className="h-12" aria-invalid={Boolean(err("fullName"))} />
           </Field>
-          <Field label="Email" htmlFor="email" required error={err("email")}>
+          <Field label="Email" htmlFor="email" error={err("email")}>
             <Input id="email" name="email" type="email" inputMode="email" autoComplete="email" required className="h-12" aria-invalid={Boolean(err("email"))} />
           </Field>
-          <Field label="Phone" htmlFor="phone" required hint="Include the country code, e.g. +234." error={err("phone")}>
+          <Field label="Phone" htmlFor="phone" hint="Include the country code, e.g. +234." error={err("phone")}>
             <Input id="phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" required className="h-12" aria-invalid={Boolean(err("phone"))} />
           </Field>
         </div>
       </section>
-      <Field label="Special requests (optional)" htmlFor="requests" hint="Arrival time, accessibility needs, anything we should know. We'll do our best.">
+      <Field label="Special requests" optional htmlFor="requests" hint="Arrival time, accessibility needs, anything we should know. We'll do our best.">
         <Textarea id="requests" name="specialRequests" rows={3} maxLength={1000} />
       </Field>
       <section className="rounded-card bg-ivory-100 p-5 text-sm text-ink-700">

@@ -33,7 +33,7 @@ export function CategoryForm({ category, action = saveCategory }: { category?: C
         <Card>
           <CardHeader title="Details" description="Shown to guests on the website." />
           <div className="grid gap-5 p-5 sm:grid-cols-2">
-            <Field label="Name" htmlFor="cname" required error={err("name")}><Input id="cname" name="name" defaultValue={category?.name} required /></Field>
+            <Field label="Name" htmlFor="cname" error={err("name")}><Input id="cname" name="name" defaultValue={category?.name} required /></Field>
             <Field label="Web address" htmlFor="cslug" hint="e.g. deluxe" error={err("slug")}><Input id="cslug" name="slug" defaultValue={category?.slug} required /></Field>
             <Field label="Short description" htmlFor="cshort" className="sm:col-span-2" error={err("shortDescription")}>
               <Input id="cshort" name="shortDescription" defaultValue={category?.shortDescription} maxLength={200} />
@@ -41,7 +41,7 @@ export function CategoryForm({ category, action = saveCategory }: { category?: C
             <Field label="Full description" htmlFor="cdesc" className="sm:col-span-2" error={err("description")}>
               <Textarea id="cdesc" name="description" rows={5} defaultValue={category?.description} maxLength={4000} />
             </Field>
-            <Field label="Amenities" htmlFor="camen" hint="One per line, e.g. King bed." className="sm:col-span-2">
+            <Field label="Amenities" optional htmlFor="camen" hint="One per line, e.g. King bed." className="sm:col-span-2">
               <Textarea id="camen" name="amenities" rows={4} defaultValue={category?.amenities.join("\n")} />
             </Field>
           </div>
@@ -51,10 +51,10 @@ export function CategoryForm({ category, action = saveCategory }: { category?: C
         <Card>
           <CardHeader title="Pricing & capacity" />
           <div className="space-y-5 p-5">
-            <Field label="Nightly rate (₦)" htmlFor="crate" required error={err("nightlyRate")}>
+            <Field label="Nightly rate (₦)" htmlFor="crate" error={err("nightlyRate")}>
               <Input id="crate" name="nightlyRate" inputMode="decimal" min={MIN_NIGHTLY_RATE_KOBO / 100} defaultValue={category?.nightlyRateKobo ? String(category.nightlyRateKobo / 100) : ""} required />
             </Field>
-            <Field label="Maximum guests" htmlFor="cocc" required error={err("maxOccupancy")}>
+            <Field label="Maximum guests" htmlFor="cocc" error={err("maxOccupancy")}>
               <Input id="cocc" name="maxOccupancy" type="number" min={1} max={20} defaultValue={category?.maxOccupancy ?? 2} required />
             </Field>
             <Field label="Display order" htmlFor="csort" hint="Lower numbers appear first.">

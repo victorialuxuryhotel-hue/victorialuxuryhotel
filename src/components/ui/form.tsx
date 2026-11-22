@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { Children, cloneElement, isValidElement, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/utils/cn";
 
 const control =
@@ -6,24 +6,35 @@ const control =
 
 /**
  * Label + control + hint/error, wired for accessibility. Pass the control as
- * children with the same `id` as `htmlFor`.
+ * children with the same `id` as `htmlFor`. Required is the default; mark the
+ * exceptions `optional`. A single control child gets aria-describedby and
+ * aria-invalid automatically.
  */
-export function Field({ label, htmlFor, hint, error, required, children, className }: {
+export function Field({ label, htmlFor, hint, error, optional, children, className }: {
   label: string;
   htmlFor: string;
   hint?: string;
   error?: string;
-  required?: boolean;
+  optional?: boolean;
   children: ReactNode;
   className?: string;
 }) {
+  const describedBy = error ? `${htmlFor}-error` : hint ? `${htmlFor}-hint` : undefined;
+  const only = Children.count(children) === 1 ? Children.only(children) : null;
+  const control =
+    only && isValidElement(only) && describedBy
+      ? cloneElement(only as ReactElement<Record<string, unknown>>, {
+          "aria-describedby": describedBy,
+          ...(error ? { "aria-invalid": true } : {}),
+        })
+      : children;
   return (
     <div className={cn("space-y-1.5", className)}>
       <label htmlFor={htmlFor} className="block text-sm font-medium text-ink-700">
         {label}
-        {required ? <span className="text-danger-600"> *</span> : null}
+        {optional ? <span className="font-normal text-ink-500"> (optional)</span> : null}
       </label>
-      {children}
+      {control}
       {error ? (
         <p id={`${htmlFor}-error`} className="text-sm text-danger-700">{error}</p>
       ) : hint ? (
