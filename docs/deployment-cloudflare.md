@@ -27,8 +27,9 @@ Cloudflare account: `victorialuxuryhotel@gmail.com`. Domain registrar: Namecheap
 | Starter room types and 29 rooms loaded (`db/starter.sql`) | Done. Edit in the management app |
 | Live at **https://victorialuxuryhotel.com** and `www` (also `…workers.dev`) | Done, `/api/health` returns `{"ok":true}` |
 | Domain nameservers moved from Namecheap to Cloudflare | Done |
-| Resend DNS records in Cloudflare (DNS only) | Done; check the domain shows Verified in Resend |
+| Resend DNS records in Cloudflare (DNS only) | Done; domain Verified in Resend |
 | Custom domains on the Worker, site URL switched | Done |
+| Test accounts, one per role (Clerk development instance) | Done: `test.owner` / `test.manager` / `test.frontdesk` `+clerk_test@example.com`; passwords in git-ignored `.test-accounts.local`; code `424242`. **Deactivate before launch**; they disappear with the switch to Clerk production anyway |
 | First owner account | To do: needs the owner's name and email |
 | Resend sending from `bookings@victorialuxuryhotel.com` | To do once Resend shows the domain verified |
 | Paystack keys | To do: test keys first, live keys only with the hotel's approval |
