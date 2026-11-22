@@ -9,6 +9,8 @@ import type { ReservationDetail } from "@/domain/views";
 import { keepValues } from "@/lib/forms";
 import { formatDate, formatNaira } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
+import { whatsappLink } from "@/lib/whatsapp";
+import type { ManagerToAsk } from "@/server/domain/admin";
 import { cancelReservation, markNoShow, overridePayment } from "@/server/reservations";
 import { useActionFeedback, withFeedback } from "./action-feedback";
 import { CheckInButton, CheckOutButton } from "./reservation-actions";
@@ -98,8 +100,37 @@ function OverrideInline({ id }: { id: string }) {
  * Phones and tablets: the one next step pinned to the bottom, worded as the
  * action, with everything else under "Other options".
  */
-export function NextStepBar({ r, today, paymentsHref, canOverride }: { r: R; today: string; paymentsHref: string; canOverride: boolean }) {
-  const [sheet, setSheet] = useState<null | "menu" | "cancel" | "noshow" | "override">(null);
+const roleName = { general_manager: "General manager", owner: "Owner" } as const;
+
+/** Front desk: who to ask for a manager-only action. The phone shows only here, to signed-in staff. */
+function AskManager({ manager, what, onBack }: { manager: ManagerToAsk | null; what: string; onBack: () => void }) {
+  const first = manager?.name.split(" ")[0];
+  const wa = whatsappLink(manager?.phone, "");
+  return (
+    <div className="mt-4 space-y-3">
+      <p className="text-base text-ink-900">Ask a manager to {what}.</p>
+      {manager ? (
+        <>
+          <p className="text-sm text-ink-600">
+            {manager.name} · {roleName[manager.role]}{manager.activeToday ? " · active today" : ""}
+          </p>
+          {manager.phone ? (
+            <div className="grid grid-cols-2 gap-2">
+              <a href={`tel:${manager.phone.replace(/[^\d+]/g, "")}`} className={buttonStyles({ size: "lg", className: "w-full" })}>Call {first}</a>
+              {wa ? <a href={wa} target="_blank" rel="noreferrer" className={buttonStyles({ variant: "secondary", size: "lg", className: "w-full" })}>WhatsApp {first}</a> : null}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <p className="text-sm text-ink-600">No manager is set up yet.</p>
+      )}
+      <Button variant="ghost" onClick={onBack} className="w-full">Back</Button>
+    </div>
+  );
+}
+
+export function NextStepBar({ r, today, paymentsHref, canOverride, manager = null }: { r: R; today: string; paymentsHref: string; canOverride: boolean; manager?: ManagerToAsk | null }) {
+  const [sheet, setSheet] = useState<null | "menu" | "cancel" | "noshow" | "override" | "ask">(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const balance = r.totalKobo - r.paidKobo;
   const open = r.status === "pending_payment" || r.status === "confirmed";
@@ -128,7 +159,7 @@ export function NextStepBar({ r, today, paymentsHref, canOverride }: { r: R; tod
     primaryIsPayment = true;
   }
 
-  const options: Array<{ label: string; hint: string; onSelect?: () => void; href?: string; disabled?: boolean }> = [];
+  const options: Array<{ label: string; hint: string; onSelect?: () => void; href?: string; disabled?: boolean; manager?: boolean }> = [];
   if (canPay && !primaryIsPayment) options.push({ label: "Record a payment", hint: `${formatNaira(balance)} still owed`, href: paymentsHref });
   if (!closed) options.push({ label: "Change dates or room", hint: "Price updates automatically", href: "#change-stay" });
   if (r.status === "confirmed") {
@@ -136,6 +167,9 @@ export function NextStepBar({ r, today, paymentsHref, canOverride }: { r: R; tod
     options.push({ label: "Mark as no-show", hint: due ? "Closes the booking and releases the room" : `Available from ${formatDate(r.checkIn, { year: false })}`, onSelect: () => setSheet("noshow"), disabled: !due });
   }
   if (r.status === "pending_payment" && canOverride) options.push({ label: "Confirm without payment", hint: "Managers only · reason recorded", onSelect: () => setSheet("override") });
+  if (r.status === "pending_payment" && !canOverride) {
+    options.push({ label: "Confirm without payment", hint: "A manager does this · tap to ask", onSelect: () => setSheet("ask"), manager: true });
+  }
   if (open) options.push({ label: "Cancel booking", hint: "Releases the room", onSelect: () => setSheet("cancel") });
 
   if (!primary && options.length === 0) return null;
@@ -164,7 +198,10 @@ export function NextStepBar({ r, today, paymentsHref, canOverride }: { r: R; tod
                   </a>
                 ) : (
                   <button type="button" disabled={o.disabled} onClick={o.onSelect} className="flex min-h-14 w-full flex-col justify-center py-2 text-left disabled:opacity-60">
-                    <span className={cn("text-base", o.label.startsWith("Cancel") ? "text-danger-700" : "text-ink-900")}>{o.label}</span>
+                    <span className={cn("flex items-center gap-2 text-base", o.manager ? "text-ink-500" : o.label.startsWith("Cancel") ? "text-danger-700" : "text-ink-900")}>
+                      {o.label}
+                      {o.manager ? <span className="rounded-full border border-ivory-300 px-2 py-0.5 text-xs text-ink-600">Manager</span> : null}
+                    </span>
                     <span className="text-sm text-ink-500">{o.hint}</span>
                   </button>
                 )}
@@ -175,6 +212,7 @@ export function NextStepBar({ r, today, paymentsHref, canOverride }: { r: R; tod
         {sheet === "cancel" ? <CancelConfirm r={r} onKeep={() => setSheet("menu")} /> : null}
         {sheet === "noshow" ? <NoShowConfirm r={r} onKeep={() => setSheet("menu")} /> : null}
         {sheet === "override" ? <OverrideInline id={r.id} /> : null}
+        {sheet === "ask" ? <AskManager manager={manager} what="confirm this booking without full payment" onBack={() => setSheet("menu")} /> : null}
       </BottomSheet>
     </>
   );

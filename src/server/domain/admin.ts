@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/errors";
 import { dbErrorToken } from "../db-errors";
-import { all, first, MANAGERS, OWNER, requireRole, uuid, writeBatch, type Actor, type Db, type StaffRole } from "../db";
+import { hotelDateOf } from "@/lib/hotel-date";
+import { all, ALL_STAFF, first, MANAGERS, OWNER, requireRole, uuid, writeBatch, type Actor, type Db, type StaffRole } from "../db";
 
 /**
  * Configuration: room types, rooms, photos, booking rules and staff.
@@ -200,14 +201,18 @@ export async function updateBookingRules(
 // Staff (owner only). Identity is Clerk; role and access live here.
 // ---------------------------------------------------------------------------
 
-export type StaffRecord = { id: string; clerk_user_id: string | null; full_name: string; email: string; role: StaffRole; is_active: number };
+export type StaffRecord = {
+  id: string; clerk_user_id: string | null; full_name: string; email: string; role: StaffRole; is_active: number; last_seen_at?: string | null;
+};
 
-export async function createStaffProfile(db: Db, actor: Actor, v: { fullName: string; email: string; role: StaffRole }): Promise<string> {
+export async function createStaffProfile(db: Db, actor: Actor, v: { fullName: string; email: string; role: StaffRole; phone?: string | null }): Promise<string> {
   requireRole(actor, OWNER);
   const id = uuid();
   try {
     await writeBatch(db, actor, [
-      db.prepare("INSERT INTO staff_profiles (id, full_name, email, role) VALUES (?, ?, ?, ?)").bind(id, v.fullName.trim(), v.email.trim().toLowerCase(), v.role),
+      db
+        .prepare("INSERT INTO staff_profiles (id, full_name, email, role, phone) VALUES (?, ?, ?, ?, ?)")
+        .bind(id, v.fullName.trim(), v.email.trim().toLowerCase(), v.role, v.phone?.trim() || null),
     ]);
   } catch (err) {
     conflictOnUnique(err, "Someone with this email already has an account.");
@@ -228,11 +233,17 @@ export async function createFirstOwner(db: Db, v: { fullName: string; email: str
 }
 
 /** Change role or access. The "keep an owner" trigger and the audit trigger apply. */
-export async function updateStaffProfile(db: Db, actor: Actor, v: { staffId: string; role: StaffRole; isActive: boolean }): Promise<StaffRecord> {
+export async function updateStaffProfile(
+  db: Db,
+  actor: Actor,
+  v: { staffId: string; role: StaffRole; isActive: boolean; phone?: string | null },
+): Promise<StaffRecord> {
   requireRole(actor, OWNER);
   if (v.staffId === actor.id && !v.isActive) throw new AppError("VALIDATION", "You can't deactivate your own account.");
   const [result] = await writeBatch(db, actor, [
-    db.prepare("UPDATE staff_profiles SET role = ?, is_active = ? WHERE id = ?").bind(v.role, v.isActive ? 1 : 0, v.staffId),
+    v.phone === undefined
+      ? db.prepare("UPDATE staff_profiles SET role = ?, is_active = ? WHERE id = ?").bind(v.role, v.isActive ? 1 : 0, v.staffId)
+      : db.prepare("UPDATE staff_profiles SET role = ?, is_active = ?, phone = ? WHERE id = ?").bind(v.role, v.isActive ? 1 : 0, v.phone?.trim() || null, v.staffId),
   ]).catch((err: unknown) => {
     if (err instanceof AppError && dbErrorToken(err.cause) === "last_owner") throw new AppError("CONFLICT", "The hotel must always have at least one active owner.");
     throw err;
@@ -250,3 +261,39 @@ export async function linkClerkUser(db: Db, clerkUserId: string, email: string):
   return first<StaffRecord>(db, "SELECT id, clerk_user_id, full_name, email, role, is_active FROM staff_profiles WHERE clerk_user_id = ?", clerkUserId);
 }
 
+
+/**
+ * Records that a staff member is using the app, at most once an hour (the
+ * caller checks the age). Not a business change: no audit entry.
+ */
+export async function touchLastSeen(db: Db, staffId: string, at: string = new Date().toISOString()): Promise<void> {
+  await db.prepare("UPDATE staff_profiles SET last_seen_at = ? WHERE id = ? AND is_active = 1").bind(at, staffId).run();
+}
+
+export const LAST_SEEN_EVERY_MS = 60 * 60 * 1000;
+
+export type ManagerToAsk = { name: string; role: "general_manager" | "owner"; phone: string | null; activeToday: boolean };
+
+/**
+ * Who front desk should ask for a manager-only action. There's no shift data,
+ * so: the most recently active general manager, else the most recently active
+ * owner. "Active today" only when they really used the app today (Lagos time).
+ * For signed-in staff only; the phone number is never shown to guests.
+ */
+export async function managerToAsk(db: Db, actor: Actor, today: string): Promise<ManagerToAsk | null> {
+  requireRole(actor, ALL_STAFF);
+  const row = await first<{ full_name: string; role: "general_manager" | "owner"; phone: string | null; last_seen_at: string | null }>(
+    db,
+    `SELECT full_name, role, phone, last_seen_at FROM staff_profiles
+     WHERE is_active = 1 AND role IN ('general_manager', 'owner')
+     ORDER BY role = 'general_manager' DESC, last_seen_at IS NULL, last_seen_at DESC, full_name
+     LIMIT 1`,
+  );
+  if (!row) return null;
+  return {
+    name: row.full_name,
+    role: row.role,
+    phone: row.phone,
+    activeToday: row.last_seen_at ? hotelDateOf(row.last_seen_at) === today : false,
+  };
+}

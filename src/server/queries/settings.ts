@@ -3,9 +3,10 @@ import { clerkClient } from "@clerk/nextjs/server";
 import type { BookingRules } from "@/components/management/settings-forms";
 import type { ActivityRow, StaffRow } from "@/domain/views";
 import { logger } from "@/lib/logger";
-import { authorize } from "../auth";
+import { hotelToday } from "@/lib/hotel-date";
+import { actorOf, authorize } from "../auth";
 import { all, first, getDb } from "../db";
-import type { StaffRecord } from "../domain/admin";
+import { managerToAsk, type StaffRecord } from "../domain/admin";
 
 export async function getBookingRules(): Promise<BookingRules> {
   await authorize();
@@ -26,7 +27,10 @@ export async function getBookingRules(): Promise<BookingRules> {
 /** Owner only. Last sign-in comes from Clerk (best effort: the list still shows if Clerk is unreachable). */
 export async function listStaff(): Promise<StaffRow[]> {
   await authorize("staff.manage");
-  const staff = await all<StaffRecord>(await getDb(), "SELECT id, clerk_user_id, full_name, email, role, is_active FROM staff_profiles ORDER BY full_name");
+  const staff = await all<StaffRecord & { phone: string | null }>(
+    await getDb(),
+    "SELECT id, clerk_user_id, full_name, email, role, is_active, phone FROM staff_profiles ORDER BY full_name",
+  );
   const linked = staff.map((s) => s.clerk_user_id).filter((id): id is string => Boolean(id));
   const lastSignIn = new Map<string, string | undefined>();
   if (linked.length) {
@@ -43,6 +47,7 @@ export async function listStaff(): Promise<StaffRow[]> {
     email: s.email,
     role: s.role,
     isActive: s.is_active === 1,
+    phone: s.phone ?? undefined,
     lastSignIn: s.clerk_user_id ? lastSignIn.get(s.clerk_user_id) : undefined,
   }));
 }
@@ -64,4 +69,10 @@ export async function recentActivity(limit = 50): Promise<ActivityRow[]> {
     summary: a.summary,
     actor: a.actor ?? (a.actor_type === "system" ? "System" : "Staff"),
   }));
+}
+
+/** Front desk: which manager to ask for a manager-only action (name, role, phone). Signed-in staff only. */
+export async function managerToAskForDesk() {
+  const staff = await authorize();
+  return managerToAsk(await getDb(), actorOf(staff), hotelToday());
 }

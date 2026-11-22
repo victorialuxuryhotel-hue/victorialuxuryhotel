@@ -8,6 +8,7 @@ import { can } from "@/lib/auth/permissions";
 import { requireStaff } from "@/server/auth";
 import { getReservation, hotelToday } from "@/server/queries/reservations";
 import { assignableRooms } from "@/server/queries/rooms";
+import { managerToAskForDesk } from "@/server/queries/settings";
 
 export const metadata: Metadata = { title: "Reservation" };
 
@@ -17,7 +18,11 @@ async function Content({ params, searchParams }: PageProps<"/app/reservations/[i
   if (!z.uuid().safeParse(id).success) notFound();
   const [r, today] = await Promise.all([getReservation(id), hotelToday()]);
   if (!r) notFound();
-  const rooms = ["pending_payment", "confirmed", "checked_in"].includes(r.status) ? await assignableRooms(r.id, r.checkIn, r.checkOut) : [];
+  const canOverride = can(staff.role, "payments.override");
+  const [rooms, manager] = await Promise.all([
+    ["pending_payment", "confirmed", "checked_in"].includes(r.status) ? assignableRooms(r.id, r.checkIn, r.checkOut) : Promise.resolve([]),
+    canOverride ? Promise.resolve(null) : managerToAskForDesk(),
+  ]);
   const sp = await searchParams;
   return (
     <ReservationDetailView
@@ -29,7 +34,8 @@ async function Content({ params, searchParams }: PageProps<"/app/reservations/[i
       guestHref={`/app/guests/${r.guestId}`}
       rooms={rooms}
       maxGuests={r.maxGuests}
-      canOverride={can(staff.role, "payments.override")}
+      canOverride={canOverride}
+      manager={manager}
       justCreated={sp.created === "1"}
       paidReceipt={typeof sp.paid === "string" && /^RCT-\d{4}-\d{6}$/.test(sp.paid) ? sp.paid : undefined}
     />

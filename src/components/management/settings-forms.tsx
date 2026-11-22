@@ -18,12 +18,15 @@ export function InviteStaffForm() {
     <form action={action} onSubmit={keepValues(action)} className="space-y-4 p-5">
       {state?.ok ? <FormMessage tone="success">Invitation sent to {state.data.email}. They&apos;ll set their own password.</FormMessage> : null}
       {state && !state.ok && !state.fieldErrors ? <FormMessage>{state.message}</FormMessage> : null}
-      <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-start">
+      <div className="grid gap-4 sm:grid-cols-2 sm:items-start xl:grid-cols-[1fr_1fr_11rem_auto_auto]">
         <Field label="Full name" htmlFor="sname" error={fieldError(state, "fullName")}>
           <Input id="sname" name="fullName" required aria-invalid={Boolean(fieldError(state, "fullName"))} />
         </Field>
         <Field label="Email" htmlFor="semail" error={fieldError(state, "email")}>
           <Input id="semail" name="email" type="email" required aria-invalid={Boolean(fieldError(state, "email"))} />
+        </Field>
+        <Field label="Phone (optional)" htmlFor="sphone" error={fieldError(state, "phone")}>
+          <Input id="sphone" name="phone" type="tel" inputMode="tel" autoComplete="off" aria-invalid={Boolean(fieldError(state, "phone"))} />
         </Field>
         <Field label="Role" htmlFor="srole">
           <Select id="srole" name="role" defaultValue="front_desk">
@@ -32,15 +35,32 @@ export function InviteStaffForm() {
         </Field>
         <Button type="submit" pending={pending} className="sm:mt-7">Send invite</Button>
       </div>
+      <p className="text-xs text-ink-500">
+        A manager&apos;s phone is shown only to signed-in staff, when front desk needs to ask a manager. Never to guests.
+      </p>
     </form>
   );
 }
 
-export function StaffAccessForm({ staffId, role, isActive, isSelf }: { staffId: string; role: StaffRole; isActive: boolean; isSelf: boolean }) {
+export function StaffAccessForm({
+  staffId,
+  role,
+  isActive,
+  isSelf,
+  phone,
+}: {
+  staffId: string;
+  role: StaffRole;
+  isActive: boolean;
+  isSelf: boolean;
+  phone?: string;
+}) {
   const [state, action, pending] = useActionState(updateStaff, null);
   return (
     <form action={action} onSubmit={keepValues(action)} className="flex flex-wrap items-center justify-end gap-2">
       <input type="hidden" name="staffId" value={staffId} />
+      <label className="sr-only" htmlFor={`phone-${staffId}`}>Phone</label>
+      <Input id={`phone-${staffId}`} name="phone" type="tel" inputMode="tel" defaultValue={phone ?? ""} placeholder="Phone" className="h-8 w-36 text-xs" />
       <label className="sr-only" htmlFor={`role-${staffId}`}>Role</label>
       <Select id={`role-${staffId}`} name="role" defaultValue={role} className="h-8 w-auto text-xs">
         {(Object.keys(staffRole) as StaffRole[]).map((r) => <option key={r} value={r}>{staffRole[r]}</option>)}

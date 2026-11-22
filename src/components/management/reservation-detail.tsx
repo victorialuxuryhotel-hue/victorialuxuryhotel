@@ -4,7 +4,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Collapsible } from "@/components/ui/collapsible";
 import { FormMessage } from "@/components/ui/form";
-import { bookingSource, paymentMethod } from "@/domain/status";
+import { bookingSource, paymentMethod, staffRole } from "@/domain/status";
 import type { ReservationDetail as Detail } from "@/domain/views";
 import { hotel } from "@/config/hotel";
 import { publicEnv } from "@/lib/env";
@@ -25,6 +25,7 @@ import {
 } from "./reservation-actions";
 import { ActionFeedbackProvider } from "./action-feedback";
 import { CorrectPaymentForm } from "./payment-correction";
+import type { ManagerToAsk } from "@/server/domain/admin";
 import { NextStepBar } from "./reservation-guide";
 import { reservationSteps, StepList } from "./reservation-steps";
 
@@ -56,6 +57,7 @@ export function ReservationDetailView({
   maxGuests,
   justCreated,
   paidReceipt,
+  manager,
 }: {
   r: Detail & { roomId?: string; publicToken?: string };
   today: string;
@@ -69,6 +71,8 @@ export function ReservationDetailView({
   justCreated?: boolean;
   /** Receipt number of a payment just recorded, to confirm it to staff. */
   paidReceipt?: string;
+  /** For roles that can't do manager-only actions: who to ask. */
+  manager?: ManagerToAsk | null;
 }) {
   const balance = r.totalKobo - r.paidKobo;
   // The guest's own receipt page, shareable on WhatsApp (no sign-in needed; the token is unguessable).
@@ -153,6 +157,12 @@ export function ReservationDetailView({
       {steps ? <div className="mt-5 lg:max-w-md"><StepList steps={steps} /></div> : null}
 
       {r.status === "pending_payment" && canOverride ? <div className="hidden lg:block"><OverrideForm reservationId={r.id} /></div> : null}
+      {r.status === "pending_payment" && !canOverride ? (
+        <p className="mt-6 hidden rounded-card border border-ivory-200 bg-white p-4 text-sm text-ink-700 lg:block">
+          <span className="mr-2 rounded-full bg-ivory-200 px-2 py-0.5 text-xs font-medium text-ink-600">Manager</span>
+          To confirm without full payment or hold the room longer, ask {manager ? `${manager.name} (${staffRole[manager.role]})` : "a manager"}.
+        </p>
+      ) : null}
 
       {r.attention ? (
         <div role="alert" className="mt-6 flex gap-3 rounded-card border border-warning-600/30 bg-warning-50 p-4 text-sm text-warning-700">
@@ -160,7 +170,7 @@ export function ReservationDetailView({
           <div className="flex-1">
             <p className="font-medium">Needs attention</p>
             <p className="mt-0.5">{r.attention}</p>
-            {canOverride ? <ResolveAttentionForm reservationId={r.id} /> : null}
+            {canOverride ? <ResolveAttentionForm reservationId={r.id} /> : <p className="mt-1 text-xs">A manager marks this resolved once it&apos;s sorted.</p>}
           </div>
         </div>
       ) : null}
@@ -316,7 +326,7 @@ export function ReservationDetailView({
         </div>
       </div>
       {/* Phones and tablets: the next step pinned to the bottom. Reset when the status changes. */}
-      <NextStepBar key={r.status} r={r} today={today} paymentsHref={paymentsHref} canOverride={canOverride} />
+      <NextStepBar key={r.status} r={r} today={today} paymentsHref={paymentsHref} canOverride={canOverride} manager={manager ?? null} />
     </div>
     </ActionFeedbackProvider>
   );

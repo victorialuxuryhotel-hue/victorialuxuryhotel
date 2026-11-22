@@ -12,10 +12,19 @@ import { createStaffProfile, updateStaffProfile } from "./domain/admin";
 
 const roleSchema = z.enum(["owner", "general_manager", "front_desk"]);
 
+/** Optional staff phone (shown only to signed-in staff, e.g. "ask a manager"). */
+const phoneSchema = z
+  .string()
+  .trim()
+  .max(20)
+  .refine((v) => v === "" || /^\+?[0-9][0-9 ()-]{6,19}$/.test(v), "Enter a phone number, e.g. +234 803 123 4567")
+  .optional();
+
 const inviteSchema = z.object({
   fullName: z.string().trim().min(2, "Enter the person's full name").max(120),
   email: z.email("Enter a valid email").transform((e) => e.toLowerCase()),
   role: roleSchema,
+  phone: phoneSchema,
 });
 
 /** Clerk errors carry codes; anything else is unexpected. */
@@ -34,7 +43,7 @@ export async function inviteStaff(_prev: ActionResult<{ email: string }> | null,
     if (!parsed.success) {
       throw new AppError("VALIDATION", "Check the details", { fieldErrors: z.flattenError(parsed.error).fieldErrors });
     }
-    const { fullName, email, role } = parsed.data;
+    const { fullName, email, role, phone } = parsed.data;
     const db = await getDb();
     if (await first(db, "SELECT 1 FROM staff_profiles WHERE email = ?", email)) throw new AppError("CONFLICT", "Someone with this email already has an account.");
 
@@ -54,7 +63,7 @@ export async function inviteStaff(_prev: ActionResult<{ email: string }> | null,
     }
 
     try {
-      await createStaffProfile(db, actorOf(me), { fullName, email, role });
+      await createStaffProfile(db, actorOf(me), { fullName, email, role, phone: phone || null });
     } catch (err) {
       await clerk.invitations.revokeInvitation(invitationId).catch((e: unknown) => logger.error("staff.invite_revoke_failed", e));
       throw err;
@@ -71,6 +80,7 @@ const updateSchema = z.object({
   staffId: z.uuid(),
   role: roleSchema,
   isActive: z.enum(["true", "false"]).transform((v) => v === "true"),
+  phone: phoneSchema,
 });
 
 /**
@@ -83,9 +93,9 @@ export async function updateStaff(_prev: ActionResult | null, formData: FormData
   try {
     const me = await authorize("staff.manage");
     const parsed = updateSchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) throw new AppError("VALIDATION", "Invalid request");
-    const { staffId, role, isActive } = parsed.data;
-    const record = await updateStaffProfile(await getDb(), actorOf(me), { staffId, role, isActive });
+    if (!parsed.success) throw new AppError("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request");
+    const { staffId, role, isActive, phone } = parsed.data;
+    const record = await updateStaffProfile(await getDb(), actorOf(me), { staffId, role, isActive, phone: phone === undefined ? undefined : phone || null });
 
     if (record.clerk_user_id) {
       const clerk = await clerkClient();

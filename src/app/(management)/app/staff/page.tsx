@@ -33,7 +33,7 @@ async function Content() {
         <InviteStaffForm />
       </SettingsSection>
       <SettingsSection title="Team" description="Only the owner can change roles or remove access.">
-        <StaffTable rows={team} manage={(s) => <StaffAccessForm staffId={s.id} role={s.role} isActive={s.isActive} isSelf={s.id === staff.id} />} />
+        <StaffTable rows={team} manage={(s) => <StaffAccessForm staffId={s.id} role={s.role} isActive={s.isActive} isSelf={s.id === staff.id} phone={s.phone} />} />
       </SettingsSection>
     </div>
   );

@@ -8,7 +8,7 @@ import { can, type Permission } from "@/lib/auth/permissions";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { first, getDb, type Actor } from "./db";
-import { linkClerkUser, type StaffRecord } from "./domain/admin";
+import { LAST_SEEN_EVERY_MS, linkClerkUser, touchLastSeen, type StaffRecord } from "./domain/admin";
 
 export type Staff = { id: string; fullName: string; email: string; role: StaffRole };
 
@@ -28,7 +28,11 @@ export const getCurrentStaff = cache(async (): Promise<Staff | null> => {
   if (!userId) return null;
 
   const db = await getDb();
-  let record = await first<StaffRecord>(db, "SELECT id, clerk_user_id, full_name, email, role, is_active FROM staff_profiles WHERE clerk_user_id = ?", userId);
+  let record = await first<StaffRecord>(
+    db,
+    "SELECT id, clerk_user_id, full_name, email, role, is_active, last_seen_at FROM staff_profiles WHERE clerk_user_id = ?",
+    userId,
+  );
   if (!record) {
     const user = await currentUser();
     const email = user?.primaryEmailAddress;
@@ -37,6 +41,10 @@ export const getCurrentStaff = cache(async (): Promise<Staff | null> => {
     if (record) logger.info("auth.staff_linked", { staffId: record.id });
   }
   if (!record || !record.is_active) return null;
+  // "Last active", at most once an hour (used to pick which manager front desk asks).
+  if (!record.last_seen_at || Date.now() - Date.parse(record.last_seen_at) > LAST_SEEN_EVERY_MS) {
+    await touchLastSeen(db, record.id).catch((err: unknown) => logger.warn("auth.last_seen_failed", { error: err instanceof Error ? err.message : "error" }));
+  }
   return { id: record.id, fullName: record.full_name, email: record.email, role: record.role };
 });
 
