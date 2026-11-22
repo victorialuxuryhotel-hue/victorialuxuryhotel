@@ -44,13 +44,20 @@ export function MapCard({ className, embedClassName }: { className?: string; emb
           <ArrowUpRight className="size-5 shrink-0 text-gold-600 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
         </div>
       </a>
-      <iframe
-        title={`Map showing ${hotel.name}`}
-        src={`https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`}
-        className={cn("hidden w-full border-0 lg:block", embedClassName)}
-        loading="lazy"
-        referrerPolicy="no-referrer-when-downgrade"
-      />
+      <MapEmbed className={embedClassName} />
     </>
+  );
+}
+
+/** The interactive map, large screens only (on phones it would catch the scroll). */
+export function MapEmbed({ className }: { className?: string }) {
+  return (
+    <iframe
+      title={`Map showing ${hotel.name}`}
+      src={`https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`}
+      className={cn("hidden w-full border-0 lg:block", className)}
+      loading="lazy"
+      referrerPolicy="no-referrer-when-downgrade"
+    />
   );
 }

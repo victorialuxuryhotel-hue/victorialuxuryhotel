@@ -34,8 +34,7 @@ export type Photo = { image?: string; alt: string; shot?: string };
 export const home = {
   eyebrow: "Alagbaka GRA · Akure",
   title: "Where every guest is treated as royalty",
-  intro:
-    "An exclusive indoor pool, an in-house spa and a relaxed lounge and bar, in the heart of Alagbaka GRA. Book direct for instant confirmation.",
+  intro: "Indoor pool, in-house spa, lounge and bar. 24/7 power and free Wi-Fi.",
   hero: {
     alt: "Victoria Luxury Hotel at dusk",
     shot: "Arrival at golden hour: the façade glowing warm against a deep-blue sky, entrance lit, a hint of welcome inside.",
