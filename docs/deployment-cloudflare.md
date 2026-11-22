@@ -25,10 +25,10 @@ Cloudflare account: `victorialuxuryhotel@gmail.com`. Domain registrar: Namecheap
 | --- | --- |
 | D1 migrations 0001–0007 applied to production | Done |
 | Starter room types and 29 rooms loaded (`db/starter.sql`) | Done. Edit in the management app |
-| Deployed to `https://victorialuxuryhotel.victorialuxuryhotel.workers.dev` | Done, `/api/health` returns `{"ok":true}` |
-| Domain nameservers moved from Namecheap to Cloudflare | Done at the registry; waiting for Cloudflare to mark the zone Active |
-| Resend DNS records copied to Cloudflare | Done, but **`resend._domainkey` must hold the full key** (see below) |
-| Custom domain on the Worker, site URL switched, redeploy | To do once the zone is Active |
+| Live at **https://victorialuxuryhotel.com** and `www` (also `…workers.dev`) | Done, `/api/health` returns `{"ok":true}` |
+| Domain nameservers moved from Namecheap to Cloudflare | Done |
+| Resend DNS records in Cloudflare (DNS only) | Done; check the domain shows Verified in Resend |
+| Custom domains on the Worker, site URL switched | Done |
 | First owner account | To do: needs the owner's name and email |
 | Resend sending from `bookings@victorialuxuryhotel.com` | To do once Resend shows the domain verified |
 | Paystack keys | To do: test keys first, live keys only with the hotel's approval |
@@ -51,7 +51,7 @@ Production overrides live in the git-ignored **`.env.production.local`**, which
 takes priority over `.env.local`:
 
 ```
-NEXT_PUBLIC_SITE_URL=https://victorialuxuryhotel.victorialuxuryhotel.workers.dev   # → https://victorialuxuryhotel.com after the domain move
+NEXT_PUBLIC_SITE_URL=https://victorialuxuryhotel.com
 PAYSTACK_BASE_URL=
 RESEND_BASE_URL=
 ALERT_WEBHOOK_URL=
@@ -105,9 +105,9 @@ Email-related records must be **DNS only (grey cloud)**.
 The Namecheap `www → parkingpage.namecheap.com` CNAME and the `@` URL redirect are
 replaced when the domain is attached to the Worker.
 
-## Attaching the domain to the Worker (once Active)
+## Attaching the domain to the Worker
 
-Add to `wrangler.jsonc`, set `NEXT_PUBLIC_SITE_URL=https://victorialuxuryhotel.com`
+Done. For reference, `wrangler.jsonc` has, set `NEXT_PUBLIC_SITE_URL=https://victorialuxuryhotel.com`
 in `.env.production.local`, then `pnpm cf:deploy`:
 
 ```jsonc
@@ -117,8 +117,9 @@ in `.env.production.local`, then `pnpm cf:deploy`:
 ]
 ```
 
-A custom domain can't be created over an existing DNS record of the same name,
-so delete the old `www` CNAME first. Cloudflare issues the HTTPS certificate
+A custom domain can't be created over an existing DNS record of the same name
+(error 100117): the old root and `www` records from Namecheap had to be deleted
+first. Email CNAMEs (`send`, `rsend`) must stay **DNS only**; proxying them breaks Resend. Cloudflare issues the HTTPS certificate
 automatically.
 
 ## Checks after each deploy

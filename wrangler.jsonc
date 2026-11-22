@@ -27,6 +27,12 @@
   ],
   // Hotel photos (room types and website), served by /media/[...key].
   // R2 must be enabled on the account before the first deploy.
+  // The hotel's domain (DNS on Cloudflare). workers.dev stays on as a fallback address.
+  "routes": [
+    { "pattern": "victorialuxuryhotel.com", "custom_domain": true },
+    { "pattern": "www.victorialuxuryhotel.com", "custom_domain": true }
+  ],
+  "workers_dev": true,
   "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "victorialuxuryhotel" }],
   // next/image optimization via Cloudflare Images.
   "images": { "binding": "IMAGES" },
