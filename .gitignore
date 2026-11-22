@@ -54,3 +54,6 @@ supabase/.temp
 /.tmp/
 .clerk/
 .test-accounts.local
+
+# Production database exports (contain guest data)
+backups/
