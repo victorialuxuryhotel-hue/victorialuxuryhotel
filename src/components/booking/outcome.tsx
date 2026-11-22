@@ -87,6 +87,9 @@ export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
         <p className="mt-3 text-sm text-ink-700">
           Questions? <a href={`https://wa.me/${hotel.whatsapp}`} className="text-navy-800 underline underline-offset-2">WhatsApp us</a> or <a href={`tel:${hotel.phone}`} className="text-navy-800 underline underline-offset-2">call the front desk</a>.
         </p>
+        <p className="mt-2 text-sm text-ink-700">
+          Need to change dates or cancel? <Link href="/account" className="text-navy-800 underline underline-offset-2">Manage your booking</Link>
+        </p>
         {stay.receiptNumber ? (
           <p className="mt-2 text-sm text-ink-500">
             Receipt <Link href={`/book/receipt/${stay.token}/${stay.receiptNumber}`} className="text-navy-800 underline underline-offset-2">{stay.receiptNumber}</Link>

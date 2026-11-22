@@ -30,6 +30,7 @@ export function SiteFooter() {
               </li>
             ))}
             <li><Link href="/book" className="hover:text-gold-300">Book your stay</Link></li>
+            <li><Link href="/account" className="hover:text-gold-300">My bookings</Link></li>
           </ul>
         </div>
 

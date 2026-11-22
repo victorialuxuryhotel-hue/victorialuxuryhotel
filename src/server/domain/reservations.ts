@@ -573,6 +573,11 @@ export async function overridePaymentRequirement(
 
 export async function changeReservationDates(db: Db, actor: Actor, reservationId: string, checkIn: string, checkOut: string): Promise<void> {
   requireRole(actor, ALL_STAFF);
+  await changeDates(db, actor, reservationId, checkIn, checkOut);
+}
+
+/** The date change itself. Callers check who may do it (staff role, or the guest who owns the booking). */
+export async function changeDates(db: Db, actor: Actor, reservationId: string, checkIn: string, checkOut: string, byGuest = false): Promise<void> {
   await retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
     if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) throw new AppError("INVALID_TRANSITION", "This reservation is closed.");
@@ -599,6 +604,13 @@ export async function changeReservationDates(db: Db, actor: Actor, reservationId
         .bind(checkIn, checkOut, newTotal, nightsBetween(checkIn, checkOut), res.id),
     ];
     const newDue = newTotal + (await newExtras(db, res.id, nightsBetween(checkIn, checkOut))) - Math.round((newTotal * res.discount_pct) / 100);
+    if (byGuest && res.status === "confirmed" && newDue > paid) {
+      stmts.push(
+        db
+          .prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?")
+          .bind(`Dates changed by the guest online: ${formatNaira(newDue - paid)} more to pay. Collect it at check-in.`, res.id),
+      );
+    }
     if (paid > newDue) {
       stmts.push(
         db

@@ -176,3 +176,15 @@ export function hotelNewBookingEmail(s: StayInfo, source: string, siteUrl: strin
   const rows = stayRows(s);
   return { subject: `New booking ${s.reference}: ${formatDate(s.checkIn)}`, html: layout({ preheader: intro, heading, intro, rows, siteUrl }), text: text(heading, intro, rows) };
 }
+
+/** The 6-digit code a guest types to open their bookings. */
+export function guestCodeEmail(code: string, siteUrl: string) {
+  const heading = "Your sign-in code";
+  const intro = "Enter this code on the Victoria Luxury website to see and manage your bookings. It expires in 15 minutes.";
+  const note = "If you didn't ask for this code, you can ignore this email.";
+  return {
+    subject: `Your Victoria Luxury code: ${code}`,
+    html: layout({ preheader: `Your code is ${code}`, heading, intro, feature: { label: "Sign-in code", value: code }, rows: [], note, siteUrl }),
+    text: text(heading, intro, [["Sign-in code", code]], note),
+  };
+}

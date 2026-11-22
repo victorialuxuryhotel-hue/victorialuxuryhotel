@@ -1,0 +1,54 @@
+import { describe, expect, it } from "vitest";
+import { recordOfflinePayment } from "@/server/domain/payments";
+import { createWebsiteReservation } from "@/server/domain/reservations";
+import { cancellationFee, checkGuestCode, guestBookings, guestCancel, guestChangeDates, issueGuestCode } from "@/server/domain/guest-account";
+import { day, db, desk, makeCategory, q1, rejects, status } from "./helpers";
+
+const mail = () => `g-${crypto.randomUUID().slice(0, 8)}@example.com`;
+
+async function book(email: string, inDays: number) {
+  const c = await makeCategory(2, { rateKobo: 5_500_000 });
+  return createWebsiteReservation(db, { categorySlug: c.slug, checkIn: day(inDays), checkOut: day(inDays + 2), guests: 1, fullName: "Guest Self", email, phone: "+2348000000004" });
+}
+
+describe("guest accounts", () => {
+  it("issues a single-use code only to emails with bookings, and locks after five wrong tries", async () => {
+    expect(await issueGuestCode(db, mail())).toBeNull();
+    const e = mail();
+    await book(e, 30);
+    const code = (await issueGuestCode(db, e.toUpperCase()))!;
+    expect(code).toMatch(/^\d{6}$/);
+    expect(await checkGuestCode(db, e, "000000" === code ? "111111" : "000000")).toBe(false);
+    expect(await checkGuestCode(db, e, code)).toBe(true);
+    expect(await checkGuestCode(db, e, code)).toBe(false);
+    const next = (await issueGuestCode(db, e))!;
+    for (let i = 0; i < 5; i++) await checkGuestCode(db, e, next === "999999" ? "888888" : "999999");
+    expect(await checkGuestCode(db, e, next)).toBe(false);
+  });
+
+  it("charges the late fee inside the window only", () => {
+    const rule = { checkInTime: "14:00", freeHours: 48, feePct: 50 };
+    const at = Date.parse("2026-12-01T13:00:00Z"); // 2pm in Lagos
+    expect(cancellationFee(11_000_000, "2026-12-04", rule, at)).toBe(0);
+    expect(cancellationFee(11_000_000, "2026-12-02", rule, at)).toBe(5_500_000);
+  });
+
+  it("lists only the guest's bookings; cancelling a paid one keeps the fee and flags the refund", async () => {
+    const e = mail();
+    const far = await book(e, 30);
+    const near = await book(e, 1);
+    await book(mail(), 30);
+    expect((await guestBookings(db, e)).map((b) => b.reference).sort()).toEqual([far.reference, near.reference].sort());
+
+    await recordOfflinePayment(db, desk, { reservationId: near.id, amountKobo: 11_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
+    const r = await guestCancel(db, e, near.id);
+    expect(r).toEqual({ feeKobo: 5_500_000, refundKobo: 5_500_000 });
+    expect(await status(near.id)).toBe("cancelled");
+    expect((await q1<{ attention_reason: string }>("SELECT attention_reason FROM reservations WHERE id = ?", near.id)).attention_reason).toMatch(/Refund ₦55,000/);
+
+    // Someone else's booking looks like it doesn't exist.
+    await rejects(guestCancel(db, mail(), far.id), /not found/i);
+    await guestChangeDates(db, e, far.id, day(31), day(34));
+    expect(await q1("SELECT check_in, check_out, total_amount_kobo FROM reservations WHERE id = ?", far.id)).toEqual({ check_in: day(31), check_out: day(34), total_amount_kobo: 16_500_000 });
+  });
+});
