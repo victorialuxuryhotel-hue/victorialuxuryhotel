@@ -7,6 +7,7 @@ import { BookingConfirmed, PaymentFailed, PaymentPending } from "@/components/bo
 import { Container } from "@/components/public/section";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
+import { publicEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { getBookingByToken, publicBookingRules } from "@/server/queries/booking";
 import { settlePaystackReference } from "@/server/payment-flow";
@@ -41,6 +42,7 @@ async function Outcome({ params }: { params: Promise<{ token: string }> }) {
           reference: b.reference, guestName: b.guest.full_name, email: b.guest.email ?? "", category: b.category.name,
           checkIn: b.check_in, checkOut: b.check_out, nights: b.nights ?? 0, guests: b.guest_count, paidKobo: b.paidKobo,
           receiptNumber: b.receipt ?? "", checkInTime: timeLabel(rules.checkInTime), checkOutTime: timeLabel(rules.checkOutTime),
+          token, siteUrl: publicEnv().NEXT_PUBLIC_SITE_URL,
         }}
       />
     );

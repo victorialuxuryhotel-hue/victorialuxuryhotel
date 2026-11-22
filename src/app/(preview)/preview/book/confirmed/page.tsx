@@ -6,7 +6,7 @@ export default function Page() {
   return (
     <Container className="py-16 sm:py-24">
       <BookingConfirmed
-        stay={{ reference: "VL-7KQ3PM", guestName: "Adaeze Okafor", email: "adaeze@example.com", category: chosen.name, checkIn: search.checkIn, checkOut: search.checkOut, nights: chosen.nights, guests: search.guests, paidKobo: chosen.totalKobo, receiptNumber: "RCT-2026-000041", checkInTime: "2:00 pm", checkOutTime: "12:00 noon" }}
+        stay={{ reference: "VL-7KQ3PM", guestName: "Adaeze Okafor", email: "adaeze@example.com", category: chosen.name, checkIn: search.checkIn, checkOut: search.checkOut, nights: chosen.nights, guests: search.guests, paidKobo: chosen.totalKobo, receiptNumber: "RCT-2026-000041", checkInTime: "2:00 pm", checkOutTime: "12:00 noon", token: "00000000-0000-4000-8000-000000000000", siteUrl: "https://victorialuxuryhotel.com" }}
       />
     </Container>
   );
