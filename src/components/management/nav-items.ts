@@ -1,8 +1,9 @@
-import { BedDouble, CalendarCheck, ConciergeBell, CreditCard, LayoutDashboard, Settings, Users } from "lucide-react";
+import { BedDouble, CalendarCheck, ConciergeBell, CreditCard, LayoutDashboard, Settings, Sun, Users } from "lucide-react";
 
 /** Management navigation. A plain module so both server and client code can import it. */
 export const managementNav = [
   { href: "/app", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/app/today", label: "Today", icon: Sun },
   { href: "/app/front-desk", label: "Front desk", icon: ConciergeBell },
   { href: "/app/reservations", label: "Reservations", icon: CalendarCheck },
   { href: "/app/rooms", label: "Rooms", icon: BedDouble },

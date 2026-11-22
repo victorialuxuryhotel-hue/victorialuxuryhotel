@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { CalendarPlus } from "lucide-react";
 import { MovementList } from "@/components/management/front-desk";
@@ -52,6 +53,8 @@ async function Revenue() {
 
 async function Content() {
   const staff = await requireStaff();
+  // The front desk's home is Today; managers keep the dashboard.
+  if (staff.role === "front_desk") redirect("/app/today");
   const [m, rooms, awaiting, recent] = await Promise.all([movements(), roomBoard(), awaitingPaymentCount(), listReservations({ tab: "all" })]);
   const noRoom = m.arrivals.filter((a) => !a.roomNumber).length;
   const owing = m.departures.filter((d) => d.totalKobo > d.paidKobo).length;

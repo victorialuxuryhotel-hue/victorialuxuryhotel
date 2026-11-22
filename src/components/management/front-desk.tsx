@@ -12,8 +12,11 @@ export function MovementList({
   kind,
   rows,
   hrefFor,
+  title,
 }: {
   kind: "arrivals" | "departures";
+  /** Defaults to "Arrivals" / "Departures". */
+  title?: string;
   rows: ReservationRow[];
   hrefFor: (r: ReservationRow) => string;
 }) {
@@ -21,7 +24,7 @@ export function MovementList({
   return (
     <Card>
       <CardHeader
-        title={arrivals ? "Arrivals" : "Departures"}
+        title={title ?? (arrivals ? "Arrivals" : "Departures")}
         description={arrivals ? "Assign a ready room, then check the guest in." : "Settle any balance, then check the guest out."}
         action={<span className="rounded-full bg-ivory-200 px-2.5 py-0.5 text-sm font-semibold tabular-nums">{rows.length}</span>}
       />
@@ -54,10 +57,10 @@ export function MovementList({
                   ) : !r.roomNumber ? (
                     <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "secondary", className: "min-h-10 shrink-0 whitespace-nowrap" })}>Assign room</Link>
                   ) : (
-                    <CheckInButton reservationId={r.id} />
+                    <div className="shrink-0 [&_button]:whitespace-nowrap"><CheckInButton reservationId={r.id} roomNumber={r.roomNumber} /></div>
                   )
                 ) : (
-                  <CheckOutButton reservationId={r.id} balanceKobo={balance} size="sm" />
+                  <div className="shrink-0 [&_button]:whitespace-nowrap"><CheckOutButton reservationId={r.id} balanceKobo={balance} size="sm" /></div>
                 )}
               </li>
             );
