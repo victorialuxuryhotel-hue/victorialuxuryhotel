@@ -3,12 +3,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Clock } from "lucide-react";
-import { BookingSummary, Steps } from "@/components/booking/booking-ui";
+import { BookingSummary, CompactSummary, Steps } from "@/components/booking/booking-ui";
 import { Container } from "@/components/public/section";
 import { PayButton } from "@/components/booking/pay-button";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatNaira } from "@/lib/format";
 import { getBookingByToken } from "@/server/queries/booking";
 
 export const metadata: Metadata = { title: "Review and pay", robots: { index: false, follow: false } };
@@ -38,9 +38,10 @@ async function Review({ params }: { params: Promise<{ token: string }> }) {
   return (
     <>
       <Steps current={3} />
-      <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_24rem] lg:gap-16">
+      <div className="mt-5 grid gap-6 sm:mt-10 lg:grid-cols-[1fr_24rem] lg:gap-16">
+        <CompactSummary option={option} search={stay} />
         <div>
-          <h1 className="font-display text-4xl text-navy-950 sm:text-5xl">Review and pay</h1>
+          <h1 className="font-display text-[2.125rem] leading-tight text-navy-950 sm:text-5xl">Review and pay</h1>
           <p className="mt-3 flex items-center gap-2 text-ink-600">
             <Clock className="size-4 text-gold-600" aria-hidden /> Your room is held until {formatDateTime(b.hold_expires_at!)}.
           </p>
@@ -52,12 +53,12 @@ async function Review({ params }: { params: Promise<{ token: string }> }) {
           <p className="mt-6 text-sm text-ink-600">
             You&apos;ll pay securely with Paystack by card, bank transfer or USSD. Your booking is confirmed as soon as Paystack confirms your payment.
           </p>
-          <PayButton token={token} />
+          <PayButton token={token} total={formatNaira(b.total_amount_kobo)} />
           <p className="mt-3 text-sm text-ink-500">
             Prefer to pay another way? Call {hotel.phoneDisplay} and quote <span className="font-mono">{b.reference}</span>.
           </p>
         </div>
-        <BookingSummary option={option} search={stay} />
+        <BookingSummary option={option} search={stay} className="hidden lg:block" />
       </div>
     </>
   );

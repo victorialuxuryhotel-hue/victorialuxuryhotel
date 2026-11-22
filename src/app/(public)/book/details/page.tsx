@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { BookingSummary, Steps } from "@/components/booking/booking-ui";
+import { BookingSummary, CompactSummary, Steps } from "@/components/booking/booking-ui";
 import { GuestDetailsForm } from "@/components/booking/guest-details-form";
 import { Container } from "@/components/public/section";
 import { buttonStyles } from "@/components/ui/button";
+import { formatNaira } from "@/lib/format";
 import { createWebsiteBooking } from "@/server/booking";
 import { publicBookingRules, searchStay, staySchema } from "@/server/queries/booking";
 
@@ -36,13 +37,15 @@ async function Details({ searchParams }: { searchParams: SP }) {
   return (
     <>
       <Steps current={2} />
-      <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_24rem] lg:gap-16">
+      <div className="mt-5 grid gap-6 sm:mt-10 lg:grid-cols-[1fr_24rem] lg:gap-16">
+        <CompactSummary option={option} search={parsed.data} holdMinutes={rules.holdMinutes} />
         <GuestDetailsForm
+          total={formatNaira(option.totalKobo)}
           action={createWebsiteBooking}
           hidden={{ category: slug, checkIn: parsed.data.checkIn, checkOut: parsed.data.checkOut, guests: String(parsed.data.guests) }}
           cancellationPolicy={rules.cancellationPolicy}
         />
-        <BookingSummary option={option} search={parsed.data}>
+        <BookingSummary option={option} search={parsed.data} className="hidden lg:block">
           <p className="mt-4 text-xs text-ink-500">Your room is held for {rules.holdMinutes} minutes while you complete payment.</p>
         </BookingSummary>
       </div>

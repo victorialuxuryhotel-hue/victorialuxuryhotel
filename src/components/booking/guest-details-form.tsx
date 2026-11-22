@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input, Textarea } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/errors";
 import { keepValues } from "@/lib/forms";
+import { MobileActionBar } from "./mobile-action-bar";
 
 type Action = (prev: ActionResult | null, formData: FormData) => Promise<ActionResult>;
 
@@ -13,10 +14,13 @@ export function GuestDetailsForm({
   action,
   hidden,
   cancellationPolicy,
+  total,
 }: {
   action: Action;
   hidden: Record<string, string>;
   cancellationPolicy: string | null;
+  /** Shown in the pinned bar on phones. */
+  total?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
   const err = (n: string) => (state && !state.ok ? state.fieldErrors?.[n]?.[0] : undefined);
@@ -25,17 +29,17 @@ export function GuestDetailsForm({
       {Object.entries(hidden).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       {state && !state.ok && !state.fieldErrors ? <FormMessage>{state.message}</FormMessage> : null}
       <section>
-        <h2 className="font-display text-3xl text-navy-950">Your details</h2>
+        <h2 className="font-display text-[1.875rem] text-navy-950 sm:text-3xl">Your details</h2>
         <p className="mt-1 text-sm text-ink-500">We&apos;ll send your confirmation to this email.</p>
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <Field label="Full name" htmlFor="name" required error={err("fullName")} className="sm:col-span-2">
             <Input id="name" name="fullName" autoComplete="name" required className="h-12" aria-invalid={Boolean(err("fullName"))} />
           </Field>
           <Field label="Email" htmlFor="email" required error={err("email")}>
-            <Input id="email" name="email" type="email" autoComplete="email" required className="h-12" aria-invalid={Boolean(err("email"))} />
+            <Input id="email" name="email" type="email" inputMode="email" autoComplete="email" required className="h-12" aria-invalid={Boolean(err("email"))} />
           </Field>
           <Field label="Phone" htmlFor="phone" required hint="Include the country code, e.g. +234." error={err("phone")}>
-            <Input id="phone" name="phone" type="tel" autoComplete="tel" required className="h-12" aria-invalid={Boolean(err("phone"))} />
+            <Input id="phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" required className="h-12" aria-invalid={Boolean(err("phone"))} />
           </Field>
         </div>
       </section>
@@ -55,7 +59,12 @@ export function GuestDetailsForm({
         </label>
         {err("acceptTerms") ? <p className="mt-1 text-sm text-danger-700">{err("acceptTerms")}</p> : null}
       </div>
-      <Button type="submit" size="lg" pending={pending} className="w-full sm:w-auto">Continue to payment</Button>
+      <Button type="submit" size="lg" pending={pending} className={total ? "hidden md:inline-flex" : "w-full sm:w-auto"}>Continue to payment</Button>
+      {total ? (
+        <MobileActionBar label="Total" amount={total}>
+          <Button type="submit" variant="accent" size="lg" pending={pending} className="shrink-0 px-5">Continue to payment</Button>
+        </MobileActionBar>
+      ) : null}
     </form>
   );
 }
