@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatNaira, nightsBetween, numberWord, roomLabel } from "./format";
+import { formatDate, formatNaira, nightsBetween, numberWord, publicText, roomLabel } from "./format";
 
 describe("format", () => {
+  it("hides unfinished placeholder copy from guests", () => {
+    expect(publicText("[Placeholder] Awaiting description")).toBe("");
+    expect(publicText(" A calm room ")).toBe("A calm room");
+    expect(publicText(null)).toBe("");
+  });
+
   it("labels a room with its floor", () => {
     expect(roomLabel("204", "2")).toBe("Room 204 · Floor 2");
     expect(roomLabel("G1", "Ground")).toBe("Room G1 · Ground floor");

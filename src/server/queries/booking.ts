@@ -6,7 +6,7 @@ import { nearestFreeStart } from "@/domain/availability";
 import type { AvailabilityOption } from "@/domain/views";
 import { AppError } from "@/lib/errors";
 import { addDays, hotelToday, nightsBetween } from "@/lib/hotel-date";
-import { roomLabel } from "@/lib/format";
+import { publicText, roomLabel } from "@/lib/format";
 import { logger } from "@/lib/logger";
 import { all, first, getDb } from "../db";
 import { freeNights, searchAvailability } from "../domain/inventory";
@@ -52,7 +52,7 @@ export async function searchStay(stay: Stay): Promise<{ ok: true; options: Avail
         freeFrom: free.get(c.slug) ? (nearestFreeStart(free.get(c.slug)!, stay.checkIn, nights, today, SUGGEST_WITHIN_DAYS) ?? undefined) : undefined,
         slug: c.slug,
         name: c.name,
-        summary: c.short_description ?? "",
+        summary: publicText(c.short_description),
         maxOccupancy: c.max_occupancy,
         isAvailable: c.is_available,
         nightlyRateKobo: c.nightly_rate_kobo,
@@ -131,7 +131,7 @@ export async function getBookingByToken(token: string) {
       attention_reason: r.attention_reason,
       guest: { full_name: r.guest_full_name, email: r.guest_email, phone: r.guest_phone },
       photo: photos.get(r.category_slug),
-      category: { slug: r.category_slug, name: r.category_name, short_description: r.category_short_description, max_occupancy: r.category_max_occupancy },
+      category: { slug: r.category_slug, name: r.category_name, short_description: publicText(r.category_short_description), max_occupancy: r.category_max_occupancy },
       // The specific room, once assigned (automatically on payment, or by staff).
       room: r.room_number ? roomLabel(r.room_number, r.room_floor) : undefined,
       // An upgrade puts the guest in another type: show the room's own type.

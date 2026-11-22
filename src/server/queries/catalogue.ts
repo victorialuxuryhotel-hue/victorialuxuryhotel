@@ -1,6 +1,7 @@
 import "server-only";
 import { connection } from "next/server";
 import { cache } from "react";
+import { publicText } from "@/lib/format";
 import { mediaUrl } from "@/lib/media";
 import { all, getDb, type Db } from "../db";
 
@@ -48,8 +49,8 @@ export const getPublicCategories = cache(async (): Promise<PublicCategory[]> => 
   return categories.map((c) => ({
     slug: c.slug,
     name: c.name,
-    summary: c.short_description ?? "",
-    description: c.description ?? "",
+    summary: publicText(c.short_description),
+    description: publicText(c.description),
     amenities: JSON.parse(c.amenities) as string[],
     maxOccupancy: c.max_occupancy,
     fromRateKobo: c.nightly_rate_kobo,

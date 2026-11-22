@@ -55,3 +55,9 @@ export function roomLabel(roomNumber: string, floor?: string | null): string {
   if (!f) return `Room ${roomNumber}`;
   return `Room ${roomNumber} · ${/^\d+$/.test(f) ? `Floor ${f}` : /floor/i.test(f) ? f : `${f} floor`}`;
 }
+
+/** Guest-facing copy from the database, minus unfinished drafts ("[Placeholder] …", "[Sample] …"). */
+export function publicText(text: string | null | undefined): string {
+  const t = (text ?? "").trim();
+  return t.startsWith("[") ? "" : t;
+}
