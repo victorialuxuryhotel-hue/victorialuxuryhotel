@@ -1,4 +1,5 @@
 import "server-only";
+import { connection } from "next/server";
 import { cache } from "react";
 import { mediaUrl } from "@/lib/media";
 import { all, getDb } from "../db";
@@ -27,6 +28,9 @@ export type PublicCategory = {
 };
 
 export const getPublicCategories = cache(async (): Promise<PublicCategory[]> => {
+  // The catalogue lives in D1 and staff can change it at any time: always read
+  // it at request time, never during the build (there is no database then).
+  await connection();
   const db = await getDb();
   const [categories, photos] = await Promise.all([
     all<{ id: string; slug: string; name: string; short_description: string | null; description: string | null; amenities: string; max_occupancy: number; nightly_rate_kobo: number }>(
@@ -63,6 +67,7 @@ export type SitePhotos = {
 };
 
 export const getSitePhotos = cache(async (): Promise<SitePhotos> => {
+  await connection();
   const rows = await all<{ slot: string; gallery_group: string | null; storage_path: string; alt_text: string }>(
     await getDb(),
     "SELECT slot, gallery_group, storage_path, alt_text FROM site_photos ORDER BY sort_order, created_at",
