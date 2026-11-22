@@ -166,7 +166,7 @@ export function ReservationDetailView({
                 <Collapsible id="change-stay" title="Change dates or room">
                   <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
                   <ChangeDatesForm reservationId={r.id} checkIn={r.checkIn} checkOut={r.checkOut} inHouse={r.status === "checked_in"} />
-                  <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} />
+                  <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} specialRequests={r.specialRequests} />
                 </Collapsible>
               </div>
             ) : null}

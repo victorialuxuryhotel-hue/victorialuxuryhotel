@@ -69,7 +69,20 @@ export function NoShowButton({ reservationId }: { reservationId: string }) {
   );
 }
 
-export function AssignRoomForm({ reservationId, current, rooms, booked }: { reservationId: string; current?: string; rooms: RoomOption[]; booked: string }) {
+export function AssignRoomForm({
+  reservationId,
+  current,
+  rooms,
+  booked,
+  specialRequests,
+}: {
+  reservationId: string;
+  current?: string;
+  rooms: RoomOption[];
+  booked: string;
+  /** Shown while choosing, so a request like "ground floor" or "quiet room" shapes the choice. */
+  specialRequests?: string;
+}) {
   const feedback = useActionFeedback();
   const [chosen, setChosen] = useState("");
   const [state, action, pending] = useActionState(
@@ -88,6 +101,12 @@ export function AssignRoomForm({ reservationId, current, rooms, booked }: { rese
   return (
     <form action={action} onSubmit={keepValues(action)} className="flex flex-col gap-3 border-t border-ivory-200 bg-ivory-50 px-5 py-4">
       <input type="hidden" name="reservationId" value={reservationId} />
+      {specialRequests ? (
+        <div className="rounded-md border border-gold-300 bg-gold-50 px-3 py-2 text-sm">
+          <p className="text-xs uppercase tracking-wide text-ink-500">Special requests</p>
+          <p className="mt-0.5 text-ink-800">{specialRequests}</p>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <Field label={current ? `Change room (now ${current})` : "Assign a room"} htmlFor="room" className="flex-1">
           <Select id="room" name="roomId" value={chosen} onChange={(e) => setChosen(e.target.value)} required>
