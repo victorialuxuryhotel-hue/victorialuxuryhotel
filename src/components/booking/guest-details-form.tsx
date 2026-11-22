@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input, Textarea } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/errors";
+import { formatNaira } from "@/lib/format";
 import { keepValues } from "@/lib/forms";
 import { MobileActionBar } from "./mobile-action-bar";
 
@@ -15,12 +16,16 @@ export function GuestDetailsForm({
   hidden,
   cancellationPolicy,
   total,
+  extras = [],
+  nights = 1,
 }: {
   action: Action;
   hidden: Record<string, string>;
   cancellationPolicy: string | null;
   /** Shown in the pinned bar on phones. */
   total?: string;
+  extras?: Array<{ id: string; name: string; price_kobo: number; per_night: number }>;
+  nights?: number;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
   const err = (n: string) => (state && !state.ok ? state.fieldErrors?.[n]?.[0] : undefined);
@@ -43,6 +48,26 @@ export function GuestDetailsForm({
           </Field>
         </div>
       </section>
+      {extras.length ? (
+        <fieldset>
+          <legend className="font-display text-2xl text-navy-950">Add to your stay</legend>
+          <div className="mt-3 divide-y divide-hairline rounded-md border border-hairline">
+            {extras.map((e) => (
+              <label key={e.id} className="flex min-h-13 cursor-pointer items-center gap-3 px-4 py-3 has-[:checked]:bg-navy-50">
+                <input type="checkbox" name="extra" value={e.id} className="size-5 shrink-0 accent-navy-800" />
+                <span className="flex-1 text-[15px] text-ink-900">{e.name}</span>
+                <span className="text-right text-sm tabular-nums text-ink-700">
+                  {formatNaira(e.price_kobo * (e.per_night ? nights : 1))}
+                  {e.per_night ? <span className="block text-xs text-ink-500">{formatNaira(e.price_kobo)} a night</span> : null}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+      <Field label="Promo code" optional htmlFor="promo" hint="Any discount is applied on the next step." error={err("promoCode")} className="sm:max-w-xs">
+        <Input id="promo" name="promoCode" autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={20} className="h-12 uppercase" />
+      </Field>
       <Field label="Special requests" optional htmlFor="requests" hint="Arrival time, accessibility needs, anything we should know. We'll do our best.">
         <Textarea id="requests" name="specialRequests" rows={3} maxLength={1000} />
       </Field>

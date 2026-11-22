@@ -7,7 +7,7 @@ import { Container } from "@/components/public/section";
 import { buttonStyles } from "@/components/ui/button";
 import { formatNaira } from "@/lib/format";
 import { createWebsiteBooking } from "@/server/booking";
-import { publicBookingRules, searchStay, staySchema } from "@/server/queries/booking";
+import { publicBookingRules, publicExtras, searchStay, staySchema } from "@/server/queries/booking";
 
 export const metadata: Metadata = { title: "Your details", robots: { index: false } };
 
@@ -30,7 +30,7 @@ async function Details({ searchParams }: { searchParams: SP }) {
   if (!slug || !parsed.success) return <StartAgain message="Let's start with your dates" />;
 
   // Re-check live: the room shown must still be available right now.
-  const [result, rules] = await Promise.all([searchStay(parsed.data), publicBookingRules()]);
+  const [result, rules, extras] = await Promise.all([searchStay(parsed.data), publicBookingRules(), publicExtras()]);
   const option = result.ok ? result.options.find((o) => o.slug === slug) : undefined;
   if (!option || !option.isAvailable) return <StartAgain message="Sorry, that room is no longer available for your dates" />;
 
@@ -44,6 +44,8 @@ async function Details({ searchParams }: { searchParams: SP }) {
           action={createWebsiteBooking}
           hidden={{ category: slug, checkIn: parsed.data.checkIn, checkOut: parsed.data.checkOut, guests: String(parsed.data.guests) }}
           cancellationPolicy={rules.cancellationPolicy}
+          extras={extras}
+          nights={option.nights}
         />
         <BookingSummary option={option} search={parsed.data} className="hidden lg:block">
           <p className="mt-4 text-xs text-ink-500">Your room is held for {rules.holdMinutes} minutes while you complete payment.</p>

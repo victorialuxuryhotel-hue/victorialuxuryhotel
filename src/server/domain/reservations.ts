@@ -45,10 +45,19 @@ export type ReservationRow = {
   hold_expires_at: string | null;
   attention_reason: string | null;
   version: number;
+  extras_kobo: number;
+  discount_pct: number;
+  discount_kobo: number;
 };
 
-const SELECT_RES = `SELECT id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count,
-  nightly_rate_kobo, total_amount_kobo, status, source, hold_expires_at, attention_reason, version FROM reservations`;
+/** What the guest owes for the booking: room total + extras - discount. */
+export const dueOf = (r: Pick<ReservationRow, "total_amount_kobo" | "extras_kobo" | "discount_kobo">) => r.total_amount_kobo + r.extras_kobo - r.discount_kobo;
+/** The same in SQL, for a reservations row aliased r. */
+export const DUE_SQL = "(r.total_amount_kobo + r.extras_kobo - r.discount_kobo)";
+
+export const RES_COLUMNS = `id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count,
+  nightly_rate_kobo, total_amount_kobo, status, source, hold_expires_at, attention_reason, version, extras_kobo, discount_pct, discount_kobo`;
+const SELECT_RES = `SELECT ${RES_COLUMNS} FROM reservations`;
 
 export async function loadReservation(db: Db, id: string): Promise<ReservationRow> {
   const res = await first<ReservationRow>(db, `${SELECT_RES} WHERE id = ?`, id);
@@ -102,6 +111,10 @@ type CreateInput = {
   email?: string | null;
   phone?: string | null;
   specialRequests?: string | null;
+  /** Extras the guest chose (ids of active extras). */
+  extraIds?: string[];
+  /** A promo code typed by the guest (website only). */
+  promoCode?: string | null;
   source: ReservationRow["source"];
   createdBy: string | null;
   holdMinutes: number;
@@ -138,6 +151,24 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
 
   const nights = nightsBetween(input.checkIn, input.checkOut);
   const total = cat.nightly_rate_kobo * nights;
+
+  // Extras are priced now (per stay or per night) and kept with the booking.
+  const ids = [...new Set(input.extraIds ?? [])].slice(0, 20);
+  const extras = ids.length
+    ? await all<{ id: string; name: string; price_kobo: number; per_night: number }>(
+        db,
+        `SELECT id, name, price_kobo, per_night FROM extras WHERE is_active = 1 AND id IN (${ids.map(() => "?").join(",")})`,
+        ...ids,
+      )
+    : [];
+  if (extras.length !== ids.length) throw new AppError("VALIDATION", "One of the extras is no longer available. Please choose again.");
+  const extrasKobo = extras.reduce((sum, e) => sum + e.price_kobo * (e.per_night ? nights : 1), 0);
+
+  // A promo code takes a percentage off the room total. The database re-checks it when the booking is written.
+  const code = input.promoCode?.trim().toUpperCase() || null;
+  const promo = code ? await validPromo(db, code) : null;
+  const discountPct = promo?.percent_off ?? 0;
+  const discountKobo = Math.round((total * discountPct) / 100);
   const holdExpiresAt = new Date(Date.now() + input.holdMinutes * 60_000).toISOString();
 
   // A reference collision is astronomically rare; retry with a new one if it happens.
@@ -171,25 +202,34 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
       db
         .prepare(
           `INSERT INTO reservations (id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count,
-             nightly_rate_kobo, total_amount_kobo, status, source, special_requests, hold_expires_at, created_by)
-           VALUES (?, ?, ?, ${guestExpr}, ?, ?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?, ?, ?)`,
+             nightly_rate_kobo, total_amount_kobo, status, source, special_requests, hold_expires_at, created_by,
+             extras_kobo, discount_pct, discount_kobo, promo_code)
+           VALUES (?, ?, ?, ${guestExpr}, ?, ?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id, reference, publicToken, guestParam, cat.id, input.roomId || null, input.checkIn, input.checkOut, input.guests,
           cat.nightly_rate_kobo, total, input.source, input.specialRequests?.trim() || null, holdExpiresAt, input.createdBy,
+          extrasKobo, discountPct, discountKobo, promo ? code : null,
         ),
+      ...extras.map((e) =>
+        db
+          .prepare("INSERT INTO reservation_extras (reservation_id, extra_id, name, unit_price_kobo, per_night) VALUES (?, ?, ?, ?, ?)")
+          .bind(id, e.id, e.name, e.price_kobo, e.per_night),
+      ),
       activity(db, "reservation.created", "reservation", id, `Reservation ${reference} created: ${cat.name}, ${input.checkIn} → ${input.checkOut}`, {
         source: input.source,
         total_kobo: total,
+        ...(extrasKobo ? { extras_kobo: extrasKobo } : {}),
+        ...(promo ? { promo_code: code, discount_kobo: discountKobo } : {}),
       }),
     );
     try {
       await writeBatch(db, actor, stmts);
-      return { id, reference, publicToken, totalAmountKobo: total, holdExpiresAt };
+      return { id, reference, publicToken, totalAmountKobo: total + extrasKobo - discountKobo, holdExpiresAt };
     } catch (err) {
       const collided = err instanceof AppError && dbErrorToken(err.cause) === "unique" && /reservations\.(reference|public_token)/.test(String((err.cause as Error)?.message));
       if (collided && attempt < 3) continue;
-      rethrow(err, { no_capacity: unavailable, room_overlap: new AppError("CONFLICT", "That room was just booked for some of these nights. Choose another.") });
+      rethrow(err, { no_capacity: unavailable, promo_invalid: new AppError("VALIDATION", "That promo code can no longer be used."), room_overlap: new AppError("CONFLICT", "That room was just booked for some of these nights. Choose another.") });
     }
   }
 }
@@ -197,7 +237,10 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
 /** Website: called by the server after validating input. Holds for the website hold period. */
 export async function createWebsiteReservation(
   db: Db,
-  input: { categorySlug: string; checkIn: string; checkOut: string; guests: number; fullName: string; email: string; phone: string; specialRequests?: string | null },
+  input: {
+    categorySlug: string; checkIn: string; checkOut: string; guests: number; fullName: string; email: string; phone: string;
+    specialRequests?: string | null; extraIds?: string[]; promoCode?: string | null;
+  },
 ): Promise<CreatedReservation> {
   const cat = await first<{ id: string }>(db, "SELECT id FROM room_categories WHERE slug = ?", input.categorySlug);
   if (!cat) throw new AppError("NOT_FOUND", "That room type is not available for booking.");
@@ -327,7 +370,7 @@ export async function checkOutReservation(db: Db, actor: Actor, reservationId: s
   return retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
     if (res.status !== "checked_in") throw new AppError("INVALID_TRANSITION", "Only checked-in guests can be checked out.");
-    const balance = res.total_amount_kobo - (await netPaid(db, res.id));
+    const balance = dueOf(res) - (await netPaid(db, res.id));
     const room = res.room_id ? await loadRoom(db, res.room_id) : null;
     const results = await writeBatch(db, actor, [
       assertVersion(db, "reservations", res.id, res.version),
@@ -545,9 +588,18 @@ export async function changeReservationDates(db: Db, actor: Actor, reservationId
     const paid = await netPaid(db, res.id);
     const stmts = [
       assertVersion(db, "reservations", res.id, res.version),
-      db.prepare("UPDATE reservations SET check_in = ?, check_out = ?, total_amount_kobo = ? WHERE id = ?").bind(checkIn, checkOut, newTotal, res.id),
+      // The discount stays the same percentage; per-night extras follow the new nights.
+      db
+        .prepare(
+          `UPDATE reservations SET check_in = ?1, check_out = ?2, total_amount_kobo = ?3,
+             discount_kobo = CAST(round(?3 * discount_pct / 100.0) AS INTEGER),
+             extras_kobo = (SELECT coalesce(sum(unit_price_kobo * CASE per_night WHEN 1 THEN ?4 ELSE 1 END), 0) FROM reservation_extras WHERE reservation_id = ?5)
+           WHERE id = ?5`,
+        )
+        .bind(checkIn, checkOut, newTotal, nightsBetween(checkIn, checkOut), res.id),
     ];
-    if (paid > newTotal) {
+    const newDue = newTotal + (await newExtras(db, res.id, nightsBetween(checkIn, checkOut))) - Math.round((newTotal * res.discount_pct) / 100);
+    if (paid > newDue) {
       stmts.push(
         db
           .prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?")
@@ -693,4 +745,28 @@ export async function listAssignableRooms(db: Db, reservationId: string) {
     res.check_in,
     res.check_out,
   );
+}
+
+/** A promo code a guest may use right now, or a clear error. */
+export async function validPromo(db: Db, code: string): Promise<{ code: string; percent_off: number }> {
+  const p = await first<{ code: string; percent_off: number; is_active: number; valid_until: string | null; max_uses: number | null; used_count: number }>(
+    db,
+    "SELECT code, percent_off, is_active, valid_until, max_uses, used_count FROM promo_codes WHERE code = ?",
+    code.trim().toUpperCase(),
+  );
+  const bad = new AppError("VALIDATION", "That promo code isn't valid.");
+  if (!p || !p.is_active) throw bad;
+  if (p.valid_until && p.valid_until < hotelToday()) throw new AppError("VALIDATION", "That promo code has expired.");
+  if (p.max_uses !== null && p.used_count >= p.max_uses) throw new AppError("VALIDATION", "That promo code has been fully used.");
+  return { code: p.code, percent_off: p.percent_off };
+}
+
+async function newExtras(db: Db, reservationId: string, nights: number): Promise<number> {
+  const r = await first<{ kobo: number }>(
+    db,
+    "SELECT coalesce(sum(unit_price_kobo * CASE per_night WHEN 1 THEN ? ELSE 1 END), 0) AS kobo FROM reservation_extras WHERE reservation_id = ?",
+    nights,
+    reservationId,
+  );
+  return r?.kobo ?? 0;
 }

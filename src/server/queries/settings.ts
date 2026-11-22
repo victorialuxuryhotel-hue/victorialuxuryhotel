@@ -10,9 +10,13 @@ import { managerToAsk, ROLE, type StaffRecord } from "../domain/admin";
 
 export async function getBookingRules(): Promise<BookingRules> {
   await authorizeRead();
-  const data = await first<{ check_in_time: string; check_out_time: string; website_hold_minutes: number; staff_hold_hours: number; cancellation_policy: string | null }>(
+  const data = await first<{
+    check_in_time: string; check_out_time: string; website_hold_minutes: number; staff_hold_hours: number; cancellation_policy: string | null;
+    free_cancel_hours: number; late_cancel_fee_pct: number; vat_rate_bp: number;
+  }>(
     await getDb(),
-    "SELECT check_in_time, check_out_time, website_hold_minutes, staff_hold_hours, cancellation_policy FROM hotel_settings WHERE id = 1",
+    `SELECT check_in_time, check_out_time, website_hold_minutes, staff_hold_hours, cancellation_policy,
+            free_cancel_hours, late_cancel_fee_pct, vat_rate_bp FROM hotel_settings WHERE id = 1`,
   );
   if (!data) throw new Error("Could not load hotel settings");
   return {
@@ -21,7 +25,24 @@ export async function getBookingRules(): Promise<BookingRules> {
     websiteHoldMinutes: data.website_hold_minutes,
     staffHoldHours: data.staff_hold_hours,
     cancellationPolicy: data.cancellation_policy,
+    freeCancelHours: data.free_cancel_hours,
+    lateCancelFeePct: data.late_cancel_fee_pct,
+    vatRateBp: data.vat_rate_bp,
   };
+}
+
+/** Extras and promo codes, for the Booking rules page (managers). */
+export async function getCatalogueSettings() {
+  await authorizeRead("settings.manage");
+  const db = await getDb();
+  const [extras, promos] = await Promise.all([
+    all<{ id: string; name: string; price_kobo: number; per_night: number; is_active: number }>(db, "SELECT id, name, price_kobo, per_night, is_active FROM extras ORDER BY is_active DESC, sort_order, name"),
+    all<{ id: string; code: string; percent_off: number; valid_until: string | null; max_uses: number | null; used_count: number; is_active: number }>(
+      db,
+      "SELECT id, code, percent_off, valid_until, max_uses, used_count, is_active FROM promo_codes ORDER BY is_active DESC, created_at DESC",
+    ),
+  ]);
+  return { extras, promos };
 }
 
 /** Owner only. Last sign-in comes from Clerk (best effort: the list still shows if Clerk is unreachable). */

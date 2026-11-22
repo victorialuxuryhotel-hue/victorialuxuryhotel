@@ -25,6 +25,7 @@ const bookingSchema = z.object({
     .trim()
     .regex(/^\+?[0-9 ()-]{7,20}$/, "Enter a valid phone number, e.g. +234 803 000 0000"),
   specialRequests: z.string().max(1000).optional(),
+  promoCode: z.string().trim().max(20).optional(),
   acceptTerms: z.literal("on", { error: "Please accept the booking terms" }),
 });
 
@@ -36,6 +37,7 @@ export async function createWebsiteBooking(_prev: ActionResult | null, formData:
   let token: string;
   try {
     const parsed = bookingSchema.safeParse(Object.fromEntries(formData));
+    const extraIds = formData.getAll("extra").map(String).filter((id) => z.uuid().safeParse(id).success);
     if (!parsed.success) {
       throw new AppError("VALIDATION", "Please check the highlighted fields", { fieldErrors: z.flattenError(parsed.error).fieldErrors });
     }
@@ -51,6 +53,8 @@ export async function createWebsiteBooking(_prev: ActionResult | null, formData:
       email: v.email,
       phone: v.phone,
       specialRequests: v.specialRequests || null,
+      extraIds,
+      promoCode: v.promoCode || null,
     });
     token = held.publicToken;
     logger.info("booking.held", { reference: held.reference });

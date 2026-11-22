@@ -33,7 +33,7 @@ async function loadStay(db: Db, reservationId: string): Promise<(StayInfo & { em
       room_number: string | null; room_floor: string | null;
     }>(
       db,
-      `SELECT r.reference, r.check_in, r.check_out, r.nights, r.guest_count, r.total_amount_kobo, r.source, r.public_token,
+      `SELECT r.reference, r.check_in, r.check_out, r.nights, r.guest_count, (r.total_amount_kobo + r.extras_kobo - r.discount_kobo) AS total_amount_kobo, r.source, r.public_token,
               g.full_name, g.email, coalesce(rc.name, c.name) AS category, rm.room_number, rm.floor AS room_floor
        FROM reservations r JOIN guests g ON g.id = r.guest_id JOIN room_categories c ON c.id = r.category_id
        LEFT JOIN rooms rm ON rm.id = r.room_id LEFT JOIN room_categories rc ON rc.id = rm.category_id

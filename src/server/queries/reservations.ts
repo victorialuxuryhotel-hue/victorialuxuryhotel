@@ -16,7 +16,7 @@ import { cleanSearch } from "../db-errors";
 
 /** Columns for list rows, with net paid computed in the database. */
 const LIST_COLUMNS = `
-  r.id, r.reference, r.check_in, r.check_out, r.guest_count, r.total_amount_kobo, r.status, r.source, r.hold_expires_at, r.attention_reason,
+  r.id, r.reference, r.check_in, r.check_out, r.guest_count, (r.total_amount_kobo + r.extras_kobo - r.discount_kobo) AS total_amount_kobo, r.status, r.source, r.hold_expires_at, r.attention_reason,
   g.full_name AS guest_name, g.phone AS guest_phone, c.name AS category_name, rm.room_number,
   (SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
      FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful') AS paid_kobo`;

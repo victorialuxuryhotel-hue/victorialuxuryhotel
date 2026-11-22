@@ -1,7 +1,8 @@
 import { AppError } from "@/lib/errors";
 import { dbErrorToken } from "../db-errors";
 import { hotelDateOf } from "@/lib/hotel-date";
-import { all, ALL_STAFF, first, MANAGERS, OWNER, requireRole, uuid, writeBatch, type Actor, type Db, type StaffRole } from "../db";
+import { activity, all, ALL_STAFF, first, MANAGERS, OWNER, requireRole, uuid, writeBatch, type Actor, type Db, type StaffRole } from "../db";
+import { formatNaira } from "@/lib/format";
 
 /**
  * Configuration: room types, rooms, photos, booking rules and staff.
@@ -183,17 +184,21 @@ export async function deleteSitePhoto(db: Db, actor: Actor, photoId: string): Pr
 export async function updateBookingRules(
   db: Db,
   actor: Actor,
-  v: { checkInTime: string; checkOutTime: string; websiteHoldMinutes: number; staffHoldHours: number; cancellationPolicy: string | null },
+  v: {
+    checkInTime: string; checkOutTime: string; websiteHoldMinutes: number; staffHoldHours: number; cancellationPolicy: string | null;
+    freeCancelHours: number; lateCancelFeePct: number; vatRatePct: number;
+  },
 ): Promise<void> {
   requireRole(actor, MANAGERS);
   const hhmm = (t: string) => t.slice(0, 5);
   await writeBatch(db, actor, [
     db
       .prepare(
-        `UPDATE hotel_settings SET check_in_time = ?, check_out_time = ?, website_hold_minutes = ?, staff_hold_hours = ?, cancellation_policy = ?
+        `UPDATE hotel_settings SET check_in_time = ?, check_out_time = ?, website_hold_minutes = ?, staff_hold_hours = ?, cancellation_policy = ?,
+           free_cancel_hours = ?, late_cancel_fee_pct = ?, vat_rate_bp = ?
          WHERE id = 1`,
       )
-      .bind(hhmm(v.checkInTime), hhmm(v.checkOutTime), v.websiteHoldMinutes, v.staffHoldHours, v.cancellationPolicy),
+      .bind(hhmm(v.checkInTime), hhmm(v.checkOutTime), v.websiteHoldMinutes, v.staffHoldHours, v.cancellationPolicy, v.freeCancelHours, v.lateCancelFeePct, v.vatRatePct),
   ]);
 }
 
@@ -332,4 +337,57 @@ export async function managerToAsk(db: Db, actor: Actor, today: string): Promise
     phone: row.phone,
     activeToday: row.last_seen_at ? hotelDateOf(row.last_seen_at) === today : false,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Booking extras and promo codes (managers). Changes are logged.
+// ---------------------------------------------------------------------------
+
+export async function addExtra(db: Db, actor: Actor, v: { name: string; priceKobo: number; perNight: boolean }): Promise<string> {
+  requireRole(actor, MANAGERS);
+  const id = uuid();
+  await writeBatch(db, actor, [
+    db.prepare("INSERT INTO extras (id, name, price_kobo, per_night) VALUES (?, ?, ?, ?)").bind(id, v.name.trim(), v.priceKobo, v.perNight ? 1 : 0),
+    activity(db, "extra.created", "extra", id, `Extra added: ${v.name.trim()} (${formatNaira(v.priceKobo)}${v.perNight ? " a night" : ""})`),
+  ]);
+  return id;
+}
+
+export async function setExtraActive(db: Db, actor: Actor, id: string, active: boolean): Promise<void> {
+  requireRole(actor, MANAGERS);
+  const [r] = await writeBatch(db, actor, [
+    db.prepare("UPDATE extras SET is_active = ? WHERE id = ?").bind(active ? 1 : 0, id),
+    activity(db, active ? "extra.shown" : "extra.hidden", "extra", id, `Extra ${active ? "offered again" : "no longer offered"}`),
+  ]);
+  if (!r?.meta.changes) throw new AppError("NOT_FOUND", "Extra not found.");
+}
+
+export async function addPromo(
+  db: Db,
+  actor: Actor,
+  v: { code: string; percentOff: number; validUntil: string | null; maxUses: number | null },
+): Promise<string> {
+  requireRole(actor, MANAGERS);
+  const id = uuid();
+  const code = v.code.trim().toUpperCase();
+  try {
+    await writeBatch(db, actor, [
+      db
+        .prepare("INSERT INTO promo_codes (id, code, percent_off, valid_until, max_uses, created_by) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(id, code, v.percentOff, v.validUntil, v.maxUses, actor?.id ?? null),
+      activity(db, "promo.created", "promo_code", id, `Promo code ${code} created: ${v.percentOff}% off`, { valid_until: v.validUntil, max_uses: v.maxUses }),
+    ]);
+  } catch (err) {
+    conflictOnUnique(err, "That code already exists.");
+  }
+  return id;
+}
+
+export async function setPromoActive(db: Db, actor: Actor, id: string, active: boolean): Promise<void> {
+  requireRole(actor, MANAGERS);
+  const [r] = await writeBatch(db, actor, [
+    db.prepare("UPDATE promo_codes SET is_active = ? WHERE id = ?").bind(active ? 1 : 0, id),
+    activity(db, active ? "promo.enabled" : "promo.disabled", "promo_code", id, `Promo code ${active ? "switched on" : "switched off"}`),
+  ]);
+  if (!r?.meta.changes) throw new AppError("NOT_FOUND", "Promo code not found.");
 }

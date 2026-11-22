@@ -4,7 +4,7 @@ import { addDays, hotelInstant, hotelTimeNow, hotelToday } from "@/lib/hotel-dat
 import { dbErrorToken, StaleStateError } from "../db-errors";
 import { activity, ALL_STAFF, assertVersion, first, MANAGERS, now, requireRole, retryOnStale, uuid, writeBatch, type Actor, type Db, type Stmt } from "../db";
 import { autoAssignRoomStatements, freeUnits } from "./inventory";
-import { loadReservation, netPaid, type ReservationRow } from "./reservations";
+import { dueOf, loadReservation, netPaid, RES_COLUMNS, type ReservationRow } from "./reservations";
 
 /**
  * Payments.
@@ -70,7 +70,7 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number):
     );
   const flag = (text: string) => stmts.push(db.prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?").bind(text, res.id));
 
-  if (paidAfter < res.total_amount_kobo) {
+  if (paidAfter < dueOf(res)) {
     outcome = "part_paid";
   } else if (res.status === "pending_payment" && res.hold_expires_at && res.hold_expires_at > now()) {
     confirm();
@@ -98,7 +98,7 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number):
 
   // More than one payment arrived (e.g. a Paystack checkout and a staff-recorded
   // transfer). The money is real: record it and flag a refund of the excess.
-  const over = paidAfter - res.total_amount_kobo;
+  const over = paidAfter - dueOf(res);
   if (over > 0) {
     flag(`Overpaid by ${naira(over)}: more than one payment was received. Refund the difference.`);
     stmts.push(activity(db, "payment.overpaid", "reservation", res.id, `${res.reference} overpaid by ${naira(over)}`, { over_kobo: over }));
@@ -115,8 +115,7 @@ export async function beginPaystackPayment(db: Db, publicToken: string): Promise
   return retryOnStale(async () => {
     const res = await first<ReservationRow>(
       db,
-      `SELECT id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count, nightly_rate_kobo,
-              total_amount_kobo, status, source, hold_expires_at, attention_reason, version FROM reservations WHERE public_token = ?`,
+      `SELECT ${RES_COLUMNS} FROM reservations WHERE public_token = ?`,
       publicToken,
     );
     if (!res) throw new AppError("NOT_FOUND", "Booking not found.");
@@ -127,7 +126,7 @@ export async function beginPaystackPayment(db: Db, publicToken: string): Promise
     const guest = await first<{ email: string | null }>(db, "SELECT email FROM guests WHERE id = ?", res.guest_id);
     if (!guest?.email) throw new AppError("VALIDATION", "An email address is needed to pay online.");
     const paid = await netPaid(db, res.id);
-    const balance = res.total_amount_kobo - paid;
+    const balance = dueOf(res) - paid;
     if (balance <= 0) throw new AppError("INVALID_TRANSITION", "Nothing left to pay on this booking.");
 
     // One reference per attempt; Paystack rejects re-used references.
@@ -265,7 +264,7 @@ export async function recordOfflinePayment(
       throw new AppError("INVALID_TRANSITION", "Payments can't be recorded against a cancelled reservation.");
     }
     const paid = await netPaid(db, res.id);
-    const balance = res.total_amount_kobo - paid;
+    const balance = dueOf(res) - paid;
     if (balance <= 0) throw new AppError("VALIDATION", "This reservation is already paid in full.");
     if (input.amountKobo > balance) throw new AppError("VALIDATION", `That is more than the ${naira(balance)} balance due.`);
 
@@ -337,7 +336,7 @@ export async function recordPaymentCorrection(
 
     const res = await loadReservation(db, original.reservation_id);
     const paid = await netPaid(db, res.id);
-    const balance = res.total_amount_kobo - (paid - input.amountKobo);
+    const balance = dueOf(res) - (paid - input.amountKobo);
     const id = uuid();
     const stmts: Stmt[] = [
       assertVersion(db, "reservations", res.id, res.version),

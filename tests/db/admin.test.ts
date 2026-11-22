@@ -47,7 +47,7 @@ describe("front desk", () => {
     await rejects(saveCategory(db, desk, category()), /role does not allow/, "FORBIDDEN");
     await rejects(createRoom(db, desk, { roomNumber: "X1", categoryId: c.id, floor: null }), /role does not allow/);
     await rejects(addCategoryPhoto(db, desk, { categoryId: c.id, storagePath: "x.jpg", altText: "A room" }), /role does not allow/);
-    await rejects(updateBookingRules(db, desk, { checkInTime: "14:00", checkOutTime: "12:00", websiteHoldMinutes: 30, staffHoldHours: 24, cancellationPolicy: null }), /role does not allow/);
+    await rejects(updateBookingRules(db, desk, { checkInTime: "14:00", checkOutTime: "12:00", websiteHoldMinutes: 30, staffHoldHours: 24, cancellationPolicy: null, freeCancelHours: 48, lateCancelFeePct: 50, vatRatePct: 750 }), /role does not allow/);
     await rejects(createStaffProfile(db, desk, { fullName: "New Person", email: "new@example.com", role: "owner" }), /role does not allow/);
     await rejects(updateStaffProfile(db, desk, { staffId: desk!.id, role: "owner", isActive: true }), /role does not allow/);
   });
@@ -58,7 +58,7 @@ describe("general manager", () => {
     const id = await saveCategory(db, gm, category({ nightlyRateKobo: 4_000_000 }));
     await saveCategory(db, gm, { ...category(), id, nightlyRateKobo: 4_500_000 });
     await createRoom(db, gm, { roomNumber: `G${crypto.randomUUID().slice(0, 5)}`, categoryId: id, floor: "1" });
-    await updateBookingRules(db, gm, { checkInTime: "15:00:00", checkOutTime: "11:00", websiteHoldMinutes: 45, staffHoldHours: 12, cancellationPolicy: "Free cancellation up to 48 hours before arrival." });
+    await updateBookingRules(db, gm, { checkInTime: "15:00:00", checkOutTime: "11:00", websiteHoldMinutes: 45, staffHoldHours: 12, cancellationPolicy: "Free cancellation up to 48 hours before arrival.", freeCancelHours: 48, lateCancelFeePct: 50, vatRatePct: 750 });
     const s = await q1<{ check_in_time: string; website_hold_minutes: number }>("SELECT check_in_time, website_hold_minutes FROM hotel_settings");
     expect(s).toEqual({ check_in_time: "15:00", website_hold_minutes: 45 });
     const logs = await q<{ action: string; actor_id: string }>(
@@ -66,7 +66,7 @@ describe("general manager", () => {
     );
     expect(logs.map((l) => l.action).sort()).toEqual(["category.created", "category.updated", "room.created", "settings.updated"]);
     expect(new Set(logs.map((l) => l.actor_id))).toEqual(new Set([gm!.id]));
-    await updateBookingRules(db, gm, { checkInTime: "14:00", checkOutTime: "12:00", websiteHoldMinutes: 30, staffHoldHours: 24, cancellationPolicy: null });
+    await updateBookingRules(db, gm, { checkInTime: "14:00", checkOutTime: "12:00", websiteHoldMinutes: 30, staffHoldHours: 24, cancellationPolicy: null, freeCancelHours: 48, lateCancelFeePct: 50, vatRatePct: 750 });
   });
 
   it("gets a clear message for a duplicate room type or room number", async () => {
