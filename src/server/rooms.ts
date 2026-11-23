@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { MIN_NIGHTLY_RATE_KOBO } from "@/domain/pricing";
+import { recordId } from "@/lib/ids";
 import { formatNaira } from "@/lib/format";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -22,7 +23,7 @@ async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResul
 }
 
 const statusSchema = z.object({
-  roomId: z.uuid(),
+  roomId: recordId(),
   readiness: z.enum(["needs_cleaning", "cleaning_in_progress", "ready"]).optional(),
   serviceStatus: z.enum(["in_service", "maintenance"]).optional(),
   note: z.string().max(200).optional(),

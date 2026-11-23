@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
+import { recordId } from "@/lib/ids";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize, authorizeRead } from "./auth";
@@ -39,7 +40,7 @@ const createSchema = z.object({
   email: z.union([z.literal(""), z.email("Enter a valid email")]).optional(),
   specialRequests: z.string().max(1000).optional(),
   guestId: z.union([z.literal(""), z.uuid()]).optional(),
-  roomId: z.union([z.literal(""), z.uuid()]).optional(),
+  roomId: z.union([z.literal(""), recordId()]).optional(),
   next: z.enum(["payment", "reservation"]).optional(),
 });
 
@@ -70,7 +71,7 @@ export async function assignRoom(_prev: ActionResult<Undoable> | null, formData:
   return run("reservation.assign_room", async () => {
     const staff = await authorize("reservations.manage");
     const reservationId = id.parse(formData.get("reservationId"));
-    const roomId = z.uuid("Choose a room").safeParse(formData.get("roomId"));
+    const roomId = recordId("Choose a room").safeParse(formData.get("roomId"));
     if (!roomId.success) throw new AppError("VALIDATION", "Choose a room");
     const result = await engine.assignRoom(await getDb(), actorOf(staff), reservationId, roomId.data);
     refresh();
