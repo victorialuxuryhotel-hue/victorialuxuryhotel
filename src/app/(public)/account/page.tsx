@@ -27,7 +27,7 @@ async function Content() {
   const db = await getDb();
   const [bookings, rule] = await Promise.all([
     guestBookings(db, email),
-    db.prepare("SELECT free_cancel_hours, late_cancel_fee_pct FROM hotel_settings WHERE id = 1").first<{ free_cancel_hours: number; late_cancel_fee_pct: number }>(),
+    db.prepare("SELECT free_cancel_hours, late_cancel_fee_pct, check_in_time, cancellation_policy FROM hotel_settings WHERE id = 1").first<{ free_cancel_hours: number; late_cancel_fee_pct: number; check_in_time: string; cancellation_policy: string | null }>(),
   ]);
   return (
     <div className="max-w-2xl">
@@ -38,7 +38,7 @@ async function Content() {
         </div>
         <form action={signOutGuest}><button type="submit" className={buttonStyles({ variant: "ghost", size: "sm", className: "h-11" })}>Sign out</button></form>
       </div>
-      {rule ? <p className="mt-4 text-sm text-ink-600">{cancellationRuleText(rule.free_cancel_hours, rule.late_cancel_fee_pct)}</p> : null}
+      {rule ? <p className="mt-4 text-sm text-ink-600">{rule.cancellation_policy ?? cancellationRuleText(rule.free_cancel_hours, rule.late_cancel_fee_pct, rule.check_in_time)}</p> : null}
       <div className="mt-6"><MyBookings bookings={bookings} today={hotelToday()} /></div>
     </div>
   );

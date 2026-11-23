@@ -1,4 +1,5 @@
 import "server-only";
+import { cancellationRuleText } from "@/lib/cancellation";
 import type { PaymentMethod } from "@/domain/status";
 import { connection } from "next/server";
 import { z } from "zod";
@@ -185,14 +186,11 @@ export async function publicBookingRules() {
     checkInTime: data?.check_in_time ?? "14:00",
     checkOutTime: data?.check_out_time ?? "12:00",
     holdMinutes: data?.website_hold_minutes ?? 30,
-    cancellationPolicy: data?.cancellation_policy ?? (data ? cancellationRuleText(data.free_cancel_hours, data.late_cancel_fee_pct) : null),
+    cancellationPolicy: data?.cancellation_policy ?? (data ? cancellationRuleText(data.free_cancel_hours, data.late_cancel_fee_pct, data.check_in_time) : null),
   };
 }
 
-export function cancellationRuleText(freeHours: number, feePct: number): string {
-  if (feePct === 0) return "Free cancellation up to check-in.";
-  return `Free cancellation up to ${freeHours} hours before check-in. After that, ${feePct}% of the room price is charged.`;
-}
+export { cancellationRuleText };
 
 export async function publicExtras() {
   return all<{ id: string; name: string; price_kobo: number; per_night: number }>(
