@@ -51,4 +51,35 @@ describe("guest accounts", () => {
     await guestChangeDates(db, e, far.id, day(31), day(34));
     expect(await q1("SELECT check_in, check_out, total_amount_kobo FROM reservations WHERE id = ?", far.id)).toEqual({ check_in: day(31), check_out: day(34), total_amount_kobo: 16_500_000 });
   });
+
+  it("parallel wrong guesses still get only five tries", async () => {
+    const e = mail();
+    await book(e, 40);
+    const code = (await issueGuestCode(db, e))!;
+    const wrong = code === "123456" ? "654321" : "123456";
+    await Promise.all(Array.from({ length: 12 }, () => checkGuestCode(db, e, wrong)));
+    expect(await checkGuestCode(db, e, code)).toBe(false);
+  });
+
+  it("a paid booking can't dodge the late fee by moving its dates first", async () => {
+    const e = mail();
+    const near = await book(e, 1);
+    await recordOfflinePayment(db, desk, { reservationId: near.id, amountKobo: 11_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
+    expect((await guestBookings(db, e)).find((b) => b.id === near.id)?.canChange).toBe(false);
+    await rejects(guestChangeDates(db, e, near.id, day(100), day(101)), /made by the hotel/);
+    const { feeKobo } = await guestCancel(db, e, near.id);
+    expect(feeKobo).toBeGreaterThan(0);
+  });
+
+  it("the same payment form submitted twice records one payment", async () => {
+    const e = mail();
+    const r = await book(e, 50);
+    const paymentId = crypto.randomUUID();
+    const input = { reservationId: r.id, paymentId, amountKobo: 1_000_000, method: "cash" as const, paidOn: day(0), confirmReceived: true };
+    const [a, b] = await Promise.all([recordOfflinePayment(db, desk, input), recordOfflinePayment(db, desk, input)]);
+    expect(a.receiptNumber).toBe(b.receiptNumber);
+    expect((await q1<{ n: number }>("SELECT count(*) AS n FROM payments WHERE reservation_id = ?", r.id)).n).toBe(1);
+    await recordOfflinePayment(db, desk, input);
+    expect((await q1<{ n: number }>("SELECT count(*) AS n FROM payments WHERE reservation_id = ?", r.id)).n).toBe(1);
+  });
 });

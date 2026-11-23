@@ -242,6 +242,7 @@ export async function recordOfflinePayment(
   actor: Actor,
   input: {
     reservationId: string;
+    paymentId?: string;
     amountKobo: number;
     method: "cash" | "bank_transfer" | "pos_terminal" | "other";
     reference?: string | null;
@@ -258,7 +259,16 @@ export async function recordOfflinePayment(
   if (!input.paidOn || input.paidOn > today) throw new AppError("VALIDATION", "The payment date can't be in the future.");
   if (input.paidOn < addDays(today, -60)) throw new AppError("VALIDATION", "Payments older than 60 days must be recorded by a manager with the accounts team.");
 
+  const already = async () => {
+    if (!input.paymentId) return null;
+    const row = await first<{ reservation_id: string; receipt_number: string }>(db, "SELECT reservation_id, receipt_number FROM payments WHERE id = ?", input.paymentId);
+    if (row && row.reservation_id !== input.reservationId) throw new AppError("CONFLICT", "This form was already used. Reload and try again.");
+    return row ? { paymentId: input.paymentId, receiptNumber: row.receipt_number, outcome: "already_processed" as const } : null;
+  };
+
   return retryOnStale(async () => {
+    const done = await already();
+    if (done) return done;
     const res = await loadReservation(db, input.reservationId);
     if (!["pending_payment", "confirmed", "checked_in", "checked_out", "expired"].includes(res.status)) {
       throw new AppError("INVALID_TRANSITION", "Payments can't be recorded against a cancelled reservation.");
@@ -268,7 +278,7 @@ export async function recordOfflinePayment(
     if (balance <= 0) throw new AppError("VALIDATION", "This reservation is already paid in full.");
     if (input.amountKobo > balance) throw new AppError("VALIDATION", `That is more than the ${naira(balance)} balance due.`);
 
-    const paymentId = uuid();
+    const paymentId = input.paymentId ?? uuid();
     const settle = await settleStatements(db, res, paid + input.amountKobo);
     const methodLabel = input.method.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
     try {
@@ -296,7 +306,11 @@ export async function recordOfflinePayment(
         settle.reason,
       );
     } catch (err) {
-      if (err instanceof AppError && dbErrorToken(err.cause) === "unique") throw new AppError("CONFLICT", "A payment with this reference has already been recorded.");
+      if (err instanceof AppError && dbErrorToken(err.cause) === "unique") {
+        const done = await already();
+        if (done) return done;
+        throw new AppError("CONFLICT", "A payment with this reference has already been recorded.");
+      }
       retryIfCapacityRace(err);
     }
     const row = await first<{ receipt_number: string }>(db, "SELECT receipt_number FROM payments WHERE id = ?", paymentId);

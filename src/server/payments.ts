@@ -13,6 +13,7 @@ import { deliverEmails } from "./notifications";
 
 const schema = z.object({
   reservationId: z.uuid(),
+  paymentId: z.uuid().optional(),
   amount: z.coerce.number({ error: "Enter the amount received" }).positive("Enter the amount received").max(100_000_000),
   method: z.enum(["cash", "bank_transfer", "pos_terminal", "other"], { error: "Choose how it was paid" }),
   paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose the date received"),
@@ -34,7 +35,7 @@ export async function recordOfflinePayment(_prev: ActionResult | null, formData:
     const v = parsed.data;
     const amountKobo = Math.round(v.amount * 100);
     const row = await record(await getDb(), actorOf(staff), {
-      reservationId: v.reservationId, amountKobo, method: v.method, reference: v.reference ?? null,
+      reservationId: v.reservationId, paymentId: v.paymentId, amountKobo, method: v.method, reference: v.reference ?? null,
       paidOn: v.paidOn, notes: v.notes ?? null, confirmReceived: true,
     });
 

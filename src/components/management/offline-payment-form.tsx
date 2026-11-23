@@ -24,6 +24,7 @@ export function OfflinePaymentForm({
   today: string;
 }) {
   const [state, action, pending] = useActionState(recordOfflinePayment, null);
+  const [paymentId] = useState(() => crypto.randomUUID());
   const [review, setReview] = useState<null | { amount: string; method: string; paidOn: string; reference: string }>(null);
   // A server reply (e.g. a refused amount) returns to the form so the error shows next to its field.
   const [seen, setSeen] = useState(state);
@@ -55,6 +56,7 @@ export function OfflinePaymentForm({
   return (
     <form action={action} onSubmit={onSubmit} className="space-y-5">
       <input type="hidden" name="reservationId" value={reservation.id} />
+      <input type="hidden" name="paymentId" value={paymentId} />
       <div className="rounded-md bg-ivory-100 p-4 text-sm">
         <p className="font-medium text-ink-900">{reservation.guestName} · <span className="font-mono">{reservation.reference}</span></p>
         <p className="mt-1 text-ink-600">
