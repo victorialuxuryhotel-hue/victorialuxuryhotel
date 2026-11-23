@@ -10,16 +10,6 @@ import { claimOutbox, finishOutbox, type OutboxRow } from "./domain/system";
 import { sendEmail } from "./email/send";
 import { bookingConfirmedEmail, hotelNewBookingEmail, paymentReceivedEmail, reservationCancelledEmail, type StayInfo } from "./email/templates";
 
-/**
- * Delivers queued emails from the outbox. Emails are queued by database
- * triggers in the same transaction as the change that causes them, so none
- * is lost if the app stops between committing and sending. This runs after
- * the response (via after()) and from the scheduled job; each row is claimed
- * by exactly one sender (one atomic statement) and sent with the outbox id as
- * the idempotency key, so concurrent runs and retries never send twice.
- * Never throws.
- */
-
 const timeLabel = (t: string) => {
   const [h = 0, m = 0] = t.split(":").map(Number);
   return h === 12 && m === 0 ? "12:00 noon" : `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "pm" : "am"}`;
@@ -68,7 +58,6 @@ async function loadStay(db: Db, reservationId: string): Promise<(StayInfo & { em
   };
 }
 
-/** Sends one queued email. Returns "sent" | "skipped" (no address) | an error message. */
 async function deliver(db: Db, row: OutboxRow): Promise<"sent" | "skipped" | string> {
   const stay = await loadStay(db, row.reservation_id);
   if (!stay) return "skipped";
@@ -101,7 +90,6 @@ async function deliver(db: Db, row: OutboxRow): Promise<"sent" | "skipped" | str
   return (await sendEmail({ to: stay.email, ...email, idempotencyKey: row.id })) ? "sent" : "Payment receipt could not be sent";
 }
 
-/** `reservationId` sends that booking's emails first (used right after an action). */
 export async function deliverEmails(opts: { limit?: number; reservationId?: string } = {}): Promise<{ sent: number; failed: number }> {
   const result = { sent: 0, failed: 0 };
   try {

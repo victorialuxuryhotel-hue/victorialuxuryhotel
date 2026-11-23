@@ -7,9 +7,7 @@ import { updateRoomStatus } from "@/server/rooms";
 import { ActionButton } from "./action-form";
 import { keepValues } from "@/lib/forms";
 
-/** Quick status changes for one room, shown when its tile is opened. */
 export function RoomQuickActions({ roomId, readiness, maintenance, large = false }: { roomId: string; readiness: string; maintenance: boolean; large?: boolean }) {
-  // Phones (bottom sheet): full-width 48px buttons. Popover: compact.
   const size = large ? "lg" : "sm";
   const [state, action, pending] = useActionState(updateRoomStatus, null);
   const set = (value: string) => ({ roomId, readiness: value });

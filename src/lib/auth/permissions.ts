@@ -1,14 +1,5 @@
 import type { StaffRole } from "@/domain/status";
 
-/**
- * What each role may do. Deliberately small: three roles, a flat list of
- * capabilities. The data layer enforces the same rules again in every
- * business function (requireRole in src/server/domain/*); this matrix decides
- * what the app offers and gives a clear error first.
- *
- * Future departments (finance, restaurant, housekeeping) add roles to the
- * staff_role enum and rows here; nothing else needs to change.
- */
 export type Permission =
   | "reservations.manage" // create, edit, assign rooms, check in/out, cancel
   | "guests.manage"
@@ -49,9 +40,7 @@ const matrix: Record<StaffRole, ReadonlySet<Permission>> = {
   front_desk: new Set(frontDesk),
   general_manager: new Set(manager),
   owner: new Set<Permission>([...manager, "staff.manage"]),
-  // Money only: reports, payments and expenses. No bookings or rooms.
   finance: new Set<Permission>(["reports.view", "expenses.manage"]),
-  // The till, and recording stock they use.
   restaurant_bar: new Set<Permission>(["pos.sell", "inventory.use"]),
 };
 
@@ -59,19 +48,17 @@ export function can(role: StaffRole, permission: Permission): boolean {
   return matrix[role].has(permission);
 }
 
-/**
- * Payments list. Roles that see revenue see every payment ("all"). Front desk
- * sees today's payments (Lagos time) or the ones they recorded ("mine"),
- * enforced in the query (src/server/domain/payment-list.ts).
- */
 export type PaymentView = "all" | "today" | "mine";
 
 export function allowedPaymentViews(role: StaffRole): readonly PaymentView[] {
   return can(role, "reports.view") ? ["all"] : ["today", "mine"];
 }
 
-/** The view actually used: anything the role may not use falls back to its first allowed view. */
 export function effectivePaymentView(role: StaffRole, requested: string | undefined): PaymentView {
   const allowed = allowedPaymentViews(role);
   return allowed.includes(requested as PaymentView) ? (requested as PaymentView) : allowed[0]!;
+}
+
+export function canAny(role: StaffRole, permission: Permission | readonly Permission[]): boolean {
+  return (typeof permission === "string" ? [permission] : permission).some((p) => can(role, p));
 }

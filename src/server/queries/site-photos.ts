@@ -4,7 +4,6 @@ import { mediaUrl } from "@/lib/media";
 import { authorizeRead } from "../auth";
 import { all, getDb } from "../db";
 
-/** Website photos for the management screen. */
 export async function listSitePhotos(): Promise<{ bySlot: Record<string, ManagedPhoto>; gallery: ManagedPhoto[] }> {
   await authorizeRead("categories.manage");
   const rows = await all<{ id: string; slot: string; gallery_group: string | null; storage_path: string; alt_text: string }>(

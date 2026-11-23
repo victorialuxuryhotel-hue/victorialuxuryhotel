@@ -15,7 +15,6 @@ export type ActivityParams = { range: ReportRange; cat: ActivityCategory; who?: 
 const rangeLabel: Record<ReportRange, string> = { today: "Today", "14d": "14 days", month: "This month" };
 const time = (iso: string) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" }).format(new Date(iso));
 
-/** Query string for the activity tab, dropping defaults so URLs stay short. */
 export function activityHref(p: ActivityParams, change: Partial<ActivityParams> = {}): string {
   const n = { ...p, page: 1, ...change };
   const q = new URLSearchParams({ tab: "activity" });
@@ -33,11 +32,6 @@ function dayHeading(day: string, today: string): string {
   return formatDate(day);
 }
 
-/**
- * The activity log for managers: a period, a category, a person, routine
- * events off by default, grouped by Lagos day, 20 per page. Entries are
- * permanent; this only filters what's shown.
- */
 export function ActivityLog({ p, rows, total, people, today, size }: {
   p: ActivityParams;
   rows: ActivityEntry[];

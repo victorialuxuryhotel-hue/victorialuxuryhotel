@@ -26,7 +26,6 @@ export const RoomStateBadge = ({ state }: { state: RoomBoardState }) => (
   <Badge tone={roomBoardState[state].tone}>{roomBoardState[state].label}</Badge>
 );
 
-/** Paid vs total, with balance. Used wherever money owed must be obvious. */
 export function PaidProgress({ paidKobo, totalKobo, format }: { paidKobo: number; totalKobo: number; format: (k: number) => string }) {
   const pct = Math.min(100, Math.round((paidKobo / totalKobo) * 100));
   const balance = totalKobo - paidKobo;

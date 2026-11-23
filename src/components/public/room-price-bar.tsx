@@ -7,11 +7,6 @@ import { cn } from "@/lib/utils/cn";
 
 const noop = () => () => {};
 
-/**
- * Phones and tablets: the room's price pinned to the bottom of the screen.
- * "Choose dates" jumps to the availability form and opens the check-in date
- * picker. Hidden while the form itself is on screen.
- */
 export function RoomPriceBar({ price, targetId }: { price: string; targetId: string }) {
   const [formVisible, setFormVisible] = useState(false);
   const mounted = useSyncExternalStore(noop, () => true, () => false);
@@ -33,7 +28,6 @@ export function RoomPriceBar({ price, targetId }: { price: string; targetId: str
     try {
       input.showPicker?.();
     } catch {
-      // Some browsers only allow the picker from a direct tap on the input.
     }
   }
 
@@ -57,7 +51,6 @@ export function RoomPriceBar({ price, targetId }: { price: string; targetId: str
           </button>
         </div>
       </div>
-      {/* Room at the very end of the page so the bar never covers the footer. */}
       {mounted ? createPortal(<div aria-hidden className="h-20 shrink-0 bg-navy-950 md:hidden" />, document.body) : null}
     </>
   );

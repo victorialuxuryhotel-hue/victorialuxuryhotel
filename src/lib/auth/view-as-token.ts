@@ -1,9 +1,3 @@
-/**
- * "View as front desk" token: owner id + Clerk session id + expiry, signed
- * with HMAC-SHA256. Pure (Web Crypto only) so it runs in the Worker and in
- * unit tests. The server honours it only for that same active owner in that
- * same session, before the expiry.
- */
 export const VIEW_AS_MINUTES = 30;
 
 export type ViewAsClaims = { staffId: string; sessionId: string; exp: number };
@@ -17,7 +11,6 @@ async function hmac(secret: string, data: string): Promise<Uint8Array> {
   return new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(data)));
 }
 
-/** Constant-time comparison of two signatures. */
 function same(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -31,7 +24,6 @@ export async function signViewAs(secret: string, staffId: string, sessionId: str
   return `${body}.${b64url(await hmac(secret, body))}`;
 }
 
-/** The claims if the signature is valid and the token hasn't expired; otherwise null. Never throws. */
 export async function verifyViewAs(secret: string, token: string | undefined, now = Date.now()): Promise<ViewAsClaims | null> {
   if (!token || secret.length < 32) return null;
   const [body, sig] = token.split(".");

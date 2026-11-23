@@ -1,19 +1,12 @@
 import { addDays, hotelToday } from "@/lib/hotel-date";
 import { FINANCE, all, first, requireRole, type Actor, type Db } from "../db";
 
-/**
- * Reports for managers and the owner. Every range is in hotel (Lagos) dates,
- * the same rule as the front-desk payments scope: a payment belongs to the
- * Lagos day it was paid (date(paid_at, '+1 hour'); Lagos is UTC+1 all year).
- * Money is net: successful payments minus corrections and refunds.
- */
 export type ReportRange = "today" | "14d" | "month";
 
 export function reportRange(range: string | undefined): ReportRange {
   return range === "today" || range === "month" ? range : "14d";
 }
 
-/** Inclusive Lagos dates for a range ending today. */
 export function rangeDates(range: ReportRange, today: string): { from: string; to: string; days: string[] } {
   const from = range === "today" ? today : range === "14d" ? addDays(today, -13) : `${today.slice(0, 7)}-01`;
   const days: string[] = [];
@@ -45,7 +38,6 @@ export async function moneyReport(db: Db, actor: Actor, range: ReportRange, toda
 
 export type CashUpRow = { who: string; staffId: string | null; counts: Record<Bucket, number>; totalKobo: number };
 
-/** Who took what on one Lagos day: count of payments by method and the net total, per staff member (or Website). */
 export async function cashUp(db: Db, actor: Actor, day = hotelToday()): Promise<CashUpRow[]> {
   requireRole(actor, FINANCE);
   const rows = await all<{ staff_id: string | null; who: string | null; online: number; bucket: Bucket; n: number; kobo: number }>(
@@ -74,20 +66,17 @@ export async function cashUp(db: Db, actor: Actor, day = hotelToday()): Promise<
 }
 
 const STAYING = "r.status IN ('confirmed', 'checked_in', 'checked_out')";
+const STAY_END =
+  "(CASE WHEN r.status = 'checked_out' AND r.checked_out_at IS NOT NULL THEN min(r.check_out, max(date(r.check_in, '+1 day'), date(r.checked_out_at, '+1 hour'))) ELSE r.check_out END)";
 
-/**
- * Nightly occupancy: rooms with a guest (confirmed, in house or completed)
- * against rooms in service today. Room-nights sold by type, by the type of
- * the room actually assigned (upgrades count where the guest slept).
- */
 export async function occupancyReport(db: Db, actor: Actor, range: ReportRange, today = hotelToday()) {
   requireRole(actor, FINANCE);
   const { from, to } = rangeDates(range, today);
   const [rooms, nights, byType] = await Promise.all([
-    first<{ n: number }>(db, "SELECT count(*) AS n FROM rooms WHERE is_active = 1 AND service_status = 'in_service'"),
+    first<{ n: number }>(db, "SELECT count(*) AS n FROM rooms WHERE is_active = 1"),
     all<{ day: string; occupied: number }>(
       db,
-      `SELECT cal.d AS day, (SELECT count(*) FROM reservations r WHERE ${STAYING} AND r.check_in <= cal.d AND r.check_out > cal.d) AS occupied
+      `SELECT cal.d AS day, (SELECT count(*) FROM reservations r WHERE ${STAYING} AND r.check_in <= cal.d AND ${STAY_END} > cal.d) AS occupied
        FROM calendar cal WHERE cal.d BETWEEN ? AND ? ORDER BY cal.d`,
       from,
       to,
@@ -96,7 +85,7 @@ export async function occupancyReport(db: Db, actor: Actor, range: ReportRange, 
       db,
       `SELECT c.name, count(*) AS nights
        FROM calendar cal
-       JOIN reservations r ON r.check_in <= cal.d AND r.check_out > cal.d AND ${STAYING}
+       JOIN reservations r ON r.check_in <= cal.d AND ${STAY_END} > cal.d AND ${STAYING}
        LEFT JOIN rooms rm ON rm.id = r.room_id
        JOIN room_categories c ON c.id = coalesce(rm.category_id, r.category_id)
        WHERE cal.d BETWEEN ? AND ?
@@ -106,14 +95,14 @@ export async function occupancyReport(db: Db, actor: Actor, range: ReportRange, 
     ),
   ]);
   const inService = rooms?.n ?? 0;
-  const pct = (occupied: number) => (inService ? Math.round((occupied / inService) * 100) : 0);
+  const pct = (occupied: number) => (inService ? Math.min(100, Math.round((occupied / inService) * 100)) : 0);
   const sold = nights.reduce((s, n) => s + n.occupied, 0);
   return {
     from,
     to,
     roomsInService: inService,
     nights: nights.map((n) => ({ day: n.day, occupied: n.occupied, pct: pct(n.occupied) })),
-    averagePct: nights.length && inService ? Math.round((sold / (nights.length * inService)) * 100) : 0,
+    averagePct: nights.length && inService ? Math.min(100, Math.round((sold / (nights.length * inService)) * 100)) : 0,
     byType,
   };
 }
@@ -123,7 +112,6 @@ export type PaymentCsvRow = {
   amount_kobo: number; receipt_number: string | null; taken_by: string | null;
 };
 
-/** Successful payments and corrections in the range, oldest first, for the CSV download. */
 export async function paymentsForCsv(db: Db, actor: Actor, range: ReportRange, today = hotelToday()): Promise<PaymentCsvRow[]> {
   requireRole(actor, FINANCE);
   const { from, to } = rangeDates(range, today);
@@ -139,10 +127,6 @@ export async function paymentsForCsv(db: Db, actor: Actor, range: ReportRange, t
   );
 }
 
-/**
- * One CSV field. Numbers go out as plain numbers. Text is quoted, with a
- * leading quote mark on anything a spreadsheet would run as a formula.
- */
 export function csvField(value: string | number | null | undefined): string {
   if (typeof value === "number") return String(value);
   let s = value ?? "";

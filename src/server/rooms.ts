@@ -4,12 +4,14 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { MIN_NIGHTLY_RATE_KOBO } from "@/domain/pricing";
+import { recordId } from "@/lib/ids";
 import { formatNaira } from "@/lib/format";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize } from "./auth";
 import { getDb } from "./db";
 import { createRoom as addRoom, saveCategory as save } from "./domain/admin";
+import { markTidied as tidied } from "./domain/housekeeping";
 import { updateRoomStatus as setRoomStatus } from "./domain/reservations";
 
 async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResult<T>> {
@@ -22,18 +24,25 @@ async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResul
 }
 
 const statusSchema = z.object({
-  roomId: z.uuid(),
+  roomId: recordId(),
   readiness: z.enum(["needs_cleaning", "cleaning_in_progress", "ready"]).optional(),
   serviceStatus: z.enum(["in_service", "maintenance"]).optional(),
   note: z.string().max(200).optional(),
 });
 
-/** Readiness and maintenance: any staff member, via the audited database function. */
 export async function updateRoomStatus(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return run("room.status", async () => {
     const staff = await authorize("rooms.status");
     const v = statusSchema.parse(Object.fromEntries([...formData.entries()].filter(([, val]) => val !== "")));
     await setRoomStatus(await getDb(), actorOf(staff), { roomId: v.roomId, readiness: v.readiness, serviceStatus: v.serviceStatus, note: v.note ?? null });
+    refresh();
+  });
+}
+
+export async function markTidied(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return run("room.tidied", async () => {
+    const staff = await authorize("rooms.status");
+    await tidied(await getDb(), actorOf(staff), recordId().parse(formData.get("roomId")));
     refresh();
   });
 }
@@ -71,7 +80,6 @@ const categorySchema = z.object({
   isActive: z.literal("on").optional(),
 });
 
-/** Create or update a room category. Rates are entered in naira and stored in kobo. */
 export async function saveCategory(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const result = await run("category.save", async () => {
     const staff = await authorize("categories.manage");

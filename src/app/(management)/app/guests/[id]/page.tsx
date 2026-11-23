@@ -1,3 +1,5 @@
+import { canAny } from "@/lib/auth/permissions";
+import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -10,7 +12,8 @@ import { getGuest } from "@/server/queries/guests";
 export const metadata: Metadata = { title: "Guest" };
 
 async function Content({ params }: { params: Promise<{ id: string }> }) {
-  await requireStaff();
+  const staff = await requireStaff();
+  if (!canAny(staff.role, "guests.manage")) return <AccessDenied />;
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
   const result = await getGuest(id);

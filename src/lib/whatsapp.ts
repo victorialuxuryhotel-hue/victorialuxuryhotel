@@ -1,9 +1,3 @@
-/**
- * WhatsApp click-to-chat links (wa.me). The number must be in international
- * format with digits only. Guests type phone numbers many ways; Nigerian local
- * numbers (0803…) are converted to +234. Returns null when the number can't be
- * turned into something WhatsApp would accept, so no broken button is shown.
- */
 export function whatsappNumber(phone: string | undefined | null): string | null {
   if (!phone) return null;
   const trimmed = phone.trim().replace(/\(0\)/g, ""); // "+44 (0) 7700…": the (0) is dropped when dialling internationally

@@ -1,6 +1,5 @@
 import { Container, Eyebrow } from "./section";
 
-/** Banner for inner pages: consistent, calm, and fast to scan. */
 export function PageHero({ eyebrow, title, intro }: { eyebrow: string; title: string; intro?: string }) {
   return (
     <section className="relative overflow-hidden bg-navy-950 text-ivory-50">

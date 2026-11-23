@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
+import { recordId } from "@/lib/ids";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize, authorizeRead } from "./auth";
@@ -12,7 +13,6 @@ import * as engine from "./domain/reservations";
 import { availabilityForStay, findGuestsByPhone, type PhoneMatch, type TypeAvailability } from "./domain/staff-booking";
 import { deliverEmails } from "./notifications";
 
-/** Runs an action body with consistent error handling and logging. */
 async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return ok(await body());
@@ -22,8 +22,6 @@ async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResul
     return toActionError(err);
   }
 }
-
-
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date");
 const id = z.uuid();
@@ -39,11 +37,10 @@ const createSchema = z.object({
   email: z.union([z.literal(""), z.email("Enter a valid email")]).optional(),
   specialRequests: z.string().max(1000).optional(),
   guestId: z.union([z.literal(""), z.uuid()]).optional(),
-  roomId: z.union([z.literal(""), z.uuid()]).optional(),
+  roomId: z.union([z.literal(""), recordId()]).optional(),
   next: z.enum(["payment", "reservation"]).optional(),
 });
 
-/** Direct booking (walk-in, phone, WhatsApp) through the same engine as the website. */
 export async function createReservation(_prev: ActionResult<{ id: string; next: string }> | null, formData: FormData): Promise<ActionResult<{ id: string; next: string }>> {
   const result = await run("reservation.create", async () => {
     const staff = await authorize("reservations.manage");
@@ -59,7 +56,6 @@ export async function createReservation(_prev: ActionResult<{ id: string; next: 
     refresh();
     return { id: res.id, next: v.next ?? "reservation" };
   });
-  // "Create & take payment" goes straight to recording the payment (6d).
   if (result.ok) redirect(result.data.next === "payment" ? `/app/payments/record?reservation=${result.data.id}&created=1` : `/app/reservations/${result.data.id}?created=1`);
   return result;
 }
@@ -70,7 +66,7 @@ export async function assignRoom(_prev: ActionResult<Undoable> | null, formData:
   return run("reservation.assign_room", async () => {
     const staff = await authorize("reservations.manage");
     const reservationId = id.parse(formData.get("reservationId"));
-    const roomId = z.uuid("Choose a room").safeParse(formData.get("roomId"));
+    const roomId = recordId("Choose a room").safeParse(formData.get("roomId"));
     if (!roomId.success) throw new AppError("VALIDATION", "Choose a room");
     const result = await engine.assignRoom(await getDb(), actorOf(staff), reservationId, roomId.data);
     refresh();
@@ -186,7 +182,6 @@ export async function resolveAttention(_prev: ActionResult | null, formData: For
   });
 }
 
-/** Undo a room assignment or status change made moments ago (see engine.undoAction). */
 export async function undoChange(reservationId: string, undoId: number): Promise<ActionResult<{ message: string }>> {
   return run("reservation.undo", async () => {
     const staff = await authorize("reservations.manage");
@@ -197,7 +192,6 @@ export async function undoChange(reservationId: string, undoId: number): Promise
   });
 }
 
-/** New reservation form: returning guests whose phone matches what's typed (7+ digits). Read-only. */
 export async function lookupGuestsByPhone(phone: string): Promise<PhoneMatch[]> {
   try {
     const staff = await authorizeRead("reservations.manage");
@@ -208,7 +202,6 @@ export async function lookupGuestsByPhone(phone: string): Promise<PhoneMatch[]> 
   }
 }
 
-/** New reservation form: free rooms per type for the chosen dates. Read-only. */
 export async function stayAvailability(checkIn: string, checkOut: string): Promise<TypeAvailability[] | null> {
   try {
     const staff = await authorizeRead("reservations.manage");

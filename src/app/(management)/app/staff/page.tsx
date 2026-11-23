@@ -11,7 +11,6 @@ import { listStaff } from "@/server/queries/settings";
 
 export const metadata: Metadata = { title: "Staff & access" };
 
-/** Owner only: who can sign in, and with which role. */
 export default function StaffPage() {
   return (
     <>

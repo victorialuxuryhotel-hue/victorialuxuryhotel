@@ -1,8 +1,3 @@
-/**
- * SAMPLE DATA FOR THE DESIGN PREVIEW ONLY.
- * Names, amounts and rates are invented to show layouts. They are not hotel
- * data and must never be imported outside src/app/(preview).
- */
 import type {
   ActivityRow,
   AvailabilityOption,

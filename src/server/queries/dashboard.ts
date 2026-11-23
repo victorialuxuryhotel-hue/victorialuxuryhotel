@@ -5,19 +5,12 @@ import { actorOf, authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
 import { frontDeskSummary, listPaymentsFor } from "../domain/payment-list";
 
-/**
- * Basic revenue visibility (not accounting). Three different measures, never mixed:
- *  - received:    verified money in (successful payments minus refunds), by payment date
- *  - bookedValue: value of stays ARRIVING this month that are confirmed, in house or completed
- *  - outstanding: unpaid balances on confirmed / in-house / completed stays
- */
 export async function revenueSummary() {
   await authorizeRead("reports.view");
   const db = await getDb();
   const today = hotelToday();
   const monthStart = `${today.slice(0, 7)}-01`;
   const firstDay = addDays(today, -13) < monthStart ? addDays(today, -13) : monthStart;
-  // Hotel-local midnight (UTC+1) of the earliest day needed, as a UTC instant.
   const since = new Date(`${firstDay}T00:00:00+01:00`).toISOString();
 
   const [payments, stays] = await Promise.all([
@@ -57,7 +50,7 @@ export async function revenueSummary() {
 }
 
 export async function awaitingPaymentCount() {
-  await authorizeRead();
+  await authorizeRead(["reservations.manage", "reports.view"]);
   const row = await first<{ n: number }>(
     await getDb(),
     "SELECT count(*) AS n FROM reservations WHERE status = 'pending_payment' AND hold_expires_at > ?",
@@ -76,12 +69,8 @@ const toPayment = (p: P): PaymentRow => ({
   status: p.status, paidAt: p.paid_at ?? undefined, receiptNumber: p.receipt_number ?? undefined, recordedBy: p.recorder ?? undefined,
 });
 
-/**
- * The Payments page. Scope is decided in the data layer by role: front desk
- * gets today's payments (Lagos time) or their own, whatever view is asked for.
- */
 export async function listPayments(opts: { view?: string; page?: number; size?: number }) {
-  const staff = await authorizeRead();
+  const staff = await authorizeRead(["payments.record", "reports.view"]);
   const { view, rows } = await listPaymentsFor(await getDb(), actorOf(staff), opts);
   return {
     view,
@@ -94,8 +83,7 @@ export async function listPayments(opts: { view?: string; page?: number; size?: 
   };
 }
 
-/** Front desk: counts for the two views and today's takings by method. */
 export async function frontDeskPayments() {
-  const staff = await authorizeRead();
+  const staff = await authorizeRead("payments.record");
   return frontDeskSummary(await getDb(), actorOf(staff));
 }

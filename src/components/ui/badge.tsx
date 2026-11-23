@@ -12,10 +12,6 @@ const tones: Record<Tone, string> = {
   brand: "bg-navy-50 text-navy-800",
 };
 
-/**
- * Status tag (Classical: square, 11px, word first). Colour is never the only
- * signal: the label is always text. Domain status → tone maps live with each domain.
- */
 export function Badge({ tone = "neutral", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
   return (
     <span className={cn("inline-flex items-center whitespace-nowrap rounded-[3px] px-2.5 py-0.5 text-xs tracking-[0.02em]", tones[tone], className)}>

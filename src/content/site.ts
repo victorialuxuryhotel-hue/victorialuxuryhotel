@@ -1,14 +1,3 @@
-/**
- * Website copy. Every factual claim here comes from the hotel's requirements
- * form (15 Nov 2026). Wording is ours and should be reviewed by the hotel.
- *
- * Photos: set `image` to a path under /public (e.g. "/photos/pool.jpg") as the
- * hotel supplies them. Until then a branded placeholder is shown.
- *
- * Room categories are listed here only for the design phase. Phase 12 switches
- * the rooms pages to the database so names, descriptions and photos are
- * managed by staff; rates are only ever shown from live availability.
- */
 import type { LucideIcon } from "lucide-react";
 import {
   Car,
@@ -24,12 +13,6 @@ import {
   Music,
 } from "lucide-react";
 
-/**
- * `alt` describes the photo for screen readers (rewrite it to match the real
- * photo when it arrives). `shot` is the art direction for the photographer:
- * the experience the image should make a visitor feel. See
- * docs/photography-brief.md.
- */
 export type Photo = { image?: string; alt: string; shot?: string };
 
 export const home = {
@@ -37,7 +20,6 @@ export const home = {
   title: "Where every guest is treated as royalty",
   intro:
     "An exclusive indoor pool, an in-house spa and a relaxed lounge and bar, in the heart of Alagbaka GRA. Book direct for instant confirmation.",
-  /** Phones: one line of key facts. */
   facts: "Indoor pool, in-house spa, lounge and bar. 24/7 power and free Wi-Fi.",
   hero: {
     alt: "Victoria Luxury Hotel at dusk",

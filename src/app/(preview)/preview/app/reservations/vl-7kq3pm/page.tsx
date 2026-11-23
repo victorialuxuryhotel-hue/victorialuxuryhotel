@@ -4,7 +4,6 @@ import { reservationDetail } from "../../../_sample";
 
 type Props = { searchParams: Promise<{ paid?: string }> };
 
-/** ?paid=RCT-… shows the after-payment banner (with Share on WhatsApp). */
 export default function Page(props: Props) {
   return (
     <Suspense>

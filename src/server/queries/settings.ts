@@ -9,7 +9,7 @@ import { all, first, getDb } from "../db";
 import { managerToAsk, ROLE, type StaffRecord } from "../domain/admin";
 
 export async function getBookingRules(): Promise<BookingRules> {
-  await authorizeRead();
+  await authorizeRead(["reservations.manage", "payments.record", "reports.view", "settings.manage"]);
   const data = await first<{
     check_in_time: string; check_out_time: string; website_hold_minutes: number; staff_hold_hours: number; cancellation_policy: string | null;
     free_cancel_hours: number; late_cancel_fee_pct: number; vat_rate_bp: number;
@@ -31,7 +31,6 @@ export async function getBookingRules(): Promise<BookingRules> {
   };
 }
 
-/** Extras and promo codes, for the Booking rules page (managers). */
 export async function getCatalogueSettings() {
   await authorizeRead("settings.manage");
   const db = await getDb();
@@ -45,7 +44,6 @@ export async function getCatalogueSettings() {
   return { extras, promos };
 }
 
-/** Owner only. Last sign-in comes from Clerk (best effort: the list still shows if Clerk is unreachable). */
 export async function listStaff(): Promise<StaffRow[]> {
   await authorizeRead("staff.manage");
   const staff = await all<StaffRecord & { phone: string | null }>(
@@ -70,17 +68,14 @@ export async function listStaff(): Promise<StaffRow[]> {
     isActive: s.is_active === 1,
     phone: s.phone ?? undefined,
     lastSignIn: s.clerk_user_id ? lastSignIn.get(s.clerk_user_id) : undefined,
-    // Last time they used the app (recorded at most hourly), else their last sign-in.
     lastSeen: latest(s.last_seen_at ?? undefined, s.clerk_user_id ? lastSignIn.get(s.clerk_user_id) : undefined),
     invited: !s.clerk_user_id,
   }));
 }
 
-
 const latest = (a?: string, b?: string) => (!a ? b : !b ? a : a > b ? a : b);
 
-/** Front desk: which manager to ask for a manager-only action (name, role, phone). Signed-in staff only. */
 export async function managerToAskForDesk() {
-  const staff = await authorizeRead();
+  const staff = await authorizeRead(["reservations.manage", "payments.record", "reports.view"]);
   return managerToAsk(await getDb(), actorOf(staff), hotelToday());
 }

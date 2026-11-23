@@ -103,7 +103,6 @@ function Row({ b, today }: { b: HallBooking; today: string }) {
   );
 }
 
-/** Upcoming hall bookings, grouped by date. */
 export function HallBookingList({ bookings, today }: { bookings: HallBooking[]; today: string }) {
   if (!bookings.length) return <p className="px-5 py-6 text-sm text-ink-500">No hall bookings yet.</p>;
   const days: Array<{ day: string; items: HallBooking[] }> = [];

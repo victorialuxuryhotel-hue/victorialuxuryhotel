@@ -12,13 +12,12 @@ import { getDb } from "./db";
 import { checkGuestCode, guestCancel, guestChangeDates, issueGuestCode } from "./domain/guest-account";
 import { guestCodeEmail } from "./email/templates";
 import { sendEmail } from "./email/send";
-import { enforceRateLimit } from "./rate-limit";
+import { enforceRateLimit, enforceSubjectLimit } from "./rate-limit";
 
 const COOKIE = "vl_guest";
 const secret = () => process.env.GUEST_SESSION_SECRET ?? process.env.VIEW_AS_SECRET ?? "";
 const email = z.email("Enter the email you booked with").max(254).transform((e) => e.trim().toLowerCase());
 
-/** The signed-in guest's email, or null. */
 export async function guestEmail(): Promise<string | null> {
   return verifyGuest(secret(), (await cookies()).get(COOKIE)?.value);
 }
@@ -29,11 +28,11 @@ async function requireGuest(): Promise<string> {
   return e;
 }
 
-/** Step 1: email a code. Says the same thing whether or not the email has bookings. */
 export async function requestGuestCode(_prev: ActionResult<{ email: string }> | null, formData: FormData): Promise<ActionResult<{ email: string }>> {
   try {
     const e = email.parse(formData.get("email"));
     await enforceRateLimit("guest_code", 5, 3600);
+    await enforceSubjectLimit("guest_code", e, 3, 3600);
     const code = await issueGuestCode(await getDb(), e);
     if (code) {
       if (process.env.NODE_ENV !== "production") logger.info("guest.code_dev", { code });
@@ -46,12 +45,12 @@ export async function requestGuestCode(_prev: ActionResult<{ email: string }> | 
   }
 }
 
-/** Step 2: check the code and start a 7-day guest session. */
 export async function verifyGuestCode(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     const e = email.parse(formData.get("email"));
     const code = z.string().regex(/^\d{6}$/, "Enter the 6-digit code").parse(String(formData.get("code") ?? "").trim());
     await enforceRateLimit("guest_verify", 20, 3600);
+    await enforceSubjectLimit("guest_verify", e, 10, 3600);
     if (!(await checkGuestCode(await getDb(), e, code))) throw new AppError("VALIDATION", "That code isn't right or has expired. Check the latest email, or send a new code.");
     (await cookies()).set(COOKIE, await signGuest(secret(), e), {
       httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: GUEST_SESSION_DAYS * 86_400,

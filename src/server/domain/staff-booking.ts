@@ -2,10 +2,6 @@ import { phoneMatches, localDigits } from "@/lib/phone";
 import { ALL_STAFF, all, requireRole, type Actor, type Db } from "../db";
 import { freeUnits, validateStay } from "./inventory";
 
-/**
- * Helpers for the staff New reservation form (6d): find a returning guest by
- * phone as it's typed, and show which room types are free for the dates.
- */
 export type PhoneMatch = { id: string; name: string; phone: string | null; email: string | null; stays: number };
 
 export async function findGuestsByPhone(db: Db, actor: Actor, typed: string): Promise<PhoneMatch[]> {
@@ -28,11 +24,6 @@ export async function findGuestsByPhone(db: Db, actor: Actor, typed: string): Pr
 export type FreeRoom = { id: string; number: string; floor: string | null };
 export type TypeAvailability = { categoryId: string; free: number; rooms: FreeRoom[] };
 
-/**
- * Free rooms per active room type for the stay (staff only; the public search
- * never shows counts). `free` is the type's capacity; `rooms` are the specific
- * rooms free every night, ready ones first, for staff to pick from.
- */
 export async function availabilityForStay(db: Db, actor: Actor, checkIn: string, checkOut: string): Promise<TypeAvailability[]> {
   requireRole(actor, ALL_STAFF);
   validateStay(checkIn, checkOut, 1);
@@ -54,7 +45,6 @@ export async function availabilityForStay(db: Db, actor: Actor, checkIn: string,
   return Promise.all(
     cats.map(async (c) => {
       const free = Math.max(0, await freeUnits(db, c.id, checkIn, checkOut));
-      // Rooms can look free while the type is full (unassigned bookings hold them).
       return { categoryId: c.id, free, rooms: free ? rooms.filter((r) => r.category_id === c.id).map(({ id, number, floor }) => ({ id, number, floor })) : [] };
     }),
   );

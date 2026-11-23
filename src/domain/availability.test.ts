@@ -10,7 +10,6 @@ const days = (from: string, flags: string) =>
   }));
 
 describe("nearestFreeStart", () => {
-  // 1 Dec … 20 Dec; asking for 5 Dec, 2 nights.
   it("finds the nearest start with every night free", () => {
     expect(nearestFreeStart(days("2026-12-01", "00000000011000000000"), "2026-12-05", 2, "2026-12-01")).toBe("2026-12-10");
   });

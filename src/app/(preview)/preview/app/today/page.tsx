@@ -7,7 +7,6 @@ const detail = "/preview/app/reservations/vl-7kq3pm";
 export default function Page() {
   const arrivals = reservations.filter((r) => r.checkIn === today && (r.status === "confirmed" || r.status === "pending_payment"));
   const departures = reservations.filter((r) => r.checkOut <= today && r.status === "checked_in");
-  // Sample: Adaeze's room 204 still needs cleaning.
   const board = rooms.map((r) => (r.number === "204" ? { ...r, readiness: "needs_cleaning" as const } : r));
   return (
     <TodayView

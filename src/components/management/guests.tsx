@@ -10,7 +10,6 @@ import { ReservationTable } from "./reservation-table";
 export function GuestTable({ rows, hrefFor }: { rows: GuestRow[]; hrefFor: (g: GuestRow) => string }) {
   return (
     <>
-      {/* Phones: one tappable row per guest. */}
       <ul className="divide-y divide-hairline md:hidden">
         {rows.map((g) => (
           <li key={g.id}>

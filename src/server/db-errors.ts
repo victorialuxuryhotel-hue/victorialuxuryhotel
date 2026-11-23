@@ -1,12 +1,5 @@
 import { AppError, type ErrorCode } from "@/lib/errors";
 
-/**
- * Database rule violations (raised by triggers as short tokens, or by
- * constraints) translated into AppErrors with messages safe to show staff or
- * guests. Business code usually checks first and gives a more specific
- * message; these are the backstop when two requests race, or for rules that
- * only the database enforces.
- */
 const tokens: Record<string, [ErrorCode, string]> = {
   room_overlap: ["CONFLICT", "That room is already booked for some of these nights."],
   no_capacity: ["UNAVAILABLE", "Sorry, this room type is no longer available for those dates."],
@@ -32,10 +25,10 @@ const tokens: Record<string, [ErrorCode, string]> = {
   unsettled_charges: ["VALIDATION", "Restaurant & bar charges are unpaid. Settle them before check-out."],
   stock_move_immutable: ["CONFLICT", "Stock records can't be changed or deleted. Record an adjustment instead."],
   hall_overlap: ["CONFLICT", "The hall is already booked at that time."],
+  history_immutable: ["FORBIDDEN", "Booking history can't be deleted."],
   hall_booking_delete_forbidden: ["FORBIDDEN", "Hall bookings are cancelled, not deleted."],
 };
 
-/** The trigger token or constraint description inside a D1 error message. */
 export function dbErrorToken(err: unknown): string | null {
   const message = err instanceof Error ? err.message : String(err);
   const token = /\b([a-z_]+): SQLITE_CONSTRAINT/.exec(message)?.[1];
@@ -46,7 +39,6 @@ export function dbErrorToken(err: unknown): string | null {
   return null;
 }
 
-/** Something read by an action changed before its write landed. The action re-reads and retries. */
 export class StaleStateError extends Error {
   constructor(cause?: unknown) {
     super("stale_state", { cause });
@@ -65,7 +57,6 @@ export function translateDbError(err: unknown): Error {
   return new AppError("INTERNAL", "Something went wrong. Please try again.", { cause: err });
 }
 
-/** Free-text search input, trimmed and length-limited (queries are parameterised). */
 export function cleanSearch(q: string | undefined | null): string {
   return (q ?? "").replace(/[%_\\]/g, "").trim().slice(0, 60);
 }

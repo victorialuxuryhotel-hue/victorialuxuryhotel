@@ -6,7 +6,6 @@ import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
 function isoDate(d: Date) {
-  // Local calendar date (the guest's), not UTC.
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
@@ -22,16 +21,6 @@ function addDays(iso: string, days: number) {
 const MIN_GUESTS = 1;
 const MAX_GUESTS = 6;
 
-/**
- * Availability search. Submits a plain GET to /book so the search is
- * shareable. Validation of dates and capacity happens on the server; this
- * only guides the guest.
- *
- * Phones: the two dates share a row, and the guest stepper sits beside the
- * Search button (about 120px tall in all). From `sm` up: one row of four.
- * The form is marked `data-booking-search` so the sticky booking bar knows
- * when it is on screen.
- */
 export function BookingBar({
   variant = "floating",
   defaults,
@@ -39,7 +28,6 @@ export function BookingBar({
   variant?: "floating" | "inline" | "stacked";
   defaults?: { checkIn?: string; checkOut?: string; guests?: string };
 }) {
-  // The guest's "today" is only known in the browser; on the server it is "".
   const today = useSyncExternalStore(noopSubscribe, () => isoDate(new Date()), () => "");
   const [checkInValue, setCheckIn] = useState(defaults?.checkIn ?? "");
   const [checkOutValue, setCheckOut] = useState(defaults?.checkOut ?? "");
@@ -99,7 +87,6 @@ export function BookingBar({
           />
         </span>
       </label>
-      {/* Phones: guests + Search share the second row; from sm they are grid cells. */}
       <div className={cn("col-span-2 grid grid-cols-[1fr_auto] gap-px", row && "sm:col-span-1 sm:contents")}>
         <div className={cn(cell, "justify-between py-1 pr-1 sm:py-4 sm:pr-2")} role="group" aria-labelledby="guests-label">
           <Users className="hidden size-5 shrink-0 text-gold-500 sm:block" aria-hidden />

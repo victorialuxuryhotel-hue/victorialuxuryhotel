@@ -4,10 +4,6 @@ import { useState } from "react";
 import { BookingBar } from "@/components/public/booking-bar";
 import { formatDate, plural } from "@/lib/format";
 
-/**
- * Pinned under the site header while choosing a room: the stay in one line,
- * and Edit, which opens the booking bar right here with the current dates.
- */
 export function StaySummaryBar({ checkIn, checkOut, guests, nights }: { checkIn: string; checkOut: string; guests: number; nights: number }) {
   const [editing, setEditing] = useState(false);
   return (

@@ -24,19 +24,11 @@ const chip = (on: boolean) =>
     on ? "border-navy-800 bg-navy-50 text-navy-800" : "border-hairline text-ink-900 hover:bg-ink-900/7",
   );
 
-/**
- * Direct booking (walk-in, phone, WhatsApp), in the order the desk works:
- * who (phone first, so a returning guest is one tap), when, then which room
- * type is free. Submits to the same engine as the website: the database
- * re-checks availability and sets the price. Counts and totals here are a
- * preview only.
- */
 export function ReservationForm({ categories, today, holdHours, aboveTabs = false }: { categories: CategoryRow[]; today: string; holdHours: number; aboveTabs?: boolean }) {
   const [state, action, pending] = useActionState(createReservation, null);
   const err = (n: string) => (state && !state.ok ? state.fieldErrors?.[n]?.[0] : undefined);
   const active = categories.filter((c) => c.isActive);
 
-  // Guest: phone lookup as it's typed (7+ digits), debounced.
   const [phone, setPhone] = useState("");
   const [found, setFound] = useState<{ phone: string; list: PhoneMatch[] }>({ phone: "", list: [] });
   const [guest, setGuest] = useState<PhoneMatch | null>(null);
@@ -54,16 +46,13 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
       clearTimeout(t);
     };
   }, [phone, searchable]);
-  // Only show results for the number currently typed.
   const matches = searchable && found.phone === phone ? found.list : [];
 
-  // Stay: tonight by default.
   const [checkIn, setCheckIn] = useState(today);
   const [checkOut, setCheckOut] = useState(addDays(today, 1));
   const [source, setSource] = useState<Source>("walk_in");
   const nights = checkIn && checkOut && checkOut > checkIn ? nightsBetween(checkIn, checkOut) : 0;
 
-  // Room type: free counts for these dates.
   const stayKey = `${checkIn}|${checkOut}`;
   const [freeFor, setFreeFor] = useState<{ key: string; map: Map<string, TypeAvailability> | null }>({ key: "", map: null });
   const [picked, setPicked] = useState("");
@@ -79,12 +68,10 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
   }, [checkIn, checkOut, nights]);
   const typeInfo = (id: string) => (nights && freeFor.key === stayKey ? freeFor.map?.get(id) : undefined);
   const freeOf = (id: string) => typeInfo(id)?.free;
-  // A type that is full for the current dates can't stay chosen.
   const categoryId = picked && freeOf(picked) !== 0 ? picked : "";
   const setCategoryId = setPicked;
 
   const cat = active.find((c) => c.id === categoryId);
-  // The specific room: the one staff picked if still free, else the first free one (ready rooms first).
   const [pickedRoom, setPickedRoom] = useState("");
   const freeRooms = categoryId ? (typeInfo(categoryId)?.rooms ?? []) : [];
   const room = freeRooms.find((r) => r.id === pickedRoom) ?? freeRooms[0];
@@ -243,11 +230,9 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
         </p>
       </div>
 
-      {/* Pinned on mobile, inline on desktop. */}
       <div
         className={cn(
           "fixed inset-x-0 z-30 border-t border-hairline bg-ivory-50 px-4 pt-3 shadow-[0_-4px_12px_rgb(0_0_0/0.06)] lg:static lg:mx-auto lg:mt-6 lg:max-w-3xl lg:rounded-card lg:border lg:p-5 lg:shadow-none",
-          // Front desk has the bottom tab bar on phones; sit just above it.
           aboveTabs ? "bottom-[calc(3.25rem+env(safe-area-inset-bottom))] pb-3 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]" : "bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
         )}
       >

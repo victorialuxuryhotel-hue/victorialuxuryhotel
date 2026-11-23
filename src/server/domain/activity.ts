@@ -2,11 +2,6 @@ import { hotelToday } from "@/lib/hotel-date";
 import { MANAGERS, all, first, requireRole, type Actor, type Db } from "../db";
 import { rangeDates, type ReportRange } from "./reports";
 
-/**
- * The activity log, filtered for reading. Entries are never edited or deleted
- * (database triggers enforce that); this only decides which ones to show.
- * Days are Lagos days, the same rule as Reports.
- */
 export type ActivityCategory = "all" | "bookings" | "payments" | "rooms" | "staff";
 
 export const ACTIVITY_CATEGORIES: Record<Exclude<ActivityCategory, "all">, { label: string; prefixes: string[] }> = {
@@ -16,7 +11,6 @@ export const ACTIVITY_CATEGORIES: Record<Exclude<ActivityCategory, "all">, { lab
   staff: { label: "Staff & settings", prefixes: ["staff.", "settings.", "category.", "photo."] },
 };
 
-/** Frequent, low-stakes events hidden unless asked for. */
 export const ROUTINE_ACTIONS = ["payment.started", "room.status_updated", "staff.view_as_started", "staff.view_as_ended"] as const;
 
 export function activityCategory(v: string | undefined): ActivityCategory {
@@ -64,7 +58,6 @@ export async function listActivity(db: Db, actor: Actor, f: ActivityFilter, toda
   return { rows, total: count?.n ?? 0 };
 }
 
-/** Everything matching the filter, oldest first, for the CSV download (capped). */
 export async function activityForCsv(db: Db, actor: Actor, f: Omit<ActivityFilter, "page" | "size">, today = hotelToday()): Promise<ActivityEntry[]> {
   requireRole(actor, MANAGERS);
   const w = where({ ...f, page: 1, size: 0 }, today);
@@ -77,7 +70,6 @@ export async function activityForCsv(db: Db, actor: Actor, f: Omit<ActivityFilte
   );
 }
 
-/** Staff who appear in the log, for the "Who" filter. */
 export async function activityPeople(db: Db, actor: Actor): Promise<Array<{ id: string; name: string }>> {
   requireRole(actor, MANAGERS);
   return all<{ id: string; name: string }>(

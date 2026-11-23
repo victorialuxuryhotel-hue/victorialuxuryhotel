@@ -1,4 +1,3 @@
-/** Accepted photo formats, identified by their file signature (not the name or the browser's claim). */
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export type ImageKind = { ext: "jpg" | "png" | "webp"; contentType: "image/jpeg" | "image/png" | "image/webp" };

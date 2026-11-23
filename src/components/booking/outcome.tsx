@@ -16,20 +16,14 @@ export type ConfirmedStay = {
   guests: number;
   paidKobo: number;
   receiptNumber: string;
-  /** From hotel settings, e.g. "2:00 pm". */
   checkInTime: string;
   checkOutTime: string;
-  /** The specific room, e.g. "Room 204 · Floor 2" (assigned on payment). */
   room?: string;
-  /** The booking's private link token, for the calendar file (never shared). */
   token: string;
   siteUrl: string;
 };
 
-/** Shown only after the server has verified payment with Paystack (6b). */
 export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
-  // Shared with friends or family: the stay and the hotel only. The private
-  // booking link (which opens the receipt) and the reference stay with the guest.
   const share = `https://wa.me/?text=${encodeURIComponent(`I'm staying at ${hotel.name}, ${formatDate(stay.checkIn)} to ${formatDate(stay.checkOut)}. ${stay.siteUrl}`)}`;
   const rows: Array<[string, string]> = [
     ["Room", `${stay.room ? `${stay.room} · ` : ""}${stay.category} · ${plural(stay.guests, "guest")}`],
@@ -100,7 +94,6 @@ export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
   );
 }
 
-/** Paystack redirected back but the webhook/verification hasn't completed yet. */
 export function PaymentPending({ reference }: { reference: string }) {
   return (
     <div className="mx-auto max-w-xl text-center">

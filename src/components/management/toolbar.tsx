@@ -4,10 +4,6 @@ import { Input, Select } from "@/components/ui/form";
 import { cn } from "@/lib/utils/cn";
 import { FiltersToggle } from "./filters-toggle";
 
-/**
- * Search + filters row that sits on top of list cards. Submits as GET params.
- * Phones: pinned below the top bar while the list scrolls; filters fold away.
- */
 export function ListToolbar({
   placeholder,
   filters,
@@ -21,7 +17,6 @@ export function ListToolbar({
   className?: string;
   defaultQuery?: string;
   hidden?: Record<string, string>;
-  /** A filter is in use: show the filters open on phones. */
   filtersActive?: boolean;
 }) {
   return (
@@ -58,7 +53,6 @@ export function FilterSelect({ name, label, options, value }: { name: string; la
   );
 }
 
-/** Segmented tabs (links), e.g. Arrivals / Departures / In house. */
 export function Tabs({ items }: { items: Array<{ label: string; count?: number; active?: boolean; href: string }> }) {
   return (
     <nav className="flex gap-1 overflow-x-auto border-b border-hairline px-4">

@@ -29,10 +29,6 @@ const bookingSchema = z.object({
   acceptTerms: z.literal("on", { error: "Please accept the booking terms" }),
 });
 
-/**
- * Creates the reservation hold for a website booking. Price and availability
- * are decided by the database; nothing about the amount comes from the browser.
- */
 export async function createWebsiteBooking(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   let token: string;
   try {
@@ -41,7 +37,6 @@ export async function createWebsiteBooking(_prev: ActionResult | null, formData:
     if (!parsed.success) {
       throw new AppError("VALIDATION", "Please check the highlighted fields", { fieldErrors: z.flattenError(parsed.error).fieldErrors });
     }
-    // Holds take rooms off sale for a while: limit how many one visitor can create.
     await enforceRateLimit("hold", limits.holdsPerHour, 3600);
     const v = parsed.data;
     const held = await createWebsiteReservation(await getDb(), {
@@ -65,10 +60,6 @@ export async function createWebsiteBooking(_prev: ActionResult | null, formData:
   redirect(`/book/review/${token}`);
 }
 
-/**
- * Guest pressed "Pay": create a payment attempt for the balance the DATABASE
- * calculates, then send them to Paystack's checkout.
- */
 export async function startPayment(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   let authorizationUrl: string;
   try {

@@ -1,13 +1,6 @@
 import { addDays } from "@/lib/hotel-date";
 import type { AvailabilityOption } from "./views";
 
-/**
- * The nearest check-in date (within `withinDays` either side of the one asked
- * for, never before today) where a room type is free for the same number of
- * nights. `free` maps a date to whether at least one room is free that night;
- * a date missing from the map counts as not free. Later dates win ties, since
- * guests more often push a trip back than bring it forward.
- */
 export function nearestFreeStart(
   free: ReadonlyMap<string, boolean>,
   checkIn: string,
@@ -24,11 +17,6 @@ export function nearestFreeStart(
   return null;
 }
 
-/**
- * How room types are shown for a search: types that fit the party and are
- * free (cheapest first), then those that fit but are full, then (separately)
- * the ones too small for the party.
- */
 export function groupOptions(options: AvailabilityOption[], guests: number) {
   const byPrice = (a: AvailabilityOption, b: AvailabilityOption) => a.totalKobo - b.totalKobo;
   const fitting = options.filter((o) => o.maxOccupancy >= guests);

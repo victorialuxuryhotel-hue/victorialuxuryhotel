@@ -1,6 +1,5 @@
 "use client";
 
-// Last-resort boundary for errors in the root layout. Must render its own <html>.
 export default function GlobalError({ retry }: { error: unknown; retry: () => void }) {
   return (
     <html lang="en-NG">

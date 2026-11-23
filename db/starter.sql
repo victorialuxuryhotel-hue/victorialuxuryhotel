@@ -20,6 +20,6 @@ INSERT OR IGNORE INTO room_categories (id, slug, name, nightly_rate_kobo, max_oc
 WITH RECURSIVE n(x) AS (SELECT 101 UNION ALL SELECT x + 1 FROM n WHERE x < 403),
 plan(slug, first, last) AS (VALUES ('standard', 101, 112), ('deluxe', 201, 209), ('suite', 301, 305), ('apartment', 401, 403))
 INSERT OR IGNORE INTO rooms (id, room_number, category_id, floor)
-SELECT lower(printf('%s-%s-4%s-%s-%s', hex(randomblob(4)), hex(randomblob(2)), substr(hex(randomblob(2)), 2), hex(randomblob(2)), hex(randomblob(6)))),
+SELECT lower(printf('%s-%s-4%s-%s-%s', hex(randomblob(4)), hex(randomblob(2)), substr(hex(randomblob(2)), 2), substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)), 2), hex(randomblob(6)))),
        CAST(n.x AS TEXT), c.id, substr(CAST(n.x AS TEXT), 1, 1)
 FROM n JOIN plan p ON n.x BETWEEN p.first AND p.last JOIN room_categories c ON c.slug = p.slug;

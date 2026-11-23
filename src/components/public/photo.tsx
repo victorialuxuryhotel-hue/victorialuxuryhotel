@@ -2,14 +2,6 @@ import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 import type { Photo as PhotoContent } from "@/content/site";
 
-/**
- * A photograph slot. Renders the hotel's photo when `image` is set; until the
- * hotel supplies photography it renders a quiet branded placeholder of the
- * same shape, so layouts don't shift when real images arrive.
- *
- * Positioning (relative/absolute) is left to the caller via `className`.
- */
-/** The "photograph to come" label helps while building; guests never see it. */
 const showPlaceholderLabel = process.env.NODE_ENV !== "production";
 
 export function Photo({

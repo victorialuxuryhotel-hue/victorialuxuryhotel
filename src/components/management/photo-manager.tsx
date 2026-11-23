@@ -24,7 +24,6 @@ export type ManagedPhoto = { id: string; url: string; alt: string; isCover?: boo
 
 type Action = (p: ActionResult | null, f: FormData) => Promise<ActionResult>;
 
-/** Upload form with a local preview and client-side size/type hints (the server re-checks). */
 export function UploadForm({
   action,
   hidden,
@@ -105,7 +104,6 @@ function AltEditor({ photo, kind }: { photo: ManagedPhoto; kind: "room" | "site"
   );
 }
 
-/** All photos of one room type: cover, order, descriptions, delete, upload. */
 export function CategoryPhotoManager({ categoryId, photos }: { categoryId: string; photos: ManagedPhoto[] }) {
   return (
     <div className="space-y-6">
@@ -143,7 +141,6 @@ export function CategoryPhotoManager({ categoryId, photos }: { categoryId: strin
   );
 }
 
-/** One website photo place (hero, pool, ...): current photo, brief, replace/remove. */
 export function SitePhotoSlot({
   slot,
   label,

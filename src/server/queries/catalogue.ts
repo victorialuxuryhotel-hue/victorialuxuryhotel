@@ -5,16 +5,6 @@ import { publicText } from "@/lib/format";
 import { mediaUrl } from "@/lib/media";
 import { all, getDb, type Db } from "../db";
 
-/**
- * Public catalogue: what website visitors see about room types and photos.
- *
- * Read from the database on each request (de-duplicated within a request with
- * React cache). Deliberately not stored in Next's data cache, so staff changes
- * appear on the very next page view and the Worker needs no writable cache.
- * Rates shown here are "from" prices only; the price of a stay always comes
- * from live availability.
- */
-
 export type PublicPhoto = { image: string; alt: string };
 
 export type PublicCategory = {
@@ -29,8 +19,6 @@ export type PublicCategory = {
 };
 
 export const getPublicCategories = cache(async (): Promise<PublicCategory[]> => {
-  // The catalogue lives in D1 and staff can change it at any time: always read
-  // it at request time, never during the build (there is no database then).
   await connection();
   const db = await getDb();
   const [categories, photos] = await Promise.all([
@@ -83,7 +71,6 @@ export const getSitePhotos = cache(async (): Promise<SitePhotos> => {
   return { slots, gallery };
 });
 
-/** Each room type's first real photo (the cover, else the first), by slug. */
 export async function coverPhotos(db: Db): Promise<Map<string, PublicPhoto>> {
   const rows = await all<{ slug: string; storage_path: string; alt_text: string }>(
     db,

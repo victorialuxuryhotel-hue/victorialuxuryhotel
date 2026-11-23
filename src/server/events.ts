@@ -23,7 +23,7 @@ export async function addHallBooking(_prev: ActionResult | null, formData: FormD
         startTime: time,
         endTime: time,
         guests: z.union([z.literal(""), z.coerce.number().int().positive()]).transform((n) => (n === "" ? null : n)),
-        price: z.union([z.literal(""), z.coerce.number().min(0)]).transform((n) => (n === "" ? 0 : Math.round(n * 100))),
+        price: z.union([z.literal(""), z.coerce.number().min(0).max(1_000_000_000, "That price is too high")]).transform((n) => (n === "" ? 0 : Math.round(n * 100))),
         status: z.enum(["enquiry", "confirmed"]),
         notes: opt(1000),
       })
@@ -54,7 +54,7 @@ export async function addHallPayment(_prev: ActionResult | null, formData: FormD
     const v = z
       .object({
         bookingId: z.uuid(),
-        amount: z.coerce.number().positive("Enter an amount").transform((n) => Math.round(n * 100)),
+        amount: z.coerce.number().min(0.01, "Enter an amount").max(1_000_000_000, "That amount is too high").transform((n) => Math.round(n * 100)),
         method: z.enum(["cash", "bank_transfer", "pos_terminal", "card"]),
         paidOn: z.iso.date(),
         reference: opt(80),

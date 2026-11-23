@@ -22,7 +22,6 @@ describe("extras and promo codes", () => {
     const code = `TEN${rand()}`;
     await addPromo(db, gm, { code, percentOff: 10, validUntil: null, maxUses: 5 });
     const b = await book([pickup, breakfast], code.toLowerCase());
-    // Room 2 x 55,000 = 110,000; minus 10% = 11,000; extras 15,000 + 2 x 5,000 = 25,000.
     const r = await q1<{ total_amount_kobo: number; extras_kobo: number; discount_kobo: number; promo_code: string }>(
       "SELECT total_amount_kobo, extras_kobo, discount_kobo, promo_code FROM reservations WHERE id = ?", b.id);
     expect(r).toEqual({ total_amount_kobo: 11_000_000, extras_kobo: 2_500_000, discount_kobo: 1_100_000, promo_code: code });
@@ -34,7 +33,6 @@ describe("extras and promo codes", () => {
     expect(await applyPaystackResult(db, { reference: p.reference, status: "success", amountKobo: p.amountKobo, currency: "NGN", paidAt: iso(0), channel: "card", gatewayResponse: "ok" })).toBe("confirmed");
     expect(await status(b.id)).toBe("confirmed");
 
-    // One more night: the discount stays 10% and breakfast follows the nights.
     await changeReservationDates(db, desk, b.id, day(40), day(43));
     expect(await q1("SELECT total_amount_kobo, extras_kobo, discount_kobo FROM reservations WHERE id = ?", b.id)).toEqual({
       total_amount_kobo: 16_500_000, extras_kobo: 3_000_000, discount_kobo: 1_650_000,

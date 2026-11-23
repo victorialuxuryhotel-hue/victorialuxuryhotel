@@ -10,7 +10,6 @@ export function Steps({ current }: { current: number }) {
   const total = bookingSteps.length;
   return (
     <>
-      {/* Phones: "Step 3 of 4" with a thin progress bar. */}
       <div className="sm:hidden">
         <p className="text-sm text-ink-500 tabular-nums">
           Step {current + 1} of {total} · <span className="text-navy-950">{bookingSteps[current]}</span>
@@ -47,12 +46,6 @@ export function Steps({ current }: { current: number }) {
 
 export type StaySearch = { checkIn: string; checkOut: string; guests: number };
 
-/** Search criteria strip with an edit link: guests always see what they searched. */
-/**
- * Phones and tablets: the stay and its total ABOVE the form, collapsible, so
- * the price is visible before the guest types anything. The full summary
- * card (BookingSummary with className "hidden lg:block") takes over from lg.
- */
 export function CompactSummary({ option, search, holdMinutes }: { option: AvailabilityOption; search: StaySearch; holdMinutes?: number }) {
   return (
     <details open className="group rounded-card border border-hairline bg-ivory-50 lg:hidden">

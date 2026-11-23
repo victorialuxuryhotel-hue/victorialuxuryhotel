@@ -5,10 +5,6 @@ import { updateRoomStatus } from "@/server/domain/reservations";
 import { listPaymentsFor } from "@/server/domain/payment-list";
 import { day, db, makeCategory, owner, q1 } from "./helpers";
 
-/**
- * 5g: an owner viewing as front desk acts with a read-only front-desk actor.
- * The data layer refuses every write (nothing is stored) but reads still work.
- */
 const viewingAs = { id: owner!.id, role: "front_desk" as const, readOnly: true };
 
 describe("viewing as front desk", () => {

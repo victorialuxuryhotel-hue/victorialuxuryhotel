@@ -7,7 +7,6 @@ import { formatDate, formatNaira, nightsBetween, plural } from "@/lib/format";
 import { ReservationBadge } from "./badges";
 import { CheckInButton, CheckOutButton } from "./reservation-actions";
 
-/** Arrivals or departures for one day, with the one action that matters inline. */
 export function MovementList({
   kind,
   rows,
@@ -15,7 +14,6 @@ export function MovementList({
   title,
 }: {
   kind: "arrivals" | "departures";
-  /** Defaults to "Arrivals" / "Departures". */
   title?: string;
   rows: ReservationRow[];
   hrefFor: (r: ReservationRow) => string;
@@ -50,7 +48,6 @@ export function MovementList({
                   </p>
                   {balance > 0 ? <p className="mt-1 text-sm font-medium text-warning-700">{formatNaira(balance)} outstanding</p> : null}
                 </div>
-                {/* The one next step for this guest; the server re-checks everything. */}
                 {arrivals ? (
                   r.status === "pending_payment" ? (
                     <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "secondary", className: "min-h-10 shrink-0 whitespace-nowrap" })}>Take payment</Link>

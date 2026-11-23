@@ -1,11 +1,6 @@
 import { translateDbError } from "../db-errors";
 import { type Db } from "../db";
 
-/**
- * Background plumbing: the email outbox and the rate limiter. No actor: these
- * run for the system (scheduled job, after a response, anonymous visitors).
- */
-
 export type OutboxRow = {
   id: string;
   kind: "booking_confirmed" | "payment_received" | "reservation_cancelled";
@@ -14,12 +9,6 @@ export type OutboxRow = {
   attempts: number;
 };
 
-/**
- * Claims due emails for sending. One statement: D1 runs it atomically, so two
- * senders can never claim the same row (the first pushes next_attempt_at into
- * the future). The attempt is counted up front, so a crash mid-send still
- * backs off: 1, 2, 4… minutes, at most 60.
- */
 export async function claimOutbox(db: Db, opts: { limit?: number; reservationId?: string } = {}): Promise<OutboxRow[]> {
   try {
     const { results } = await db
@@ -44,7 +33,6 @@ export async function claimOutbox(db: Db, opts: { limit?: number; reservationId?
   }
 }
 
-/** Records the result. Anything other than sent/skipped is retried, up to 5 attempts. */
 export async function finishOutbox(db: Db, id: string, status: "sent" | "skipped" | "retry", error?: string): Promise<void> {
   try {
     await db
@@ -63,7 +51,6 @@ export async function finishOutbox(db: Db, id: string, status: "sent" | "skipped
   }
 }
 
-/** Fixed-window rate limit. Returns true if this hit is within the limit. */
 export async function hitRateLimit(db: Db, key: string, limit: number, windowSeconds: number): Promise<boolean> {
   const windowStart = new Date(Math.floor(Date.now() / (windowSeconds * 1000)) * windowSeconds * 1000).toISOString();
   try {
@@ -75,7 +62,6 @@ export async function hitRateLimit(db: Db, key: string, limit: number, windowSec
       )
       .bind(key, windowStart)
       .first<{ hits: number }>();
-    // Housekeeping on ~1% of calls: drop windows older than a day.
     if (Math.random() < 0.01) {
       await db.prepare("DELETE FROM rate_limit_hits WHERE window_start < ?").bind(new Date(Date.now() - 86_400_000).toISOString()).run();
     }

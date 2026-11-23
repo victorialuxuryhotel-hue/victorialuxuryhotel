@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils/cn";
 import { cancelMyBooking, changeMyDates, requestGuestCode, verifyGuestCode } from "@/server/guest-account";
 import type { GuestBooking } from "@/server/domain/guest-account";
 
-/** Email -> 6-digit code. No passwords. */
 export function GuestSignIn() {
   const [sent, send, sending] = useActionState(requestGuestCode, null);
   const [checked, check, checking] = useActionState(verifyGuestCode, null);

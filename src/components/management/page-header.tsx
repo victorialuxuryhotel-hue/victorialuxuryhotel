@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-/** Title row for management pages, with primary actions on the right. */
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
   return (
     <div className="flex flex-row items-end justify-between gap-3 border-b border-hairline bg-ivory-50 px-4 py-4 sm:py-5 lg:px-8">

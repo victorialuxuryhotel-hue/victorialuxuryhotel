@@ -1,7 +1,6 @@
 import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react";
 import { cn } from "@/lib/utils/cn";
 
-/** Horizontally scrollable on small screens so wide tables never break the page. */
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
   return (
     <div className="overflow-x-auto">

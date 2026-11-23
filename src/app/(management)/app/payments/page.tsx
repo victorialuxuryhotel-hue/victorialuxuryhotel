@@ -1,3 +1,5 @@
+import { canAny } from "@/lib/auth/permissions";
+import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { FrontDeskPayments } from "@/components/management/front-desk-payments";
@@ -16,12 +18,12 @@ type SP = Promise<Record<string, string | string[] | undefined>>;
 
 async function Content({ searchParams }: { searchParams: SP }) {
   const staff = await requireStaff();
+  if (!canAny(staff.role, ["payments.record", "reports.view"])) return <AccessDenied />;
   const sp = await searchParams;
   const requested = typeof sp.view === "string" ? sp.view : undefined;
   const page = pageFrom(sp.page);
   const reservationHref = (p: { reservationId?: string }) => `/app/reservations/${p.reservationId}`;
 
-  // Front desk: the server limits the list to today's payments or their own.
   if (!allowedPaymentViews(staff.role).includes("all")) {
     const [{ view, rows }, summary] = await Promise.all([listPayments({ view: requested, size: 200 }), frontDeskPayments()]);
     return (

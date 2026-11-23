@@ -357,7 +357,6 @@ describe("undo (room assignment and status changes)", () => {
 
     const b = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
     const late = await assignRoom(db, desk, b, c.roomIds[1]!);
-    // The log is append-only, so move the clock instead of backdating the entry.
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(Date.now() + UNDO_WINDOW_MS + 1_000);
     try {
@@ -385,7 +384,6 @@ describe("undo (room assignment and status changes)", () => {
     const r = await insertReservation({ categoryId: c.id, checkIn: day(3), checkOut: day(5), status: "confirmed" });
     await assignRoom(db, desk, r, c.roomIds[0]!);
     const move = await assignRoom(db, desk, r, c.roomIds[1]!);
-    // Someone else takes room 0 for the same nights without touching this booking.
     await insertReservation({ categoryId: c.id, checkIn: day(3), checkOut: day(5), roomId: c.roomIds[0], status: "confirmed" });
     await rejects(undoAction(db, desk, r, move.undoId!), /given to another guest|filled up/);
   });

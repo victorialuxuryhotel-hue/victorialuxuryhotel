@@ -2,7 +2,6 @@
 
 import { Children, useEffect, useRef, useState } from "react";
 
-/** Phones: a swipeable strip of photos with "2 / 5 photos" beneath it. */
 export function PhotoStrip({ children, label }: { children: React.ReactNode; label: string }) {
   const strip = useRef<HTMLDivElement>(null);
   const count = Children.count(children);

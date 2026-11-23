@@ -1,4 +1,3 @@
-// Operational safeguards: alerts reach the team, health check, and list paging.
 import puppeteer from "puppeteer-core";
 import { execSync } from "node:child_process";
 
@@ -12,7 +11,6 @@ const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH
 const waitText = (p, re, timeout = 20000) => p.waitForFunction((src) => new RegExp(src).test(document.body.innerText), { timeout }, re.source);
 const tag = `pg${Date.now().toString(36)}`;
 
-// ---------------------------------------------------------------- Alerts
 {
   await fetch(`${MOCK}/__alerts`, { method: "DELETE" });
   await fetch(`${MOCK}/__control/next-webhook?mode=skip`, { method: "POST" });
@@ -52,7 +50,6 @@ const tag = `pg${Date.now().toString(36)}`;
   check("the alert contains no guest contact details, card data or keys", !text.includes(email) && !/\+234|4081|408408|sk_test|sb_secret/.test(text), text);
 }
 
-// ---------------------------------------------------------------- Health check
 {
   const res = await fetch(`${BASE}/api/health`);
   const body = await res.json();
@@ -60,8 +57,6 @@ const tag = `pg${Date.now().toString(36)}`;
   check("health check reveals nothing else", Object.keys(body).join(",") === "ok");
 }
 
-// ---------------------------------------------------------------- Paging
-// 60 guests and 55 reservations with a shared, searchable name.
 sql(`
   insert into guests (full_name, phone)
   select 'Paging ${tag} ' || lpad(n::text, 3, '0'), '+23480' || lpad(n::text, 8, '0') from generate_series(1, 60) n;
@@ -81,7 +76,6 @@ sql(`
 
   const rowsMatching = () => p.evaluate((t) => [...document.querySelectorAll("table tbody tr")].filter((r) => r.innerText.includes(`Paging ${t}`)).length, tag);
 
-  // Guests: 60 → 50 + 10
   await p.goto(`${BASE}/app/guests?q=${encodeURIComponent(`Paging ${tag}`)}`, { waitUntil: "networkidle0" });
   await p.waitForSelector("table tbody tr");
   check("guests page 1 shows 50", (await rowsMatching()) === 50, String(await rowsMatching()));
@@ -92,7 +86,6 @@ sql(`
   await Promise.all([p.waitForNavigation({ waitUntil: "networkidle0" }), p.click("a::-p-text(Previous)")]);
   check("Previous returns to page 1", !p.url().includes("page=") && (await rowsMatching()) === 50, p.url());
 
-  // Reservations: 55 → 50 + 5, tab and search kept
   await p.goto(`${BASE}/app/reservations?tab=all&q=${encodeURIComponent(`Paging ${tag}`)}`, { waitUntil: "networkidle0" });
   await p.waitForSelector("table tbody tr");
   check("reservations page 1 shows 50", (await rowsMatching()) === 50, String(await rowsMatching()));
@@ -100,7 +93,6 @@ sql(`
   await p.waitForSelector("table tbody tr");
   check("reservations page 2 shows the other 5, tab and search kept", (await rowsMatching()) === 5 && p.url().includes("tab=all") && p.url().includes(tag), p.url());
 
-  // No row appears on both pages
   const page2 = await p.evaluate(() => [...document.querySelectorAll("table tbody tr")].map((r) => r.innerText.split("\n")[0]));
   await p.goto(`${BASE}/app/reservations?tab=all&q=${encodeURIComponent(`Paging ${tag}`)}`, { waitUntil: "networkidle0" });
   await p.waitForSelector("table tbody tr");
@@ -112,7 +104,6 @@ sql(`
   await ctx.close();
 }
 
-// Tidy up
 sql(`delete from reservations where guest_id in (select id from guests where full_name like 'Paging ${tag} %');
      delete from guests where full_name like 'Paging ${tag} %';`);
 

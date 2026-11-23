@@ -2,7 +2,6 @@ import { publicEnv } from "@/lib/env";
 import { stayIcs } from "@/lib/ics";
 import { getBookingByToken, publicBookingRules } from "@/server/queries/booking";
 
-/** "Add to calendar" for a confirmed stay, through the booking's private link only. */
 export async function GET(_req: Request, ctx: RouteContext<"/book/confirmation/[token]/calendar">) {
   const { token } = await ctx.params;
   const b = await getBookingByToken(token);

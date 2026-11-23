@@ -9,7 +9,6 @@ import { PaidProgress, ReservationBadge } from "./badges";
 export function ReservationTable({ rows, hrefFor }: { rows: ReservationRow[]; hrefFor: (r: ReservationRow) => string }) {
   return (
     <>
-      {/* Cards on phones */}
       <ul className="divide-y divide-hairline md:hidden">
         {rows.map((r) => (
           <li key={r.id}>
@@ -35,7 +34,6 @@ export function ReservationTable({ rows, hrefFor }: { rows: ReservationRow[]; hr
         ))}
       </ul>
 
-      {/* Table from tablet up */}
       <div className="hidden md:block">
         <Table>
           <THead>

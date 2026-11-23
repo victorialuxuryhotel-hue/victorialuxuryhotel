@@ -11,7 +11,6 @@ export const metadata: Metadata = { title: "Staff sign-in", robots: { index: fal
 
 async function FormWithNext({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  // Signed in with Clerk but sent back here: the account isn't active staff.
   if (params.denied && (await auth()).userId) return <AccessDenied />;
   return <SignInPanel next={typeof params.next === "string" ? params.next : undefined} />;
 }

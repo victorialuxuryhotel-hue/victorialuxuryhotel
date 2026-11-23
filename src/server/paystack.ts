@@ -3,15 +3,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { serverEnv } from "@/lib/env.server";
 import { logger } from "@/lib/logger";
 
-/**
- * Minimal Paystack client: initialize a transaction, verify one, and check
- * webhook signatures. Only server code calls Paystack; the secret key never
- * reaches the browser. https://paystack.com/docs/api/transaction
- */
-
 type Envelope<T> = { status: boolean; message: string; data: T };
 
-/** Paystack has no record of this reference (e.g. the guest never reached checkout). */
 export class PaystackNotFoundError extends Error {
   constructor(reference: string) {
     super(`Paystack has no transaction ${reference}`);
@@ -65,7 +58,6 @@ export type VerifiedTransaction = {
   gatewayResponse: string | null;
 };
 
-/** The authoritative answer about a transaction, straight from Paystack. */
 export async function verifyTransaction(reference: string): Promise<VerifiedTransaction> {
   const res = await fetch(`${serverEnv.paystackBaseUrl()}/transaction/verify/${encodeURIComponent(reference)}`, {
     headers: { Authorization: `Bearer ${serverEnv.paystackSecretKey()}` },
@@ -91,7 +83,6 @@ export async function verifyTransaction(reference: string): Promise<VerifiedTran
   };
 }
 
-/** Paystack signs each webhook body with HMAC-SHA512 using the secret key. */
 export function isValidWebhookSignature(rawBody: string, signature: string | null): boolean {
   if (!signature) return false;
   const expected = createHmac("sha512", serverEnv.paystackSecretKey()).update(rawBody).digest("hex");

@@ -17,11 +17,6 @@ import {
 import { updateGuest } from "@/server/domain/reservations";
 import { db, desk, exec, gm, makeCategory, makeGuest, owner, q, q1, rejects } from "./helpers";
 
-/**
- * Role limits at the data layer (the app's authorize() checks the same matrix
- * first; this is the backstop that replaces Postgres row-level security).
- */
-
 const category = (over: Partial<Parameters<typeof saveCategory>[2]> = {}) => ({
   name: `Cat ${crypto.randomUUID().slice(0, 6)}`,
   slug: `cat-${crypto.randomUUID().slice(0, 6)}`,
@@ -138,7 +133,6 @@ describe("owner and staff", () => {
     expect(await q1("SELECT role, department FROM staff_profiles WHERE id = ?", id)).toEqual({ role: "front_desk", department: "restaurant_bar" });
     await updateStaffProfile(db, owner, { staffId: id, role: "general_manager", isActive: true });
     expect(await q1("SELECT role, department FROM staff_profiles WHERE id = ?", id)).toEqual({ role: "general_manager", department: null });
-    // The database refuses a department on anything but front desk.
     await rejects(exec("UPDATE staff_profiles SET department = 'finance' WHERE id = ?", id), /department_needs_front_desk/);
     await updateStaffProfile(db, owner, { staffId: id, role: "front_desk", isActive: false });
   });
@@ -149,11 +143,9 @@ describe("owner and staff", () => {
     await rejects(updateStaffProfile(db, owner, { staffId: id, role: "owner", isActive: true }), /Make owner/);
     await rejects(promoteToOwner(db, gm, id), /role does not allow/);
     expect((await promoteToOwner(db, owner, id)).role).toBe("owner");
-    // Once an owner, ordinary saves (e.g. a phone change) keep the role.
     await updateStaffProfile(db, owner, { staffId: id, role: "owner", isActive: true, phone: "+234 803 000 0000" });
     const logs = await q<{ action: string }>("SELECT action FROM activity_log WHERE entity_id = ? ORDER BY id", id);
     expect(logs.map((l) => l.action)).toEqual(["staff.created", "staff.updated"]);
-    // Step back down so the shared database keeps its usual owners.
     await updateStaffProfile(db, owner, { staffId: id, role: "general_manager", isActive: false });
     await rejects(promoteToOwner(db, owner, id), /Restore their access/);
   });
@@ -168,7 +160,6 @@ describe("owner and staff", () => {
     await createStaffProfile(db, owner, { fullName: "Link Me", email, role: "front_desk" });
     const linked = await linkClerkUser(db, "user_clerk_1" + email, email.toUpperCase());
     expect(linked).toMatchObject({ email, role: "front_desk", is_active: 1 });
-    // A second Clerk account with the same email can't take over the record.
     expect(await linkClerkUser(db, "user_clerk_2" + email, email)).toBeNull();
   });
 

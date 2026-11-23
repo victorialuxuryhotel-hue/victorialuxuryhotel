@@ -2,11 +2,6 @@ import { AppError } from "@/lib/errors";
 import { dbErrorToken } from "../db-errors";
 import { activity, all, MANAGERS, requireRole, STOCK_USERS, uuid, writeBatch, type Actor, type Db } from "../db";
 
-/**
- * Stock: items with a unit, a current quantity and a low-stock level.
- * Quantities change only through recorded movements (received, used,
- * adjusted), which the database applies and never lets go below zero.
- */
 export type StockItem = { id: string; name: string; unit: string; quantity: number; min_quantity: number; is_active: number };
 export type MoveKind = "received" | "used" | "adjusted";
 
@@ -33,7 +28,6 @@ export async function addStockItem(db: Db, actor: Actor, v: { name: string; unit
   return id;
 }
 
-/** Record a movement. Anyone on stock can record what they used; deliveries and corrections are for managers. */
 export async function recordMove(db: Db, actor: Actor, v: { itemId: string; kind: MoveKind; quantity: number; note: string | null }): Promise<void> {
   requireRole(actor, v.kind === "used" ? STOCK_USERS : MANAGERS);
   if (!Number.isInteger(v.quantity) || v.quantity === 0 || Math.abs(v.quantity) > 1_000_000) throw new AppError("VALIDATION", "Enter a whole number.");

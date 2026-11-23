@@ -14,7 +14,6 @@ const href = () => "/preview/app/reservations/vl-7kq3pm";
 export default function Page() {
   const arrivals = reservations.filter((r) => r.checkIn === "2026-12-01" && r.status !== "cancelled");
   const count = (s: string) => rooms.filter((r) => r.state === s).length;
-  // Daily figures for the last 14 days (sample) to show the revenue chart.
   const daily = [42, 18, 65, 30, 0, 88, 54, 21, 47, 120, 35, 60, 28, 75];
   const max = Math.max(...daily);
   return (

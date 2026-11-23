@@ -1,13 +1,8 @@
 import { AppError } from "@/lib/errors";
 import { formatNaira } from "@/lib/format";
 import { addDays, hotelToday } from "@/lib/hotel-date";
-import { activity, all, EVENTS_STAFF, first, requireRole, uuid, writeBatch, type Actor, type Db } from "../db";
+import { activity, activityIfChanged, all, EVENTS_STAFF, first, requireRole, uuid, writeBatch, type Actor, type Db } from "../db";
 
-/**
- * Conference hall: enquiries and confirmed events, with payments. The
- * database refuses two confirmed events at the same time. Payments can't be
- * edited or deleted.
- */
 export type HallStatus = "enquiry" | "confirmed" | "cancelled";
 export type HallMethod = "cash" | "bank_transfer" | "pos_terminal" | "card";
 
@@ -52,7 +47,7 @@ export async function setHallStatus(db: Db, actor: Actor, id: string, status: Ex
   requireRole(actor, EVENTS_STAFF);
   const [r] = await writeBatch(db, actor, [
     db.prepare(`UPDATE hall_bookings SET status = ? WHERE id = ? AND status <> 'cancelled' AND status <> ?`).bind(status, id, status),
-    activity(db, `hall.${status}`, "hall_booking", id, `Hall booking ${status}`),
+    activityIfChanged(db, `hall.${status}`, "hall_booking", id, `Hall booking ${status}`),
   ]);
   if (!r?.meta.changes) throw new AppError("INVALID_TRANSITION", "That booking can't change to this status.");
 }
@@ -73,10 +68,16 @@ export async function recordHallPayment(
   if (b.price_kobo > 0 && b.paid + v.amountKobo > b.price_kobo) throw new AppError("VALIDATION", `That's more than the ${formatNaira(b.price_kobo - b.paid)} still due.`);
   if (v.paidOn > hotelToday()) throw new AppError("VALIDATION", "The date can't be in the future.");
   const id = uuid();
-  await writeBatch(db, actor, [
+  const [r] = await writeBatch(db, actor, [
     db
-      .prepare("INSERT INTO hall_payments (id, booking_id, amount_kobo, method, paid_on, reference, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .prepare(
+        `INSERT INTO hall_payments (id, booking_id, amount_kobo, method, paid_on, reference, recorded_by)
+         SELECT ?1, h.id, ?3, ?4, ?5, ?6, ?7 FROM hall_bookings h
+         WHERE h.id = ?2 AND h.status <> 'cancelled'
+           AND (h.price_kobo = 0 OR (SELECT coalesce(sum(amount_kobo), 0) FROM hall_payments WHERE booking_id = h.id) + ?3 <= h.price_kobo)`,
+      )
       .bind(id, v.bookingId, v.amountKobo, v.method, v.paidOn, v.reference, actor.id),
-    activity(db, "hall.payment", "hall_booking", v.bookingId, `Hall payment ${formatNaira(v.amountKobo)} for ${b.title}`),
+    activityIfChanged(db, "hall.payment", "hall_booking", v.bookingId, `Hall payment ${formatNaira(v.amountKobo)} for ${b.title}`),
   ]);
+  if (!r?.meta.changes) throw new AppError("CONFLICT", "Someone just recorded a payment or changed this booking. Reload and try again.");
 }

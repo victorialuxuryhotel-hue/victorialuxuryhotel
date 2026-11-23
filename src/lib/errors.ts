@@ -1,10 +1,4 @@
-/**
- * Error model shared by server actions, route handlers and domain services.
- *
- * Domain code throws `AppError` with a stable `code`; the boundary (action or
- * route) converts it to an `ActionResult` so the UI receives a safe message and
- * never a raw database or provider error.
- */
+import { ZodError } from "zod";
 export type ErrorCode =
   | "VALIDATION"
   | "UNAUTHENTICATED"
@@ -38,6 +32,10 @@ export const ok = <T>(data: T): ActionResult<T> => ({ ok: true, data });
 export function toActionError(err: unknown): Extract<ActionResult, { ok: false }> {
   if (err instanceof AppError) {
     return { ok: false, code: err.code, message: err.message, fieldErrors: err.fieldErrors };
+  }
+  if (err instanceof ZodError) {
+    const msg = err.issues[0]?.message ?? "";
+    return { ok: false, code: "VALIDATION", message: !msg || /^(Invalid|Too (big|small))|expected/i.test(msg) ? "Check the details and try again." : msg };
   }
   return { ok: false, code: "INTERNAL", message: "Something went wrong. Please try again." };
 }

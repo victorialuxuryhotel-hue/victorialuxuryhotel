@@ -11,12 +11,6 @@ import { startPayment } from "@/server/booking";
 const noop = () => () => {};
 const NOTE = "Lost connection after paying? We'll still confirm it.";
 
-/**
- * "Pay ₦110,000". On phones the button is pinned to the bottom (full width,
- * 50px) with the reassurance under it; it stays the form's real submit.
- * The note is true because the Paystack webhook confirms payment even if the
- * guest never returns to the site.
- */
 export function PayButton({ token, total }: { token: string; total: string }) {
   const [state, action, pending] = useActionState(startPayment, null);
   const mounted = useSyncExternalStore(noop, () => true, () => false);

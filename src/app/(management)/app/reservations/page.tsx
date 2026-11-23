@@ -1,3 +1,5 @@
+import { canAny } from "@/lib/auth/permissions";
+import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -27,7 +29,8 @@ type SP = Promise<Record<string, string | string[] | undefined>>;
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 
 async function Content({ searchParams }: { searchParams: SP }) {
-  await requireStaff();
+  const staff = await requireStaff();
+  if (!canAny(staff.role, ["reservations.manage", "reports.view"])) return <AccessDenied />;
   const sp = await searchParams;
   const tab = (tabs.find((t) => t.key === one(sp.tab))?.key ?? "upcoming") as ReservationTab;
   const q = one(sp.q);

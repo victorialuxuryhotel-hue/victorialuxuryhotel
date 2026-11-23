@@ -6,17 +6,6 @@ import { activity, ALL_STAFF, assertVersion, first, MANAGERS, now, requireRole, 
 import { autoAssignRoomStatements, freeUnits } from "./inventory";
 import { dueOf, loadReservation, netPaid, RES_COLUMNS, type ReservationRow } from "./reservations";
 
-/**
- * Payments.
- *  * A reservation is confirmed only from a VERIFIED payment: Paystack's verify
- *    API (called by our server) or a staff member confirming receipt.
- *  * applyPaystackResult is idempotent and race-safe: the payment's status
- *    change is guarded, so of several concurrent callers (callback, webhook,
- *    sweep) exactly one confirms.
- *  * Amount and currency must match what we asked for. Anything unexpected is
- *    flagged for a human, never silently accepted.
- */
-
 export type SettleOutcome =
   | "confirmed" | "part_paid" | "paid_unavailable" | "paid_closed" | "already_settled" | "already_processed"
   | "amount_mismatch" | "already_flagged" | "overpaid" | "failed" | "abandoned" | "still_pending";
@@ -32,17 +21,11 @@ type PaymentRow = {
 
 const naira = (kobo: number) => formatNaira(kobo).replace(/\s/g, "");
 
-/**
- * A late payment's confirmation lost a race for the last unit (the capacity
- * trigger refused it). Re-run the decision: it will now see no capacity and
- * record the money with the booking flagged, never lose the payment.
- */
 function retryIfCapacityRace(err: unknown): never {
   if (err instanceof AppError && dbErrorToken(err.cause) === "no_capacity") throw new StaleStateError(err);
   throw err;
 }
 
-/** Aborts the batch (stale → retry) if money received changed since it was read. */
 function assertNetPaid(db: Db, reservationId: string, expected: number): Stmt {
   return db
     .prepare(
@@ -53,16 +36,10 @@ function assertNetPaid(db: Db, reservationId: string, expected: number): Stmt {
     .bind(reservationId, expected);
 }
 
-/**
- * The reservation side of a payment: confirms a fully paid booking if it can,
- * flags what needs a human. `paidAfter` includes the payment being applied.
- */
 async function settleStatements(db: Db, res: ReservationRow, paidAfter: number): Promise<{ outcome: SettleOutcome; stmts: Stmt[]; reason?: string }> {
   const stmts: Stmt[] = [];
   let outcome: SettleOutcome;
   let reason: string | undefined;
-  // Confirming also gives the guest a specific room of their type (shown on
-  // their confirmation, email and receipt), unless one is already assigned.
   const confirm = () =>
     stmts.push(
       db.prepare("UPDATE reservations SET status = 'confirmed' WHERE id = ?").bind(res.id),
@@ -76,8 +53,6 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number):
     confirm();
     outcome = "confirmed";
   } else if (res.status === "pending_payment" || res.status === "expired") {
-    // Paid after the hold lapsed: inventory may have gone. (The capacity
-    // trigger re-checks inside the write; a race there retries this decision.)
     if ((await freeUnits(db, res.category_id, res.check_in, res.check_out, res.id)) > 0) {
       confirm();
       outcome = "confirmed";
@@ -96,8 +71,6 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number):
     outcome = "already_settled"; // confirmed / checked in / checked out
   }
 
-  // More than one payment arrived (e.g. a Paystack checkout and a staff-recorded
-  // transfer). The money is real: record it and flag a refund of the excess.
   const over = paidAfter - dueOf(res);
   if (over > 0) {
     flag(`Overpaid by ${naira(over)}: more than one payment was received. Refund the difference.`);
@@ -106,10 +79,6 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number):
   }
   return { outcome, stmts, reason };
 }
-
-// ---------------------------------------------------------------------------
-// Paystack: start a payment attempt for a held website booking
-// ---------------------------------------------------------------------------
 
 export async function beginPaystackPayment(db: Db, publicToken: string): Promise<{ reference: string; amountKobo: number; email: string; reservationReference: string }> {
   return retryOnStale(async () => {
@@ -129,7 +98,6 @@ export async function beginPaystackPayment(db: Db, publicToken: string): Promise
     const balance = dueOf(res) - paid;
     if (balance <= 0) throw new AppError("INVALID_TRANSITION", "Nothing left to pay on this booking.");
 
-    // One reference per attempt; Paystack rejects re-used references.
     const hex = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(16).padStart(2, "0")).join("");
     const reference = `${res.reference.toLowerCase()}-${hex}`;
     await writeBatch(db, null, [
@@ -143,10 +111,6 @@ export async function beginPaystackPayment(db: Db, publicToken: string): Promise
     return { reference, amountKobo: balance, email: guest.email, reservationReference: res.reference };
   });
 }
-
-// ---------------------------------------------------------------------------
-// Paystack: apply a result OUR SERVER obtained from Paystack's verify API.
-// ---------------------------------------------------------------------------
 
 const methodFor = (channel: string | null) =>
   channel === "card" ? "card" : channel === "bank" || channel === "bank_transfer" ? "bank_transfer" : channel === "ussd" ? "ussd" : "other";
@@ -168,7 +132,6 @@ export async function applyPaystackResult(
 
     if (r.status === "success") {
       if (r.currency.toUpperCase() !== "NGN" || r.amountKobo !== pay.amount_kobo) {
-        // Flag once; later checks (page refresh, the sweep) don't alert again.
         if (pay.gateway_response?.startsWith("Amount/currency mismatch")) return "already_flagged";
         await writeBatch(db, null, [
           ...guard,
@@ -233,15 +196,12 @@ export async function applyPaystackResult(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Offline payments: staff confirm the money has actually been received.
-// ---------------------------------------------------------------------------
-
 export async function recordOfflinePayment(
   db: Db,
   actor: Actor,
   input: {
     reservationId: string;
+    paymentId?: string;
     amountKobo: number;
     method: "cash" | "bank_transfer" | "pos_terminal" | "other";
     reference?: string | null;
@@ -258,7 +218,16 @@ export async function recordOfflinePayment(
   if (!input.paidOn || input.paidOn > today) throw new AppError("VALIDATION", "The payment date can't be in the future.");
   if (input.paidOn < addDays(today, -60)) throw new AppError("VALIDATION", "Payments older than 60 days must be recorded by a manager with the accounts team.");
 
+  const already = async () => {
+    if (!input.paymentId) return null;
+    const row = await first<{ reservation_id: string; receipt_number: string }>(db, "SELECT reservation_id, receipt_number FROM payments WHERE id = ?", input.paymentId);
+    if (row && row.reservation_id !== input.reservationId) throw new AppError("CONFLICT", "This form was already used. Reload and try again.");
+    return row ? { paymentId: input.paymentId, receiptNumber: row.receipt_number, outcome: "already_processed" as const } : null;
+  };
+
   return retryOnStale(async () => {
+    const done = await already();
+    if (done) return done;
     const res = await loadReservation(db, input.reservationId);
     if (!["pending_payment", "confirmed", "checked_in", "checked_out", "expired"].includes(res.status)) {
       throw new AppError("INVALID_TRANSITION", "Payments can't be recorded against a cancelled reservation.");
@@ -268,7 +237,7 @@ export async function recordOfflinePayment(
     if (balance <= 0) throw new AppError("VALIDATION", "This reservation is already paid in full.");
     if (input.amountKobo > balance) throw new AppError("VALIDATION", `That is more than the ${naira(balance)} balance due.`);
 
-    const paymentId = uuid();
+    const paymentId = input.paymentId ?? uuid();
     const settle = await settleStatements(db, res, paid + input.amountKobo);
     const methodLabel = input.method.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
     try {
@@ -296,18 +265,17 @@ export async function recordOfflinePayment(
         settle.reason,
       );
     } catch (err) {
-      if (err instanceof AppError && dbErrorToken(err.cause) === "unique") throw new AppError("CONFLICT", "A payment with this reference has already been recorded.");
+      if (err instanceof AppError && dbErrorToken(err.cause) === "unique") {
+        const done = await already();
+        if (done) return done;
+        throw new AppError("CONFLICT", "A payment with this reference has already been recorded.");
+      }
       retryIfCapacityRace(err);
     }
     const row = await first<{ receipt_number: string }>(db, "SELECT receipt_number FROM payments WHERE id = ?", paymentId);
     return { paymentId, receiptNumber: row!.receipt_number, outcome: settle.outcome };
   });
 }
-
-// ---------------------------------------------------------------------------
-// Corrections. Payments are never edited: a manager records a correction, a
-// new linked row (kind 'refund') with its own receipt number and a reason.
-// ---------------------------------------------------------------------------
 
 export async function recordPaymentCorrection(
   db: Db,

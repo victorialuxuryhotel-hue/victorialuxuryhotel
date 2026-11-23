@@ -1,10 +1,11 @@
+import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { z } from "zod";
 import { ReservationDetailView } from "@/components/management/reservation-detail";
 import { LoadingState } from "@/components/ui/feedback";
-import { can } from "@/lib/auth/permissions";
+import { can, canAny } from "@/lib/auth/permissions";
 import { RoomCharges } from "@/components/management/room-charges";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { getDb } from "@/server/db";
@@ -17,6 +18,7 @@ export const metadata: Metadata = { title: "Reservation" };
 
 async function Content({ params, searchParams }: PageProps<"/app/reservations/[id]">) {
   const staff = await requireStaff();
+  if (!canAny(staff.role, ["reservations.manage", "payments.record", "reports.view"])) return <AccessDenied />;
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
   const [r, today] = await Promise.all([getReservation(id), hotelToday()]);

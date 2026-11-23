@@ -1,3 +1,4 @@
+import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -8,7 +9,7 @@ import { roomBoardState, type RoomBoardState } from "@/domain/status";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
-import { can } from "@/lib/auth/permissions";
+import { can, canAny } from "@/lib/auth/permissions";
 import { requireStaff } from "@/server/auth";
 import { listCategories, roomBoard } from "@/server/queries/rooms";
 
@@ -16,6 +17,7 @@ export const metadata: Metadata = { title: "Rooms" };
 
 async function Content({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const staff = await requireStaff();
+  if (!canAny(staff.role, "rooms.status")) return <AccessDenied />;
   const requested = (await searchParams).state;
   const active = typeof requested === "string" && requested in roomBoardState ? (requested as RoomBoardState) : undefined;
   const configure = can(staff.role, "rooms.configure");

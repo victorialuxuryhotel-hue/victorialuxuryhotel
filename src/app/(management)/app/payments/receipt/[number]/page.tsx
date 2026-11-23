@@ -1,3 +1,5 @@
+import { canAny } from "@/lib/auth/permissions";
+import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -12,7 +14,8 @@ import { getReservation, reservationIdForReceipt } from "@/server/queries/reserv
 export const metadata: Metadata = { title: "Receipt" };
 
 async function Content({ params }: { params: Promise<{ number: string }> }) {
-  await requireStaff();
+  const staff = await requireStaff();
+  if (!canAny(staff.role, ["payments.record", "reports.view"])) return <AccessDenied />;
   const { number } = await params;
   if (!/^RCT-\d{4}-\d{6}$/.test(number)) notFound();
   const reservationId = await reservationIdForReceipt(number);

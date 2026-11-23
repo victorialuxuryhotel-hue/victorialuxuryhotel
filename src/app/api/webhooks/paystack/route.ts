@@ -8,12 +8,6 @@ import { isValidWebhookSignature } from "@/server/paystack";
 
 const HANDLED = new Set(["charge.success", "charge.failed"]);
 
-/**
- * Paystack webhook. Verifies the HMAC signature over the raw body, stores the
- * event once (retries carry an identical body, so the hash de-duplicates them),
- * then settles the payment via the verify API. Returns 500 on processing
- * errors so Paystack retries; a retry of an already-processed event is a no-op.
- */
 export async function POST(request: NextRequest) {
   const raw = await request.text();
   if (!isValidWebhookSignature(raw, request.headers.get("x-paystack-signature"))) {
@@ -33,7 +27,6 @@ export async function POST(request: NextRequest) {
   const hash = createHash("sha256").update(raw).digest("hex");
   const db = await getDb();
 
-  // Store only what's needed to investigate: no card authorization details.
   const payload = {
     event: type,
     data: { reference, status: String(d.status ?? ""), amount: Number(d.amount ?? 0), currency: String(d.currency ?? ""), paid_at: d.paid_at ? String(d.paid_at) : null, channel: d.channel ? String(d.channel) : null, gateway_response: d.gateway_response ? String(d.gateway_response) : null },

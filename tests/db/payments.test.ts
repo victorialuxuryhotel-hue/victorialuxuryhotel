@@ -39,7 +39,6 @@ describe("Paystack payments", () => {
 
   it("confirming gives the guest a free room of their type, logged; taken rooms are skipped", async () => {
     const b = await heldBooking(2);
-    // Another confirmed guest already has the first room for these nights.
     await insertReservation({ categoryId: b.category.id, checkIn: day(31), checkOut: day(33), roomId: b.category.roomIds[0], status: "confirmed" });
     const p = await beginPaystackPayment(db, b.publicToken);
     expect(await success(p.reference, p.amountKobo)).toBe("confirmed");
@@ -199,7 +198,6 @@ describe("overpayment across payment channels", () => {
     const p = await beginPaystackPayment(db, b.publicToken);
     const [online, transfer] = await Promise.allSettled([success(p.reference, p.amountKobo), offline(b.id, 10_000_000)]);
     expect(online.status).toBe("fulfilled");
-    // The transfer either lands (then the booking is overpaid and flagged) or is refused as already paid.
     const rows = await q<{ amount_kobo: number }>("SELECT amount_kobo FROM payments WHERE reservation_id = ? AND status = 'successful'", b.id);
     if (transfer.status === "fulfilled") {
       expect(rows).toHaveLength(2);

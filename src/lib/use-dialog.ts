@@ -2,12 +2,6 @@
 
 import { useEffect, type RefObject } from "react";
 
-/**
- * Behaviour shared by menus and bottom sheets while they are open:
- *  - the page behind doesn't scroll,
- *  - focus moves inside, Tab stays inside, and returns to the trigger on close,
- *  - Escape and browser back/forward close it.
- */
 export function useDialog(open: boolean, close: () => void, panel: RefObject<HTMLElement | null>, trigger?: RefObject<HTMLElement | null>) {
   useEffect(() => {
     if (!open) return;

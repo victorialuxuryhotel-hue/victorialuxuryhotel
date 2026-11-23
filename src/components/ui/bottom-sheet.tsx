@@ -7,11 +7,6 @@ import { cn } from "@/lib/utils/cn";
 
 const noop = () => () => {};
 
-/**
- * A panel that slides up from the bottom of the screen (phones), over a dimmed
- * page. Tap the backdrop, press Escape, or navigate to close. Focus moves in
- * and returns to the trigger. Rendered into <body> so no parent can clip it.
- */
 export function BottomSheet({
   open,
   onClose,
@@ -26,7 +21,6 @@ export function BottomSheet({
   title: string;
   subtitle?: string;
   trigger?: React.RefObject<HTMLElement | null>;
-  /** From md up, show as a centred dialog instead of a sheet. */
   dialogOnDesktop?: boolean;
   children: React.ReactNode;
 }) {

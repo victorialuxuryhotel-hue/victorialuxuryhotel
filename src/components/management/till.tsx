@@ -14,7 +14,6 @@ const METHODS = { cash: "Cash", bank_transfer: "Transfer", pos_terminal: "POS" }
 const chip = (on: boolean) =>
   cn("inline-flex min-h-11 items-center justify-center rounded-full border px-4 text-sm", on ? "border-navy-800 bg-navy-50 text-navy-800" : "border-hairline text-ink-900 hover:bg-ink-900/7");
 
-/** Tap items, choose how it's paid (or a guest's room), done. */
 export function Till({ menu, guests }: { menu: MenuItem[]; guests: Array<{ id: string; reference: string; guest: string; room: string | null }> }) {
   const [outlet, setOutlet] = useState<Outlet>("bar");
   const [cart, setCart] = useState<Record<string, number>>({});

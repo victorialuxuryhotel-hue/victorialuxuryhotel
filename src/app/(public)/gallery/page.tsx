@@ -16,14 +16,11 @@ export const metadata: Metadata = {
   alternates: { canonical: "/gallery" },
 };
 
-// Varied tile shapes give an editorial rhythm on large screens.
 const spans = ["lg:col-span-2 lg:row-span-2", "", "", "lg:row-span-2", "", "lg:col-span-2", ""];
 
 async function GalleryPageContent() {
   const [categories, site] = await Promise.all([getPublicCategories(), getSitePhotos()]);
 
-  // Real photos per section: room-type photos feed "Rooms"; the rest come from
-  // the gallery uploads. Sections with no photos yet keep their placeholders.
   const real: Record<string, PhotoContent[]> = Object.fromEntries(galleryGroups.map((g) => [g, [] as PhotoContent[]]));
   for (const c of categories) real.Rooms!.push(...c.photos);
   for (const p of site.gallery) real[p.group]?.push(p);
@@ -60,7 +57,6 @@ async function GalleryPageContent() {
   );
 }
 
-/** Content reads room types and photos per request; the page frame shows immediately. */
 export default function GalleryPage() {
   return (
     <Suspense fallback={<PageSkeleton />}>

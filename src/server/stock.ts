@@ -34,8 +34,8 @@ export async function moveStock(_prev: ActionResult | null, formData: FormData):
     await recordMove(await getDb(), actorOf(staff), {
       itemId: z.uuid().parse(formData.get("itemId")),
       kind,
-      quantity: z.coerce.number().int("Enter a whole number").parse(formData.get("quantity")),
-      note: String(formData.get("note") ?? "") || null,
+      quantity: z.coerce.number().int("Enter a whole number").min(-1_000_000).max(1_000_000).parse(formData.get("quantity")),
+      note: z.string().trim().max(200, "Keep the note short").parse(String(formData.get("note") ?? "")) || null,
     });
     refresh();
     return ok(undefined);

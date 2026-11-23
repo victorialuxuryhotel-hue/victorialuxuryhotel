@@ -10,7 +10,6 @@ import { getGuestReceipt } from "@/server/queries/booking";
 
 export const metadata: Metadata = { title: "Your receipt", robots: { index: false, follow: false } };
 
-/** The guest's printable receipt, linked from the payment email ("View or print receipt"). */
 async function Content({ params }: { params: Promise<{ token: string; number: string }> }) {
   const { token, number } = await params;
   const data = await getGuestReceipt(token, number);

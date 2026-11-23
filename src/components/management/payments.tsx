@@ -12,7 +12,6 @@ import { PaymentBadge } from "./badges";
 export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: PaymentRow[]; receiptHref: (n: string) => string; reservationHref?: (p: PaymentRow) => string }) {
   return (
     <>
-      {/* Phones: amount and status right-aligned for scanning; the row opens the reservation. */}
       <ul className="divide-y divide-hairline md:hidden">
         {rows.map((p) => {
           const href = reservationHref?.(p) ?? (p.receiptNumber ? receiptHref(p.receiptNumber) : undefined);
@@ -75,7 +74,6 @@ export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: Pay
 export type ReceiptPayment = Pick<PaymentRow, "receiptNumber" | "paidAt" | "method" | "providerReference" | "amountKobo" | "provider" | "recordedBy">;
 export type ReceiptStay = Pick<ReservationDetail, "guestName" | "reference" | "category" | "nights" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo"> & { room?: string };
 
-/** A printable receipt. `forGuest` leaves out staff names (the guest's own copy). */
 export function Receipt({ payment, reservation, forGuest = false, vatRateBp }: { payment: ReceiptPayment; reservation: ReceiptStay; forGuest?: boolean; vatRateBp?: number }) {
   return (
     <article className="mx-auto max-w-2xl rounded-card border border-hairline bg-ivory-50 p-5 sm:p-12 print:border-0">

@@ -17,15 +17,6 @@ export function CardHeader({ title, description, action }: { title: string; desc
   );
 }
 
-/**
- * Dashboard figure. `caption` is required so every number states what it
- * measures (e.g. "Payments received" vs "Booked value"). The brief requires
- * never letting booking totals read as cash received.
- */
-/**
- * A row of stats. Phones: one bordered 2×2 block with hairline dividers (a
- * lone last stat spans the row). From sm: separate cards, 2 then 4 across.
- */
 export function StatGrid({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div

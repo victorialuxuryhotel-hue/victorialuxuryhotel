@@ -50,12 +50,10 @@ async function RoomType({ params }: { params: Promise<{ slug: string }> }) {
 
   return (
     <>
-      {/* Gallery: one large photo plus up to four smaller ones. */}
       <Container className="pt-8 sm:pt-12">
         <Link href="/rooms" className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-navy-800">
           <ArrowLeft className="size-4" aria-hidden /> All rooms
         </Link>
-        {/* Phones: every photo, swipeable. */}
         <div className="mt-4">
           <PhotoStrip label={`Photos of ${c.name}`}>
             {(c.photos.length ? c.photos : [{ alt: c.name }]).map((p, i) => (
@@ -63,7 +61,6 @@ async function RoomType({ params }: { params: Promise<{ slug: string }> }) {
             ))}
           </PhotoStrip>
         </div>
-        {/* Larger screens: one large photo plus up to four smaller ones. */}
         <div className="mt-6 hidden gap-3 sm:grid sm:grid-cols-4 sm:grid-rows-2">
           <Photo photo={cover ?? { alt: c.name }} priority sizes="50vw" className="col-span-2 row-span-2 h-full rounded-card" />
           {[0, 1, 2, 3].map((i) => (

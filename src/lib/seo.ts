@@ -1,12 +1,6 @@
 import { hotel } from "@/config/hotel";
 import { facilities } from "@/content/site";
 
-/**
- * Structured facts for search engines and AI assistants (schema.org Hotel).
- * Only facts the hotel confirmed (config/hotel.ts, the facilities list) and
- * live data (room types, prices, check-in times). No ratings, coordinates or
- * claims the hotel hasn't given us.
- */
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://victorialuxuryhotel.com";
 export const ALTERNATE_NAMES = ["Victoria Luxury Hotel and Apartments", "Victoria Luxury Hotel", "Victoria Luxury Hotel Akure"];
 
@@ -64,7 +58,6 @@ export function hotelJsonLd(rooms: RoomFact[], times: Times) {
 
 export type Faq = { q: string; a: string };
 
-/** Plain answers to the questions guests (and AI assistants) ask most, from confirmed facts only. */
 export function hotelFaqs(times: Times, cancellation: string): Faq[] {
   return [
     { q: "Where is Victoria Luxury Hotel and Apartment?", a: `${hotel.address.line1}, ${hotel.address.city}, ${hotel.address.state}, Nigeria.` },
@@ -84,5 +77,4 @@ export function faqJsonLd(faqs: Faq[]) {
   };
 }
 
-/** JSON for a <script type="application/ld+json">, safe to inline (no closing tags). */
 export const ldJson = (data: unknown) => JSON.stringify(data).replace(/</g, "\\u003c");

@@ -8,13 +8,6 @@ import { authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
 import { cleanSearch } from "../db-errors";
 
-/**
- * Staff reads of reservations. Every query starts with authorize(): with no
- * row-level security in D1, this (plus the role checks in the domain layer)
- * is what keeps staff data to staff.
- */
-
-/** Columns for list rows, with net paid computed in the database. */
 const LIST_COLUMNS = `
   r.id, r.reference, r.check_in, r.check_out, r.guest_count, (r.total_amount_kobo + r.extras_kobo - r.discount_kobo) AS total_amount_kobo, r.status, r.source, r.hold_expires_at, r.attention_reason,
   g.full_name AS guest_name, g.phone AS guest_phone, c.name AS category_name, rm.room_number,
@@ -51,7 +44,6 @@ function toRow(r: ListRow): ReservationRow {
   };
 }
 
-/** Today's date at the hotel (Africa/Lagos). */
 export async function hotelToday(): Promise<string> {
   return today();
 }
@@ -67,7 +59,7 @@ const tabWhere: Record<ReservationTab, string> = {
 };
 
 export async function listReservations(opts: { tab?: ReservationTab; q?: string; status?: string; source?: string; guestId?: string; page?: number; pageSize?: number } = {}) {
-  await authorizeRead();
+  await authorizeRead(["reservations.manage", "reports.view"]);
   const db = await getDb();
   const tab = opts.tab ?? "upcoming";
   const size = opts.pageSize ?? 50;
@@ -91,7 +83,6 @@ export async function listReservations(opts: { tab?: ReservationTab; q?: string;
     const like = `%${q}%`;
     params.push(like, like, like, like);
   }
-  // One extra row tells the caller whether there is a next page.
   params.push(size + 1, ((opts.page ?? 1) - 1) * size);
   const rows = await all<ListRow>(
     db,
@@ -103,7 +94,7 @@ export async function listReservations(opts: { tab?: ReservationTab; q?: string;
 }
 
 export async function tabCounts(): Promise<Record<Exclude<ReservationTab, "all">, number>> {
-  await authorizeRead();
+  await authorizeRead(["reservations.manage", "reports.view"]);
   const row = await first<Record<Exclude<ReservationTab, "all">, number>>(
     await getDb(),
     `SELECT
@@ -117,9 +108,8 @@ export async function tabCounts(): Promise<Record<Exclude<ReservationTab, "all">
   return { upcoming: row?.upcoming ?? 0, in_house: row?.in_house ?? 0, awaiting: row?.awaiting ?? 0, attention: row?.attention ?? 0 };
 }
 
-/** Arrivals (due today, not yet in) and departures (in house, due out today or overdue). */
 export async function movements(day?: string) {
-  await authorizeRead();
+  await authorizeRead(["reservations.manage", "reports.view"]);
   const db = await getDb();
   const d = day ?? today();
   const [arrivals, departures, inHouse] = await Promise.all([
@@ -133,7 +123,7 @@ export async function movements(day?: string) {
 export async function getReservation(
   id: string,
 ): Promise<(ReservationDetail & { categoryId: string; roomId?: string; guestId: string; maxGuests: number; publicToken: string }) | null> {
-  await authorizeRead();
+  await authorizeRead(["reservations.manage", "payments.record", "reports.view"]);
   const db = await getDb();
   const r = await first<
     ListRow & {
@@ -213,9 +203,8 @@ export async function getReservation(
   };
 }
 
-/** Which reservation a receipt number belongs to. */
 export async function reservationIdForReceipt(receiptNumber: string): Promise<string | null> {
-  await authorizeRead();
+  await authorizeRead(["payments.record", "reports.view"]);
   const row = await first<{ reservation_id: string }>(await getDb(), "SELECT reservation_id FROM payments WHERE receipt_number = ?", receiptNumber);
   return row?.reservation_id ?? null;
 }

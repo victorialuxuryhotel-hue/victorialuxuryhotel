@@ -5,10 +5,6 @@ import { frontDeskSummary, listPaymentsFor } from "@/server/domain/payment-list"
 import { addDays, hotelInstant, hotelToday } from "@/lib/hotel-date";
 import { day, db, desk, exec, gm, makeCategory, owner } from "./helpers";
 
-/**
- * Front desk sees only today's payments (Lagos time) and the ones they
- * recorded. Enforced in the query, so asking for more gets the same answer.
- */
 async function booking() {
   const c = await makeCategory(1, { rateKobo: 10_000_000 });
   return createWebsiteReservation(db, {
@@ -20,7 +16,6 @@ async function booking() {
 const pay = (actor: typeof desk, reservationId: string, paidOn: string, amountKobo: number) =>
   recordOfflinePayment(db, actor, { reservationId, amountKobo, method: "cash", paidOn, confirmReceived: true });
 
-/** A successful cash payment at an exact instant (to test the Lagos-midnight edge). */
 async function payAt(reservationId: string, paidAt: string, amountKobo: number, recordedBy: string) {
   const id = crypto.randomUUID();
   await exec(
@@ -45,11 +40,9 @@ describe("payments the front desk can see", () => {
 
     expect(await amounts(desk, b.id)).toEqual({ used: "today", amounts: [2_000_000] });
     expect(await amounts(desk, b.id, "mine")).toEqual({ used: "mine", amounts: [3_000_000] });
-    // Asking for everything doesn't widen the scope.
     expect(await amounts(desk, b.id, "all")).toEqual({ used: "today", amounts: [2_000_000] });
     expect(await amounts(desk, b.id, "anything")).toEqual({ used: "today", amounts: [2_000_000] });
 
-    // Managers and the owner see the full list.
     expect(await amounts(gm, b.id)).toEqual({ used: "all", amounts: [1_000_000, 2_000_000, 3_000_000] });
     expect(await amounts(owner, b.id, "today")).toEqual({ used: "all", amounts: [1_000_000, 2_000_000, 3_000_000] });
   });

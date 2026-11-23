@@ -12,7 +12,6 @@ import { getBookingRules, getCatalogueSettings } from "@/server/queries/settings
 
 export const metadata: Metadata = { title: "Booking rules" };
 
-/** How bookings and holds work. Staff moved to /app/staff, room types and photos to Rates & room types, the activity log to Reports. */
 export default function SettingsPage() {
   return (
     <>

@@ -13,7 +13,6 @@ const accent: Record<RoomBoardState, string> = {
   maintenance: "border-l-danger-600",
 };
 
-/** Count of rooms in each state, as a legend that doubles as a summary. */
 export function RoomBoardLegend({ rooms }: { rooms: RoomTile[] }) {
   return (
     <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
@@ -28,10 +27,6 @@ export function RoomBoardLegend({ rooms }: { rooms: RoomTile[] }) {
   );
 }
 
-/**
- * Phones: a sideways-scrolling row of state chips ("All 29", "Needs cleaning 4")
- * that filter the board via ?state=, so it works without JavaScript.
- */
 export function RoomStateChips({ rooms, active, hrefFor }: { rooms: RoomTile[]; active?: RoomBoardState; hrefFor: (s?: RoomBoardState) => string }) {
   const chip = (on: boolean) =>
     cn(
@@ -53,7 +48,6 @@ export function RoomStateChips({ rooms, active, hrefFor }: { rooms: RoomTile[]; 
   );
 }
 
-/** Every room at a glance, grouped by floor. Tiles open the room's quick actions. */
 export function RoomBoard({ rooms, interactive = true }: { rooms: Array<RoomTile & { serviceStatus?: string }>; interactive?: boolean }) {
   const floors = [...new Set(rooms.map((r) => r.floor ?? "—"))];
   return (

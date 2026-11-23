@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-/**
- * Public environment. NEXT_PUBLIC_* values are inlined at build time, so each
- * one must be referenced statically (process.env.NAME), never dynamically.
- */
 const publicSchema = z.object({
   NEXT_PUBLIC_SITE_URL: z.url(),
 });

@@ -3,20 +3,8 @@ import { effectivePaymentView, type PaymentView } from "@/lib/auth/permissions";
 import { hotelToday } from "@/lib/hotel-date";
 import { ALL_STAFF, all, first, requireRole, type Actor, type Db } from "../db";
 
-/** Desk staff take payments; finance reads them all. */
 const PAYMENT_READERS = [...ALL_STAFF, "finance"] as const;
 
-/**
- * Who may see which payments on the Payments page.
- *
- * Roles that can see revenue (`reports.view`) see every payment. Everyone else
- * (front desk) sees only payments made today, Lagos time, or ones they
- * recorded themselves. The limit is applied in SQL here, so no page can show
- * more than this returns. A reservation's own page still shows its full
- * payment history to every role; that query is separate. Which views each
- * role may use is decided in src/lib/auth/permissions.ts.
- */
-/** Lagos is UTC+1 all year, so the hotel date of a stored UTC timestamp is date(ts, '+1 hour'). */
 const HOTEL_DATE = (col: string) => `date(${col}, '+1 hour')`;
 const PAID_OR_CREATED = "coalesce(p.paid_at, p.created_at)";
 
@@ -42,7 +30,6 @@ const SELECT = `SELECT p.id, p.amount_kobo, p.kind, p.method, p.provider, p.prov
   FROM payments p JOIN reservations r ON r.id = p.reservation_id JOIN guests g ON g.id = r.guest_id
   LEFT JOIN staff_profiles s ON s.id = p.recorded_by`;
 
-/** One page of payments in the requested view, limited to what the role may see. */
 export async function listPaymentsFor(
   db: Db,
   actor: Actor,
@@ -64,15 +51,11 @@ export async function listPaymentsFor(
 }
 
 export type FrontDeskSummary = {
-  /** Payments made today (any status), the "Today" count. */
   todayCount: number;
-  /** Payments this person has ever recorded, the "Recorded by me" count (all time). */
   mineCount: number;
-  /** Money actually received today, net of corrections, by how it was paid. */
   totals: { cash: number; transfer: number; cardOnline: number; pos: number; other: number };
 };
 
-/** Counts and today's takings for the front-desk Payments page. */
 export async function frontDeskSummary(db: Db, actor: Actor, today = hotelToday()): Promise<FrontDeskSummary> {
   requireRole(actor, PAYMENT_READERS);
   const t = paymentScopeSql("today", actor.id, today);

@@ -1,3 +1,5 @@
+import { canAny } from "@/lib/auth/permissions";
+import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { GuestTable } from "@/components/management/guests";
@@ -12,7 +14,8 @@ import { listGuests } from "@/server/queries/guests";
 export const metadata: Metadata = { title: "Guests" };
 
 async function Content({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireStaff();
+  const staff = await requireStaff();
+  if (!canAny(staff.role, "guests.manage")) return <AccessDenied />;
   const sp = await searchParams;
   const term = typeof sp.q === "string" ? sp.q : undefined;
   const page = pageFrom(sp.page);
