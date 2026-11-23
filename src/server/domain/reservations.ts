@@ -287,6 +287,7 @@ export async function assignRoom(db: Db, actor: Actor, reservationId: string, ro
     if (!room || !room.is_active) throw new AppError("NOT_FOUND", "Room not found.");
     if (room.service_status !== "in_service") throw new AppError("UNAVAILABLE", `Room ${room.room_number} is under maintenance.`);
     if (res.room_id === roomId) return { undoId: null };
+    if (res.status === "checked_in" && room.readiness !== "ready") throw new AppError("UNAVAILABLE", `Room ${room.room_number} isn't clean yet. Mark it ready first.`);
 
     // The reservation counts against its assigned room's category, or the
     // booked one. Moving it to a room in another category (an upgrade, or
@@ -483,7 +484,11 @@ export async function undoAction(db: Db, actor: Actor, reservationId: string, ac
       }
       case "reservation.checked_in":
         if (res.status !== "checked_in") throw tooLate;
-        stmts.push(db.prepare("UPDATE reservations SET status = 'confirmed', checked_in_at = NULL WHERE id = ?").bind(res.id));
+        if (await first(db, "SELECT 1 FROM sales WHERE reservation_id = ? AND status <> 'void'", res.id)) throw tooLate;
+        stmts.push(
+          db.prepare("INSERT INTO _guard (ok) SELECT 0 WHERE EXISTS (SELECT 1 FROM sales WHERE reservation_id = ? AND status <> 'void')").bind(res.id),
+          db.prepare("UPDATE reservations SET status = 'confirmed', checked_in_at = NULL WHERE id = ?").bind(res.id),
+        );
         message = "Check-in undone.";
         break;
       case "reservation.checked_out":
@@ -701,6 +706,11 @@ export async function updateRoomStatus(
     if (input.serviceStatus === "maintenance" && occupied) {
       throw new AppError("CONFLICT", `Room ${room.room_number} has a guest checked in. Move the guest first.`);
     }
+    const UPCOMING = `room_id = ?1 AND check_out > ?2 AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))`;
+    if (input.serviceStatus === "maintenance" && room.service_status !== "maintenance") {
+      const booked = await first<{ reference: string; check_in: string }>(db, `SELECT reference, check_in FROM reservations WHERE ${UPCOMING} ORDER BY check_in LIMIT 1`, room.id, hotelToday());
+      if (booked) throw new AppError("CONFLICT", `Room ${room.room_number} is booked (${booked.reference}, from ${booked.check_in}). Move that booking to another room first.`);
+    }
     const readiness = input.readiness ?? room.readiness;
     const service = input.serviceStatus ?? room.service_status;
     const note = service === "maintenance" ? input.note?.trim() || room.maintenance_note : null;
@@ -721,7 +731,12 @@ export async function updateRoomStatus(
     ];
     // Backstop for a guest checked in between the read and the write.
     if (input.serviceStatus === "maintenance") {
-      stmts.splice(1, 0, db.prepare("INSERT INTO _guard (ok) SELECT 0 WHERE EXISTS (SELECT 1 FROM reservations WHERE room_id = ? AND status = 'checked_in')").bind(room.id));
+      stmts.splice(
+        1,
+        0,
+        db.prepare("INSERT INTO _guard (ok) SELECT 0 WHERE EXISTS (SELECT 1 FROM reservations WHERE room_id = ? AND status = 'checked_in')").bind(room.id),
+        db.prepare(`INSERT INTO _guard (ok) SELECT 0 WHERE EXISTS (SELECT 1 FROM reservations WHERE ${UPCOMING})`).bind(room.id, hotelToday()),
+      );
     }
     await writeBatch(db, actor, stmts);
   });

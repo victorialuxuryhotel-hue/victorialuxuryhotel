@@ -142,7 +142,7 @@ async function Occupancy({ range }: { range: ReportRange }) {
         <div className="p-5">
           <p className="text-sm text-ink-500">Average occupancy · {rangeLabel[range].toLowerCase()}</p>
           <p className="mt-1 text-4xl font-semibold tabular-nums text-ink-900">{o.averagePct}%</p>
-          <p className="mt-1 text-xs text-ink-500">Rooms with a guest each night, out of {plural(o.roomsInService, "room")} in service today.</p>
+          <p className="mt-1 text-xs text-ink-500">Rooms with a guest each night, out of {plural(o.roomsInService, "room")}.</p>
         </div>
         {o.nights.length > 1 ? (
           <div className="border-t border-hairline">

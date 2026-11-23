@@ -74,20 +74,22 @@ export async function cashUp(db: Db, actor: Actor, day = hotelToday()): Promise<
 }
 
 const STAYING = "r.status IN ('confirmed', 'checked_in', 'checked_out')";
+const STAY_END =
+  "(CASE WHEN r.status = 'checked_out' AND r.checked_out_at IS NOT NULL THEN min(r.check_out, max(date(r.check_in, '+1 day'), date(r.checked_out_at, '+1 hour'))) ELSE r.check_out END)";
 
 /**
  * Nightly occupancy: rooms with a guest (confirmed, in house or completed)
- * against rooms in service today. Room-nights sold by type, by the type of
+ * against all rooms. An early check-out stops counting from the day the guest left. Room-nights sold by type, by the type of
  * the room actually assigned (upgrades count where the guest slept).
  */
 export async function occupancyReport(db: Db, actor: Actor, range: ReportRange, today = hotelToday()) {
   requireRole(actor, FINANCE);
   const { from, to } = rangeDates(range, today);
   const [rooms, nights, byType] = await Promise.all([
-    first<{ n: number }>(db, "SELECT count(*) AS n FROM rooms WHERE is_active = 1 AND service_status = 'in_service'"),
+    first<{ n: number }>(db, "SELECT count(*) AS n FROM rooms WHERE is_active = 1"),
     all<{ day: string; occupied: number }>(
       db,
-      `SELECT cal.d AS day, (SELECT count(*) FROM reservations r WHERE ${STAYING} AND r.check_in <= cal.d AND r.check_out > cal.d) AS occupied
+      `SELECT cal.d AS day, (SELECT count(*) FROM reservations r WHERE ${STAYING} AND r.check_in <= cal.d AND ${STAY_END} > cal.d) AS occupied
        FROM calendar cal WHERE cal.d BETWEEN ? AND ? ORDER BY cal.d`,
       from,
       to,
@@ -96,7 +98,7 @@ export async function occupancyReport(db: Db, actor: Actor, range: ReportRange, 
       db,
       `SELECT c.name, count(*) AS nights
        FROM calendar cal
-       JOIN reservations r ON r.check_in <= cal.d AND r.check_out > cal.d AND ${STAYING}
+       JOIN reservations r ON r.check_in <= cal.d AND ${STAY_END} > cal.d AND ${STAYING}
        LEFT JOIN rooms rm ON rm.id = r.room_id
        JOIN room_categories c ON c.id = coalesce(rm.category_id, r.category_id)
        WHERE cal.d BETWEEN ? AND ?
@@ -106,14 +108,14 @@ export async function occupancyReport(db: Db, actor: Actor, range: ReportRange, 
     ),
   ]);
   const inService = rooms?.n ?? 0;
-  const pct = (occupied: number) => (inService ? Math.round((occupied / inService) * 100) : 0);
+  const pct = (occupied: number) => (inService ? Math.min(100, Math.round((occupied / inService) * 100)) : 0);
   const sold = nights.reduce((s, n) => s + n.occupied, 0);
   return {
     from,
     to,
     roomsInService: inService,
     nights: nights.map((n) => ({ day: n.day, occupied: n.occupied, pct: pct(n.occupied) })),
-    averagePct: nights.length && inService ? Math.round((sold / (nights.length * inService)) * 100) : 0,
+    averagePct: nights.length && inService ? Math.min(100, Math.round((sold / (nights.length * inService)) * 100)) : 0,
     byType,
   };
 }
