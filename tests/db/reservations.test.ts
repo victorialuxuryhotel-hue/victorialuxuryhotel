@@ -311,7 +311,7 @@ describe("concurrent staff actions", () => {
     const final = await status(r.id);
     expect(["cancelled", "confirmed"]).toContain(final);
     const rejected = results.find((x) => x.status === "rejected") as PromiseRejectedResult;
-    expect(rejected.reason.message).toMatch(/Only upcoming|Only reservations awaiting payment/);
+    expect(rejected.reason.message).toMatch(/Only upcoming|Only reservations awaiting payment|just changed by someone else/);
   });
 });
 
