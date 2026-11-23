@@ -133,13 +133,24 @@ export type BillStay = ReceiptStay & { payments: PaymentRow[]; status: string };
 export type BillLines = {
   roomKobo: number; nightlyRateKobo: number; nights: number; extrasKobo: number; discountKobo: number; promoCode: string | null;
   extras: { name: string; unitKobo: number; perNight: boolean; amountKobo: number }[];
+  roomCharges: { number: number; outlet: "restaurant" | "bar"; items: string; totalKobo: number; settled: boolean; method: string | null; at: string; settledAt: string | null }[];
 };
+
+const SALE_METHOD: Record<string, string> = { cash: "Cash", bank_transfer: "Bank transfer", pos_terminal: "POS" };
 
 export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillStay; lines: BillLines; vatRateBp: number; printedAt: string }) {
   const extrasListed = lines.extras.reduce((s, e) => s + e.amountKobo, 0);
   const adjustment = lines.extrasKobo - extrasListed;
   const paid = stay.payments.filter((p) => p.status === "successful");
-  const balance = stay.totalKobo - stay.paidKobo;
+  const chargesKobo = lines.roomCharges.reduce((s, c) => s + c.totalKobo, 0);
+  const chargesUnpaid = lines.roomCharges.filter((c) => !c.settled).reduce((s, c) => s + c.totalKobo, 0);
+  const chargesSettled = chargesKobo - chargesUnpaid;
+  const roomBalance = stay.totalKobo - stay.paidKobo;
+  const balance = roomBalance + chargesUnpaid;
+  const settlements = [...new Map(lines.roomCharges.filter((c) => c.settled).map((c) => [`${c.settledAt}|${c.method}`, c])).values()].map((c) => ({
+    at: c.settledAt, method: c.method,
+    kobo: lines.roomCharges.filter((x) => x.settled && x.settledAt === c.settledAt && x.method === c.method).reduce((s, x) => s + x.totalKobo, 0),
+  }));
   const row = "border-b border-hairline";
   const amount = "py-3 text-right tabular-nums whitespace-nowrap";
   return (
@@ -189,10 +200,24 @@ export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillSta
           {lines.discountKobo ? (
             <tr className={row}><td className="py-3">Discount{lines.promoCode ? ` (${lines.promoCode})` : ""}</td><td className={amount}>−{formatNaira(lines.discountKobo)}</td></tr>
           ) : null}
+          {lines.roomCharges.length ? (
+            <>
+              <tr className={row}><td className="pt-4 pb-2 text-xs font-medium uppercase tracking-wide text-ink-500" colSpan={2}>Restaurant &amp; bar, charged to room</td></tr>
+              {lines.roomCharges.map((c) => (
+                <tr key={c.number} className={row}>
+                  <td className="py-3">
+                    {c.outlet === "bar" ? "Bar" : "Restaurant"} · no. {c.number}
+                    <p className="text-xs text-ink-500">{formatDateTime(c.at)}{c.items ? ` · ${c.items}` : ""}</p>
+                  </td>
+                  <td className={amount}>{formatNaira(c.totalKobo)}</td>
+                </tr>
+              ))}
+            </>
+          ) : null}
         </tbody>
         <tfoot>
-          <tr><td className="pt-3 font-semibold text-ink-900">Total charges</td><td className="pt-3 text-right font-semibold tabular-nums">{formatNaira(stay.totalKobo)}</td></tr>
-          {vatRateBp ? <tr><td className="pt-1 text-xs text-ink-500">Includes VAT ({vatRateBp / 100}%)</td><td className="pt-1 text-right text-xs tabular-nums text-ink-500">{formatNaira(vatIncluded(stay.totalKobo, vatRateBp))}</td></tr> : null}
+          <tr><td className="pt-3 font-semibold text-ink-900">Total charges</td><td className="pt-3 text-right font-semibold tabular-nums">{formatNaira(stay.totalKobo + chargesKobo)}</td></tr>
+          {vatRateBp ? <tr><td className="pt-1 text-xs text-ink-500">Includes VAT ({vatRateBp / 100}%)</td><td className="pt-1 text-right text-xs tabular-nums text-ink-500">{formatNaira(vatIncluded(stay.totalKobo + chargesKobo, vatRateBp))}</td></tr> : null}
         </tfoot>
       </table>
 
@@ -201,7 +226,7 @@ export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillSta
           <tr><th className="py-3 font-medium">Payments</th><th className="py-3 font-medium">Receipt</th><th className="py-3 text-right font-medium">Amount</th></tr>
         </thead>
         <tbody>
-          {paid.length ? (
+          {paid.length || settlements.length ? (
             paid.map((p) => (
               <tr key={p.id} className={row}>
                 <td className="py-3">
@@ -211,13 +236,30 @@ export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillSta
                 <td className="py-3 font-mono text-xs">{p.receiptNumber ?? ""}</td>
                 <td className={amount}>{p.kind === "refund" ? "−" : ""}{formatNaira(p.amountKobo)}</td>
               </tr>
-            ))
+            )).concat(
+              settlements.map((st) => (
+                <tr key={`${st.at}|${st.method}`} className={row}>
+                  <td className="py-3">
+                    Restaurant &amp; bar charges · {SALE_METHOD[st.method ?? ""] ?? "Other"}
+                    <p className="text-xs text-ink-500">{st.at ? formatDateTime(st.at) : ""}</p>
+                  </td>
+                  <td className="py-3 text-xs text-ink-500">Settled</td>
+                  <td className={amount}>{formatNaira(st.kobo)}</td>
+                </tr>
+              )),
+            )
           ) : (
             <tr className={row}><td colSpan={3} className="py-3 text-ink-500">No payments yet.</td></tr>
           )}
         </tbody>
         <tfoot>
-          <tr><td colSpan={2} className="pt-3 text-ink-500">Total paid</td><td className="pt-3 text-right tabular-nums">{formatNaira(stay.paidKobo)}</td></tr>
+          <tr><td colSpan={2} className="pt-3 text-ink-500">Total paid</td><td className="pt-3 text-right tabular-nums">{formatNaira(stay.paidKobo + chargesSettled)}</td></tr>
+          {chargesUnpaid && roomBalance > 0 ? (
+            <>
+              <tr><td colSpan={2} className="pt-1 text-xs text-ink-500">Room account due</td><td className="pt-1 text-right text-xs tabular-nums text-ink-500">{formatNaira(roomBalance)}</td></tr>
+              <tr><td colSpan={2} className="pt-1 text-xs text-ink-500">Restaurant &amp; bar due</td><td className="pt-1 text-right text-xs tabular-nums text-ink-500">{formatNaira(chargesUnpaid)}</td></tr>
+            </>
+          ) : null}
           <tr>
             <td colSpan={2} className="pt-2 text-base font-semibold text-ink-900">{balance > 0 ? "Balance due" : balance < 0 ? "Paid over" : "Balance"}</td>
             <td className="pt-2 text-right text-lg font-semibold tabular-nums">{formatNaira(Math.abs(balance))}</td>
