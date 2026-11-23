@@ -2,6 +2,7 @@ const CLERK = "https://*.clerk.accounts.dev https://*.clerk.com https://clerk.vi
 const CLERK_IMG = "https://img.clerk.com https://*.clerk.com https://*.clerk.accounts.dev";
 const TURNSTILE = "https://challenges.cloudflare.com";
 const PAYSTACK = "https://checkout.paystack.com https://api.paystack.co https://standard.paystack.co";
+const CF_ANALYTICS = "https://static.cloudflareinsights.com";
 const MAPS = "https://www.google.com https://maps.google.com https://maps.googleapis.com";
 
 export const CONTENT_SECURITY_POLICY = [
@@ -10,11 +11,11 @@ export const CONTENT_SECURITY_POLICY = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   `form-action 'self' ${PAYSTACK}`,
-  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' ${CLERK} ${TURNSTILE}`,
+  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' ${CLERK} ${TURNSTILE} ${CF_ANALYTICS}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${CLERK_IMG}`,
   "font-src 'self' data:",
-  `connect-src 'self' ${CLERK} https://*.clerk.com:* https://api.clerk.com https://clerk-telemetry.com https://*.clerk-telemetry.com ${TURNSTILE} ${PAYSTACK}`,
+  `connect-src 'self' ${CLERK} https://*.clerk.com:* https://api.clerk.com https://clerk-telemetry.com https://*.clerk-telemetry.com https://cloudflareinsights.com ${TURNSTILE} ${PAYSTACK}`,
   `frame-src ${MAPS} ${CLERK} ${TURNSTILE} ${PAYSTACK}`,
   "worker-src 'self' blob:",
   "upgrade-insecure-requests",
