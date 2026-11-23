@@ -11,6 +11,7 @@ import { logger } from "@/lib/logger";
 import { actorOf, authorize } from "./auth";
 import { getDb } from "./db";
 import { createRoom as addRoom, saveCategory as save } from "./domain/admin";
+import { markTidied as tidied } from "./domain/housekeeping";
 import { updateRoomStatus as setRoomStatus } from "./domain/reservations";
 
 async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResult<T>> {
@@ -35,6 +36,15 @@ export async function updateRoomStatus(_prev: ActionResult | null, formData: For
     const staff = await authorize("rooms.status");
     const v = statusSchema.parse(Object.fromEntries([...formData.entries()].filter(([, val]) => val !== "")));
     await setRoomStatus(await getDb(), actorOf(staff), { roomId: v.roomId, readiness: v.readiness, serviceStatus: v.serviceStatus, note: v.note ?? null });
+    refresh();
+  });
+}
+
+/** Daily tidy of a room with a guest staying (housekeeping list). */
+export async function markTidied(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return run("room.tidied", async () => {
+    const staff = await authorize("rooms.status");
+    await tidied(await getDb(), actorOf(staff), recordId().parse(formData.get("roomId")));
     refresh();
   });
 }
