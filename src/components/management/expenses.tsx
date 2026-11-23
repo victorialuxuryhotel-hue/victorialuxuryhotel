@@ -8,7 +8,9 @@ import { cn } from "@/lib/utils/cn";
 import { addExpense, cancelExpense } from "@/server/finance";
 import type { ExpenseCategory, ExpenseRow } from "@/server/domain/finance";
 
-export function ExpenseForm({ today, categories, methods }: { today: string; categories: Record<string, string>; methods: Record<string, string> }) {
+const departmentLabel: Record<string, string> = { rooms: "Rooms", restaurant_bar: "Restaurant & bar", hall: "Conference hall" };
+
+export function ExpenseForm({ today, categories, methods, departments }: { today: string; categories: Record<string, string>; methods: Record<string, string>; departments: Record<string, string> }) {
   const [state, action, pending] = useActionState(addExpense, null);
   const form = useRef<HTMLFormElement>(null);
   useEffect(() => {
@@ -26,13 +28,16 @@ export function ExpenseForm({ today, categories, methods }: { today: string; cat
           {Object.entries(categories).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Select>
       </Field>
+      <Field label="Department" htmlFor="edept" error={err("department")}>
+        <Select id="edept" name="department" defaultValue="general">{Object.entries(departments).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
+      </Field>
       <Field label="Amount (₦)" htmlFor="eamt" error={err("amount")}><Input id="eamt" name="amount" type="number" min={1} step="any" inputMode="decimal" required /></Field>
       <Field label="What for" htmlFor="edesc" error={err("description")} className="sm:col-span-2"><Input id="edesc" name="description" placeholder="Diesel for generator" required /></Field>
       <Field label="Paid by" htmlFor="emeth">
         <Select id="emeth" name="method" defaultValue="cash">{Object.entries(methods).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
       </Field>
       <Field label="Reference" optional htmlFor="eref" hint="Receipt or transfer number."><Input id="eref" name="reference" /></Field>
-      <div className="flex items-end sm:col-span-2 lg:col-span-2"><Button type="submit" pending={pending}>Record expense</Button></div>
+      <div className="flex items-end lg:col-span-1"><Button type="submit" pending={pending}>Record expense</Button></div>
     </form>
   );
 }
@@ -61,7 +66,7 @@ export function ExpenseList({ rows, categories }: { rows: ExpenseRow[]; categori
           <div className="min-w-0 flex-1">
             <p className={cn("text-[15px] text-ink-900", r.voided_at && "line-through")}>{r.description}</p>
             <p className="text-xs text-ink-500">
-              {formatDate(r.spent_on, { year: false })} · {categories[r.category]}{r.reference ? ` · ${r.reference}` : ""}{r.recorded_by_name ? ` · ${r.recorded_by_name}` : ""}
+              {formatDate(r.spent_on, { year: false })} · {categories[r.category]}{r.department && r.department !== "general" ? ` · ${departmentLabel[r.department]}` : ""}{r.reference ? ` · ${r.reference}` : ""}{r.recorded_by_name ? ` · ${r.recorded_by_name}` : ""}
               {r.voided_at ? ` · Voided: ${r.void_reason}` : ""}
             </p>
           </div>

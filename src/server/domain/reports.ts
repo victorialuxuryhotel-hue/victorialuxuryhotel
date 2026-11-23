@@ -83,9 +83,13 @@ export async function incomeRows(db: Db, actor: Actor, range: ReportRange, today
 export type DayIncome = { day: string } & Record<Department, number> & { total: number };
 export type StaffTakings = { who: string; staffId: string | null; byMethod: Record<Bucket, number>; total: number };
 
-export async function incomeReport(db: Db, actor: Actor, range: ReportRange, today = hotelToday()) {
+export function reportDepartment(value: string | null | undefined): Department | null {
+  return value === "rooms" || value === "restaurantBar" || value === "hall" ? value : null;
+}
+
+export async function incomeReport(db: Db, actor: Actor, range: ReportRange, today = hotelToday(), department: Department | null = null) {
   const { from, to, days } = rangeDates(range, today);
-  const rows = await incomeRows(db, actor, range, today);
+  const rows = (await incomeRows(db, actor, range, today)).filter((r) => !department || r.department === department);
   const daily = new Map<string, DayIncome>(days.map((day) => [day, { day, rooms: 0, restaurantBar: 0, hall: 0, total: 0 }]));
   const staff = new Map<string, StaffTakings>();
   for (const r of rows) {

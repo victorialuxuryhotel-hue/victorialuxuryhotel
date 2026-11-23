@@ -1,7 +1,7 @@
 import { actorOf, authorizeRead } from "@/server/auth";
 import { csvResponse, deniedResponse, lagosDate, lagosTime, naira } from "@/server/csv";
 import { first, getDb } from "@/server/db";
-import { incomeRows, rangeDates, reportRange, type Bucket, type Department } from "@/server/domain/reports";
+import { incomeRows, rangeDates, reportDepartment, reportRange, type Bucket, type Department } from "@/server/domain/reports";
 import { hotelToday } from "@/lib/hotel-date";
 import { vatIncluded } from "@/lib/vat";
 
@@ -15,16 +15,18 @@ export async function GET(request: Request) {
   } catch (err) {
     return deniedResponse(err);
   }
-  const range = reportRange(new URL(request.url).searchParams.get("range") ?? undefined);
+  const q = new URL(request.url).searchParams;
+  const range = reportRange(q.get("range") ?? undefined);
+  const dept = reportDepartment(q.get("dept"));
   const { from, to } = rangeDates(range, hotelToday());
   const db = await getDb();
   const [rows, settings] = await Promise.all([
-    incomeRows(db, actorOf(staff), range),
+    incomeRows(db, actorOf(staff), range).then((rows) => rows.filter((r) => !dept || r.department === dept)),
     first<{ vat_rate_bp: number }>(db, "SELECT vat_rate_bp FROM hotel_settings WHERE id = 1"),
   ]);
   const rate = settings?.vat_rate_bp ?? 750;
   return csvResponse(
-    `income-${from}-to-${to}.csv`,
+    `income-${dept ? `${DEPARTMENT[dept].toLowerCase().replace(/[^a-z]+/g, "-")}-` : ""}${from}-to-${to}.csv`,
     ["Date", "Time", "Department", "Reference", "Details", "Method", "Type", "Amount (NGN)", `VAT included at ${rate / 100}% (NGN)`, "Receipt / no.", "Taken by"],
     rows.map((r) => [
       r.department === "hall" ? r.day : lagosDate(r.at),

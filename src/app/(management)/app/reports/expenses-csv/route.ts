@@ -1,7 +1,7 @@
 import { actorOf, authorizeRead } from "@/server/auth";
 import { csvResponse, deniedResponse, naira } from "@/server/csv";
 import { getDb } from "@/server/db";
-import { EXPENSE_CATEGORIES, EXPENSE_METHODS, listExpenses } from "@/server/domain/finance";
+import { EXPENSE_CATEGORIES, EXPENSE_DEPARTMENTS, EXPENSE_METHODS, listExpenses } from "@/server/domain/finance";
 import { reportRange } from "@/server/domain/reports";
 
 export async function GET(request: Request) {
@@ -11,13 +11,16 @@ export async function GET(request: Request) {
   } catch (err) {
     return deniedResponse(err);
   }
-  const range = reportRange(new URL(request.url).searchParams.get("range") ?? undefined);
-  const { from, to, rows } = await listExpenses(await getDb(), actorOf(staff), range, undefined, { limit: 10_000 });
+  const q = new URL(request.url).searchParams;
+  const range = reportRange(q.get("range") ?? undefined);
+  const dept = ({ rooms: "rooms", restaurantBar: "restaurant_bar", hall: "hall", general: "general" } as const)[q.get("dept") as "rooms"] ?? undefined;
+  const { from, to, rows } = await listExpenses(await getDb(), actorOf(staff), range, undefined, { limit: 10_000, department: dept });
   return csvResponse(
     `expenses-${from}-to-${to}.csv`,
-    ["Date", "Category", "Description", "Method", "Reference", "Amount (NGN)", "Recorded by", "Status", "Void reason"],
+    ["Date", "Department", "Category", "Description", "Method", "Reference", "Amount (NGN)", "Recorded by", "Status", "Void reason"],
     [...rows].reverse().map((r) => [
       r.spent_on,
+      EXPENSE_DEPARTMENTS[r.department ?? "general"],
       EXPENSE_CATEGORIES[r.category],
       r.description,
       EXPENSE_METHODS[r.method],

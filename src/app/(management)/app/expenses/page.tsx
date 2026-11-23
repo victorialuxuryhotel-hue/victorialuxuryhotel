@@ -12,7 +12,7 @@ import { hotelToday } from "@/lib/hotel-date";
 import { cn } from "@/lib/utils/cn";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { getDb } from "@/server/db";
-import { EXPENSE_CATEGORIES, EXPENSE_METHODS, listExpenses } from "@/server/domain/finance";
+import { EXPENSE_CATEGORIES, EXPENSE_DEPARTMENTS, EXPENSE_METHODS, listExpenses } from "@/server/domain/finance";
 import { reportRange, type ReportRange } from "@/server/domain/reports";
 
 export const metadata: Metadata = { title: "Expenses" };
@@ -31,7 +31,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     <div className="space-y-6 px-4 py-6 lg:px-8">
       <Card>
         <CardHeader title="Record an expense" description="Mistakes can be voided, not deleted." />
-        <ExpenseForm today={today} categories={EXPENSE_CATEGORIES} methods={EXPENSE_METHODS} />
+        <ExpenseForm today={today} categories={EXPENSE_CATEGORIES} methods={EXPENSE_METHODS} departments={EXPENSE_DEPARTMENTS} />
       </Card>
       <nav aria-label="Period" className="flex overflow-hidden rounded-md border border-hairline sm:max-w-sm [&>*+*]:border-l [&>*+*]:border-hairline">
         {(Object.keys(ranges) as ReportRange[]).map((r) => (
@@ -64,7 +64,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
 export default function ExpensesPage(props: PageProps<"/app/expenses">) {
   return (
     <>
-      <PageHeader title="Expenses" description="What the hotel spends, by category." />
+      <PageHeader title="Expenses" description="What the hotel spends, by category and department." />
       <Suspense fallback={<LoadingState />}><Content searchParams={props.searchParams} /></Suspense>
     </>
   );

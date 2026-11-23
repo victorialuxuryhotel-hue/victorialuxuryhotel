@@ -12,21 +12,23 @@ export const EXPENSE_CATEGORIES = {
 export type ExpenseCategory = keyof typeof EXPENSE_CATEGORIES;
 export const EXPENSE_METHODS = { cash: "Cash", bank_transfer: "Bank transfer", pos_terminal: "POS", card: "Card", other: "Other" } as const;
 export type ExpenseMethod = keyof typeof EXPENSE_METHODS;
+export const EXPENSE_DEPARTMENTS = { general: "Whole hotel", rooms: "Rooms", restaurant_bar: "Restaurant & bar", hall: "Conference hall" } as const;
+export type ExpenseDepartment = keyof typeof EXPENSE_DEPARTMENTS;
 
 export { vatIncluded };
 
 export async function recordExpense(
   db: Db,
   actor: Actor,
-  v: { spentOn: string; category: ExpenseCategory; description: string; amountKobo: number; method: ExpenseMethod; reference: string | null },
+  v: { spentOn: string; category: ExpenseCategory; description: string; amountKobo: number; method: ExpenseMethod; reference: string | null; department?: ExpenseDepartment },
 ): Promise<string> {
   requireRole(actor, FINANCE);
   if (v.spentOn > hotelToday()) throw new AppError("VALIDATION", "The date can't be in the future.");
   const id = uuid();
   await writeBatch(db, actor, [
     db
-      .prepare("INSERT INTO expenses (id, spent_on, category, description, amount_kobo, method, reference, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(id, v.spentOn, v.category, v.description.trim(), v.amountKobo, v.method, v.reference?.trim() || null, actor!.id),
+      .prepare("INSERT INTO expenses (id, spent_on, category, description, amount_kobo, method, reference, recorded_by, department) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(id, v.spentOn, v.category, v.description.trim(), v.amountKobo, v.method, v.reference?.trim() || null, actor!.id, v.department ?? "general"),
     activity(db, "expense.recorded", "expense", id, `Expense ${formatNaira(v.amountKobo)}: ${v.description.trim()} (${EXPENSE_CATEGORIES[v.category]})`, { spent_on: v.spentOn }),
   ]);
   return id;
@@ -45,19 +47,21 @@ export async function voidExpense(db: Db, actor: Actor, id: string, reason: stri
 
 export type ExpenseRow = {
   id: string; spent_on: string; category: ExpenseCategory; description: string; amount_kobo: number; method: ExpenseMethod;
-  reference: string | null; recorded_by_name: string | null; voided_at: string | null; void_reason: string | null;
+  reference: string | null; recorded_by_name: string | null; voided_at: string | null; void_reason: string | null; department: ExpenseDepartment;
 };
 
-export async function listExpenses(db: Db, actor: Actor, range: ReportRange, today = hotelToday(), opts: { limit?: number } = {}) {
+export async function listExpenses(db: Db, actor: Actor, range: ReportRange, today = hotelToday(), opts: { limit?: number; department?: ExpenseDepartment } = {}) {
   requireRole(actor, FINANCE);
   const { from, to } = rangeDates(range, today);
   const rows = await all<ExpenseRow>(
     db,
-    `SELECT e.id, e.spent_on, e.category, e.description, e.amount_kobo, e.method, e.reference, s.full_name AS recorded_by_name, e.voided_at, e.void_reason
+    `SELECT e.id, e.spent_on, e.category, e.description, e.amount_kobo, e.method, e.reference, s.full_name AS recorded_by_name, e.voided_at, e.void_reason, e.department
      FROM expenses e LEFT JOIN staff_profiles s ON s.id = e.recorded_by
-     WHERE e.spent_on BETWEEN ? AND ? ORDER BY e.spent_on DESC, e.created_at DESC LIMIT ?`,
+     WHERE e.spent_on BETWEEN ? AND ? AND (? IS NULL OR e.department = ?) ORDER BY e.spent_on DESC, e.created_at DESC LIMIT ?`,
     from,
     to,
+    opts.department ?? null,
+    opts.department ?? null,
     Math.min(opts.limit ?? 500, 10_000),
   );
   const live = rows.filter((r) => !r.voided_at);
@@ -83,11 +87,25 @@ export async function financeSummary(db: Db, actor: Actor, range: ReportRange, t
       from, to,
     ),
     first<{ kobo: number }>(db, "SELECT coalesce(sum(amount_kobo), 0) AS kobo FROM hall_payments WHERE paid_on BETWEEN ? AND ?", from, to),
-    first<{ kobo: number }>(db, "SELECT coalesce(sum(amount_kobo), 0) AS kobo FROM expenses WHERE voided_at IS NULL AND spent_on BETWEEN ? AND ?", from, to),
+    all<{ department: ExpenseDepartment; kobo: number }>(
+      db,
+      "SELECT department, sum(amount_kobo) AS kobo FROM expenses WHERE voided_at IS NULL AND spent_on BETWEEN ? AND ? GROUP BY department",
+      from, to,
+    ),
     first<{ vat_rate_bp: number }>(db, "SELECT vat_rate_bp FROM hotel_settings WHERE id = 1"),
   ]);
   const income = { rooms: rooms?.kobo ?? 0, restaurantBar: sales?.kobo ?? 0, hall: halls?.kobo ?? 0 };
   const incomeTotal = income.rooms + income.restaurantBar + income.hall;
+  const spent = (d: ExpenseDepartment) => expenses.find((e) => e.department === d)?.kobo ?? 0;
+  const expensesKobo = expenses.reduce((t, e) => t + e.kobo, 0);
   const rate = settings?.vat_rate_bp ?? 750;
-  return { from, to, income, incomeTotal, expensesKobo: expenses?.kobo ?? 0, netKobo: incomeTotal - (expenses?.kobo ?? 0), vatRateBp: rate, vatKobo: vatIncluded(incomeTotal, rate) };
+  const departments = (
+    [
+      ["rooms", "rooms", income.rooms],
+      ["restaurantBar", "restaurant_bar", income.restaurantBar],
+      ["hall", "hall", income.hall],
+      ["general", "general", 0],
+    ] as const
+  ).map(([key, dept, kobo]) => ({ key, label: EXPENSE_DEPARTMENTS[dept], incomeKobo: kobo, expensesKobo: spent(dept), netKobo: kobo - spent(dept), vatKobo: vatIncluded(kobo, rate) }));
+  return { from, to, income, incomeTotal, expensesKobo, netKobo: incomeTotal - expensesKobo, vatRateBp: rate, vatKobo: vatIncluded(incomeTotal, rate), departments };
 }

@@ -3,12 +3,12 @@ import { actorOf, authorizeRead } from "../auth";
 import { getDb } from "../db";
 import { activityPeople, listActivity, type ActivityFilter } from "../domain/activity";
 import { financeSummary } from "../domain/finance";
-import { incomeReport, occupancyReport, type ReportRange } from "../domain/reports";
+import { incomeReport, occupancyReport, type Department, type ReportRange } from "../domain/reports";
 
-export async function moneyPageData(range: ReportRange) {
+export async function moneyPageData(range: ReportRange, department: Department | null = null) {
   const staff = await authorizeRead("reports.view");
   const db = await getDb();
-  const [income, finance] = await Promise.all([incomeReport(db, actorOf(staff), range), financeSummary(db, actorOf(staff), range)]);
+  const [income, finance] = await Promise.all([incomeReport(db, actorOf(staff), range, undefined, department), financeSummary(db, actorOf(staff), range)]);
   return { income, finance };
 }
 

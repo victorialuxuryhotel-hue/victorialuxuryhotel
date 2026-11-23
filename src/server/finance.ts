@@ -6,7 +6,7 @@ import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize } from "./auth";
 import { getDb } from "./db";
-import { EXPENSE_CATEGORIES, EXPENSE_METHODS, recordExpense, voidExpense } from "./domain/finance";
+import { EXPENSE_CATEGORIES, EXPENSE_DEPARTMENTS, EXPENSE_METHODS, recordExpense, voidExpense } from "./domain/finance";
 
 const schema = z.object({
   spentOn: z.iso.date("Choose a date"),
@@ -15,6 +15,7 @@ const schema = z.object({
   amount: z.coerce.number().positive("Enter an amount").max(1_000_000_000).transform((n) => Math.round(n * 100)),
   method: z.enum(Object.keys(EXPENSE_METHODS) as [keyof typeof EXPENSE_METHODS]),
   reference: z.string().trim().max(80).optional(),
+  department: z.enum(Object.keys(EXPENSE_DEPARTMENTS) as [keyof typeof EXPENSE_DEPARTMENTS]).default("general"),
 });
 
 export async function addExpense(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {

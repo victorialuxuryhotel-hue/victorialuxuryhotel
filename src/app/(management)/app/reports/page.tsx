@@ -16,7 +16,7 @@ import { can } from "@/lib/auth/permissions";
 import { formatDate, formatNaira, plural } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 import { requireStaff } from "@/server/auth";
-import { recentMonths, reportRange, type Bucket, type ReportRange } from "@/server/domain/reports";
+import { recentMonths, reportDepartment, reportRange, type Bucket, type Department, type ReportRange } from "@/server/domain/reports";
 import { activityPageData, moneyPageData, occupancyPageData } from "@/server/queries/reports";
 
 export const metadata: Metadata = { title: "Reports" };
@@ -30,7 +30,30 @@ const monthName = (m: string) => new Intl.DateTimeFormat("en-GB", { month: "long
 const rangeName = (r: ReportRange) => (r in fixedLabel ? fixedLabel[r as keyof typeof fixedLabel] : monthName(r));
 const METHODS: [Bucket, string][] = [["cash", "Cash"], ["transfer", "Transfer"], ["pos", "POS / card"], ["cardOnline", "Card online"], ["other", "Other"]];
 
-function RangeControl({ tab, range }: { tab: Tab; range: ReportRange }) {
+const DEPARTMENTS: [Department | null, string][] = [[null, "All departments"], ["rooms", "Rooms"], ["restaurantBar", "Restaurant & bar"], ["hall", "Conference hall"]];
+const deptQuery = (d: Department | null) => (d ? `&dept=${d}` : "");
+
+function DeptControl({ range, dept }: { range: ReportRange; dept: Department | null }) {
+  return (
+    <nav aria-label="Department" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
+      {DEPARTMENTS.map(([d, label]) => (
+        <Link
+          key={label}
+          href={`/app/reports?tab=money&range=${range}${deptQuery(d)}`}
+          aria-current={d === dept ? "page" : undefined}
+          className={cn(
+            "inline-flex min-h-10 shrink-0 items-center rounded-full border px-4 text-sm whitespace-nowrap",
+            d === dept ? "border-navy-800 bg-navy-800 text-white" : "border-ink-300 bg-ivory-50 text-ink-700 hover:bg-ink-900/5",
+          )}
+        >
+          {label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+function RangeControl({ tab, range, dept }: { tab: Tab; range: ReportRange; dept: Department | null }) {
   const months = recentMonths(hotelToday()).slice(1);
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -38,7 +61,7 @@ function RangeControl({ tab, range }: { tab: Tab; range: ReportRange }) {
         {(["today", "14d", "month"] as const).map((r) => (
           <Link
             key={r}
-            href={`/app/reports?tab=${tab}&range=${r}`}
+            href={`/app/reports?tab=${tab}&range=${r}${deptQuery(dept)}`}
             aria-current={r === range ? "page" : undefined}
             className={cn(
               "flex min-h-11 flex-1 items-center justify-center px-2 text-sm",
@@ -52,6 +75,7 @@ function RangeControl({ tab, range }: { tab: Tab; range: ReportRange }) {
       {months.length ? (
         <form action="/app/reports" className="flex gap-2">
           <input type="hidden" name="tab" value={tab} />
+          {dept ? <input type="hidden" name="dept" value={dept} /> : null}
           <label htmlFor="month" className="sr-only">Earlier month</label>
           <select id="month" name="range" defaultValue={months.includes(range) ? range : ""} className="min-h-11 rounded-md border border-hairline bg-ivory-50 px-3 text-sm">
             <option value="" disabled>Earlier month</option>
@@ -84,8 +108,10 @@ function Bars({ items, label, format, scaleTo }: { items: { day: string; value: 
   );
 }
 
-async function Money({ range }: { range: ReportRange }) {
-  const { income, finance } = await moneyPageData(range);
+async function Money({ range, dept }: { range: ReportRange; dept: Department | null }) {
+  const { income, finance } = await moneyPageData(range, dept);
+  const mine = dept ? finance.departments.find((d) => d.key === dept)! : null;
+  const deptName = dept ? DEPARTMENTS.find(([d]) => d === dept)![1] : "All departments";
   const line = (label: string, kobo: number, strong = false) => (
     <div className={cn("flex justify-between gap-4 py-2", strong && "border-t border-hairline pt-3 font-semibold text-ink-900")}>
       <dt className={strong ? "" : "text-ink-600"}>{label}</dt>
@@ -97,45 +123,85 @@ async function Money({ range }: { range: ReportRange }) {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader title="Income and expenses" description={`${rangeName(range)} · all departments`} />
-        <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
-          <div>
-            {line("Rooms", finance.income.rooms)}
-            {line("Restaurant & bar", finance.income.restaurantBar)}
-            {line("Conference hall", finance.income.hall)}
-            {line("Total income", finance.incomeTotal, true)}
-          </div>
-          <div>
-            {line("Expenses", finance.expensesKobo)}
-            {line(`VAT included in income (${finance.vatRateBp / 100}%)`, finance.vatKobo)}
-            {line("Income after expenses", finance.netKobo, true)}
-          </div>
-        </dl>
+        <CardHeader title="Income and expenses" description={`${rangeName(range)} · ${deptName.toLowerCase()}`} />
+        {mine ? (
+          <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
+            <div>
+              {line("Income", mine.incomeKobo)}
+              {line(`VAT included (${finance.vatRateBp / 100}%)`, mine.vatKobo)}
+            </div>
+            <div>
+              {line("Expenses", mine.expensesKobo)}
+              {line("Income after expenses", mine.netKobo, true)}
+            </div>
+          </dl>
+        ) : (
+          <>
+            <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
+              <div>
+                {line("Total income", finance.incomeTotal)}
+                {line(`VAT included in income (${finance.vatRateBp / 100}%)`, finance.vatKobo)}
+              </div>
+              <div>
+                {line("Total expenses", finance.expensesKobo)}
+                {line("Income after expenses", finance.netKobo, true)}
+              </div>
+            </dl>
+            <div className="overflow-x-auto border-t border-hairline">
+              <table className="w-full min-w-[30rem] text-sm">
+                <thead className="text-xs text-ink-500">
+                  <tr className="border-b border-hairline">
+                    <th scope="col" className="px-5 py-2.5 text-left font-medium">Department</th>
+                    <th scope="col" className={cn(cell, "font-medium")}>Income</th>
+                    <th scope="col" className={cn(cell, "font-medium")}>Expenses</th>
+                    <th scope="col" className={cn(cell, "pr-5 font-medium")}>After expenses</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-hairline">
+                  {finance.departments.map((d) => (
+                    <tr key={d.key}>
+                      <th scope="row" className="px-5 py-2.5 text-left font-medium text-ink-900">
+                        {d.key === "general" ? d.label : <Link href={`/app/reports?tab=money&range=${range}&dept=${d.key}`} className="hover:underline">{d.label}</Link>}
+                      </th>
+                      <td className={cell}>{d.key === "general" ? "–" : formatNaira(d.incomeKobo)}</td>
+                      <td className={cell}>{formatNaira(d.expensesKobo)}</td>
+                      <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(d.netKobo)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
         <div className="flex flex-col gap-2 border-t border-hairline px-5 py-4 sm:flex-row">
-          <a href={`/app/reports/income-csv?range=${range}`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
+          <a href={`/app/reports/income-csv?range=${range}${deptQuery(dept)}`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
             <Download className="size-4" aria-hidden /> Income (CSV)
           </a>
-          <a href={`/app/reports/expenses-csv?range=${range}`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
+          <a href={`/app/reports/expenses-csv?range=${range}${deptQuery(dept)}`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
             <Download className="size-4" aria-hidden /> Expenses (CSV)
           </a>
         </div>
       </Card>
 
       <Card>
-        <CardHeader title="Income by day" description="Money received each day, by department. Days with nothing received are left out." />
+        <CardHeader title="Income by day" description={`Money received each day${dept ? "" : ", by department"}. Days with nothing received are left out.`} />
         {income.daily.length > 1 ? (
           <div className="border-t border-hairline">
             <Bars items={income.daily.map((d) => ({ day: d.day, value: d.total }))} label="Bar chart of income per day" format={formatNaira} />
           </div>
         ) : null}
         <div className="overflow-x-auto border-t border-hairline">
-          <table className="w-full min-w-[34rem] text-sm">
+          <table className={cn("w-full text-sm", dept ? "" : "min-w-[34rem]")}>
             <thead className="text-xs text-ink-500">
               <tr className="border-b border-hairline">
                 <th scope="col" className="px-5 py-2.5 text-left font-medium">Day</th>
-                <th scope="col" className={cn(cell, "font-medium")}>Rooms</th>
-                <th scope="col" className={cn(cell, "font-medium")}>Restaurant & bar</th>
-                <th scope="col" className={cn(cell, "font-medium")}>Hall</th>
+                {dept ? null : (
+                  <>
+                    <th scope="col" className={cn(cell, "font-medium")}>Rooms</th>
+                    <th scope="col" className={cn(cell, "font-medium")}>Restaurant & bar</th>
+                    <th scope="col" className={cn(cell, "font-medium")}>Hall</th>
+                  </>
+                )}
                 <th scope="col" className={cn(cell, "pr-5 font-medium")}>Total</th>
               </tr>
             </thead>
@@ -143,9 +209,13 @@ async function Money({ range }: { range: ReportRange }) {
               {days.map((d) => (
                 <tr key={d.day}>
                   <th scope="row" className="px-5 py-2.5 text-left font-normal text-ink-700">{formatDate(d.day, { year: false })}</th>
-                  <td className={cell}>{formatNaira(d.rooms)}</td>
-                  <td className={cell}>{formatNaira(d.restaurantBar)}</td>
-                  <td className={cell}>{formatNaira(d.hall)}</td>
+                  {dept ? null : (
+                    <>
+                      <td className={cell}>{formatNaira(d.rooms)}</td>
+                      <td className={cell}>{formatNaira(d.restaurantBar)}</td>
+                      <td className={cell}>{formatNaira(d.hall)}</td>
+                    </>
+                  )}
                   <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(d.total)}</td>
                 </tr>
               ))}
@@ -155,7 +225,7 @@ async function Money({ range }: { range: ReportRange }) {
       </Card>
 
       <Card>
-        <CardHeader title="Takings by staff and method" description={`${rangeName(range)} · money each person took`} />
+        <CardHeader title="Takings by staff and method" description={`${rangeName(range)} · ${deptName.toLowerCase()} · money each person took`} />
         {income.byStaff.length === 0 ? (
           <div className="p-5"><EmptyState title="No money taken in this period" /></div>
         ) : (
@@ -242,6 +312,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const tab: Tab = str(sp.tab) === "occupancy" ? "occupancy" : str(sp.tab) === "activity" ? "activity" : "money";
   const range = reportRange(str(sp.range));
+  const dept = tab === "money" ? reportDepartment(str(sp.dept)) : null;
   return (
     <>
       <div className="bg-ivory-50">
@@ -262,8 +333,9 @@ async function Content({ searchParams }: { searchParams: SP }) {
           )
         ) : (
           <>
-            <RangeControl tab={tab} range={range} />
-            {tab === "money" ? <Money range={range} /> : <Occupancy range={range} />}
+            {tab === "money" ? <DeptControl range={range} dept={dept} /> : null}
+            <RangeControl tab={tab} range={range} dept={dept} />
+            {tab === "money" ? <Money range={range} dept={dept} /> : <Occupancy range={range} />}
           </>
         )}
       </div>
