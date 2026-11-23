@@ -27,21 +27,19 @@ export async function issueGuestCode(db: Db, email: string): Promise<string | nu
   return code;
 }
 
-/** True if the code matches the latest unused, unexpired code for this email. Five tries per code. */
+/** True if the code matches the latest unused, unexpired code for this email. Five tries per code, counted before checking. */
 export async function checkGuestCode(db: Db, email: string, code: string): Promise<boolean> {
   const e = email.trim().toLowerCase();
-  const row = await first<{ id: number; code_hash: string; attempts: number }>(
-    db,
-    "SELECT id, code_hash, attempts FROM guest_login_codes WHERE email = ? AND used_at IS NULL AND expires_at > ? ORDER BY id DESC LIMIT 1",
-    e,
-    now(),
-  );
-  if (!row || row.attempts >= MAX_ATTEMPTS) return false;
-  if (row.code_hash !== (await hashCode(e, code.trim()))) {
-    await db.prepare("UPDATE guest_login_codes SET attempts = attempts + 1 WHERE id = ?").bind(row.id).run();
-    return false;
-  }
-  // Single use: only one request can mark it used.
+  const row = await db
+    .prepare(
+      `UPDATE guest_login_codes SET attempts = attempts + 1
+       WHERE id = (SELECT id FROM guest_login_codes WHERE email = ? AND used_at IS NULL AND expires_at > ? ORDER BY id DESC LIMIT 1)
+         AND attempts < ?
+       RETURNING id, code_hash`,
+    )
+    .bind(e, now(), MAX_ATTEMPTS)
+    .first<{ id: number; code_hash: string }>();
+  if (!row || row.code_hash !== (await hashCode(e, code.trim()))) return false;
   const used = await db.prepare("UPDATE guest_login_codes SET used_at = ? WHERE id = ? AND used_at IS NULL").bind(now(), row.id).run();
   return used.meta.changes === 1;
 }
@@ -72,7 +70,8 @@ export async function guestBookings(db: Db, email: string): Promise<GuestBooking
     return {
       id: r.id, reference: r.reference, token: r.public_token, status: r.status, checkIn: r.check_in, checkOut: r.check_out,
       nights: r.nights ?? 0, guests: r.guest_count, category: r.category, dueKobo: r.total_amount_kobo + r.extras_kobo - r.discount_kobo, paidKobo: r.paid,
-      canCancel: upcoming, canChange: upcoming,
+      canCancel: upcoming,
+      canChange: upcoming && !(r.paid > 0 && cancellationFee(r.total_amount_kobo, r.check_in, rule) > 0),
       feeIfCancelledKobo: r.status === "confirmed" ? cancellationFee(r.total_amount_kobo, r.check_in, rule) : 0,
     };
   });
@@ -142,6 +141,9 @@ export async function guestChangeDates(db: Db, email: string, reservationId: str
   const rule = await cancelRule(db);
   if (!(res.status === "pending_payment" || res.status === "confirmed") || Date.parse(hotelInstant(res.check_in, rule.checkInTime)) <= Date.now()) {
     throw new AppError("INVALID_TRANSITION", "This booking can't be changed online. Please contact the hotel.");
+  }
+  if (cancellationFee(res.total_amount_kobo, res.check_in, rule) > 0 && (await netPaid(db, res.id)) > 0) {
+    throw new AppError("INVALID_TRANSITION", `Changes within ${rule.freeHours} hours of check-in are made by the hotel. Please contact us.`);
   }
   await changeDates(db, null, res.id, checkIn, checkOut, true);
 }
