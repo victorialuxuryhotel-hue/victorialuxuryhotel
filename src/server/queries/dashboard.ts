@@ -57,7 +57,7 @@ export async function revenueSummary() {
 }
 
 export async function awaitingPaymentCount() {
-  await authorizeRead();
+  await authorizeRead(["reservations.manage", "reports.view"]);
   const row = await first<{ n: number }>(
     await getDb(),
     "SELECT count(*) AS n FROM reservations WHERE status = 'pending_payment' AND hold_expires_at > ?",
@@ -81,7 +81,7 @@ const toPayment = (p: P): PaymentRow => ({
  * gets today's payments (Lagos time) or their own, whatever view is asked for.
  */
 export async function listPayments(opts: { view?: string; page?: number; size?: number }) {
-  const staff = await authorizeRead();
+  const staff = await authorizeRead(["payments.record", "reports.view"]);
   const { view, rows } = await listPaymentsFor(await getDb(), actorOf(staff), opts);
   return {
     view,
@@ -96,6 +96,6 @@ export async function listPayments(opts: { view?: string; page?: number; size?: 
 
 /** Front desk: counts for the two views and today's takings by method. */
 export async function frontDeskPayments() {
-  const staff = await authorizeRead();
+  const staff = await authorizeRead("payments.record");
   return frontDeskSummary(await getDb(), actorOf(staff));
 }

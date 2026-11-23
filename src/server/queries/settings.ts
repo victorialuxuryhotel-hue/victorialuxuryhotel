@@ -9,7 +9,7 @@ import { all, first, getDb } from "../db";
 import { managerToAsk, ROLE, type StaffRecord } from "../domain/admin";
 
 export async function getBookingRules(): Promise<BookingRules> {
-  await authorizeRead();
+  await authorizeRead(["reservations.manage", "payments.record", "reports.view", "settings.manage"]);
   const data = await first<{
     check_in_time: string; check_out_time: string; website_hold_minutes: number; staff_hold_hours: number; cancellation_policy: string | null;
     free_cancel_hours: number; late_cancel_fee_pct: number; vat_rate_bp: number;
@@ -81,6 +81,6 @@ const latest = (a?: string, b?: string) => (!a ? b : !b ? a : a > b ? a : b);
 
 /** Front desk: which manager to ask for a manager-only action (name, role, phone). Signed-in staff only. */
 export async function managerToAskForDesk() {
-  const staff = await authorizeRead();
+  const staff = await authorizeRead(["reservations.manage", "payments.record", "reports.view"]);
   return managerToAsk(await getDb(), actorOf(staff), hotelToday());
 }

@@ -75,3 +75,8 @@ export function effectivePaymentView(role: StaffRole, requested: string | undefi
   const allowed = allowedPaymentViews(role);
   return allowed.includes(requested as PaymentView) ? (requested as PaymentView) : allowed[0]!;
 }
+
+/** True if the role has the permission, or any of a list of permissions. */
+export function canAny(role: StaffRole, permission: Permission | readonly Permission[]): boolean {
+  return (typeof permission === "string" ? [permission] : permission).some((p) => can(role, p));
+}

@@ -1,3 +1,5 @@
+import { canAny } from "@/lib/auth/permissions";
+import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { TodayView } from "@/components/management/today";
@@ -12,6 +14,7 @@ export const metadata: Metadata = { title: "Today" };
 
 async function Content() {
   const staff = await requireStaff();
+  if (!canAny(staff.role, "reservations.manage")) return <AccessDenied />;
   const [m, rooms] = await Promise.all([movements(), roomBoard()]);
   return (
     <TodayView

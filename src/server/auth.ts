@@ -5,7 +5,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import type { StaffRole } from "@/domain/status";
-import { can, type Permission } from "@/lib/auth/permissions";
+import { canAny, type Permission } from "@/lib/auth/permissions";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { verifyViewAs } from "@/lib/auth/view-as-token";
@@ -87,10 +87,10 @@ export async function authorize(permission?: Permission): Promise<Staff> {
 }
 
 /** For staff queries that only read. Allowed while viewing as front desk, with front-desk permissions. */
-export async function authorizeRead(permission?: Permission): Promise<Staff> {
+export async function authorizeRead(permission?: Permission | readonly Permission[]): Promise<Staff> {
   const staff = await getCurrentStaff();
   if (!staff) throw new AppError("UNAUTHENTICATED", "Your session has ended. Please sign in again.");
-  if (permission && !can(staff.role, permission)) {
+  if (permission && !canAny(staff.role, permission)) {
     throw new AppError("FORBIDDEN", "Your role does not allow this action.");
   }
   return staff;
