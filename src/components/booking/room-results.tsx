@@ -72,11 +72,6 @@ export function MoreThanOneRoom() {
   );
 }
 
-/**
- * Room types for a search. Guests choose a type, never a specific room, and
- * never see how many rooms are left. Free types that fit come first (cheapest
- * first), full ones after, and types too small for the party are folded away.
- */
 export function RoomResults({ options, stay, selectHref }: { options: AvailabilityOption[]; stay: Stay; selectHref: (o: AvailabilityOption) => string }) {
   const { available, full, tooSmall } = groupOptions(options, stay.guests);
   const fitting = [...available, ...full];

@@ -5,7 +5,6 @@ import { CheckCircle2, X } from "lucide-react";
 import type { ActionResult } from "@/lib/errors";
 import { undoChange } from "@/server/reservations";
 
-/** How long the Undo button is offered. The server allows a little longer for slow networks. */
 const UNDO_SECONDS = 10;
 
 type Feedback = { message: string; undo?: { reservationId: string; undoId: number } };
@@ -13,16 +12,10 @@ type Shown = Feedback & { at: number; key: number };
 
 const FeedbackContext = createContext<(f: Feedback) => void>(() => {});
 
-/** Show "what just happened" at the top of the page, with Undo for reversible changes. */
 export function useActionFeedback() {
   return useContext(FeedbackContext);
 }
 
-/**
- * Wraps a form action so a successful result also reports feedback. The
- * button that ran the action often disappears when the page refreshes (Check
- * in becomes Check out), so the feedback lives in a provider above it.
- */
 export function withFeedback<T>(
   action: (prev: ActionResult<T> | null, formData: FormData) => Promise<ActionResult<T>>,
   onSuccess: (data: T) => void,

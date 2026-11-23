@@ -5,7 +5,6 @@ import { payments } from "../../../_sample";
 
 type Props = { searchParams: Promise<{ view?: string }> };
 
-/** Payments as front desk sees them (5d). ?view=mine shows "Recorded by me". */
 async function Content({ searchParams }: Props) {
   const view = (await searchParams).view === "mine" ? "mine" : "today";
   const rows = payments

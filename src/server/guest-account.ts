@@ -18,7 +18,6 @@ const COOKIE = "vl_guest";
 const secret = () => process.env.GUEST_SESSION_SECRET ?? process.env.VIEW_AS_SECRET ?? "";
 const email = z.email("Enter the email you booked with").max(254).transform((e) => e.trim().toLowerCase());
 
-/** The signed-in guest's email, or null. */
 export async function guestEmail(): Promise<string | null> {
   return verifyGuest(secret(), (await cookies()).get(COOKIE)?.value);
 }
@@ -29,7 +28,6 @@ async function requireGuest(): Promise<string> {
   return e;
 }
 
-/** Step 1: email a code. Says the same thing whether or not the email has bookings. */
 export async function requestGuestCode(_prev: ActionResult<{ email: string }> | null, formData: FormData): Promise<ActionResult<{ email: string }>> {
   try {
     const e = email.parse(formData.get("email"));
@@ -47,7 +45,6 @@ export async function requestGuestCode(_prev: ActionResult<{ email: string }> | 
   }
 }
 
-/** Step 2: check the code and start a 7-day guest session. */
 export async function verifyGuestCode(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     const e = email.parse(formData.get("email"));

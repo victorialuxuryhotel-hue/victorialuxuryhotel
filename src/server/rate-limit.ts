@@ -6,15 +6,6 @@ import { logger } from "@/lib/logger";
 import { getDb } from "./db";
 import { hitRateLimit } from "./domain/system";
 
-/**
- * Per-visitor limits for anonymous website actions that hold inventory or call
- * Paystack. The visitor is identified by IP, stored only as a salted hash.
- * On Cloudflare the client IP comes from CF-Connecting-IP, which Cloudflare
- * sets itself; X-Forwarded-For can be supplied by the client, so it is only a
- * fallback for local development. Fails OPEN if the limiter itself errors: a
- * database hiccup must not stop genuine guests booking.
- */
-/** IPv6 visitors usually control a whole /64, so they are limited per /64, not per address. */
 export function networkOf(ip: string): string {
   if (!ip.includes(":")) return ip;
   const [head = "", tail = ""] = ip.toLowerCase().split("::");
@@ -50,12 +41,10 @@ export async function enforceRateLimit(action: string, limit: number, windowSeco
   await hit(`${action}:${await visitorKey()}`, action, limit, windowSeconds, "Too many attempts from this connection. Please wait a little and try again, or contact the hotel.");
 }
 
-/** A limit on one subject (such as an email address), whichever connection the requests come from. */
 export async function enforceSubjectLimit(action: string, subject: string, limit: number, windowSeconds: number) {
   await hit(`${action}:s:${hashed(subject)}`, action, limit, windowSeconds, "Too many attempts for this email. Please wait an hour and try again, or contact the hotel.");
 }
 
-/** Limits are configurable so automated tests (which book many times) can raise them. */
 export const limits = {
   holdsPerHour: Number(process.env.RATE_LIMIT_HOLDS_PER_HOUR ?? 6),
   paymentsPerHour: Number(process.env.RATE_LIMIT_PAYMENTS_PER_HOUR ?? 20),

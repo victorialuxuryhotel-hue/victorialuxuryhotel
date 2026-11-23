@@ -2,17 +2,6 @@ import { AppError } from "@/lib/errors";
 import { addDays, hotelToday, isIsoDate, nightsBetween } from "@/lib/hotel-date";
 import { first, type Db, type Stmt } from "../db";
 
-/**
- * Inventory: how many units of a room type are free across a stay.
- *
- * Mirrors the capacity trigger (migrations/0002): capacity is active,
- * in-service rooms; demand is other LIVE reservations (confirmed, in house,
- * or awaiting payment with an unexpired hold), counted against their
- * assigned room's category if any, else the booked one. The app checks this
- * first to give a clear message; the trigger is the guarantee.
- */
-
-/** SQL condition: reservation alias `r` holds inventory right now. */
 export const LIVE_SQL = `(r.status IN ('confirmed', 'checked_in') OR (r.status = 'pending_payment' AND r.hold_expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))`;
 
 export async function freeUnits(db: Db, categoryId: string, checkIn: string, checkOut: string, excludeReservationId: string | null = null): Promise<number> {
@@ -48,10 +37,6 @@ export type AvailabilityRow = {
   is_available: boolean;
 };
 
-/**
- * Public availability search (website). Prices and yes/no only: room counts
- * are internal and never leave the server through this path.
- */
 export async function searchAvailability(db: Db, checkIn: string, checkOut: string, guests: number): Promise<AvailabilityRow[]> {
   validateStay(checkIn, checkOut, guests);
   const nights = nightsBetween(checkIn, checkOut);
@@ -81,12 +66,6 @@ export async function searchAvailability(db: Db, checkIn: string, checkOut: stri
   }));
 }
 
-/**
- * Whether each of the given room types has at least one room free on each
- * night from `from` (inclusive) to `to` (exclusive). Yes/no only: like the
- * search, no counts leave this function. Used to suggest nearby dates when a
- * type is full.
- */
 export async function freeNights(db: Db, slugs: string[], from: string, to: string): Promise<Map<string, Map<string, boolean>>> {
   const out = new Map<string, Map<string, boolean>>(slugs.map((s) => [s, new Map()]));
   if (slugs.length === 0 || to <= from) return out;
@@ -106,7 +85,6 @@ export async function freeNights(db: Db, slugs: string[], from: string, to: stri
   return out;
 }
 
-/** Stay rules shared by the website and staff (same messages as before). */
 export function validateStay(checkIn: string | null | undefined, checkOut: string | null | undefined, guests: number | null | undefined, allowPast = false): asserts checkIn is string {
   if (!checkIn || !checkOut || !isIsoDate(checkIn) || !isIsoDate(checkOut)) throw new AppError("VALIDATION", "Choose check-in and check-out dates.");
   if (checkOut <= checkIn) throw new AppError("VALIDATION", "Check-out must be after check-in.");
@@ -117,14 +95,6 @@ export function validateStay(checkIn: string | null | undefined, checkOut: strin
   if (guests == null || !Number.isInteger(guests) || guests < 1 || guests > 20) throw new AppError("VALIDATION", "Enter the number of guests.");
 }
 
-/**
- * Statements that give a just-confirmed reservation a specific room of its
- * booked type, if it has none: a free, in-service room for every night of the
- * stay, ready rooms first, then by room number. Runs inside the confirming
- * batch, so the room-overlap trigger settles any race. If no single room is
- * free for the whole stay (rare: the nights are split across rooms), the
- * booking stays unassigned and staff assign it as before.
- */
 export function autoAssignRoomStatements(db: Db, reservationId: string): Stmt[] {
   return [
     db

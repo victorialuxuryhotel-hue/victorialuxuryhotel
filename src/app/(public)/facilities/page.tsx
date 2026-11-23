@@ -63,7 +63,6 @@ async function FacilitiesPageContent() {
   );
 }
 
-/** Content reads room types and photos per request; the page frame shows immediately. */
 export default function FacilitiesPage() {
   return (
     <Suspense fallback={<PageSkeleton />}>

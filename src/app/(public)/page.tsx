@@ -26,7 +26,6 @@ async function HomePageContent() {
   const experienceSlots = ["pool", "spa", "bar"];
   return (
     <>
-      {/* Hero */}
       <section className="relative isolate overflow-hidden bg-navy-950 text-ivory-50">
         <Photo photo={sitePhoto(photos, "hero", home.hero)} tone="dark" priority sizes="100vw" className="absolute inset-0 -z-10" />
         <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_80%_0%,rgb(4_48_160/0.55),transparent_55%)]" />
@@ -49,16 +48,13 @@ async function HomePageContent() {
         </Container>
       </section>
 
-      {/* Phones: the search sits below the hero (not over it). Larger screens: it floats over the hero's edge. */}
       <div className="border-b border-hairline bg-ivory-50 py-4 sm:border-0 sm:bg-transparent sm:py-0">
         <Container className="relative z-10 sm:-mt-12">
           <BookingBar />
         </Container>
       </div>
 
-      {/* Laptops and desktops keep the full page; phones and tablets get the short one (lg:hidden sections below). */}
       <div className="hidden lg:block">
-        {/* Welcome */}
         <Section className="pt-20 sm:pt-28">
           <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-20">
             <div className="relative">
@@ -95,7 +91,6 @@ async function HomePageContent() {
         </Section>
       </div>
 
-      {/* Accommodation */}
       <Section tone="ivory">
         <div className="flex items-end justify-between gap-6">
           <SectionHeading eyebrow="Stay" title="Rooms, suites & apartments" />
@@ -125,7 +120,6 @@ async function HomePageContent() {
         </ScrollRail>
       </Section>
 
-      {/* On site: pool, spa and bar, then every facility in one line */}
       <Section tone="navy" className="py-14 lg:hidden">
         <SectionHeading invert eyebrow="On site" title="Pool, spa & bar" />
         <ScrollRail label="On site" tone="dark" className="mt-8 sm:mt-12 sm:grid-cols-3">
@@ -145,7 +139,6 @@ async function HomePageContent() {
         </div>
       </Section>
 
-      {/* Find us */}
       <Section className="py-10 sm:py-16 lg:hidden">
         <div className="grid overflow-hidden rounded-card border border-hairline bg-ivory-50">
           <div className="p-5 sm:p-8">
@@ -169,7 +162,6 @@ async function HomePageContent() {
       </Section>
 
       <div className="hidden lg:block">
-        {/* Experiences */}
         <Section tone="navy">
           <SectionHeading invert eyebrow="Experiences" title="Unwind without leaving the hotel" />
           <ScrollRail label="Experiences" tone="dark" className="mt-10 sm:mt-12 sm:grid-cols-3">
@@ -184,7 +176,6 @@ async function HomePageContent() {
           </ScrollRail>
         </Section>
 
-        {/* Facilities */}
         <Section>
           <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
             <div>
@@ -206,7 +197,6 @@ async function HomePageContent() {
           </div>
         </Section>
 
-        {/* Who we host */}
         <Section tone="ivory">
           <SectionHeading eyebrow="Your stay" title="However you travel" />
           <div className="mt-12 grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
@@ -219,7 +209,6 @@ async function HomePageContent() {
           </div>
         </Section>
 
-        {/* Location */}
         <Section>
           <div className="grid overflow-hidden rounded-card bg-ivory-50 shadow-card lg:grid-cols-2">
             <div className="p-8 sm:p-12">
@@ -245,7 +234,6 @@ async function HomePageContent() {
   );
 }
 
-/** Content reads room types and photos per request; the page frame shows immediately. */
 export default function HomePage() {
   return (
     <Suspense fallback={<PageSkeleton />}>

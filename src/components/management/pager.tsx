@@ -4,10 +4,6 @@ import { buttonStyles } from "@/components/ui/button";
 
 export const PAGE_SIZE = 20;
 
-/**
- * Previous / next links that keep the current search and filters. With
- * `total`, it also says "Showing 21–40 of 118" (and "Page 2 of 6").
- */
 export function Pager({ basePath, params, page, hasMore, total, size = PAGE_SIZE }: {
   basePath: string;
   params: Record<string, string | undefined>;

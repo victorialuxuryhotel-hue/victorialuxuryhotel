@@ -42,10 +42,6 @@ function describe(n: NeedsYou, links: TodayLinks) {
   }
 }
 
-/**
- * The front desk's home: what needs doing now, who's coming and going, and
- * the state of the rooms. Everything links to the screen that fixes it.
- */
 export function TodayView({
   firstName,
   greeting,

@@ -11,14 +11,6 @@ import { actorOf, authorize } from "./auth";
 import { getDb } from "./db";
 import * as admin from "./domain/admin";
 
-/**
- * Photo management for managers. Files go to the PHOTOS R2 bucket; records
- * (and their audit trail) to the database. Upload stores the file first and
- * removes it again if the record can't be saved; delete removes the record
- * first, then the file. Public pages read photos per request, so changes
- * show immediately.
- */
-
 async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return ok(await body());
@@ -32,7 +24,6 @@ const bucket = async () => (await getCloudflareContext({ async: true })).env.PHO
 
 const altText = z.string().trim().min(3, "Describe the photo in a few words (for screen readers)").max(200);
 
-/** Removes stored files; a failure is logged (the record is already gone) so it can be cleaned up. */
 async function removeFiles(keys: string[]) {
   try {
     await (await bucket()).delete(keys);
@@ -64,8 +55,6 @@ async function store(key: string, bytes: Uint8Array, contentType: string) {
     throw new AppError("INTERNAL", "The photo couldn't be uploaded. Please try again.", { cause: err });
   }
 }
-
-// ---------------------------------------------------------------- Room type photos
 
 export async function uploadCategoryPhoto(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return run("photo.category_upload", async () => {
@@ -126,12 +115,9 @@ export async function updatePhotoAlt(_prev: ActionResult | null, formData: FormD
   });
 }
 
-// ---------------------------------------------------------------- Website photos
-
 const SINGLE_SLOTS = ["hero", "welcome", "pool", "spa", "bar", "restaurant", "conference", "exterior", "reception", "about"] as const;
 const GROUPS = ["Rooms", "Pool & spa", "Dining", "The hotel"] as const;
 
-/** Upload to a website photo place. Single places are replaced; the gallery grows. */
 export async function uploadSitePhoto(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return run("photo.site_upload", async () => {
     const staff = await authorize("categories.manage");

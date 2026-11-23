@@ -24,7 +24,6 @@ async function Content({ searchParams }: { searchParams: SP }) {
   const page = pageFrom(sp.page);
   const reservationHref = (p: { reservationId?: string }) => `/app/reservations/${p.reservationId}`;
 
-  // Front desk: the server limits the list to today's payments or their own.
   if (!allowedPaymentViews(staff.role).includes("all")) {
     const [{ view, rows }, summary] = await Promise.all([listPayments({ view: requested, size: 200 }), frontDeskPayments()]);
     return (

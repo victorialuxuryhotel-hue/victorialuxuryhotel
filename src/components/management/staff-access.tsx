@@ -47,7 +47,6 @@ function RoleTag({ role }: { role: StaffRole }) {
   );
 }
 
-/** Role choice as radio rows with a one-line explanation. Owner is never offered here. */
 function RoleRadios({ name, value, onChange }: { name: string; value: Exclude<StaffRole, "owner">; onChange: (r: Exclude<StaffRole, "owner">) => void }) {
   return (
     <fieldset>
@@ -167,11 +166,6 @@ function ManageForm({ s, isSelf, onDone }: { s: StaffRow; isSelf: boolean; onDon
   );
 }
 
-/**
- * Owner-only Staff & access (6e): counts and Invite in the header, one row per
- * person (initials, last active, role). Tapping a row opens their settings.
- * Owner access is a separate, confirmed step, never part of an invite.
- */
 export function StaffAccess({ rows, selfId, today }: { rows: StaffRow[]; selfId: string; today: string }) {
   const [inviting, setInviting] = useState(false);
   const [inviteKey, setInviteKey] = useState(0);

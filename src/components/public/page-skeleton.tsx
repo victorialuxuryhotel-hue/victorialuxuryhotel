@@ -1,6 +1,5 @@
 import { Container } from "./section";
 
-/** Shown for a moment while a public page's content streams in. */
 export function PageSkeleton() {
   return (
     <div aria-busy="true" aria-label="Loading">

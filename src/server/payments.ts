@@ -22,10 +22,6 @@ const schema = z.object({
   confirmReceived: z.literal("on", { error: "Confirm the hotel has received this money" }),
 });
 
-/**
- * Records money received directly by the hotel. The database insists on the
- * confirmation too; amounts are entered in naira and stored in kobo.
- */
 export async function recordOfflinePayment(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   let target: string;
   try {
@@ -39,7 +35,6 @@ export async function recordOfflinePayment(_prev: ActionResult | null, formData:
       paidOn: v.paidOn, notes: v.notes ?? null, confirmReceived: true,
     });
 
-    // Emails were queued in the same transaction; send them after responding.
     after(() => deliverEmails({ reservationId: v.reservationId }));
 
     refresh();
@@ -58,7 +53,6 @@ const correctionSchema = z.object({
   reason: z.string().trim().min(5, "Say what was wrong").max(500),
 });
 
-/** Managers: correct a recorded payment (never edit it). */
 export async function correctPayment(_prev: ActionResult<{ receiptNumber: string }> | null, formData: FormData): Promise<ActionResult<{ receiptNumber: string }>> {
   try {
     const staff = await authorize("payments.override");

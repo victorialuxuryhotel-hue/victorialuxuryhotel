@@ -8,7 +8,6 @@ import { toActionError } from "@/lib/errors";
 const TZ = "Africa/Lagos";
 const lagos = (iso: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ, ...opts }).format(new Date(iso));
 
-/** Payments received in a range as CSV (managers and the owner). Dates and times are Lagos time. */
 export async function GET(request: Request) {
   let staff;
   try {

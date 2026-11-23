@@ -21,7 +21,6 @@ function Toggle({ action, id, active }: { action: (fd: FormData) => Promise<void
   );
 }
 
-/** Extras guests can add when booking online (airport pickup, breakfast...). */
 export function ExtrasManager({ extras }: { extras: Extra[] }) {
   const [state, action, pending] = useActionState(addExtra, null);
   const form = useRef<HTMLFormElement>(null);
@@ -55,7 +54,6 @@ export function ExtrasManager({ extras }: { extras: Extra[] }) {
   );
 }
 
-/** Percentage-off codes for the website. Each use is counted; switch a code off any time. */
 export function PromoManager({ promos }: { promos: Promo[] }) {
   const [state, action, pending] = useActionState(addPromo, null);
   const form = useRef<HTMLFormElement>(null);

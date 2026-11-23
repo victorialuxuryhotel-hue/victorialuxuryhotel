@@ -8,16 +8,6 @@ import { expireUnpaidReservations } from "@/server/domain/reservations";
 import { deliverEmails } from "@/server/notifications";
 import { settlePaystackReference } from "@/server/payment-flow";
 
-/**
- * Scheduled housekeeping, called by the Cloudflare Cron Trigger in worker.ts with
- * `Authorization: Bearer $CRON_SECRET`:
- *  1. Re-verify Paystack attempts still pending after 30 minutes, so a payment
- *     whose webhook was delayed or lost is still settled, and attempts that
- *     never reached Paystack are closed as abandoned (reconciliation).
- *  2. Mark unpaid holds that have lapsed as expired.
- *  3. Send (or retry) queued emails.
- * Order matters: settle first, so a guest who paid is never expired.
- */
 export async function GET(request: NextRequest) {
   const expected = Buffer.from(`Bearer ${serverEnv.cronSecret()}`);
   const given = Buffer.from(request.headers.get("authorization") ?? "");

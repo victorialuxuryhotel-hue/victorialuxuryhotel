@@ -5,11 +5,6 @@ import { vatIncluded } from "@/lib/vat";
 import { activity, activityIfChanged, all, FINANCE, first, requireRole, uuid, writeBatch, type Actor, type Db } from "../db";
 import { rangeDates, type ReportRange } from "./reports";
 
-/**
- * Finance: expenses and VAT. Expenses are never edited or deleted; a mistake
- * is voided with a reason (the database allows nothing else). Prices include
- * VAT, so VAT is the part of each amount at the hotel's rate.
- */
 export const EXPENSE_CATEGORIES = {
   supplies: "Supplies", food_drink: "Food & drink", utilities: "Utilities", fuel: "Fuel & generator", maintenance: "Repairs & maintenance",
   salaries: "Salaries", laundry: "Laundry", marketing: "Marketing", tax: "Tax & levies", other: "Other",
@@ -70,7 +65,6 @@ export async function listExpenses(db: Db, actor: Actor, range: ReportRange, tod
   return { from, to, rows, totalKobo: live.reduce((s, r) => s + r.amount_kobo, 0), byCategory: [...byCategory.entries()].sort((a, b) => b[1] - a[1]) };
 }
 
-/** Income, expenses and VAT for the Money report. */
 export async function financeSummary(db: Db, actor: Actor, range: ReportRange, today = hotelToday()) {
   requireRole(actor, FINANCE);
   const { from, to } = rangeDates(range, today);

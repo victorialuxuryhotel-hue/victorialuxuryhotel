@@ -41,7 +41,6 @@ export async function updateBookingRules(_prev: ActionResult | null, formData: F
 
 const naira = z.coerce.number().positive("Enter an amount").max(100_000_000).transform((n) => Math.round(n * 100));
 
-/** Managers: add a bookable extra (airport pickup, breakfast...). */
 export async function addExtra(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     const staff = await authorize("settings.manage");
@@ -63,7 +62,6 @@ export async function toggleExtra(formData: FormData): Promise<void> {
   refresh();
 }
 
-/** Managers (the brief: the general manager approves discounts): create a promo code. */
 export async function addPromo(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     const staff = await authorize("settings.manage");

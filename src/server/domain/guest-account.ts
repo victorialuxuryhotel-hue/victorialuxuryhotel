@@ -5,17 +5,9 @@ import { hotelInstant, isIsoDate } from "@/lib/hotel-date";
 import { activity, all, assertVersion, first, now, retryOnStale, writeBatch, type Db } from "../db";
 import { changeDates, loadReservation, netPaid } from "./reservations";
 
-/**
- * Guest self-service: sign in with a 6-digit code sent to the email on their
- * booking, see their bookings, cancel (under the cancellation rule) or change
- * dates. There is no actor: these run as the system, after checking the
- * booking belongs to the signed-in email.
- */
-
 const CODE_MINUTES = 15;
 const MAX_ATTEMPTS = 5;
 
-/** A new sign-in code for an email that has bookings; null (send nothing) when it has none. */
 export async function issueGuestCode(db: Db, email: string): Promise<string | null> {
   const e = email.trim().toLowerCase();
   if (!(await first(db, "SELECT 1 FROM guests g JOIN reservations r ON r.guest_id = g.id WHERE g.email = ? LIMIT 1", e))) return null;
@@ -27,7 +19,6 @@ export async function issueGuestCode(db: Db, email: string): Promise<string | nu
   return code;
 }
 
-/** True if the code matches the latest unused, unexpired code for this email. Five tries per code, counted before checking. */
 export async function checkGuestCode(db: Db, email: string, code: string): Promise<boolean> {
   const e = email.trim().toLowerCase();
   const row = await db
@@ -87,7 +78,6 @@ async function cancelRule(db: Db): Promise<Rule> {
   return { checkInTime: s?.check_in_time ?? "14:00", freeHours: s?.free_cancel_hours ?? 48, feePct: s?.late_cancel_fee_pct ?? 50 };
 }
 
-/** The fee kept when cancelling now: none more than `freeHours` before check-in, else `feePct`% of the room price. */
 export function cancellationFee(roomTotalKobo: number, checkIn: string, rule: Rule, at = Date.now()): number {
   const hoursBefore = (Date.parse(hotelInstant(checkIn, rule.checkInTime)) - at) / 3_600_000;
   return hoursBefore > rule.freeHours ? 0 : Math.round((roomTotalKobo * rule.feePct) / 100);
@@ -96,12 +86,10 @@ export function cancellationFee(roomTotalKobo: number, checkIn: string, rule: Ru
 async function ownBooking(db: Db, email: string, reservationId: string) {
   const res = await loadReservation(db, reservationId);
   const owner = await first<{ email: string | null }>(db, "SELECT email FROM guests WHERE id = ?", res.guest_id);
-  // Same message whether it doesn't exist or isn't theirs.
   if (!owner?.email || owner.email.toLowerCase() !== email.trim().toLowerCase()) throw new AppError("NOT_FOUND", "Booking not found.");
   return res;
 }
 
-/** Guest cancels online. Unpaid holds just end; paid bookings keep the fee and flag the refund for a manager. */
 export async function guestCancel(db: Db, email: string, reservationId: string): Promise<{ feeKobo: number; refundKobo: number }> {
   return retryOnStale(async () => {
     const res = await ownBooking(db, email, reservationId);
@@ -134,7 +122,6 @@ export async function guestCancel(db: Db, email: string, reservationId: string):
   });
 }
 
-/** Guest changes dates online (same room type, if free). Any difference is flagged for the front desk. */
 export async function guestChangeDates(db: Db, email: string, reservationId: string, checkIn: string, checkOut: string): Promise<void> {
   if (!isIsoDate(checkIn) || !isIsoDate(checkOut)) throw new AppError("VALIDATION", "Choose your new dates.");
   const res = await ownBooking(db, email, reservationId);

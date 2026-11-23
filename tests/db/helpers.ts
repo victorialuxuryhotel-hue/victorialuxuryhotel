@@ -4,16 +4,10 @@ import type { Actor, Db } from "@/server/db";
 import { addDays, hotelToday } from "@/lib/hotel-date";
 import { TEST_DB_DIR } from "./global-setup";
 
-/**
- * Test access to the throwaway local D1 database (the real D1 engine, via
- * wrangler's platform proxy). Domain functions take the database and the
- * acting staff member as arguments, so tests call them exactly as the app does.
- */
 const proxy = await getPlatformProxy<{ DB: Db }>({ persist: { path: `${TEST_DB_DIR}/v3` } });
 export const db = proxy.env.DB;
 afterAll(() => proxy.dispose());
 
-// Seeded staff (db/seed.sql).
 export const owner: Actor = { id: "00000000-0000-4000-8000-0000000000a1", role: "owner" };
 export const gm: Actor = { id: "00000000-0000-4000-8000-0000000000a2", role: "general_manager" };
 export const desk: Actor = { id: "00000000-0000-4000-8000-0000000000a3", role: "front_desk" };
@@ -32,7 +26,6 @@ export async function q1<T = Record<string, unknown>>(sql: string, ...params: un
 }
 export const exec = (sql: string, ...params: unknown[]) => db.prepare(sql).bind(...params).run();
 
-/** Expects a promise to reject with a message (AppError message, or a raw trigger token) matching. */
 export async function rejects(promise: Promise<unknown>, pattern: RegExp, code?: string): Promise<void> {
   try {
     await promise;
@@ -47,10 +40,6 @@ export async function rejects(promise: Promise<unknown>, pattern: RegExp, code?:
 
 const rand = () => crypto.randomUUID().slice(0, 8);
 
-/**
- * An isolated room type with `rooms` in-service rooms, so capacity tests never
- * collide with each other or the seed.
- */
 export async function makeCategory(rooms: number, opts: { rateKobo?: number; maxOccupancy?: number } = {}) {
   const id = crypto.randomUUID();
   const slug = `t-${rand()}`;
@@ -75,7 +64,6 @@ export async function makeGuest(email: string | null = `guest-${rand()}@example.
   return id;
 }
 
-/** Inserts a reservation directly (bypassing business rules, but not triggers). */
 export async function insertReservation(input: {
   categoryId: string;
   checkIn: string;
@@ -104,5 +92,4 @@ export async function insertReservation(input: {
 
 export const status = async (reservationId: string) => (await q1<{ status: string }>("SELECT status FROM reservations WHERE id = ?", reservationId)).status;
 
-/** Moves a reservation's hold into the past (as if the guest never paid in time). */
 export const lapseHold = (reservationId: string) => exec("UPDATE reservations SET hold_expires_at = ? WHERE id = ?", iso(-60_000), reservationId);

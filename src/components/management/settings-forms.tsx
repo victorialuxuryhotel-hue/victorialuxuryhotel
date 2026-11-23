@@ -21,7 +21,6 @@ export type BookingRules = {
   vatRateBp: number;
 };
 
-/** Booking rules the hotel can change without a code release. */
 export function BookingRulesForm({ rules }: { rules: BookingRules }) {
   const [state, action, pending] = useActionState(updateBookingRules, null);
   const err = (n: string) => fieldError(state, n);

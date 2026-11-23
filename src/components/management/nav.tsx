@@ -11,9 +11,7 @@ import { activeHref, managementNavGroups } from "./nav-items";
 
 type NavProps = {
   footer?: React.ReactNode;
-  /** `base` lets the design preview reuse this shell under /preview/app. */
   base?: string;
-  /** App hrefs this staff member may see (decided on the server by role). Omit for all. */
   allowed?: readonly string[];
 };
 
@@ -26,7 +24,6 @@ function NavLinks({ onNavigate, base, allowed }: { onNavigate?: () => void; base
     }))
     .filter((g) => g.items.length > 0);
   const active = activeHref(pathname, groups.flatMap((g) => g.items.map((i) => i.href)), base);
-  // One group (front desk): no heading needed.
   const headings = groups.length > 1;
   return (
     <nav aria-label="Management" className="flex flex-col gap-5 px-3">
@@ -81,14 +78,8 @@ export function Sidebar({ footer, base = "/app", allowed }: NavProps) {
   );
 }
 
-/**
- * Phones and tablets: a top bar that stays put while scrolling, and a full
- * menu. While the menu is open the page behind doesn't scroll, Tab stays in
- * the menu, and Escape or any navigation closes it.
- */
 export function MobileBar({ footer, base = "/app", allowed }: NavProps) {
   const pathname = usePathname();
-  // The page the menu was opened on: navigating anywhere closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === pathname;
   const close = useCallback(() => setOpenOn(null), []);
@@ -136,11 +127,6 @@ const deskTabs = [
   { href: "/app/reservations/new", label: "New booking", icon: CalendarPlus },
 ] as const;
 
-/**
- * Front desk, below md: the four things they do all day as a bottom tab bar.
- * Shown only on those four screens; a reservation's own page has its own
- * bottom bar (the next step), and two stacked bars would crowd the screen.
- */
 export function DeskTabs({ base = "/app" }: { base?: string }) {
   const pathname = usePathname();
   const tabs = deskTabs.map((t) => ({ ...t, href: t.href.replace(/^\/app/, base) }));

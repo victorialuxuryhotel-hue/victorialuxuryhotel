@@ -2,12 +2,6 @@ import "server-only";
 import { hotel } from "@/config/hotel";
 import { formatDate, formatNaira, plural } from "@/lib/format";
 
-/**
- * Transactional email templates. Table-based, inline-styled HTML that renders
- * in Gmail, Outlook and Apple Mail, plus a plain-text part. Everything shown is
- * escaped; amounts and dates come from the database.
- */
-
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 const NAVY = "#021c6c";
@@ -19,12 +13,6 @@ const LINE = "#e6e0d2";
 type Button = { label: string; href: string };
 type Feature = { label: string; value: string; sub?: string };
 
-/**
- * One layout for every guest email (handoff 6f/6g): logo and name, heading and
- * a one-line intro, a bordered feature box, detail rows, two full-width
- * bordered link buttons (44px+), a short note, and the hotel's contact footer.
- * Max 600px; headings fall back to Georgia; body text 15–16px.
- */
 function layout(opts: { preheader: string; heading: string; intro: string; feature?: Feature; rows: Array<[string, string]>; buttons?: Button[]; note?: string; siteUrl: string }) {
   const rows = opts.rows
     .map(([k, v]) => `<tr><td style="padding:11px 0;color:${MUTED};font-size:15px;border-bottom:1px solid ${LINE}">${esc(k)}</td><td style="padding:11px 0;color:${INK};font-size:15px;text-align:right;border-bottom:1px solid ${LINE}">${esc(v)}</td></tr>`)
@@ -80,7 +68,6 @@ export type StayInfo = {
   guestName: string;
   reference: string;
   category: string;
-  /** The specific room once assigned, e.g. "Room 204 · Floor 2". */
   room?: string;
   checkIn: string;
   checkOut: string;
@@ -92,7 +79,6 @@ export type StayInfo = {
   checkOutTime: string;
 };
 
-/** "Room 204 · Floor 2 · Deluxe" once a room is assigned, else just the type. */
 const roomText = (s: { category: string; room?: string }) => (s.room ? `${s.room} · ${s.category}` : s.category);
 
 const stayRows = (s: StayInfo): Array<[string, string]> => [
@@ -177,7 +163,6 @@ export function hotelNewBookingEmail(s: StayInfo, source: string, siteUrl: strin
   return { subject: `New booking ${s.reference}: ${formatDate(s.checkIn)}`, html: layout({ preheader: intro, heading, intro, rows, siteUrl }), text: text(heading, intro, rows) };
 }
 
-/** The 6-digit code a guest types to open their bookings. */
 export function guestCodeEmail(code: string, siteUrl: string) {
   const heading = "Your sign-in code";
   const intro = "Enter this code on the Victoria Luxury website to see and manage your bookings. It expires in 15 minutes.";

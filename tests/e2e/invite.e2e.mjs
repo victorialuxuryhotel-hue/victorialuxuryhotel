@@ -5,14 +5,12 @@ const sql = (q) => execSync(`docker exec -i supabase_db_victoria-hotel psql -U p
 let pass = 0, fail = 0;
 const check = (n, c, x = "") => { if (c) pass++; else fail++; console.log(`${c ? "PASS" : "FAIL"}  ${n}${c ? "" : "  " + x}`); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-/** Wait for an observable outcome rather than network heuristics (avoids races). */
 const waitForUrl = (p, pred) => p.waitForFunction(pred, { timeout: 15000 });
 const waitForText = (p, re) => p.waitForFunction((src) => new RegExp(src).test(document.body.innerText), { timeout: 15000 }, re.source);
 
 const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: true });
 const email = `newstaff-${Date.now()}@victoria.test`;
 
-// Owner invites
 let ctx = await browser.createBrowserContext(); let p = await ctx.newPage();
 await p.goto(`${BASE}/login`, { waitUntil: "networkidle0" });
 await p.type("#email", "owner@victoria.test"); await p.type("#password", "victoria-dev-2026!");
@@ -25,7 +23,6 @@ check("profile created as front desk", sql(`select role from staff_profiles wher
 check("invite is audited", sql(`select count(*) from activity_log a join staff_profiles s on s.id = a.entity_id where a.action='staff.created' and s.email='${email}';`) === "1");
 await ctx.close();
 
-// Fetch email
 let link;
 for (let i = 0; i < 10 && !link; i++) {
   const list = await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent("to:" + email)}`)).json();
@@ -35,7 +32,6 @@ for (let i = 0; i < 10 && !link; i++) {
 }
 check("invite email arrives with a confirm link", Boolean(link), "no link");
 
-// New staff accepts and sets a password
 ctx = await browser.createBrowserContext(); p = await ctx.newPage();
 await p.goto(link.replace("http://127.0.0.1:3000", BASE).replace("http://localhost:3000", BASE), { waitUntil: "networkidle0" });
 check("invite link signs them in and opens the account page", p.url() === `${BASE}/app/account`, p.url());
@@ -49,7 +45,6 @@ await p.click("button::-p-text(Save password)"); await waitForText(p, /Password 
 check("password saved", (await p.evaluate(() => document.body.innerText)).includes("Password saved"));
 await ctx.close();
 
-// Sign in with the new password
 ctx = await browser.createBrowserContext(); p = await ctx.newPage();
 await p.goto(`${BASE}/login`, { waitUntil: "networkidle0" });
 await p.type("#email", email); await p.type("#password", "a-strong-pass-2026");
@@ -57,7 +52,6 @@ await p.click("button[type=submit]"); await waitForUrl(p, () => location.pathnam
 check("new staff member signs in with their password", p.url() === `${BASE}/app`, p.url());
 const nav = await p.$$eval('aside nav a', (as) => as.map((a) => a.textContent.trim()));
 check("and gets front-desk navigation", !nav.includes("Settings"), nav.join(","));
-// Reused link must not work again
 const p2 = await (await browser.createBrowserContext()).newPage();
 await p2.goto(link.replace("http://127.0.0.1:3000", BASE), { waitUntil: "networkidle0" });
 check("invite link cannot be reused", p2.url().includes("/login?error=link"), p2.url());

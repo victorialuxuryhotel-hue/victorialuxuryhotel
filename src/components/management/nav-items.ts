@@ -1,12 +1,6 @@
 import { BarChart3, BedDouble, BrushCleaning, CalendarCheck, CreditCard, LayoutDashboard, Package, Presentation, Receipt, Settings, ShieldCheck, Sun, Tags, Users, UtensilsCrossed } from "lucide-react";
 import type { Permission } from "@/lib/auth/permissions";
 
-/**
- * Management navigation, grouped by what the work is. An item with
- * `permission` is shown when the role has ANY of those permissions (decided
- * on the server). Pages re-check on their own; hiding a link is not the gate.
- * A plain module so both server and client code can import it.
- */
 export type NavItem = { href: string; label: string; icon: typeof Sun; permission?: readonly Permission[] };
 export type NavGroup = { label: string; items: readonly NavItem[] };
 
@@ -43,7 +37,6 @@ export const managementNavGroups: readonly NavGroup[] = [
 
 export const managementNav: readonly NavItem[] = managementNavGroups.flatMap((g) => g.items);
 
-/** The one menu item for this page: the longest href that matches (so Rates & room types beats Rooms). */
 export function activeHref(pathname: string, hrefs: readonly string[], base: string): string | undefined {
   return hrefs
     .filter((h) => (h === base ? pathname === base : pathname === h || pathname.startsWith(`${h}/`)))

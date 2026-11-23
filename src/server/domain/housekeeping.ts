@@ -2,12 +2,6 @@ import { AppError } from "@/lib/errors";
 import { hotelInstant, hotelToday } from "@/lib/hotel-date";
 import { ALL_STAFF, all, first, requireRole, writeBatch, type Actor, type Db } from "../db";
 
-/**
- * Housekeeping: the day's cleaning list. Rooms that need cleaning (check-out
- * marks them) come first when a guest arrives today; rooms with a guest staying
- * get a daily tidy. Readiness lives on the room; "tidied" and "cleaned" are read
- * back from the activity log, so nothing new is stored.
- */
 export type ToClean = { id: string; number: string; category: string; floor: string | null; readiness: "needs_cleaning" | "cleaning_in_progress"; arrivingToday: boolean };
 export type StayOver = { id: string; number: string; category: string; guest: string; tidiedAt: string | null };
 export type CleanedToday = { room: string; what: "cleaned" | "tidied"; who: string | null; at: string };
@@ -56,7 +50,6 @@ export async function cleaningList(db: Db, actor: Actor, today = hotelToday()) {
   };
 }
 
-/** Daily tidy of a room with a guest staying. Once per room per day; a second tap is a no-op. */
 export async function markTidied(db: Db, actor: Actor, roomId: string, today = hotelToday()): Promise<void> {
   requireRole(actor, ALL_STAFF);
   const room = await first<{ room_number: string }>(db, "SELECT room_number FROM rooms WHERE id = ? AND is_active = 1", roomId);

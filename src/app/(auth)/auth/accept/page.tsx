@@ -4,12 +4,6 @@ import { AcceptInvitation } from "./accept-invitation";
 
 export const metadata: Metadata = { title: "Accept your invitation", robots: { index: false, follow: false } };
 
-/**
- * Where a staff invitation email lands. Clerk reads the invitation from the
- * link; the person sets a password and is then linked to the staff record the
- * owner created (same email). Public sign-up is disabled: without a valid
- * invitation this page can't create an account.
- */
 export default function AcceptInvitationPage() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center bg-ivory-100 px-4 py-12">

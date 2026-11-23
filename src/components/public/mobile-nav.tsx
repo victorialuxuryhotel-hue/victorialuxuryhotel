@@ -8,16 +8,6 @@ import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
 import { useDialog } from "@/lib/use-dialog";
 
-/**
- * Phone menu. Full screen below the header, with large 56px rows; Call and
- * WhatsApp live here because the desktop contact strip is hidden on phones.
- * While open: the page behind doesn't scroll, Tab stays inside the menu, and
- * Escape closes it and returns focus to the menu button.
- *
- * The panel is rendered into <body>: the header uses backdrop-blur, which
- * makes it the containing block for `position: fixed` children, so a panel
- * inside it would be clipped to the header's 64px.
- */
 const noop = () => () => {};
 export function MobileNav({ items }: { items: ReadonlyArray<{ href: string; label: string }> }) {
   const [open, setOpen] = useState(false);
@@ -27,7 +17,6 @@ export function MobileNav({ items }: { items: ReadonlyArray<{ href: string; labe
   const close = useCallback(() => setOpen(false), []);
   useDialog(open, close, panel, toggle);
 
-  // Portals need the DOM: render the panel only after hydration.
   const mounted = useSyncExternalStore(noop, () => true, () => false);
 
   return (

@@ -1,7 +1,3 @@
-/**
- * Guest session token: the guest's email + expiry, signed with HMAC-SHA256.
- * Set after they enter the 6-digit code we emailed. Pure (Web Crypto only).
- */
 export const GUEST_SESSION_DAYS = 7;
 
 const enc = new TextEncoder();
@@ -25,7 +21,6 @@ export async function signGuest(secret: string, email: string, now = Date.now())
   return `${body}.${b64url(await hmac(secret, body))}`;
 }
 
-/** The email if the token is valid and unexpired; otherwise null. Never throws. */
 export async function verifyGuest(secret: string, token: string | undefined, now = Date.now()): Promise<string | null> {
   if (!token || secret.length < 32) return null;
   const [body, sig] = token.split(".");
@@ -39,7 +34,6 @@ export async function verifyGuest(secret: string, token: string | undefined, now
   }
 }
 
-/** SHA-256 of a sign-in code, salted with the email so codes are never stored in clear. */
 export async function hashCode(email: string, code: string): Promise<string> {
   const d = new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(`${email.toLowerCase()}:${code}`)));
   return b64url(d);

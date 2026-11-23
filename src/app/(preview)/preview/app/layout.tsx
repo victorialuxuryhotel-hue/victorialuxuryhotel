@@ -18,7 +18,6 @@ export default function PreviewAppLayout({ children }: LayoutProps<"/preview/app
       <Sidebar base="/preview/app" footer={<StaffCard />} />
       <MobileBar base="/preview/app" footer={<StaffCard />} />
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-      {/* Front-desk staff see this tab bar on phones; shown here so it can be reviewed. */}
       <DeskTabs base="/preview/app" />
     </div>
   );

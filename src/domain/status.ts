@@ -1,9 +1,5 @@
 import type { Tone } from "@/components/ui/badge";
 
-/**
- * Domain enums (mirroring the Postgres enums) with their staff-facing labels
- * and badge tones. One place, so every screen describes a status the same way.
- */
 export const reservationStatus = {
   pending_payment: { label: "Awaiting payment", tone: "warning" },
   confirmed: { label: "Confirmed", tone: "brand" },
@@ -58,10 +54,6 @@ export const staffRole = {
 } as const;
 export type StaffRole = keyof typeof staffRole;
 
-/**
- * What the front desk sees for a room right now. Occupancy is derived from
- * reservations; only maintenance and readiness are stored on the room.
- */
 export const roomBoardState = {
   occupied: { label: "Occupied", tone: "brand" },
   arriving: { label: "Arriving", tone: "info" },

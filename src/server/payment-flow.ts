@@ -10,21 +10,12 @@ import { PaystackNotFoundError, verifyTransaction, type VerifiedTransaction } fr
 
 export type SettleOutcome = DbOutcome | "unknown_reference";
 
-/**
- * The one path by which a Paystack payment affects a booking. Used by both the
- * browser callback and the webhook. Whatever triggered it, we ask PAYSTACK
- * (verify API) for the truth and apply that; the database function is
- * idempotent and locks the payment, so concurrent callers are safe and only
- * one sees "confirmed", which is the one that sends the confirmation email.
- */
 export async function settlePaystackReference(reference: string, trigger: "callback" | "webhook" | "sweep"): Promise<SettleOutcome> {
   let tx: VerifiedTransaction;
   try {
     tx = await verifyTransaction(reference);
   } catch (err) {
     if (!(err instanceof PaystackNotFoundError)) throw err;
-    // The guest never reached Paystack. The scheduled sweep closes the attempt;
-    // anywhere else, it may simply be too early to tell.
     if (trigger !== "sweep") return "still_pending";
     tx = { reference, status: "abandoned", amountKobo: 0, currency: "NGN", paidAt: null, channel: null, gatewayResponse: "Never reached Paystack checkout" };
   }
@@ -51,7 +42,6 @@ export async function settlePaystackReference(reference: string, trigger: "callb
   }
   logger.info("payment.settled", { reference, trigger, paystackStatus: tx.status, outcome });
 
-  // The confirmation email was queued in the same transaction; send it after responding.
   if (outcome === "confirmed") {
     const p = await first<{ reservation_id: string }>(db, "SELECT reservation_id FROM payments WHERE provider = 'paystack' AND provider_reference = ?", reference);
     after(() => deliverEmails({ reservationId: p?.reservation_id }));
@@ -63,7 +53,6 @@ export async function settlePaystackReference(reference: string, trigger: "callb
     paid_closed: "Payment received for a cancelled reservation",
     overpaid: "A reservation has been paid more than once",
   };
-  // Paystack references are "<booking reference>-<attempt>", e.g. vl-7kq3pm-1a2b3c4d.
   const bookingRef = reference.split("-").slice(0, 2).join("-").toUpperCase();
   if (attention[outcome]) await alert("payment_attention", attention[outcome]!, { reference: bookingRef });
   return outcome;

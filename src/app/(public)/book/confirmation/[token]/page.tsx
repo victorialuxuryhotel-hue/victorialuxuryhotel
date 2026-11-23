@@ -24,7 +24,6 @@ async function Outcome({ params }: { params: Promise<{ token: string }> }) {
   let b = await getBookingByToken(token);
   if (!b) notFound();
 
-  // If the webhook hasn't arrived yet, ask Paystack directly (server-side).
   if (b.status === "pending_payment" && b.latestAttempt?.status === "pending" && b.latestAttempt.provider_reference) {
     try {
       await settlePaystackReference(b.latestAttempt.provider_reference, "callback");
@@ -48,7 +47,6 @@ async function Outcome({ params }: { params: Promise<{ token: string }> }) {
     );
   }
 
-  // Something didn't match (e.g. the amount): staff have been alerted.
   if (b.attention_reason) {
     return (
       <div className="mx-auto max-w-xl text-center">
@@ -73,7 +71,6 @@ async function Outcome({ params }: { params: Promise<{ token: string }> }) {
     return <PaymentFailed retryHref={`/book/review/${token}`} />;
   }
 
-  // Hold ended, or paid too late for the room (flagged for staff to contact the guest).
   const paid = b.paidKobo > 0;
   return (
     <div className="mx-auto max-w-xl text-center">

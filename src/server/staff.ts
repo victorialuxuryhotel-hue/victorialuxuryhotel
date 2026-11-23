@@ -12,7 +12,6 @@ import { createStaffProfile, promoteToOwner, updateStaffProfile } from "./domain
 
 const roleSchema = z.enum(["owner", "general_manager", "front_desk", "finance", "restaurant_bar"]);
 
-/** Optional staff phone (shown only to signed-in staff, e.g. "ask a manager"). */
 const phoneSchema = z
   .string()
   .trim()
@@ -23,20 +22,12 @@ const phoneSchema = z
 const inviteSchema = z.object({
   fullName: z.string().trim().min(2, "Enter the person's full name").max(120),
   email: z.email("Enter a valid email").transform((e) => e.toLowerCase()),
-  // Owner is never chosen in an invite (6e); see makeOwner.
   role: z.enum(["general_manager", "front_desk", "finance", "restaurant_bar"], "Choose a role"),
   phone: phoneSchema,
 });
 
-/** Clerk errors carry codes; anything else is unexpected. */
 const clerkCode = (err: unknown) => (err as { errors?: Array<{ code?: string }> })?.errors?.[0]?.code;
 
-/**
- * Owner invites a staff member: Clerk emails an invitation link to
- * /auth/accept, and the staff record (role, access) is created here. The
- * person's Clerk account is linked to this record by email on first sign-in.
- * If the record can't be created, the invitation is revoked.
- */
 export async function inviteStaff(_prev: ActionResult<{ email: string }> | null, formData: FormData): Promise<ActionResult<{ email: string }>> {
   try {
     const me = await authorize("staff.manage");
@@ -84,12 +75,6 @@ const updateSchema = z.object({
   phone: phoneSchema,
 });
 
-/**
- * Change role or access. The database keeps at least one active owner and
- * audits the change. Deactivation takes effect on the person's next request
- * (every request re-checks the record); their Clerk account is also locked so
- * they can't sign in again.
- */
 export async function updateStaff(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     const me = await authorize("staff.manage");
@@ -104,7 +89,6 @@ export async function updateStaff(_prev: ActionResult | null, formData: FormData
         if (isActive) await clerk.users.unbanUser(record.clerk_user_id);
         else await clerk.users.banUser(record.clerk_user_id);
       } catch (err) {
-        // Access is already removed by the database record; log so the lock can be retried.
         logger.error("staff.clerk_lock_failed", err, { staffId });
       }
     }
@@ -116,7 +100,6 @@ export async function updateStaff(_prev: ActionResult | null, formData: FormData
   }
 }
 
-/** The separate, confirmed "Make owner" action on a staff row (owner only, logged). */
 export async function makeOwner(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     const me = await authorize("staff.manage");

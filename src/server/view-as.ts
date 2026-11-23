@@ -8,11 +8,6 @@ import { logger } from "@/lib/logger";
 import { getCurrentStaff, VIEW_AS_COOKIE } from "./auth";
 import { activity, getDb, writeBatch } from "./db";
 
-/**
- * Owner only: see the app exactly as front desk does, read-only, for 30 minutes.
- * Start and exit are logged under the owner. Nothing here grants access the
- * owner doesn't have; it only takes permissions away.
- */
 export async function startViewAsFrontDesk(): Promise<void> {
   const staff = await getCurrentStaff();
   const { sessionId } = await auth();

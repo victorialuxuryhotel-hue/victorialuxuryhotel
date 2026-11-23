@@ -35,7 +35,6 @@ async function Content() {
   );
 }
 
-/** Front-desk home (managers land on the dashboard, and can open this too). */
 export default function TodayPage() {
   return (
     <Suspense fallback={<LoadingState />}>

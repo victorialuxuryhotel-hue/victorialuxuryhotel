@@ -11,7 +11,6 @@ import { settleCharges } from "@/server/pos";
 type Charge = { id: string; number: number; total_kobo: number; status: string; created_at: string; items: string };
 const METHODS = { cash: "Cash", bank_transfer: "Transfer", pos_terminal: "POS" } as const;
 
-/** Restaurant & bar charges on this stay. Unpaid ones must be settled before check-out. */
 export function RoomCharges({ reservationId, charges, canSettle }: { reservationId: string; charges: Charge[]; canSettle: boolean }) {
   const [method, setMethod] = useState<keyof typeof METHODS>("cash");
   const [state, action, pending] = useActionState(settleCharges, null);

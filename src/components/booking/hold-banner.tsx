@@ -13,7 +13,6 @@ const mmss = (ms: number) => {
   return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 };
 
-/** "Your Deluxe room is held · 24:12 left", counting down; at zero, "Your hold has ended". */
 export function HoldBanner({ category, expiresAt, againHref }: { category: string; expiresAt: string; againHref: string }) {
   const end = Date.parse(expiresAt);
   const [left, setLeft] = useState<number | null>(null);

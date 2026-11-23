@@ -1,8 +1,3 @@
-/**
- * Hotel facts supplied by the hotel in the client requirements form
- * (15 Nov 2026). Do not add facilities, policies or rates that the hotel has
- * not confirmed. Room categories and rates live in the database, not here.
- */
 export const hotel = {
   name: "Victoria Luxury Hotel and Apartment",
   shortName: "Victoria Luxury Hotel",

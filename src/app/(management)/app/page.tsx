@@ -41,7 +41,6 @@ async function Revenue() {
 
 async function Content() {
   const staff = await requireStaff();
-  // The front desk's home is Today; managers keep the dashboard.
   if (staff.role === "front_desk") redirect("/app/today");
   if (staff.role === "restaurant_bar") redirect("/app/sales");
   const [m, rooms, awaiting, recent] = await Promise.all([movements(), roomBoard(), awaitingPaymentCount(), listReservations({ tab: "all" })]);

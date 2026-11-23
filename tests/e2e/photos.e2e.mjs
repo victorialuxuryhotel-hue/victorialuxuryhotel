@@ -1,4 +1,3 @@
-// Photo management end to end: upload in the management app → visible on the public website.
 import puppeteer from "puppeteer-core";
 import { execSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -31,8 +30,6 @@ async function signIn(email) {
 const publicImages = async (path) => {
   const ctx = await browser.createBrowserContext();
   const p = await ctx.newPage();
-  // Wait for the page to load (not for total network silence: image
-  // optimisation can keep a connection busy briefly on first request).
   await p.goto(`${BASE}${path}`, { waitUntil: "load" });
   await new Promise((r) => setTimeout(r, 1000));
   const srcs = await p.$$eval("img", (imgs) => imgs.map((i) => decodeURIComponent(i.currentSrc || i.src)));
@@ -41,19 +38,16 @@ const publicImages = async (path) => {
 };
 
 const cat = sql("select id from room_categories where slug = 'deluxe';");
-// Start clean: remove photos an interrupted earlier run may have left behind.
 sql("delete from room_category_images where alt_text like 'Deluxe test photo%' or alt_text = 'Not really a photo';");
 sql("delete from site_photos where alt_text like '%(test)%';");
 const hadPhotos = sql(`select count(*) from room_category_images where category_id = '${cat}';`) !== "0";
 const tag = `Deluxe test photo ${Date.now()}`;
 
-// Manager uploads a room photo
 {
   const { ctx, p } = await signIn("gm@victoria.test");
   await p.goto(`${BASE}/app/rooms/categories/${cat}`, { waitUntil: "networkidle0" });
   await p.waitForSelector('input[type=file][name=file]');
 
-  // Fake image first: rejected by the server
   await (await p.$('input[type=file][name=file]')).uploadFile(fakeImage);
   await p.type("form:has(input[type=file]) input[name=altText]", "Not really a photo");
   await p.click("button::-p-text(Upload photo)");
@@ -77,7 +71,6 @@ const tag = `Deluxe test photo ${Date.now()}`;
   if (!hadPhotos) check("and on the rooms list as the cover", listImgs.some((s) => s.includes(path)));
 }
 
-// Website hero photo
 {
   const { ctx, p } = await signIn("gm@victoria.test");
   await p.goto(`${BASE}/app/settings/photos`, { waitUntil: "networkidle0" });
@@ -96,7 +89,6 @@ const tag = `Deluxe test photo ${Date.now()}`;
   check("homepage shows the new hero", imgs.some((s) => s.includes(hero)));
 }
 
-// Front desk cannot manage website photos
 {
   const { ctx, p } = await signIn("frontdesk@victoria.test");
   await p.goto(`${BASE}/app/settings/photos`, { waitUntil: "networkidle0" });
@@ -105,18 +97,15 @@ const tag = `Deluxe test photo ${Date.now()}`;
   await ctx.close();
 }
 
-// Delete the room photo: gone from the public page and from storage
 {
   const { ctx, p } = await signIn("gm@victoria.test");
   await p.goto(`${BASE}/app/rooms/categories/${cat}`, { waitUntil: "networkidle0" });
   const path = sql(`select storage_path from room_category_images where alt_text = '${tag}';`);
   p.on("dialog", (d) => d.accept());
-  // Delete this test's photo (the card whose image has the test description).
   await p.evaluate((alt) => {
     const card = [...document.querySelectorAll("li")].find((li) => li.querySelector(`img[alt="${alt}"]`));
     card?.querySelector('button:has([aria-label="Delete photo"])')?.click();
   }, tag);
-  // Wait until no displayed image uses the file any more.
   await p.waitForFunction((t) => ![...document.images].some((i) => decodeURIComponent(i.currentSrc || i.src).includes(t)), { timeout: 20000 }, path);
   check("deleting removes the record", sql(`select count(*) from room_category_images where alt_text = '${tag}';`) === "0");
   check("and the stored file", sql(`select count(*) from storage.objects where bucket_id = 'room-images' and name = '${path}';`) === "0");
@@ -126,7 +115,6 @@ const tag = `Deluxe test photo ${Date.now()}`;
   check("photo changes are in the activity log", Number(sql("select count(*) from activity_log where action in ('photo.added', 'photo.removed') and created_at > now() - interval '5 minutes';")) >= 3);
 }
 
-// Tidy up the hero so the demo site keeps its placeholder
 sql("delete from site_photos where slot = 'hero' and alt_text like '%(test)';");
 
 await browser.close();

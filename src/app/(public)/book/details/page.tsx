@@ -29,7 +29,6 @@ async function Details({ searchParams }: { searchParams: SP }) {
   const parsed = staySchema.safeParse({ checkIn: one(sp.checkIn), checkOut: one(sp.checkOut), guests: one(sp.guests) });
   if (!slug || !parsed.success) return <StartAgain message="Let's start with your dates" />;
 
-  // Re-check live: the room shown must still be available right now.
   const [result, rules, extras] = await Promise.all([searchStay(parsed.data), publicBookingRules(), publicExtras()]);
   const option = result.ok ? result.options.find((o) => o.slug === slug) : undefined;
   if (!option || !option.isAvailable) return <StartAgain message="Sorry, that room is no longer available for your dates" />;

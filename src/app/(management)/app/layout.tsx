@@ -12,18 +12,10 @@ import { exitViewAs, startViewAsFrontDesk } from "@/server/view-as";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
-// Every management page depends on the staff session, so it can't have a
-// prerendered "instant" shell; opt the segment out of that validation.
 export const instant = false;
 
-/**
- * The staff session is read inside a Suspense boundary (required by Cache
- * Components). requireStaff() redirects to /login when there is no ACTIVE
- * staff session. This is the real gate; the proxy redirect is only a fast path.
- */
 async function StaffShell({ children }: { children: React.ReactNode }) {
   const staff = await requireStaff();
-  // Visible when the item needs no permission, or the role has any of those listed.
   const allowed = managementNav.filter((item) => !item.permission || item.permission.some((p) => can(staff.role, p))).map((item) => item.href);
   const footer = (
     <StaffCard fullName={staff.fullName} role={staff.viewAs ? "owner" : staff.role}>
@@ -49,7 +41,6 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Shown on every page while an owner views the app as front desk. */
 function ViewAsBanner() {
   return (
     <div role="status" className="flex min-h-11 items-center justify-center gap-3 border-b border-gold-500 bg-gold-100 px-4 py-1.5 text-sm text-navy-950">

@@ -7,15 +7,6 @@ import { paymentMethod } from "@/domain/status";
 import { formatNaira } from "@/lib/format";
 import { recordOfflinePayment } from "@/server/payments";
 
-/**
- * Offline payment. The confirmation checkbox is required by the server and the
- * database: staff must have actually received the money (cash in hand, or a
- * transfer visible in the hotel's bank account). A guest's screenshot is not proof.
- *
- * Saving takes two steps: "Record payment" shows a review ("Record ₦85,000
- * cash for Tunde Bakare?") and only "Yes, record it" saves. Payments can't be
- * edited afterwards; a manager records a correction instead.
- */
 export function OfflinePaymentForm({
   reservation,
   today,
@@ -26,7 +17,6 @@ export function OfflinePaymentForm({
   const [state, action, pending] = useActionState(recordOfflinePayment, null);
   const [paymentId] = useState(() => crypto.randomUUID());
   const [review, setReview] = useState<null | { amount: string; method: string; paidOn: string; reference: string }>(null);
-  // A server reply (e.g. a refused amount) returns to the form so the error shows next to its field.
   const [seen, setSeen] = useState(state);
   if (state !== seen) {
     setSeen(state);
@@ -39,7 +29,6 @@ export function OfflinePaymentForm({
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     if (!review) {
-      // Step 1: show what is about to be saved. Fields stay in the form (hidden).
       const amount = Number(String(data.get("amount") ?? "").replace(/[,\s₦]/g, ""));
       setReview({
         amount: Number.isFinite(amount) && amount > 0 ? formatNaira(Math.round(amount * 100)) : String(data.get("amount")),
@@ -49,7 +38,6 @@ export function OfflinePaymentForm({
       });
       return;
     }
-    // Step 2: save (keeping the typed values if the server refuses).
     startTransition(() => action(data));
   }
 

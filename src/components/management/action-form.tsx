@@ -7,11 +7,6 @@ import { cn } from "@/lib/utils/cn";
 
 type Action<T> = (prev: ActionResult<T> | null, formData: FormData) => Promise<ActionResult<T>>;
 
-/**
- * A single-button form bound to a server action, with pending and error
- * states. The server decides whether the action is allowed; this only
- * reports the outcome.
- */
 export function ActionButton<T>({
   action,
   fields,
@@ -29,10 +24,8 @@ export function ActionButton<T>({
   variant?: "primary" | "accent" | "secondary" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
   className?: string;
-  /** Native confirmation prompt for irreversible actions. */
   confirm?: string;
   successMessage?: (data: T) => string | null;
-  /** Called after the action succeeds (e.g. to show page-level feedback with Undo). */
   onSuccess?: (data: T) => void;
 }) {
   const run: Action<T> = onSuccess

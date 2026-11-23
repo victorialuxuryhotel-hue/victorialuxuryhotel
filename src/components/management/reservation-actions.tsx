@@ -81,7 +81,6 @@ export function AssignRoomForm({
   current?: string;
   rooms: RoomOption[];
   booked: string;
-  /** Shown while choosing, so a request like "ground floor" or "quiet room" shapes the choice. */
   specialRequests?: string;
 }) {
   const feedback = useActionFeedback();

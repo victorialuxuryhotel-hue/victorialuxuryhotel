@@ -7,10 +7,6 @@ type R = Pick<ReservationDetail, "status" | "roomNumber" | "checkIn" | "checkOut
 
 export type Step = { title: string; detail: string; state: "done" | "now" | "later" };
 
-/**
- * Where the booking is and what comes next, as a numbered list, so new staff
- * don't have to interpret statuses. Derived entirely from the reservation.
- */
 export function reservationSteps(r: R, today: string): Step[] | null {
   if (!["pending_payment", "confirmed", "checked_in", "checked_out"].includes(r.status)) return null;
   const balance = r.totalKobo - r.paidKobo;
@@ -38,7 +34,6 @@ export function reservationSteps(r: R, today: string): Step[] | null {
 }
 
 export function StepList({ steps }: { steps: Step[] }) {
-  // Only the first "now" step is the next step; later "now"s wait for it.
   const next = steps.findIndex((s) => s.state === "now");
   return (
     <ol className="divide-y divide-hairline rounded-card border border-hairline bg-ivory-50" aria-label="Progress of this booking">

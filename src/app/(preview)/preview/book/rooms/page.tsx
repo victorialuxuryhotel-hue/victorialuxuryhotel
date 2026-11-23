@@ -8,7 +8,6 @@ import { search } from "../_search";
 
 type Props = { searchParams: Promise<{ guests?: string }> };
 
-/** ?guests=3 shows the "party doesn't fit most types" layout. */
 async function Content({ searchParams }: Props) {
   const guests = Number((await searchParams).guests) || search.guests;
   const options = availability.map((o) => ({

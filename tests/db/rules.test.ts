@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { day, db, exec, insertReservation, iso, makeCategory, makeGuest, q, q1, rejects, status } from "./helpers";
 
-/**
- * The hard rules enforced by the database itself (triggers and constraints),
- * exercised with raw writes, so they hold no matter what app code does.
- */
-
 describe("room overlap", () => {
   it("rejects a second live reservation on the same room for overlapping nights", async () => {
     const c = await makeCategory(2);
@@ -47,7 +42,6 @@ describe("room-type capacity", () => {
     await insertReservation({ categoryId: c.id, checkIn: day(10), checkOut: day(12) });
     await insertReservation({ categoryId: c.id, checkIn: day(11), checkOut: day(13) });
     await rejects(insertReservation({ categoryId: c.id, checkIn: day(11), checkOut: day(12) }), /no_capacity/);
-    // Night 12 has only one live booking.
     await insertReservation({ categoryId: c.id, checkIn: day(12), checkOut: day(13) });
   });
 
@@ -71,7 +65,6 @@ describe("room-type capacity", () => {
     const big = await makeCategory(1);
     const r = await insertReservation({ categoryId: small.id, checkIn: day(10), checkOut: day(11), status: "confirmed" });
     await exec("UPDATE reservations SET room_id = ? WHERE id = ?", big.roomIds[0], r);
-    // The big category's only room is taken by the upgrade; the small one is free again.
     await rejects(insertReservation({ categoryId: big.id, checkIn: day(10), checkOut: day(11) }), /no_capacity/);
     await insertReservation({ categoryId: small.id, checkIn: day(10), checkOut: day(11) });
   });
@@ -152,7 +145,6 @@ describe("reservation lifecycle", () => {
     const r = await insertReservation({ categoryId: c.id, checkIn: day(5), checkOut: day(6) });
     await exec("UPDATE reservations SET status = 'cancelled' WHERE id = ?", r);
     await rejects(exec("UPDATE reservations SET check_out = ?, total_amount_kobo = 10000000 WHERE id = ?", day(7), r), /reservation_closed/);
-    // Notes and flags can still change.
     await exec("UPDATE reservations SET attention_reason = 'x' WHERE id = ?", r);
   });
 

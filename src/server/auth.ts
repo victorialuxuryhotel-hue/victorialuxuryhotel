@@ -12,15 +12,10 @@ import { verifyViewAs } from "@/lib/auth/view-as-token";
 import { first, getDb, VIEW_AS_READ_ONLY, type Actor } from "./db";
 import { LAST_SEEN_EVERY_MS, linkClerkUser, ROLE, touchLastSeen, type StaffRecord } from "./domain/admin";
 
-/**
- * `viewAs` is true while an owner views the app as front desk: `role` is then
- * front_desk (menus, pages and permissions follow it) and every write refuses.
- */
 export type Staff = { id: string; fullName: string; email: string; role: StaffRole; viewAs?: boolean };
 
 export const VIEW_AS_COOKIE = "vl_view_as";
 
-/** The view-as cookie counts only for this active owner, in this Clerk session, before it expires. */
 async function viewingAsFrontDesk(staffId: string, sessionId: string | null): Promise<boolean> {
   const secret = process.env.VIEW_AS_SECRET ?? "";
   const token = (await cookies()).get(VIEW_AS_COOKIE)?.value;
@@ -29,17 +24,7 @@ async function viewingAsFrontDesk(staffId: string, sessionId: string | null): Pr
   return claims?.staffId === staffId && claims.sessionId === sessionId;
 }
 
-/**
- * The signed-in, ACTIVE staff member for this request, or null.
- *
- * Identity comes from Clerk (who you are); access comes from our database
- * (whether you are active staff, and your role). A deactivated account loses
- * access immediately, even with a valid Clerk session. The first time an
- * invited person signs in, their Clerk account is linked to the staff record
- * with the same verified email. Cached per request.
- */
 export const getCurrentStaff = cache(async (): Promise<Staff | null> => {
-  // Always per-request: never let a staff lookup be prerendered.
   await connection();
   const { userId, sessionId } = await auth();
   if (!userId) return null;
@@ -58,7 +43,6 @@ export const getCurrentStaff = cache(async (): Promise<Staff | null> => {
     if (record) logger.info("auth.staff_linked", { staffId: record.id });
   }
   if (!record || !record.is_active) return null;
-  // "Last active", at most once an hour (used to pick which manager front desk asks).
   if (!record.last_seen_at || Date.now() - Date.parse(record.last_seen_at) > LAST_SEEN_EVERY_MS) {
     await touchLastSeen(db, record.id).catch((err: unknown) => logger.warn("auth.last_seen_failed", { error: err instanceof Error ? err.message : "error" }));
   }
@@ -68,25 +52,18 @@ export const getCurrentStaff = cache(async (): Promise<Staff | null> => {
   return { id: record.id, fullName: record.full_name, email: record.email, role: record.role };
 });
 
-/** For pages and layouts: redirects to sign-in when there is no active staff session. */
 export async function requireStaff(): Promise<Staff> {
   const staff = await getCurrentStaff();
   if (!staff) redirect("/login?denied=1");
   return staff;
 }
 
-/**
- * For server actions and route handlers that change something: throws instead
- * of redirecting. Refuses while viewing as front desk (fail-safe: anything that
- * hasn't declared itself a read is treated as a write). Reads use authorizeRead.
- */
 export async function authorize(permission?: Permission): Promise<Staff> {
   const staff = await authorizeRead(permission);
   if (staff.viewAs) throw new AppError("FORBIDDEN", VIEW_AS_READ_ONLY);
   return staff;
 }
 
-/** For staff queries that only read. Allowed while viewing as front desk, with front-desk permissions. */
 export async function authorizeRead(permission?: Permission | readonly Permission[]): Promise<Staff> {
   const staff = await getCurrentStaff();
   if (!staff) throw new AppError("UNAUTHENTICATED", "Your session has ended. Please sign in again.");
@@ -96,5 +73,4 @@ export async function authorizeRead(permission?: Permission | readonly Permissio
   return staff;
 }
 
-/** The staff member as the data layer's actor (domain functions re-check the role; writes refuse when read-only). */
 export const actorOf = (staff: Staff): Actor => ({ id: staff.id, role: staff.role, ...(staff.viewAs ? { readOnly: true } : {}) });

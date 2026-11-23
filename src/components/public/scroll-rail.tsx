@@ -3,11 +3,6 @@
 import { Children, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 
-/**
- * A row of cards that swipes sideways on phones (the next card peeks in) and
- * becomes a normal grid from `sm` up. On phones a position indicator below
- * shows how many cards there are and which one is in view.
- */
 export function ScrollRail({ children, className, label, tone = "light" }: { children: React.ReactNode; className?: string; label: string; tone?: "light" | "dark" }) {
   const rail = useRef<HTMLDivElement>(null);
   const count = Children.count(children);

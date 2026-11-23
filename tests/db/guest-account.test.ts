@@ -46,7 +46,6 @@ describe("guest accounts", () => {
     expect(await status(near.id)).toBe("cancelled");
     expect((await q1<{ attention_reason: string }>("SELECT attention_reason FROM reservations WHERE id = ?", near.id)).attention_reason).toMatch(/Refund ₦55,000/);
 
-    // Someone else's booking looks like it doesn't exist.
     await rejects(guestCancel(db, mail(), far.id), /not found/i);
     await guestChangeDates(db, e, far.id, day(31), day(34));
     expect(await q1("SELECT check_in, check_out, total_amount_kobo FROM reservations WHERE id = ?", far.id)).toEqual({ check_in: day(31), check_out: day(34), total_amount_kobo: 16_500_000 });

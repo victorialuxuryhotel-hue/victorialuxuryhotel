@@ -13,7 +13,6 @@ import * as engine from "./domain/reservations";
 import { availabilityForStay, findGuestsByPhone, type PhoneMatch, type TypeAvailability } from "./domain/staff-booking";
 import { deliverEmails } from "./notifications";
 
-/** Runs an action body with consistent error handling and logging. */
 async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResult<T>> {
   try {
     return ok(await body());
@@ -23,8 +22,6 @@ async function run<T>(name: string, body: () => Promise<T>): Promise<ActionResul
     return toActionError(err);
   }
 }
-
-
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date");
 const id = z.uuid();
@@ -44,7 +41,6 @@ const createSchema = z.object({
   next: z.enum(["payment", "reservation"]).optional(),
 });
 
-/** Direct booking (walk-in, phone, WhatsApp) through the same engine as the website. */
 export async function createReservation(_prev: ActionResult<{ id: string; next: string }> | null, formData: FormData): Promise<ActionResult<{ id: string; next: string }>> {
   const result = await run("reservation.create", async () => {
     const staff = await authorize("reservations.manage");
@@ -60,7 +56,6 @@ export async function createReservation(_prev: ActionResult<{ id: string; next: 
     refresh();
     return { id: res.id, next: v.next ?? "reservation" };
   });
-  // "Create & take payment" goes straight to recording the payment (6d).
   if (result.ok) redirect(result.data.next === "payment" ? `/app/payments/record?reservation=${result.data.id}&created=1` : `/app/reservations/${result.data.id}?created=1`);
   return result;
 }
@@ -187,7 +182,6 @@ export async function resolveAttention(_prev: ActionResult | null, formData: For
   });
 }
 
-/** Undo a room assignment or status change made moments ago (see engine.undoAction). */
 export async function undoChange(reservationId: string, undoId: number): Promise<ActionResult<{ message: string }>> {
   return run("reservation.undo", async () => {
     const staff = await authorize("reservations.manage");
@@ -198,7 +192,6 @@ export async function undoChange(reservationId: string, undoId: number): Promise
   });
 }
 
-/** New reservation form: returning guests whose phone matches what's typed (7+ digits). Read-only. */
 export async function lookupGuestsByPhone(phone: string): Promise<PhoneMatch[]> {
   try {
     const staff = await authorizeRead("reservations.manage");
@@ -209,7 +202,6 @@ export async function lookupGuestsByPhone(phone: string): Promise<PhoneMatch[]> 
   }
 }
 
-/** New reservation form: free rooms per type for the chosen dates. Read-only. */
 export async function stayAvailability(checkIn: string, checkOut: string): Promise<TypeAvailability[] | null> {
   try {
     const staff = await authorizeRead("reservations.manage");

@@ -1,8 +1,3 @@
-/**
- * The website's photo places (other than room types, which have their own
- * photos). `shot` is the art direction from docs/photography-brief.md, shown
- * to staff when they upload, so the right photo goes in the right place.
- */
 export const photoSlots = [
   { slot: "hero", label: "Homepage hero", where: "Full-width banner at the top of the homepage", shape: "Landscape, 16:9 or wider", shot: "Arrival at golden hour: the façade glowing warm against a deep-blue sky, entrance lit, a hint of welcome inside." },
   { slot: "welcome", label: "Homepage welcome", where: "Beside the welcome text on the homepage", shape: "Portrait, 4:5", shot: "Reception or lounge, warm and welcoming, staff greeting a guest (out of focus)." },

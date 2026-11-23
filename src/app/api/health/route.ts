@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/server/db";
 
-/**
- * Uptime check for an external monitor (e.g. Better Stack, UptimeRobot).
- * Confirms the app can reach the database. Reveals nothing else.
- */
 export async function GET() {
   let ok = false;
   try {

@@ -10,7 +10,6 @@ import { MobileActionBar } from "./mobile-action-bar";
 
 type Action = (prev: ActionResult | null, formData: FormData) => Promise<ActionResult>;
 
-/** Only what the hotel needs to confirm the stay and reach the guest. */
 export function GuestDetailsForm({
   action,
   hidden,
@@ -22,7 +21,6 @@ export function GuestDetailsForm({
   action: Action;
   hidden: Record<string, string>;
   cancellationPolicy: string | null;
-  /** Shown in the pinned bar on phones. */
   total?: string;
   extras?: Array<{ id: string; name: string; price_kobo: number; per_night: number }>;
   nights?: number;

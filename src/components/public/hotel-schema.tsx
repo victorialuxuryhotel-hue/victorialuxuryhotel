@@ -3,7 +3,6 @@ import { hotelJsonLd, ldJson } from "@/lib/seo";
 import { getPublicCategories } from "@/server/queries/catalogue";
 import { publicBookingRules } from "@/server/queries/booking";
 
-/** The hotel's facts as schema.org JSON-LD, on every public page (for Google and AI search). */
 export async function HotelSchema() {
   await connection();
   const data = await Promise.all([getPublicCategories(), publicBookingRules()]).catch(() => null);

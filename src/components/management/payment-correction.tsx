@@ -7,11 +7,6 @@ import { formatNaira } from "@/lib/format";
 import { keepValues } from "@/lib/forms";
 import { correctPayment } from "@/server/payments";
 
-/**
- * Managers only. A recorded payment is never edited: a correction is saved
- * as its own entry (with its own receipt number) that reduces what was
- * received. The original stays visible so the history adds up.
- */
 export function CorrectPaymentForm({
   paymentId,
   reservationId,

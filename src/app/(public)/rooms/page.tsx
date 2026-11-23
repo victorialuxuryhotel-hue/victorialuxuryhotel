@@ -18,7 +18,6 @@ export const metadata: Metadata = {
   alternates: { canonical: "/rooms" },
 };
 
-// Shared by every room type; all are facilities the hotel offers.
 const included = ["Free Wi-Fi", "24/7 power", "Access to the indoor pool", "On-site parking"];
 
 async function RoomsPageContent() {
@@ -33,7 +32,6 @@ async function RoomsPageContent() {
 
       <Container className="relative z-10 -mt-8"><BookingBar /></Container>
 
-      {/* Phones: a compact list, one row per room type. No availability until dates are chosen. */}
       <Container className="py-10 md:hidden">
         <p className="text-sm text-ink-600">Every room: {included.join(" · ")}</p>
         <ul className="mt-6 divide-y divide-hairline border-y border-hairline">
@@ -92,7 +90,6 @@ async function RoomsPageContent() {
   );
 }
 
-/** Content reads room types and photos per request; the page frame shows immediately. */
 export default function RoomsPage() {
   return (
     <Suspense fallback={<PageSkeleton />}>

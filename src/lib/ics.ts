@@ -1,10 +1,5 @@
 import { hotel } from "@/config/hotel";
 
-/**
- * A one-event calendar file (.ics) for a confirmed stay: from check-in time on
- * the arrival day to check-out time on the departure day. Lagos is UTC+1 all
- * year, so times are converted to UTC without a timezone block.
- */
 export type IcsStay = { reference: string; category: string; checkIn: string; checkOut: string; checkInTime: string; checkOutTime: string; url: string };
 
 function utcStamp(date: string, time: string): string {
@@ -13,7 +8,6 @@ function utcStamp(date: string, time: string): string {
   return new Date(t).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
 
-/** RFC 5545 text escaping. */
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 
 export function stayIcs(s: IcsStay, now = new Date()): string {

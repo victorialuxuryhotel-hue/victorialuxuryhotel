@@ -5,12 +5,6 @@ import { createPortal } from "react-dom";
 
 const noop = () => () => {};
 
-/**
- * Phones and small tablets: the step's total and its main action pinned to
- * the bottom of the screen. Render it INSIDE the form so the button is the
- * form's real submit (with its pending state). A spacer at the end of the
- * page keeps the bar from covering the footer.
- */
 export function MobileActionBar({ label, amount, children }: { label: string; amount: string; children: React.ReactNode }) {
   const mounted = useSyncExternalStore(noop, () => true, () => false);
   return (

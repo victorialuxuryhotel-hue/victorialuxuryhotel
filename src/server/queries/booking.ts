@@ -12,7 +12,6 @@ import { all, first, getDb } from "../db";
 import { freeNights, searchAvailability } from "../domain/inventory";
 import { coverPhotos } from "./catalogue";
 
-/** How far either side of the requested dates to look when a room type is full. */
 const SUGGEST_WITHIN_DAYS = 14;
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -27,17 +26,11 @@ export const staySchema = z
 
 export type Stay = z.infer<typeof staySchema>;
 
-/**
- * Live availability for the website: prices and a yes/no flag per room type
- * only (room counts never leave the server).
- */
 export async function searchStay(stay: Stay): Promise<{ ok: true; options: AvailabilityOption[] } | { ok: false; message: string }> {
-  // Live data and "today" checks: always at request time, never prerendered.
   await connection();
   try {
     const db = await getDb();
     const rows = await searchAvailability(db, stay.checkIn, stay.checkOut, stay.guests);
-    // Full types that would fit the party: look for the nearest dates that work.
     const full = rows.filter((c) => !c.is_available && c.max_occupancy >= stay.guests);
     const nights = nightsBetween(stay.checkIn, stay.checkOut);
     const today = hotelToday();
@@ -63,9 +56,6 @@ export async function searchStay(stay: Stay): Promise<{ ok: true; options: Avail
     };
   } catch (err) {
     if (err instanceof AppError && err.code === "VALIDATION") return { ok: false, message: err.message };
-    // Next cancels in-flight work when a prerender/prefetch completes. That is
-    // not a failed search: let Next handle it rather than rendering a
-    // "couldn't check availability" message into the prefetched page.
     if (err instanceof Error && /During prerendering|prerender/i.test(err.message)) throw err;
     logger.error("booking.search_failed", err);
     return { ok: false, message: "We couldn't check availability just now. Please try again." };
@@ -80,7 +70,6 @@ type BookingRow = {
   room_number: string | null; room_floor: string | null; room_category: string | null;
 };
 
-/** Loads a held booking by its unguessable token, for the guest's review and confirmation pages. */
 export async function getBookingByToken(token: string) {
   await connection();
   if (!z.uuid().safeParse(token).success) return null;
@@ -105,7 +94,6 @@ export async function getBookingByToken(token: string) {
       "SELECT provider, provider_reference, status, amount_kobo, kind, receipt_number, created_at FROM payments WHERE reservation_id = ? ORDER BY created_at DESC",
       r.id,
     );
-    // Decided here (request time), not during render.
     const holdActive = r.status === "pending_payment" && Boolean(r.hold_expires_at) && Date.parse(r.hold_expires_at!) > Date.now();
     const paystack = payments.filter((p) => p.provider === "paystack");
     const paidKobo = payments.filter((p) => p.status === "successful").reduce((sum, p) => sum + (p.kind === "refund" ? -p.amount_kobo : p.amount_kobo), 0);
@@ -123,7 +111,6 @@ export async function getBookingByToken(token: string) {
       extras_kobo: r.extras_kobo,
       discount_kobo: r.discount_kobo,
       promo_code: r.promo_code,
-      /** What the guest pays: room total + extras - discount. */
       due_kobo: r.total_amount_kobo + r.extras_kobo - r.discount_kobo,
       extras: await all<{ name: string; unit_price_kobo: number; per_night: number }>(db, "SELECT name, unit_price_kobo, per_night FROM reservation_extras WHERE reservation_id = ? ORDER BY name", r.id),
       hold_expires_at: r.hold_expires_at,
@@ -132,9 +119,7 @@ export async function getBookingByToken(token: string) {
       guest: { full_name: r.guest_full_name, email: r.guest_email, phone: r.guest_phone },
       photo: photos.get(r.category_slug),
       category: { slug: r.category_slug, name: r.category_name, short_description: publicText(r.category_short_description), max_occupancy: r.category_max_occupancy },
-      // The specific room, once assigned (automatically on payment, or by staff).
       room: r.room_number ? roomLabel(r.room_number, r.room_floor) : undefined,
-      // An upgrade puts the guest in another type: show the room's own type.
       roomCategory: r.room_category ?? r.category_name,
       payments,
       holdActive,
@@ -148,11 +133,6 @@ export async function getBookingByToken(token: string) {
   }
 }
 
-/**
- * The guest's own receipt, reached through the booking's unguessable link
- * (the same token as the confirmation page) plus the receipt number. Returns
- * null unless that receipt belongs to that booking.
- */
 export async function getGuestReceipt(token: string, receiptNumber: string) {
   await connection();
   if (!z.uuid().safeParse(token).success || !/^RCT-\d{4}-\d{6}$/.test(receiptNumber)) return null;
@@ -193,7 +173,6 @@ export async function getGuestReceipt(token: string, receiptNumber: string) {
   };
 }
 
-/** Booking rules the website needs (public information). */
 export async function publicBookingRules() {
   const data = await first<{
     check_in_time: string; check_out_time: string; website_hold_minutes: number; cancellation_policy: string | null;
@@ -206,18 +185,15 @@ export async function publicBookingRules() {
     checkInTime: data?.check_in_time ?? "14:00",
     checkOutTime: data?.check_out_time ?? "12:00",
     holdMinutes: data?.website_hold_minutes ?? 30,
-    // The hotel's own wording if set, otherwise the rule the system applies to online cancellations.
     cancellationPolicy: data?.cancellation_policy ?? (data ? cancellationRuleText(data.free_cancel_hours, data.late_cancel_fee_pct) : null),
   };
 }
 
-/** The cancellation rule in plain words, e.g. "Free cancellation up to 48 hours before check-in. After that, 50% of the room price is charged." */
 export function cancellationRuleText(freeHours: number, feePct: number): string {
   if (feePct === 0) return "Free cancellation up to check-in.";
   return `Free cancellation up to ${freeHours} hours before check-in. After that, ${feePct}% of the room price is charged.`;
 }
 
-/** Extras guests can add to a booking (airport pickup, breakfast...). */
 export async function publicExtras() {
   return all<{ id: string; name: string; price_kobo: number; per_night: number }>(
     await getDb(),

@@ -41,10 +41,6 @@ function Fact({ icon: Icon, label, children }: { icon: typeof CalendarDays; labe
   );
 }
 
-/**
- * Reservation detail. Which actions are OFFERED depends on status and role;
- * whether they are ALLOWED is decided by the server and database every time.
- */
 export function ReservationDetailView({
   r,
   today,
@@ -69,13 +65,10 @@ export function ReservationDetailView({
   canOverride?: boolean;
   maxGuests: number;
   justCreated?: boolean;
-  /** Receipt number of a payment just recorded, to confirm it to staff. */
   paidReceipt?: string;
-  /** For roles that can't do manager-only actions: who to ask. */
   manager?: ManagerToAsk | null;
 }) {
   const balance = r.totalKobo - r.paidKobo;
-  // The guest's own receipt page, shareable on WhatsApp (no sign-in needed; the token is unguessable).
   const receiptLink = r.publicToken ? `${publicEnv().NEXT_PUBLIC_SITE_URL}/book/confirmation/${r.publicToken}` : null;
   const shareReceipt = (receipt: string) =>
     receiptLink
@@ -325,7 +318,6 @@ export function ReservationDetailView({
           </Card>
         </div>
       </div>
-      {/* Phones and tablets: the next step pinned to the bottom. Reset when the status changes. */}
       <NextStepBar key={r.status} r={r} today={today} paymentsHref={paymentsHref} canOverride={canOverride} manager={manager ?? null} />
     </div>
     </ActionFeedbackProvider>

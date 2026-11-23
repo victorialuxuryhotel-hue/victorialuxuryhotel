@@ -3,11 +3,6 @@ import { formatNaira } from "@/lib/format";
 import { dbErrorToken } from "../db-errors";
 import { activity, activityIfChanged, all, first, retryOnStale, MANAGERS, POS_SELLERS, POS_SETTLERS, requireRole, uuid, writeBatch, type Actor, type Db } from "../db";
 
-/**
- * Restaurant and bar sales. A sale is paid at the counter, or charged to a
- * checked-in guest's room and settled (paid) by check-out at the latest. Sales
- * are never edited or deleted; a manager can void one with a reason.
- */
 export type Outlet = "restaurant" | "bar";
 export type SaleMethod = "cash" | "bank_transfer" | "pos_terminal";
 export const OUTLETS: Record<Outlet, string> = { restaurant: "Restaurant", bar: "Bar" };
@@ -41,7 +36,6 @@ export async function setMenuItem(db: Db, actor: Actor, id: string, v: { priceKo
   if (!r?.meta.changes && !(await first(db, "SELECT 1 FROM menu_items WHERE id = ?", id))) throw new AppError("NOT_FOUND", "Menu item not found.");
 }
 
-/** Guests staying now, for "charge to room". */
 export async function inHouseGuests(db: Db, actor: Actor) {
   requireRole(actor, POS_SELLERS);
   return all<{ id: string; reference: string; guest: string; room: string | null }>(
@@ -74,7 +68,6 @@ export async function recordSale(
   const room = v.reservationId ? await first<{ reference: string }>(db, "SELECT reference FROM reservations WHERE id = ?", v.reservationId) : null;
   try {
     await writeBatch(db, actor, [
-      // Sale numbers run 1, 2, 3...; D1 writes one batch at a time, so max + 1 can't collide.
       db
         .prepare(
           `INSERT INTO sales (id, number, outlet, total_kobo, status, method, reservation_id, sold_by)
@@ -95,7 +88,6 @@ export async function recordSale(
   return { id, number: row!.number, totalKobo: total };
 }
 
-/** Front desk takes payment for a guest's unpaid restaurant and bar charges (needed before check-out). */
 export async function settleRoomCharges(db: Db, actor: Actor, reservationId: string, method: SaleMethod): Promise<number> {
   requireRole(actor, POS_SETTLERS);
   return retryOnStale(async () => {
@@ -137,7 +129,6 @@ export type SaleRow = {
   created_at: string; sold_by_name: string | null; room_reference: string | null; items: string;
 };
 
-/** Today's sales (Lagos day), newest first, with a one-line item summary. */
 export async function salesToday(db: Db, actor: Actor, day: string): Promise<SaleRow[]> {
   requireRole(actor, POS_SELLERS);
   return all<SaleRow>(
@@ -150,7 +141,6 @@ export async function salesToday(db: Db, actor: Actor, day: string): Promise<Sal
   );
 }
 
-/** A guest's restaurant and bar charges, for the reservation page. */
 export async function chargesFor(db: Db, actor: Actor, reservationId: string) {
   requireRole(actor, [...POS_SETTLERS, ...POS_SELLERS]);
   return all<{ id: string; number: number; total_kobo: number; status: string; created_at: string; items: string }>(

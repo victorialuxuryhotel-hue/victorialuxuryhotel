@@ -6,12 +6,10 @@ import { SignOutButton, useSignIn } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input } from "@/components/ui/form";
 
-/** Only allow redirects back into the management app (no open redirects). */
 function safeNext(next: string | undefined) {
   return next && /^\/app(\/[\w\-/]*)?$/.test(next) ? next : "/app";
 }
 
-/** Plain words for the Clerk errors staff are likely to hit. */
 function friendly(code: string | undefined, fallback: string | undefined): string {
   switch (code) {
     case "form_identifier_not_found":
@@ -30,11 +28,6 @@ function friendly(code: string | undefined, fallback: string | undefined): strin
   }
 }
 
-/**
- * Staff sign-in with username (or email) and password. Clerk may ask a new
- * device to confirm with a code emailed to the account; that step is handled
- * here too. No sign-up: new staff arrive through the owner's invitation.
- */
 export function SignInPanel({ next }: { next?: string }) {
   const { signIn, fetchStatus } = useSignIn();
   const router = useRouter();
@@ -160,10 +153,6 @@ export function SignInPanel({ next }: { next?: string }) {
   );
 }
 
-/**
- * Signed in with Clerk, but not (or no longer) active staff. Sign-in would
- * just bounce back here, so offer to sign out instead.
- */
 export function AccessDenied() {
   return (
     <div className="space-y-5">

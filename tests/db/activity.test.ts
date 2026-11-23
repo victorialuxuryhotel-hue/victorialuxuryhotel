@@ -3,7 +3,6 @@ import { listActivity } from "@/server/domain/activity";
 import { addDays, hotelToday } from "@/lib/hotel-date";
 import { db, desk, exec, gm, owner, rejects } from "./helpers";
 
-/** Activity screen filters: Lagos days, category, person, routine events, paging. Nothing is ever deleted. */
 const tag = crypto.randomUUID().slice(0, 8);
 
 async function log(action: string, at: string, actorId: string | null, summary: string) {
@@ -18,7 +17,6 @@ const mine = (rows: Array<{ summary: string }>) => rows.filter((r) => r.summary.
 describe("activity log screen", () => {
   it("filters by Lagos day, category, person and routine, newest first", async () => {
     const today = hotelToday();
-    // 23:30 UTC yesterday is 00:30 Lagos today.
     await log("reservation.checked_in", `${addDays(today, -1)}T23:30:00.000Z`, gm!.id, "just after Lagos midnight");
     await log("payment.recorded", `${today}T09:00:00.000Z`, desk!.id, "desk payment");
     await log("payment.started", `${today}T09:05:00.000Z`, null, "routine attempt");

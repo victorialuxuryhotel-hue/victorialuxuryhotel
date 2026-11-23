@@ -8,10 +8,6 @@ import { all, first, getDb } from "../db";
 
 export type BoardRoom = RoomTile & { categoryId: string; serviceStatus: "in_service" | "maintenance"; reservationId?: string };
 
-/**
- * Every room with its state right now. Occupancy is derived from reservations;
- * only maintenance and readiness are stored on the room itself.
- */
 export async function roomBoard(): Promise<BoardRoom[]> {
   await authorizeRead(["rooms.status", "reports.view"]);
   const db = await getDb();
@@ -63,7 +59,6 @@ export async function roomBoard(): Promise<BoardRoom[]> {
     });
 }
 
-/** In-service rooms of any category that are free for the given nights. */
 export async function assignableRooms(reservationId: string, checkIn: string, checkOut: string) {
   await authorizeRead("reservations.manage");
   const rows = await all<{ id: string; room_number: string; readiness: string; category_name: string }>(

@@ -7,7 +7,6 @@ export function Spinner({ className, label = "Loading" }: { className?: string; 
   );
 }
 
-/** Waits 300ms before showing, so quick loads don't flash a spinner. */
 export function LoadingState({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="delayed-show flex min-h-48 flex-1 items-center justify-center gap-3 text-ink-500">
@@ -17,7 +16,6 @@ export function LoadingState({ label = "Loading…" }: { label?: string }) {
   );
 }
 
-/** Skeleton rows in the shape of a list, for content that is loading. */
 export function SkeletonRows({ rows = 4, label = "Loading" }: { rows?: number; label?: string }) {
   return (
     <div role="status" aria-label={label} aria-busy className="delayed-show divide-y divide-hairline">
@@ -31,7 +29,6 @@ export function SkeletonRows({ rows = 4, label = "Loading" }: { rows?: number; l
   );
 }
 
-/** A heading that states the fact, one line of help, and the action that fills it. */
 export function EmptyState({ title, description, action, icon }: { title: string; description?: string; action?: ReactNode; icon?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-card border border-hairline px-6 py-12 text-center">

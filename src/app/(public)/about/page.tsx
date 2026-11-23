@@ -82,7 +82,6 @@ async function AboutPageContent() {
   );
 }
 
-/** Content reads room types and photos per request; the page frame shows immediately. */
 export default function AboutPage() {
   return (
     <Suspense fallback={<PageSkeleton />}>

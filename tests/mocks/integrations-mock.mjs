@@ -1,11 +1,3 @@
-// Local stand-in for Paystack and Resend, for development and automated tests.
-// Mirrors the endpoints the app uses; adds /__control endpoints so tests can
-// simulate failures, abandoned checkouts, delayed / duplicate / forged webhooks
-// and tampered amounts. NEVER used in production (live keys ignore the override).
-//
-//   node tests/mocks/integrations-mock.mjs        (port 4010)
-//   env: MOCK_PAYSTACK_SECRET (must equal the app's PAYSTACK_SECRET_KEY)
-//        APP_WEBHOOK_URL (default http://localhost:3000/api/webhooks/paystack)
 import { createServer } from "node:http";
 import { createHmac, randomUUID } from "node:crypto";
 
@@ -63,7 +55,6 @@ createServer(async (req, res) => {
   const url = new URL(req.url, SELF);
   const path = url.pathname;
   try {
-    // ---------------- Paystack API
     if (req.method === "POST" && path === "/transaction/initialize") {
       if (!authed(req, SECRET)) return json(res, 401, { status: false, message: "Invalid key" });
       const b = JSON.parse(await readBody(req));
@@ -81,7 +72,6 @@ createServer(async (req, res) => {
         reference: tx.reference, status: tx.status, amount: tx.reportedAmount ?? tx.amount, currency: tx.reportedCurrency ?? tx.currency,
         paid_at: tx.paidAt, channel: tx.channel, gateway_response: tx.gatewayResponse } });
     }
-    // ---------------- Hosted checkout
     if (req.method === "GET" && path.startsWith("/checkout/")) {
       const tx = transactions.get(path.split("/")[2]);
       if (!tx) { res.writeHead(404); return res.end("unknown"); }
@@ -97,7 +87,6 @@ createServer(async (req, res) => {
       res.writeHead(302, { Location: `${tx.callbackUrl}?trxref=${ref}&reference=${ref}` });
       return res.end();
     }
-    // ---------------- Resend API
     if (req.method === "POST" && path === "/emails") {
       if (!req.headers.authorization?.startsWith("Bearer re_")) return json(res, 401, { message: "Invalid API key" });
       const key = req.headers["idempotency-key"];
@@ -108,7 +97,6 @@ createServer(async (req, res) => {
       if (key) idempotency.set(key, id);
       return json(res, 200, { id });
     }
-    // ---------------- Test controls
     if (path === "/__emails") {
       if (req.method === "DELETE") { emails.length = 0; idempotency.clear(); return json(res, 200, { ok: true }); }
       return json(res, 200, emails);
@@ -125,7 +113,6 @@ createServer(async (req, res) => {
       for (let i = 0; i < (b.webhooks ?? 0); i++) deliveries.push(await sendWebhook(tx, { badSignature: b.badSignature }));
       return json(res, 200, { tx, deliveries });
     }
-    // ---------------- Alert webhook (Slack/Discord-compatible)
     if (path === "/__alerts") {
       if (req.method === "POST") { alerts.push(JSON.parse((await readBody(req)) || "{}")); return json(res, 200, { ok: true }); }
       if (req.method === "DELETE") { alerts.length = 0; return json(res, 200, { ok: true }); }

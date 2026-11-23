@@ -4,20 +4,10 @@ import { hotelDateOf } from "@/lib/hotel-date";
 import { activity, activityIfChanged, all, ALL_STAFF, first, MANAGERS, OWNER, requireRole, uuid, writeBatch, type Actor, type Db, type StaffRole } from "../db";
 import { formatNaira } from "@/lib/format";
 
-/**
- * Configuration: room types, rooms, photos, booking rules and staff.
- * Managers only (staff: owner only). Audit records for these changes are
- * written by triggers (migrations/0004), attributed via the request context.
- */
-
 function conflictOnUnique(err: unknown, message: string): never {
   if (err instanceof AppError && dbErrorToken(err.cause) === "unique") throw new AppError("CONFLICT", message);
   throw err;
 }
-
-// ---------------------------------------------------------------------------
-// Room types and rooms
-// ---------------------------------------------------------------------------
 
 export type CategoryInput = {
   id?: string;
@@ -71,14 +61,9 @@ export async function createRoom(db: Db, actor: Actor, v: { roomNumber: string; 
   }
 }
 
-// ---------------------------------------------------------------------------
-// Photo records (the files themselves are in R2; see src/server/photos.ts)
-// ---------------------------------------------------------------------------
-
 export async function addCategoryPhoto(db: Db, actor: Actor, v: { categoryId: string; storagePath: string; altText: string }): Promise<void> {
   requireRole(actor, MANAGERS);
   if (!(await first(db, "SELECT 1 FROM room_categories WHERE id = ?", v.categoryId))) throw new AppError("NOT_FOUND", "Room type not found.");
-  // Next position and "first photo is the cover", computed inside the insert.
   await writeBatch(db, actor, [
     db
       .prepare(
@@ -91,7 +76,6 @@ export async function addCategoryPhoto(db: Db, actor: Actor, v: { categoryId: st
   ]);
 }
 
-/** Deletes the record and returns the file's key so the caller can remove it. */
 export async function deleteCategoryPhoto(db: Db, actor: Actor, photoId: string): Promise<string> {
   requireRole(actor, MANAGERS);
   const photo = await first<{ category_id: string; storage_path: string; is_cover: number }>(
@@ -101,7 +85,6 @@ export async function deleteCategoryPhoto(db: Db, actor: Actor, photoId: string)
   );
   if (!photo) throw new AppError("NOT_FOUND", "Photo not found.");
   const stmts = [db.prepare("DELETE FROM room_category_images WHERE id = ?").bind(photoId)];
-  // The next photo becomes the cover.
   if (photo.is_cover) {
     stmts.push(
       db
@@ -120,7 +103,6 @@ export async function setCoverPhoto(db: Db, actor: Actor, photoId: string): Prom
   requireRole(actor, MANAGERS);
   const photo = await first<{ category_id: string }>(db, "SELECT category_id FROM room_category_images WHERE id = ?", photoId);
   if (!photo) throw new AppError("NOT_FOUND", "Photo not found.");
-  // Clear first: at most one cover per category (unique index). One batch, so never zero covers.
   await writeBatch(db, actor, [
     db.prepare("UPDATE room_category_images SET is_cover = 0 WHERE category_id = ? AND is_cover = 1").bind(photo.category_id),
     db.prepare("UPDATE room_category_images SET is_cover = 1 WHERE id = ?").bind(photoId),
@@ -146,10 +128,6 @@ export async function updatePhotoAlt(db: Db, actor: Actor, kind: "site" | "categ
   if (!result?.meta.changes) throw new AppError("NOT_FOUND", "Photo not found.");
 }
 
-/**
- * Adds a website photo. Single places are replaced (returns the old file's key
- * for the caller to remove); the gallery grows.
- */
 export async function addSitePhoto(
   db: Db,
   actor: Actor,
@@ -177,10 +155,6 @@ export async function deleteSitePhoto(db: Db, actor: Actor, photoId: string): Pr
   return photo.storage_path;
 }
 
-// ---------------------------------------------------------------------------
-// Booking rules
-// ---------------------------------------------------------------------------
-
 export async function updateBookingRules(
   db: Db,
   actor: Actor,
@@ -202,18 +176,8 @@ export async function updateBookingRules(
   ]);
 }
 
-// ---------------------------------------------------------------------------
-// Staff (owner only). Identity is Clerk; role and access live here.
-// ---------------------------------------------------------------------------
-
-/**
- * The role the app uses. Finance and Restaurant & bar are stored as a
- * department on a front-desk record (see migration 0009), so every staff
- * lookup reads role through this expression.
- */
 export const ROLE = "coalesce(department, role)";
 
-/** How a role is stored: departments sit on a front-desk record. */
 export function storedRole(role: StaffRole): { role: "owner" | "general_manager" | "front_desk"; department: "finance" | "restaurant_bar" | null } {
   return role === "finance" || role === "restaurant_bar" ? { role: "front_desk", department: role } : { role, department: null };
 }
@@ -224,7 +188,6 @@ export type StaffRecord = {
 
 export async function createStaffProfile(db: Db, actor: Actor, v: { fullName: string; email: string; role: StaffRole; phone?: string | null }): Promise<string> {
   requireRole(actor, OWNER);
-  // Owner access is never granted by invitation; it's a separate, confirmed step (promoteToOwner).
   if (v.role === "owner") throw new AppError("VALIDATION", "Invite as general manager or front desk. Make them owner afterwards.");
   const id = uuid();
   try {
@@ -239,7 +202,6 @@ export async function createStaffProfile(db: Db, actor: Actor, v: { fullName: st
   return id;
 }
 
-/** Bootstrap only (CLI): the very first owner, before anyone can sign in. */
 export async function createFirstOwner(db: Db, v: { fullName: string; email: string }): Promise<string> {
   if (await first(db, "SELECT 1 FROM staff_profiles WHERE role = 'owner' AND is_active = 1")) {
     throw new AppError("CONFLICT", "An owner already exists. Invite staff from the app instead.");
@@ -251,7 +213,6 @@ export async function createFirstOwner(db: Db, v: { fullName: string; email: str
   return id;
 }
 
-/** Change role or access. The "keep an owner" trigger and the audit trigger apply. */
 export async function updateStaffProfile(
   db: Db,
   actor: Actor,
@@ -277,11 +238,6 @@ export async function updateStaffProfile(
   return (await first<StaffRecord>(db, `SELECT id, clerk_user_id, full_name, email, ${ROLE} AS role, is_active FROM staff_profiles WHERE id = ?`, v.staffId))!;
 }
 
-/**
- * Gives an active staff member owner access: the separate, confirmed action
- * on their row (never part of an invite or an ordinary role change). The
- * audit trigger logs it with the owner's name.
- */
 export async function promoteToOwner(db: Db, actor: Actor, staffId: string): Promise<StaffRecord> {
   requireRole(actor, OWNER);
   const current = await first<{ role: StaffRole; is_active: number }>(db, `SELECT ${ROLE} AS role, is_active FROM staff_profiles WHERE id = ?`, staffId);
@@ -293,7 +249,6 @@ export async function promoteToOwner(db: Db, actor: Actor, staffId: string): Pro
   return (await first<StaffRecord>(db, `SELECT id, clerk_user_id, full_name, email, ${ROLE} AS role, is_active FROM staff_profiles WHERE id = ?`, staffId))!;
 }
 
-/** Links a Clerk user to the invited staff record with the same (verified) email, on first sign-in. */
 export async function linkClerkUser(db: Db, clerkUserId: string, email: string): Promise<StaffRecord | null> {
   await db
     .prepare("UPDATE staff_profiles SET clerk_user_id = ? WHERE email = ? AND clerk_user_id IS NULL")
@@ -302,11 +257,6 @@ export async function linkClerkUser(db: Db, clerkUserId: string, email: string):
   return first<StaffRecord>(db, `SELECT id, clerk_user_id, full_name, email, ${ROLE} AS role, is_active FROM staff_profiles WHERE clerk_user_id = ?`, clerkUserId);
 }
 
-
-/**
- * Records that a staff member is using the app, at most once an hour (the
- * caller checks the age). Not a business change: no audit entry.
- */
 export async function touchLastSeen(db: Db, staffId: string, at: string = new Date().toISOString()): Promise<void> {
   await db.prepare("UPDATE staff_profiles SET last_seen_at = ? WHERE id = ? AND is_active = 1").bind(at, staffId).run();
 }
@@ -315,12 +265,6 @@ export const LAST_SEEN_EVERY_MS = 60 * 60 * 1000;
 
 export type ManagerToAsk = { name: string; role: "general_manager" | "owner"; phone: string | null; activeToday: boolean };
 
-/**
- * Who front desk should ask for a manager-only action. There's no shift data,
- * so: the most recently active general manager, else the most recently active
- * owner. "Active today" only when they really used the app today (Lagos time).
- * For signed-in staff only; the phone number is never shown to guests.
- */
 export async function managerToAsk(db: Db, actor: Actor, today: string): Promise<ManagerToAsk | null> {
   requireRole(actor, ALL_STAFF);
   const row = await first<{ full_name: string; role: "general_manager" | "owner"; phone: string | null; last_seen_at: string | null }>(
@@ -338,10 +282,6 @@ export async function managerToAsk(db: Db, actor: Actor, today: string): Promise
     activeToday: row.last_seen_at ? hotelDateOf(row.last_seen_at) === today : false,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Booking extras and promo codes (managers). Changes are logged.
-// ---------------------------------------------------------------------------
 
 export async function addExtra(db: Db, actor: Actor, v: { name: string; priceKobo: number; perNight: boolean }): Promise<string> {
   requireRole(actor, MANAGERS);

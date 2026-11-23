@@ -10,12 +10,6 @@ const subscribe = (cb: () => void) => {
   return () => mq.removeEventListener("change", cb);
 };
 
-/**
- * Below xl: a section that folds away behind a 52px row ("Guest · contact
- * details  +"), so long pages aren't several forms deep on a phone. From xl:
- * its content is shown as normal (with `wideHeader` if given). Opens itself
- * when the URL hash matches its id (e.g. a "Change dates or room" shortcut).
- */
 export function Collapsible({ id, title, wideHeader, children }: { id: string; title: string; wideHeader?: React.ReactNode; children: React.ReactNode }) {
   const wide = useSyncExternalStore(subscribe, () => window.matchMedia(XL).matches, () => false);
   const [open, setOpen] = useState(false);

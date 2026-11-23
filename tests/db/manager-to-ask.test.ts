@@ -3,7 +3,6 @@ import { managerToAsk, touchLastSeen } from "@/server/domain/admin";
 import { addDays, hotelToday } from "@/lib/hotel-date";
 import { db, desk, exec, gm, q1, rejects } from "./helpers";
 
-/** 5e: front desk is pointed at a manager to ask, preferring the general manager seen most recently. */
 describe("manager to ask", () => {
   it("names the most recently seen general manager, active today, with their phone", async () => {
     await exec("UPDATE staff_profiles SET phone = ? WHERE id = ?", "+234 803 000 0000", gm!.id);

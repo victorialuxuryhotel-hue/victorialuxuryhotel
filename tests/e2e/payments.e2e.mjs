@@ -1,5 +1,3 @@
-// Payment flows end to end: browser → app → (mock) Paystack → webhook → database → (mock) Resend.
-// Needs: pnpm dev, pnpm mock:integrations, local Supabase with dev staff.
 import puppeteer from "puppeteer-core";
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -15,7 +13,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: true });
 const waitText = (p, re, timeout = 20000) => p.waitForFunction((src) => new RegExp(src).test(document.body.innerText), { timeout }, re.source);
 const emailsTo = async (to) => (await (await fetch(`${MOCK}/__emails`)).json()).filter((e) => e.to.includes(to));
-// Emails are sent from an outbox after the response: wait for them to arrive.
 const waitForEmails = async (to, match, timeout = 15000) => {
   const end = Date.now() + timeout;
   for (;;) {
@@ -29,7 +26,6 @@ let dayOffset = 400 + Math.floor(Math.random() * 300);
 
 await fetch(`${MOCK}/__emails`, { method: "DELETE" });
 
-/** Guest books a Standard room and lands on the review page. Returns {p, ctx, email, token, ref}. */
 async function bookAndReview() {
   const ctx = await browser.createBrowserContext();
   const p = await ctx.newPage();
@@ -61,7 +57,6 @@ async function payAt(p, button) {
 }
 const resStatus = (ref) => sql(`select status from reservations where reference = '${ref}';`);
 
-// 1. Success: webhook + callback race, one confirmation, one email, receipt
 {
   const { ctx, p, email, ref } = await bookAndReview();
   check("guest is charged the database-calculated amount", (await p.evaluate(() => document.body.innerText)).includes("₦"));
@@ -78,7 +73,6 @@ const resStatus = (ref) => sql(`select status from reservations where reference 
   check("hotel inbox gets a copy", (await waitForEmails("frontdesk-inbox@victoria.test", new RegExp(ref))).length === 1);
   check("exactly one verification in the audit log", sql(`select count(*) from activity_log a join reservations r on r.id = a.entity_id where r.reference='${ref}' and a.action='payment.verified';`) === "1");
 
-  // 2. Duplicate webhooks (Paystack retries): no-ops
   const dup = await control(payRef, { webhooks: 3 });
   check("duplicate webhooks are acknowledged as duplicates", dup.deliveries.every((d) => d.status === 200 && /duplicate/.test(d.body)), JSON.stringify(dup.deliveries));
   check("still one stored event for this delivery", sql(`select count(*) from payment_events where provider_reference='${payRef}' and event_type='charge.success';`) === "1");
@@ -86,13 +80,11 @@ const resStatus = (ref) => sql(`select status from reservations where reference 
   await sleep(300);
   check("no extra emails after duplicates", (await emailsTo(email)).length === 1);
 
-  // 3. Forged webhook: rejected
   const forged = await control(payRef, { webhooks: 1, badSignature: true });
   check("webhook with a bad signature is rejected (401)", forged.deliveries[0].status === 401);
   await ctx.close();
 }
 
-// 4. Failed then retried successfully
 {
   const { ctx, p, ref } = await bookAndReview();
   const failedRef = await payAt(p, "pay-failed");
@@ -107,7 +99,6 @@ const resStatus = (ref) => sql(`select status from reservations where reference 
   await ctx.close();
 }
 
-// 5. Abandoned checkout
 {
   const { ctx, p, ref } = await bookAndReview();
   const abRef = await payAt(p, "pay-cancel");
@@ -116,7 +107,6 @@ const resStatus = (ref) => sql(`select status from reservations where reference 
   await ctx.close();
 }
 
-// 6. Delayed/lost webhook: the confirmation page verifies with Paystack itself
 {
   await fetch(`${MOCK}/__control/next-webhook?mode=skip`, { method: "POST" });
   const { ctx, p, ref, email } = await bookAndReview();
@@ -129,7 +119,6 @@ const resStatus = (ref) => sql(`select status from reservations where reference 
   await ctx.close();
 }
 
-// 7. Guest never returns AND webhook lost: the scheduled job settles it
 {
   const { ctx, p, ref } = await bookAndReview();
   await p.click("button::-p-text(Pay securely)");
@@ -144,7 +133,6 @@ const resStatus = (ref) => sql(`select status from reservations where reference 
   check("scheduled job settles the paid booking", resStatus(ref) === "confirmed", JSON.stringify(cron));
 }
 
-// 8. Tampered amount: flagged, not confirmed
 {
   await fetch(`${MOCK}/__control/next-webhook?mode=skip`, { method: "POST" });
   const { ctx, p, ref } = await bookAndReview();
@@ -160,7 +148,6 @@ const resStatus = (ref) => sql(`select status from reservations where reference 
   await ctx.close();
 }
 
-// 9. Offline payments by staff, receipts, cancellation email
 {
   const ctx = await browser.createBrowserContext();
   const p = await ctx.newPage();
@@ -198,7 +185,6 @@ const resStatus = (ref) => sql(`select status from reservations where reference 
   await p.click("button::-p-text(Record payment)");
   await sleep(800);
   check("browser blocks recording without confirming receipt", sql(`select count(*) from payments where reservation_id='${resId}';`) === "0");
-  // Bypass the browser check: the server must refuse on its own.
   await p.$eval("input[name=confirmReceived]", (e) => e.removeAttribute("required"));
   await p.click("button::-p-text(Record payment)");
   await waitText(p, /Confirm the hotel has received this money/);
@@ -226,7 +212,6 @@ const resStatus = (ref) => sql(`select status from reservations where reference 
   const rt = await p.evaluate(() => document.body.innerText);
   check("printable receipt shows number, guest and 'recorded by'", rt.includes("Cash Guest") && /recorded by/i.test(rt));
 
-  // Cancellation email (new booking, then cancel)
   await p.goto(`${BASE}/app/reservations/${resId}`, { waitUntil: "networkidle0" });
   check("confirmed booking with payments offers cancel", (await p.evaluate(() => document.body.innerText)).includes("Cancel"));
   await p.click("summary::-p-text(Cancel)");

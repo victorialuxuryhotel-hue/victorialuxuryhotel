@@ -22,7 +22,6 @@ type R = Pick<
 
 const reasons = ["Guest called to cancel", "Guest changed travel plans", "Booked by mistake", "Duplicate booking"];
 
-/** "Cancel this booking?" with the result in the guest's terms. The safe choice comes first. */
 function CancelConfirm({ r, onKeep }: { r: R; onKeep: () => void }) {
   const [state, action, pending] = useActionState(cancelReservation, null);
   const [reason, setReason] = useState(reasons[0]!);
@@ -96,13 +95,8 @@ function OverrideInline({ id }: { id: string }) {
   );
 }
 
-/**
- * Phones and tablets: the one next step pinned to the bottom, worded as the
- * action, with everything else under "Other options".
- */
 const roleName = { general_manager: "General manager", owner: "Owner" } as const;
 
-/** Front desk: who to ask for a manager-only action. The phone shows only here, to signed-in staff. */
 function AskManager({ manager, what, onBack }: { manager: ManagerToAsk | null; what: string; onBack: () => void }) {
   const first = manager?.name.split(" ")[0];
   const wa = whatsappLink(manager?.phone, "");

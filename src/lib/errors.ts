@@ -1,11 +1,4 @@
 import { ZodError } from "zod";
-/**
- * Error model shared by server actions, route handlers and domain services.
- *
- * Domain code throws `AppError` with a stable `code`; the boundary (action or
- * route) converts it to an `ActionResult` so the UI receives a safe message and
- * never a raw database or provider error.
- */
 export type ErrorCode =
   | "VALIDATION"
   | "UNAUTHENTICATED"

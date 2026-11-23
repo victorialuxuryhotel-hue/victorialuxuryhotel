@@ -5,11 +5,6 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { cn } from "@/lib/utils/cn";
 import { RoomQuickActions } from "./room-actions";
 
-/**
- * A room tile that opens its quick actions: a bottom sheet with full-width
- * buttons on phones, a popover from md up (opening leftwards when the tile is
- * near the right edge, so it never runs off screen).
- */
 export function RoomTile({
   children,
   className,

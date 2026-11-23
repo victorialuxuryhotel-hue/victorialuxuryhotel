@@ -4,12 +4,6 @@ import { cn } from "@/lib/utils/cn";
 const control =
   "block w-full rounded-md border border-hairline bg-transparent px-3 text-base text-ink-900 caret-navy-700 md:text-sm placeholder:text-ink-400 hover:border-ink-900/45 focus:border-navy-700 focus:outline-none focus:ring-2 focus:ring-navy-700/20 disabled:opacity-45 aria-invalid:border-danger-600";
 
-/**
- * Label + control + hint/error, wired for accessibility. Pass the control as
- * children with the same `id` as `htmlFor`. Required is the default; mark the
- * exceptions `optional`. A single control child gets aria-describedby and
- * aria-invalid automatically.
- */
 export function Field({ label, htmlFor, hint, error, optional, children, className }: {
   label: string;
   htmlFor: string;
@@ -60,7 +54,6 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
   return <textarea className={cn(control, "min-h-24 py-2", className)} {...props} />;
 }
 
-/** Form-level error summary (e.g. "Those dates are no longer available"). */
 export function FormMessage({ tone = "error", children }: { tone?: "error" | "success"; children: ReactNode }) {
   return (
     <div

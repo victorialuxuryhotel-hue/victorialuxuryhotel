@@ -8,7 +8,6 @@ import { toActionError } from "@/lib/errors";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const lagos = (iso: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", ...opts }).format(new Date(iso));
 
-/** The activity log for the chosen filters as CSV (managers and the owner). Lagos time. */
 export async function GET(request: Request) {
   let staff;
   try {

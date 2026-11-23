@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-/** Re-renders the page every few seconds (up to a limit) while a payment is being confirmed. */
 export function AutoRefresh({ everyMs = 4000, maxTimes = 15 }: { everyMs?: number; maxTimes?: number }) {
   const router = useRouter();
   useEffect(() => {

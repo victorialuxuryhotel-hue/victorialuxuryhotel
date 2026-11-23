@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils/cn";
 
 const address = `${hotel.address.line1}, ${hotel.address.city}, ${hotel.address.state}`;
 
-/** A drawn street-map motif with a pin: a visual cue, not a real map. */
 export function MapMotif({ className }: { className?: string }) {
   return (
     <div aria-hidden className={cn("relative h-36 overflow-hidden bg-ivory-100", className)}>
@@ -22,11 +21,6 @@ export function MapMotif({ className }: { className?: string }) {
   );
 }
 
-/**
- * Where the hotel is. Phones and tablets get a still card that opens the
- * maps app: an embedded map there catches the finger and stops the page
- * scrolling. Large screens get the interactive embed.
- */
 export function MapCard({ className, embedClassName }: { className?: string; embedClassName?: string }) {
   return (
     <>
@@ -49,7 +43,6 @@ export function MapCard({ className, embedClassName }: { className?: string; emb
   );
 }
 
-/** The interactive map, large screens only (on phones it would catch the scroll). */
 export function MapEmbed({ className }: { className?: string }) {
   return (
     <iframe

@@ -20,14 +20,6 @@ import {
 } from "../db";
 import { freeUnits, validateStay } from "./inventory";
 
-/**
- * The reservation engine. Every state change goes through a function here.
- * Each one checks the actor's role, reads what it needs, validates the
- * business rules with clear messages, and writes the change plus its audit
- * record in one atomic batch guarded against concurrent changes. Database
- * triggers re-enforce the hard rules (overlap, capacity, transitions).
- */
-
 export type ReservationRow = {
   id: string;
   reference: string;
@@ -50,9 +42,7 @@ export type ReservationRow = {
   discount_kobo: number;
 };
 
-/** What the guest owes for the booking: room total + extras - discount. */
 export const dueOf = (r: Pick<ReservationRow, "total_amount_kobo" | "extras_kobo" | "discount_kobo">) => r.total_amount_kobo + r.extras_kobo - r.discount_kobo;
-/** The same in SQL, for a reservations row aliased r. */
 export const DUE_SQL = "(r.total_amount_kobo + r.extras_kobo - r.discount_kobo)";
 
 export const RES_COLUMNS = `id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count,
@@ -65,7 +55,6 @@ export async function loadReservation(db: Db, id: string): Promise<ReservationRo
   return res;
 }
 
-/** Net verified money in (payments minus refunds). */
 export async function netPaid(db: Db, reservationId: string): Promise<number> {
   const row = await first<{ paid: number }>(
     db,
@@ -81,23 +70,17 @@ const isHoldLive = (res: Pick<ReservationRow, "status" | "hold_expires_at">) =>
 
 const naira = (kobo: number) => formatNaira(kobo).replace(/\s/g, "");
 
-/** Human-friendly, non-sequential reference (no 0/O/1/I/L confusion). */
 export function generateReference(): string {
   const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return "VL-" + Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
 }
 
-/** Errors from the batch that need a message more specific than the generic one. */
 function rethrow(err: unknown, messages: Partial<Record<string, AppError>>): never {
   const token = err instanceof AppError ? dbErrorToken(err.cause) : null;
   const specific = token ? messages[token] : undefined;
   throw specific ?? err;
 }
-
-// ---------------------------------------------------------------------------
-// Creation (website and staff share one engine)
-// ---------------------------------------------------------------------------
 
 type CreateInput = {
   categoryId: string;
@@ -105,15 +88,12 @@ type CreateInput = {
   checkOut: string;
   guests: number;
   guestId?: string | null;
-  /** Staff only: the specific room, checked against the type and the dates. */
   roomId?: string | null;
   fullName?: string | null;
   email?: string | null;
   phone?: string | null;
   specialRequests?: string | null;
-  /** Extras the guest chose (ids of active extras). */
   extraIds?: string[];
-  /** A promo code typed by the guest (website only). */
   promoCode?: string | null;
   source: ReservationRow["source"];
   createdBy: string | null;
@@ -152,7 +132,6 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
   const nights = nightsBetween(input.checkIn, input.checkOut);
   const total = cat.nightly_rate_kobo * nights;
 
-  // Extras are priced now (per stay or per night) and kept with the booking.
   const ids = [...new Set(input.extraIds ?? [])].slice(0, 20);
   const extras = ids.length
     ? await all<{ id: string; name: string; price_kobo: number; per_night: number }>(
@@ -164,14 +143,12 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
   if (extras.length !== ids.length) throw new AppError("VALIDATION", "One of the extras is no longer available. Please choose again.");
   const extrasKobo = extras.reduce((sum, e) => sum + e.price_kobo * (e.per_night ? nights : 1), 0);
 
-  // A promo code takes a percentage off the room total. The database re-checks it when the booking is written.
   const code = input.promoCode?.trim().toUpperCase() || null;
   const promo = code ? await validPromo(db, code) : null;
   const discountPct = promo?.percent_off ?? 0;
   const discountKobo = Math.round((total * discountPct) / 100);
   const holdExpiresAt = new Date(Date.now() + input.holdMinutes * 60_000).toISOString();
 
-  // A reference collision is astronomically rare; retry with a new one if it happens.
   for (let attempt = 1; ; attempt++) {
     const id = uuid();
     const reference = generateReference();
@@ -182,8 +159,6 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
     if (input.guestId) {
       guestParam = input.guestId;
     } else if (email) {
-      // Link returning guests by email. Never overwrite an existing name from
-      // an unauthenticated booking; only fill in a missing phone number.
       stmts.push(
         db
           .prepare(
@@ -234,7 +209,6 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
   }
 }
 
-/** Website: called by the server after validating input. Holds for the website hold period. */
 export async function createWebsiteReservation(
   db: Db,
   input: {
@@ -255,7 +229,6 @@ export async function createWebsiteReservation(
   });
 }
 
-/** Staff: walk-in, phone, WhatsApp. Same engine; held for the direct-booking period. */
 export async function createStaffReservation(
   db: Db,
   actor: Actor,
@@ -267,10 +240,6 @@ export async function createStaffReservation(
   const res = await createReservation(db, actor, { ...input, createdBy: actor.id, holdMinutes: (settings?.staff_hold_hours ?? 24) * 60 });
   return { id: res.id, reference: res.reference };
 }
-
-// ---------------------------------------------------------------------------
-// Room assignment
-// ---------------------------------------------------------------------------
 
 type RoomRow = { id: string; room_number: string; category_id: string; service_status: string; readiness: string; is_active: number; version: number };
 const loadRoom = (db: Db, id: string) =>
@@ -289,9 +258,6 @@ export async function assignRoom(db: Db, actor: Actor, reservationId: string, ro
     if (res.room_id === roomId) return { undoId: null };
     if (res.status === "checked_in" && room.readiness !== "ready") throw new AppError("UNAVAILABLE", `Room ${room.room_number} isn't clean yet. Mark it ready first.`);
 
-    // The reservation counts against its assigned room's category, or the
-    // booked one. Moving it to a room in another category (an upgrade, or
-    // back) uses that category's inventory: check it.
     const oldRoom = res.room_id ? await loadRoom(db, res.room_id) : null;
     const currentCategory = oldRoom?.category_id ?? res.category_id;
     if (room.category_id !== currentCategory) {
@@ -306,7 +272,6 @@ export async function assignRoom(db: Db, actor: Actor, reservationId: string, ro
       assertVersion(db, "reservations", res.id, res.version),
       db.prepare("UPDATE reservations SET room_id = ? WHERE id = ?").bind(roomId, res.id),
     ];
-    // A guest moved mid-stay leaves the old room to be cleaned.
     if (res.status === "checked_in" && res.room_id) {
       stmts.push(db.prepare("UPDATE rooms SET readiness = 'needs_cleaning' WHERE id = ?").bind(res.room_id));
     }
@@ -328,10 +293,6 @@ export async function assignRoom(db: Db, actor: Actor, reservationId: string, ro
     }
   });
 }
-
-// ---------------------------------------------------------------------------
-// Front desk lifecycle
-// ---------------------------------------------------------------------------
 
 export async function checkInReservation(db: Db, actor: Actor, reservationId: string): Promise<{ undoId: number | null }> {
   requireRole(actor, ALL_STAFF);
@@ -365,7 +326,6 @@ export async function checkInReservation(db: Db, actor: Actor, reservationId: st
   });
 }
 
-/** Returns the balance still owed (the UI shows it) and the undo id. */
 export async function checkOutReservation(db: Db, actor: Actor, reservationId: string): Promise<{ balance: number; undoId: number | null }> {
   requireRole(actor, ALL_STAFF);
   return retryOnStale(async () => {
@@ -424,7 +384,6 @@ export async function markNoShow(db: Db, actor: Actor, reservationId: string): P
   });
 }
 
-/** Editable details that don't affect price or inventory. */
 export async function updateReservationDetails(db: Db, actor: Actor, reservationId: string, guests: number, specialRequests: string | null): Promise<void> {
   requireRole(actor, ALL_STAFF);
   await retryOnStale(async () => {
@@ -441,12 +400,6 @@ export async function updateReservationDetails(db: Db, actor: Actor, reservation
   });
 }
 
-// ---------------------------------------------------------------------------
-// Undo: room assignment and status changes, within a short window.
-// Never payments (a manager records a correction) and never cancellations
-// (the guest has already been emailed).
-// ---------------------------------------------------------------------------
-
 export const UNDO_WINDOW_MS = 30_000; // the UI offers 10 s; the server allows for slow networks
 const UNDOABLE = ["reservation.room_assigned", "reservation.checked_in", "reservation.checked_out", "reservation.no_show"] as const;
 
@@ -462,7 +415,6 @@ export async function undoAction(db: Db, actor: Actor, reservationId: string, ac
     if (!entry || entry.entity_id !== reservationId || !(UNDOABLE as readonly string[]).includes(entry.action)) throw tooLate;
     if (entry.actor_id !== actor.id) throw new AppError("FORBIDDEN", "Only the person who made a change can undo it.");
     if (Date.now() - Date.parse(entry.created_at) > UNDO_WINDOW_MS) throw tooLate;
-    // Nothing else may have happened to this booking since.
     const later = await first(db, "SELECT 1 FROM activity_log WHERE entity_id = ? AND id > ?", reservationId, activityId);
     if (later) throw tooLate;
 
@@ -475,7 +427,6 @@ export async function undoAction(db: Db, actor: Actor, reservationId: string, ac
       case "reservation.room_assigned": {
         if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) throw tooLate;
         stmts.push(db.prepare("UPDATE reservations SET room_id = ? WHERE id = ?").bind(meta.previous_room_id ?? null, res.id));
-        // A mid-stay move had marked the old room for cleaning: put it back as it was.
         if (res.status === "checked_in" && meta.previous_room_id && meta.previous_room_readiness) {
           stmts.push(db.prepare("UPDATE rooms SET readiness = ? WHERE id = ?").bind(meta.previous_room_readiness, meta.previous_room_id));
         }
@@ -517,10 +468,6 @@ export async function undoAction(db: Db, actor: Actor, reservationId: string, ac
   });
 }
 
-// ---------------------------------------------------------------------------
-// Manager override of the payment requirement (reason required, audited)
-// ---------------------------------------------------------------------------
-
 export async function overridePaymentRequirement(
   db: Db,
   actor: Actor,
@@ -540,7 +487,6 @@ export async function overridePaymentRequirement(
     const res = await loadReservation(db, reservationId);
     if (res.status !== "pending_payment") throw new AppError("INVALID_TRANSITION", "Only reservations awaiting payment can be overridden.");
     const lapsedMessage = new AppError("UNAVAILABLE", "The hold has lapsed and this room type is now fully booked for those dates.");
-    // If the hold already lapsed the inventory was released: re-check it.
     if (!isHoldLive(res) && (await freeUnits(db, res.category_id, res.check_in, res.check_out, res.id)) <= 0) throw lapsedMessage;
 
     const t = now();
@@ -574,16 +520,11 @@ export async function overridePaymentRequirement(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Date changes (same room type). Price uses the rate agreed at booking.
-// ---------------------------------------------------------------------------
-
 export async function changeReservationDates(db: Db, actor: Actor, reservationId: string, checkIn: string, checkOut: string): Promise<void> {
   requireRole(actor, ALL_STAFF);
   await changeDates(db, actor, reservationId, checkIn, checkOut);
 }
 
-/** The date change itself. Callers check who may do it (staff role, or the guest who owns the booking). */
 export async function changeDates(db: Db, actor: Actor, reservationId: string, checkIn: string, checkOut: string, byGuest = false): Promise<void> {
   await retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
@@ -600,7 +541,6 @@ export async function changeDates(db: Db, actor: Actor, reservationId: string, c
     const paid = await netPaid(db, res.id);
     const stmts = [
       assertVersion(db, "reservations", res.id, res.version),
-      // The discount stays the same percentage; per-night extras follow the new nights.
       db
         .prepare(
           `UPDATE reservations SET check_in = ?1, check_out = ?2, total_amount_kobo = ?3,
@@ -642,7 +582,6 @@ export async function changeDates(db: Db, actor: Actor, reservationId: string, c
   });
 }
 
-/** Managers clear a "needs attention" flag once handled, with a note. */
 export async function resolveAttention(db: Db, actor: Actor, reservationId: string, note: string): Promise<void> {
   requireRole(actor, MANAGERS);
   const how = (note ?? "").trim();
@@ -658,13 +597,8 @@ export async function resolveAttention(db: Db, actor: Actor, reservationId: stri
   });
 }
 
-// ---------------------------------------------------------------------------
-// Scheduled clean-up: mark lapsed holds as expired (system).
-// ---------------------------------------------------------------------------
-
 export async function expireUnpaidReservations(db: Db): Promise<number> {
   const t = now();
-  // Same cut-off for both statements, so every expiry is logged exactly once.
   const [, expired] = await writeBatch(
     db,
     null,
@@ -682,10 +616,6 @@ export async function expireUnpaidReservations(db: Db): Promise<number> {
   );
   return expired?.meta.changes ?? 0;
 }
-
-// ---------------------------------------------------------------------------
-// Room status (front desk) and guests
-// ---------------------------------------------------------------------------
 
 const label = (s: string) => s.replace(/_/g, " ");
 
@@ -729,7 +659,6 @@ export async function updateRoomStatus(
         service_status: input.serviceStatus !== room.service_status ? (input.serviceStatus ?? null) : null,
       }),
     ];
-    // Backstop for a guest checked in between the read and the write.
     if (input.serviceStatus === "maintenance") {
       stmts.splice(
         1,
@@ -760,7 +689,6 @@ export async function updateGuest(
   }
 }
 
-/** Rooms that can take this reservation (same or other categories), for the assign-room picker. */
 export async function listAssignableRooms(db: Db, reservationId: string) {
   const res = await loadReservation(db, reservationId);
   return all<{ id: string; room_number: string; category_id: string; readiness: string }>(
@@ -778,7 +706,6 @@ export async function listAssignableRooms(db: Db, reservationId: string) {
   );
 }
 
-/** A promo code a guest may use right now, or a clear error. */
 export async function validPromo(db: Db, code: string): Promise<{ code: string; percent_off: number }> {
   const p = await first<{ code: string; percent_off: number; is_active: number; valid_until: string | null; max_uses: number | null; used_count: number }>(
     db,

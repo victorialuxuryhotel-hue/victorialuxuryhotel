@@ -4,11 +4,6 @@ import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
-/**
- * A number with − and + buttons (44px each), for small counts like guests.
- * Submits as a hidden input. The button at a limit is disabled and the hint
- * underneath says why.
- */
 export function Stepper({ id, name, min = 1, max, defaultValue = min, unit, className }: {
   id: string;
   name: string;

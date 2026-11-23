@@ -30,7 +30,6 @@ const statusSchema = z.object({
   note: z.string().max(200).optional(),
 });
 
-/** Readiness and maintenance: any staff member, via the audited database function. */
 export async function updateRoomStatus(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return run("room.status", async () => {
     const staff = await authorize("rooms.status");
@@ -40,7 +39,6 @@ export async function updateRoomStatus(_prev: ActionResult | null, formData: For
   });
 }
 
-/** Daily tidy of a room with a guest staying (housekeeping list). */
 export async function markTidied(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return run("room.tidied", async () => {
     const staff = await authorize("rooms.status");
@@ -82,7 +80,6 @@ const categorySchema = z.object({
   isActive: z.literal("on").optional(),
 });
 
-/** Create or update a room category. Rates are entered in naira and stored in kobo. */
 export async function saveCategory(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const result = await run("category.save", async () => {
     const staff = await authorize("categories.manage");

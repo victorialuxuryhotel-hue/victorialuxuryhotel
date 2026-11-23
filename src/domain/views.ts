@@ -8,8 +8,6 @@ import type {
   StaffRole,
 } from "./status";
 
-/** Read models that screens render. Data-access code maps database rows into these. */
-
 export type ReservationRow = {
   id: string;
   reference: string;
@@ -41,10 +39,8 @@ export type PaymentRow = {
   paidAt?: string;
   receiptNumber?: string;
   recordedBy?: string;
-  /** "refund" rows on a reservation are corrections made by a manager. */
   kind?: "payment" | "refund";
   correctsPaymentId?: string;
-  /** For a payment: how much of it has been corrected so far. */
   correctedKobo?: number;
   notes?: string;
 };
@@ -99,10 +95,6 @@ export type StaffRow = { id: string; name: string; email: string; phone?: string
 
 export type ActivityRow = { id: string; at: string; actor: string; action: string; summary: string };
 
-/**
- * One room category's result in a public availability search. Deliberately
- * carries no room counts: inventory is internal and never shown to guests.
- */
 export type AvailabilityOption = {
   slug: string;
   name: string;
@@ -112,8 +104,6 @@ export type AvailabilityOption = {
   nightlyRateKobo: number;
   totalKobo: number;
   nights: number;
-  /** For a type that fits the party but is full: the nearest check-in (±14 days) with the same nights free. */
   freeFrom?: string;
-  /** The type's first real photo, when the hotel has uploaded one. */
   photo?: { image: string; alt: string };
 };

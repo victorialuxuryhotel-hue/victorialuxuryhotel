@@ -3,11 +3,6 @@ import { formatNaira } from "@/lib/format";
 import { addDays, hotelToday } from "@/lib/hotel-date";
 import { activity, activityIfChanged, all, EVENTS_STAFF, first, requireRole, uuid, writeBatch, type Actor, type Db } from "../db";
 
-/**
- * Conference hall: enquiries and confirmed events, with payments. The
- * database refuses two confirmed events at the same time. Payments can't be
- * edited or deleted.
- */
 export type HallStatus = "enquiry" | "confirmed" | "cancelled";
 export type HallMethod = "cash" | "bank_transfer" | "pos_terminal" | "card";
 

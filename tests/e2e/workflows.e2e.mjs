@@ -1,4 +1,3 @@
-// Real workflows through the browser against the dev server and local database.
 import puppeteer from "puppeteer-core";
 import { execSync } from "node:child_process";
 
@@ -29,7 +28,6 @@ async function login(p, email) {
   await waitPath(p, /^\/app$/);
 }
 
-// ---------------------------------------------------------------- Guest books online
 {
   const { ctx, p } = await page({ width: 390, height: 844 });
   const [ci, co] = [plus(20), plus(22)];
@@ -61,7 +59,6 @@ async function login(p, email) {
   await ctx.close();
 }
 
-// ---------------------------------------------------------------- Walk-in, override, assign, check-in, check-out
 let resUrl;
 {
   const { ctx, p } = await page();

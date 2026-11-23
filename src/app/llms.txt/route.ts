@@ -6,7 +6,6 @@ import { ALTERNATE_NAMES, SITE_URL } from "@/lib/seo";
 import { publicBookingRules } from "@/server/queries/booking";
 import { getPublicCategories } from "@/server/queries/catalogue";
 
-/** A plain fact sheet for AI assistants (the llms.txt convention). Live prices and times; confirmed facts only. */
 export async function GET() {
   await connection();
   const [rooms, rules] = await Promise.all([getPublicCategories().catch(() => []), publicBookingRules().catch(() => null)]);

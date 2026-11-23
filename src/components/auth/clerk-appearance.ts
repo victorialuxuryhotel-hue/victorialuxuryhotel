@@ -1,10 +1,3 @@
-/**
- * Clerk's sign-in, invitation and account components, styled to match the app
- * (Classical look: Lora, 4px corners, hairlines, outlined buttons; navy and
- * gold on ivory). Our pages provide the headings, so Clerk's own card header
- * and chrome are hidden. Classes use Tailwind's `!` so they beat Clerk's
- * built-in styles.
- */
 export const clerkAppearance = {
   variables: {
     colorPrimary: "#032684",

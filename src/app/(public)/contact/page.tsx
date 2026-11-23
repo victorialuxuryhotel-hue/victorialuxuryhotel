@@ -30,7 +30,6 @@ export default function ContactPage() {
       <PageHero eyebrow="Contact" title="We look forward to welcoming you" intro="For reservations, questions or special requests, our team is a call or message away." />
 
       <Section className="pt-6 sm:pt-20">
-        {/* Phones: compact tap rows. */}
         <ul className="divide-y divide-hairline border-b border-hairline md:hidden">
           {channels.map((c) => (
             <li key={c.label}>
@@ -87,7 +86,6 @@ export default function ContactPage() {
   );
 }
 
-/** Short answers to common questions, shown on the page and given to search engines as FAQ data. */
 async function GoodToKnow() {
   await connection();
   const rules = await publicBookingRules().catch(() => null);

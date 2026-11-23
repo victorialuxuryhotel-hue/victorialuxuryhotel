@@ -13,7 +13,6 @@ export const publicNav = [
   { href: "/contact", label: "Contact" },
 ] as const;
 
-/** Contact strip above the header on larger screens. */
 function UtilityBar() {
   return (
     <div className="hidden bg-navy-950 text-xs text-ivory-200/80 md:block">
@@ -48,7 +47,6 @@ export function SiteHeader() {
             <Logo className="w-9 md:w-11" priority />
             <span className="leading-none">
               <span className="block font-display text-xl font-semibold tracking-wide text-navy-950 md:text-2xl">Victoria Luxury</span>
-              {/* Phones: the name alone, so it never crowds the menu button. */}
               <span className="mt-1 hidden text-xs font-medium uppercase tracking-[0.3em] text-gold-600 sm:block">Hotel &amp; Apartment</span>
             </span>
           </Link>

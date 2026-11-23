@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 
-/** Shown when a signed-in staff member opens a page their role doesn't cover. */
 export function AccessDenied() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">

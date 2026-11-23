@@ -9,15 +9,12 @@ const display = Cormorant_Garamond({
   weight: ["400", "500", "600"],
 });
 
-// Body text: Lora (Classical design system). Colour stays the hotel's navy and gold.
 const sans = Lora({
   variable: "--font-sans-base",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
 });
 
-// viewport-fit=cover lets pinned bottom bars clear the iPhone home indicator
-// (env(safe-area-inset-bottom)).
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export const metadata: Metadata = {

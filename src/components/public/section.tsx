@@ -28,7 +28,6 @@ export function Section({
   );
 }
 
-/** Small gold label above headings, with a rule: the site's signature detail. */
 export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <p className={cn("flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.25em] text-gold-600", className)}>

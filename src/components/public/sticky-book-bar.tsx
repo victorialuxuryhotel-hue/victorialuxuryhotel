@@ -6,12 +6,6 @@ import { useEffect, useState } from "react";
 import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
-/**
- * Phones only: a booking bar pinned to the bottom of the screen once the
- * guest has scrolled past the page's own search form (or, on pages without
- * one, past the opening section). Hidden in the booking flow and on room
- * pages, which have their own pinned bar.
- */
 export function StickyBookBar() {
   const pathname = usePathname();
   const hidden = pathname.startsWith("/book") || /^\/rooms\/[^/]+$/.test(pathname);
@@ -21,7 +15,6 @@ export function StickyBookBar() {
     if (hidden) return;
     const form = document.querySelector("[data-booking-search]");
     if (form) {
-      // Shown once the form has scrolled up out of view (not before it appears).
       const io = new IntersectionObserver(([e]) => setShow(!e!.isIntersecting && e!.boundingClientRect.top < 0));
       io.observe(form);
       return () => io.disconnect();
@@ -42,7 +35,6 @@ export function StickyBookBar() {
   if (hidden) return null;
   return (
     <>
-      {/* Room at the end of the page so the bar never covers the footer. */}
       <div aria-hidden className="h-20 bg-navy-950 md:hidden" />
       <div
         className={cn(
@@ -59,7 +51,6 @@ export function StickyBookBar() {
             </p>
           )}
           {onRooms ? (
-            // The rooms list shows no availability until there are dates: take the guest to the search on this page.
             <button type="button" tabIndex={show ? 0 : -1} onClick={openSearch} className={buttonStyles({ variant: "accent", size: "lg", className: "w-full px-4" })}>
               Add dates to see what&apos;s free
             </button>

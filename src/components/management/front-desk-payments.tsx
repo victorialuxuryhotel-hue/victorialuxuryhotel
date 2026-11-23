@@ -15,10 +15,6 @@ const time = (iso: string) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit"
 const dateTime = (iso: string) =>
   new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(new Date(iso));
 
-/**
- * Front desk Payments: today's payments or the ones they recorded, today's
- * takings by method, and who took each payment. The server decides the scope.
- */
 export function FrontDeskPayments({
   view,
   rows,
