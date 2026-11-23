@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 import { AccessDenied } from "@/components/management/access-denied";
 import { ActionButton } from "@/components/management/action-form";
@@ -20,10 +21,16 @@ async function Content() {
   const staff = await requireStaff();
   if (!can(staff.role, "rooms.status")) return <AccessDenied />;
   const reader = await authorizeRead("rooms.status");
-  const { toClean, stayOvers, doneToday } = await cleaningList(await getDb(), actorOf(reader));
+  const { toClean, stayOvers, doneToday, arrivalsWithoutRoom } = await cleaningList(await getDb(), actorOf(reader));
   const toTidy = stayOvers.filter((s) => !s.tidiedAt);
   return (
     <div className="space-y-6 px-4 py-6 lg:px-8">
+      {arrivalsWithoutRoom ? (
+        <p role="status" className="rounded-md border border-warning-600/30 bg-warning-50 px-4 py-3 text-sm text-warning-700">
+          {arrivalsWithoutRoom === 1 ? "1 guest arriving today has" : `${arrivalsWithoutRoom} guests arriving today have`} no room yet.{" "}
+          <Link href="/app/today" className="font-medium underline">Assign rooms</Link>
+        </p>
+      ) : null}
       <Card>
         <CardHeader title={`To clean (${toClean.length})`} description="Guest arriving today: clean these first." />
         {toClean.length ? (

@@ -708,13 +708,15 @@ export async function updateRoomStatus(
       input.readiness && input.readiness !== room.readiness ? `readiness ${label(input.readiness)}` : null,
       input.serviceStatus === "maintenance" && room.service_status !== "maintenance" ? `under maintenance${input.note?.trim() ? `: ${input.note.trim()}` : ""}` : null,
       input.serviceStatus === "in_service" && room.service_status !== "in_service" ? "returned to service" : null,
+      service === "maintenance" && room.service_status === "maintenance" && note !== room.maintenance_note ? `maintenance note: ${note}` : null,
     ].filter(Boolean);
+    if (!changes.length) return;
     const stmts = [
       assertVersion(db, "rooms", room.id, room.version),
       db.prepare("UPDATE rooms SET readiness = ?, service_status = ?, maintenance_note = ? WHERE id = ?").bind(readiness, service, note, room.id),
       activity(db, "room.status_updated", "room", room.id, `Room ${room.room_number}: ${changes.join(", ")}`, {
-        readiness: input.readiness ?? null,
-        service_status: input.serviceStatus ?? null,
+        readiness: input.readiness !== room.readiness ? (input.readiness ?? null) : null,
+        service_status: input.serviceStatus !== room.service_status ? (input.serviceStatus ?? null) : null,
       }),
     ];
     // Backstop for a guest checked in between the read and the write.
