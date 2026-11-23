@@ -1,8 +1,10 @@
 import { AppError } from "@/lib/errors";
+import { lateFeeKobo } from "@/lib/cancellation";
 import { formatNaira } from "@/lib/format";
 import { hotelToday, nightsBetween } from "@/lib/hotel-date";
 import { dbErrorToken } from "../db-errors";
 import {
+  assertNetPaid,
   activity,
   ALL_STAFF,
   all,
@@ -375,10 +377,20 @@ export async function markNoShow(db: Db, actor: Actor, reservationId: string): P
     const res = await loadReservation(db, reservationId);
     if (res.status !== "confirmed") throw new AppError("INVALID_TRANSITION", "Only confirmed reservations can be marked as no-show.");
     if (res.check_in > hotelToday()) throw new AppError("VALIDATION", "The guest isn't due yet.");
+    const pct = (await first<{ late_cancel_fee_pct: number }>(db, "SELECT late_cancel_fee_pct FROM hotel_settings WHERE id = 1"))?.late_cancel_fee_pct ?? 50;
+    const paid = await netPaid(db, res.id);
+    const fee = Math.min(paid, lateFeeKobo(res.total_amount_kobo, pct));
+    const refund = paid - fee;
+    const note = refund > 0 ? `No-show. Refund ${naira(refund)} (fee kept: ${naira(fee)}).` : null;
     const results = await writeBatch(db, actor, [
+      assertNetPaid(db, res.id, paid),
       assertVersion(db, "reservations", res.id, res.version),
-      db.prepare("UPDATE reservations SET status = 'no_show' WHERE id = ?").bind(res.id),
-      activity(db, "reservation.no_show", "reservation", res.id, `${res.reference} marked as no-show`),
+      db
+        .prepare("UPDATE reservations SET status = 'no_show', cancellation_fee_kobo = ?, attention_reason = coalesce(?, attention_reason) WHERE id = ?")
+        .bind(fee, note, res.id),
+      activity(db, "reservation.no_show", "reservation", res.id, `${res.reference} marked as no-show${paid ? `: fee ${naira(fee)}, refund ${naira(refund)}` : ""}`, {
+        paid_kobo: paid, fee_kobo: fee, refund_kobo: refund,
+      }),
     ]);
     return { undoId: results.at(-1)?.meta.last_row_id ?? null };
   });
@@ -452,7 +464,11 @@ export async function undoAction(db: Db, actor: Actor, reservationId: string, ac
         break;
       default: // reservation.no_show
         if (res.status !== "no_show") throw tooLate;
-        stmts.push(db.prepare("UPDATE reservations SET status = 'confirmed' WHERE id = ?").bind(res.id));
+        stmts.push(
+          db
+            .prepare("UPDATE reservations SET status = 'confirmed', cancellation_fee_kobo = NULL, attention_reason = CASE WHEN attention_reason LIKE 'No-show.%' THEN NULL ELSE attention_reason END WHERE id = ?")
+            .bind(res.id),
+        );
         message = "No-show undone.";
     }
     stmts.push(activity(db, "reservation.undone", "reservation", res.id, `${res.reference}: ${message.replace(/\.$/, "").toLowerCase()}`, { undid: entry.action, activity_id: entry.id }));

@@ -2,7 +2,22 @@ import { AppError } from "@/lib/errors";
 import { formatNaira } from "@/lib/format";
 import { addDays, hotelInstant, hotelTimeNow, hotelToday } from "@/lib/hotel-date";
 import { dbErrorToken, StaleStateError } from "../db-errors";
-import { activity, ALL_STAFF, assertVersion, first, MANAGERS, now, requireRole, retryOnStale, uuid, writeBatch, type Actor, type Db, type Stmt } from "../db";
+import {
+  assertNetPaid,
+  activity,
+  ALL_STAFF,
+  assertVersion,
+  first,
+  MANAGERS,
+  now,
+  requireRole,
+  retryOnStale,
+  uuid,
+  writeBatch,
+  type Actor,
+  type Db,
+  type Stmt,
+} from "../db";
 import { autoAssignRoomStatements, freeUnits } from "./inventory";
 import { dueOf, loadReservation, netPaid, RES_COLUMNS, type ReservationRow } from "./reservations";
 
@@ -26,15 +41,6 @@ function retryIfCapacityRace(err: unknown): never {
   throw err;
 }
 
-function assertNetPaid(db: Db, reservationId: string, expected: number): Stmt {
-  return db
-    .prepare(
-      `INSERT INTO _guard (ok) SELECT 0 WHERE (
-         SELECT coalesce(sum(CASE WHEN kind = 'payment' THEN amount_kobo ELSE -amount_kobo END), 0)
-         FROM payments WHERE reservation_id = ? AND status = 'successful') <> ?`,
-    )
-    .bind(reservationId, expected);
-}
 
 async function settleStatements(db: Db, res: ReservationRow, paidAfter: number): Promise<{ outcome: SettleOutcome; stmts: Stmt[]; reason?: string }> {
   const stmts: Stmt[] = [];

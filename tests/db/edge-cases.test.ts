@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { addMenuItem, recordSale, settleRoomCharges } from "@/server/domain/pos";
 import { occupancyReport } from "@/server/domain/reports";
-import { assignRoom, checkInReservation, undoAction, updateRoomStatus } from "@/server/domain/reservations";
+import { recordOfflinePayment } from "@/server/domain/payments";
+import { assignRoom, checkInReservation, markNoShow, undoAction, updateRoomStatus } from "@/server/domain/reservations";
 import { day, db, desk, exec, gm, insertReservation, makeCategory, q, q1, rejects } from "./helpers";
 
 async function checkedIn(rooms = 1) {
@@ -61,5 +62,29 @@ describe("edge cases", () => {
     expect(on(after, day(-1))).toBe(on(before, day(-1)));
     expect(after.nights.every((n) => n.pct <= 100)).toBe(true);
     expect((await q1<{ n: number }>("SELECT count(*) AS n FROM rooms WHERE is_active = 1")).n).toBe(after.roomsInService);
+  });
+
+  it("a no-show keeps the late-cancellation fee and flags the rest for refund; undo clears it", async () => {
+    const c = await makeCategory(1, { rateKobo: 5_500_000 });
+    const id = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2), status: "confirmed", rateKobo: 5_500_000 });
+    await recordOfflinePayment(db, desk, { reservationId: id, amountKobo: 11_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
+    const { undoId } = await markNoShow(db, desk, id);
+    const after = await q1<{ status: string; cancellation_fee_kobo: number; attention_reason: string | null }>(
+      "SELECT status, cancellation_fee_kobo, attention_reason FROM reservations WHERE id = ?", id);
+    expect(after.status).toBe("no_show");
+    expect(after.cancellation_fee_kobo).toBe(5_500_000);
+    expect(after.attention_reason).toMatch(/^No-show\. Refund ₦55,000 \(fee kept: ₦55,000\)\.$/);
+
+    await undoAction(db, desk, id, undoId!);
+    const undone = await q1<{ status: string; cancellation_fee_kobo: number | null; attention_reason: string | null }>(
+      "SELECT status, cancellation_fee_kobo, attention_reason FROM reservations WHERE id = ?", id);
+    expect(undone).toEqual({ status: "confirmed", cancellation_fee_kobo: null, attention_reason: null });
+  });
+
+  it("an unpaid no-show has no fee and nothing to refund", async () => {
+    const c = await makeCategory(1);
+    const id = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
+    await markNoShow(db, desk, id);
+    expect(await q1("SELECT cancellation_fee_kobo AS fee, attention_reason AS note FROM reservations WHERE id = ?", id)).toEqual({ fee: 0, note: null });
   });
 });

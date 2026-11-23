@@ -104,3 +104,13 @@ export const STOCK_USERS = ["owner", "general_manager", "restaurant_bar"] as con
 export const EVENTS_STAFF = ["owner", "general_manager", "front_desk"] as const;
 
 export const VIEW_AS_READ_ONLY = "You're viewing as front desk, which is read-only. Exit view to make changes.";
+
+export function assertNetPaid(db: Db, reservationId: string, expected: number): Stmt {
+  return db
+    .prepare(
+      `INSERT INTO _guard (ok) SELECT 0 WHERE (
+         SELECT coalesce(sum(CASE WHEN kind = 'payment' THEN amount_kobo ELSE -amount_kobo END), 0)
+         FROM payments WHERE reservation_id = ? AND status = 'successful') <> ?`,
+    )
+    .bind(reservationId, expected);
+}
