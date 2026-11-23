@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Actor } from "@/server/db";
 import { financeSummary, listExpenses, recordExpense, voidExpense } from "@/server/domain/finance";
-import { moneyReport } from "@/server/domain/reports";
+import { incomeReport } from "@/server/domain/reports";
 import { day, db, desk, exec, gm, owner, rejects } from "./helpers";
 
 describe("finance", () => {
@@ -21,7 +21,7 @@ describe("finance", () => {
 
   it("finance can read the money report; the summary shows VAT inside income", async () => {
     const fin: Actor = { id: owner!.id, role: "finance" };
-    await moneyReport(db, fin, "today");
+    await incomeReport(db, fin, "today");
     const s = await financeSummary(db, fin, "month");
     expect(s.vatRateBp).toBe(750);
     expect(s.vatKobo).toBe(Math.round((s.incomeTotal * 750) / 10_750));

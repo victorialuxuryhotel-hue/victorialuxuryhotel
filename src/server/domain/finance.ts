@@ -48,16 +48,17 @@ export type ExpenseRow = {
   reference: string | null; recorded_by_name: string | null; voided_at: string | null; void_reason: string | null;
 };
 
-export async function listExpenses(db: Db, actor: Actor, range: ReportRange, today = hotelToday()) {
+export async function listExpenses(db: Db, actor: Actor, range: ReportRange, today = hotelToday(), opts: { limit?: number } = {}) {
   requireRole(actor, FINANCE);
   const { from, to } = rangeDates(range, today);
   const rows = await all<ExpenseRow>(
     db,
     `SELECT e.id, e.spent_on, e.category, e.description, e.amount_kobo, e.method, e.reference, s.full_name AS recorded_by_name, e.voided_at, e.void_reason
      FROM expenses e LEFT JOIN staff_profiles s ON s.id = e.recorded_by
-     WHERE e.spent_on BETWEEN ? AND ? ORDER BY e.spent_on DESC, e.created_at DESC LIMIT 500`,
+     WHERE e.spent_on BETWEEN ? AND ? ORDER BY e.spent_on DESC, e.created_at DESC LIMIT ?`,
     from,
     to,
+    Math.min(opts.limit ?? 500, 10_000),
   );
   const live = rows.filter((r) => !r.voided_at);
   const byCategory = new Map<ExpenseCategory, number>();

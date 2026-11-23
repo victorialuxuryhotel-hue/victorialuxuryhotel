@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { recordOfflinePayment, recordPaymentCorrection } from "@/server/domain/payments";
 import { createWebsiteReservation } from "@/server/domain/reservations";
-import { cashUp, csvField, moneyReport, occupancyReport, paymentsForCsv, rangeDates, reportRange } from "@/server/domain/reports";
+import { createHallBooking, recordHallPayment } from "@/server/domain/events";
+import { financeSummary } from "@/server/domain/finance";
+import { addMenuItem, recordSale } from "@/server/domain/pos";
+import { csvField, incomeReport, incomeRows, occupancyReport, rangeDates, recentMonths, reportRange } from "@/server/domain/reports";
 import { addDays, hotelInstant, hotelToday } from "@/lib/hotel-date";
 import { day, db, desk, exec, gm, insertReservation, makeCategory, owner, rejects } from "./helpers";
 
@@ -22,14 +25,25 @@ describe("report ranges (Lagos dates)", () => {
     expect(rangeDates("month", "2026-12-01").days).toEqual(["2026-12-01"]);
     expect([reportRange("month"), reportRange("bogus"), reportRange(undefined)]).toEqual(["month", "14d", "14d"]);
   });
+
+  it("a past month runs first to last day; this month or a future one isn't a past month", () => {
+    expect(rangeDates("2026-11", "2027-01-15")).toMatchObject({ from: "2026-11-01", to: "2026-11-30" });
+    expect(rangeDates("2026-11", "2027-01-15").days).toHaveLength(30);
+    expect(rangeDates("2026-12", "2027-01-15").to).toBe("2026-12-31");
+    expect(reportRange("2026-12", "2027-01-15")).toBe("2026-12");
+    expect(reportRange("2027-01", "2027-01-15")).toBe("month");
+    expect(reportRange("2027-02", "2027-01-15")).toBe("14d");
+    expect(reportRange("2025-12", "2027-01-15")).toBe("14d");
+    expect(reportRange("2026-13", "2027-01-15")).toBe("14d");
+    expect(recentMonths("2027-01-15")).toEqual(["2027-01", "2026-12", "2026-11"]);
+  });
 });
 
-describe("money and cash-up", () => {
-  it("are net of corrections, counted on the Lagos day, and grouped by who took the money", async () => {
+describe("income by day, by staff and method, and the accountant's download", () => {
+  it("covers rooms (net of corrections), restaurant & bar and the hall, on the Lagos day", async () => {
     const today = hotelToday();
-    const beforeMoney = await moneyReport(db, gm, "today");
-    const beforeCash = await cashUp(db, gm);
-    const mine = (rows: Awaited<ReturnType<typeof cashUp>>) => rows.find((r) => r.staffId === desk!.id);
+    const before = await incomeReport(db, gm, "today");
+    const mine = (r: typeof before) => r.byStaff.find((t) => t.staffId === desk!.id) ?? { byMethod: { cash: 0, transfer: 0, pos: 0 }, total: 0 };
 
     const b = await booking();
     const p1 = await recordOfflinePayment(db, desk, { reservationId: b.id, amountKobo: 5_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
@@ -40,24 +54,41 @@ describe("money and cash-up", () => {
        VALUES (?, ?, 300000, 'offline', 'cash', 'successful', ?, ?, ?)`,
       crypto.randomUUID(), b.id, hotelInstant(today, "00:30:00"), hotelInstant(today, "00:30:00"), desk!.id,
     );
+    const item = await addMenuItem(db, gm, { name: `Chapman ${crypto.randomUUID().slice(0, 4)}`, outlet: "bar", priceKobo: 350_000 });
+    await recordSale(db, { id: desk!.id, role: "restaurant_bar" }, { outlet: "bar", items: [{ menuItemId: item, quantity: 2 }], method: "pos_terminal" });
+    const hall = await createHallBooking(db, desk, {
+      title: "AGM", customerName: "Ondo Co-op", phone: null, email: null, guests: 50, priceKobo: 20_000_000, notes: null,
+      eventDate: day(200 + Math.floor(Math.random() * 300)), startTime: "08:00", endTime: "09:00", status: "confirmed",
+    });
+    await recordHallPayment(db, desk, { bookingId: hall, amountKobo: 4_000_000, method: "bank_transfer", paidOn: day(0), reference: "TRF-1" });
 
-    const after = await moneyReport(db, gm, "today");
-    expect(after.total - beforeMoney.total).toBe(5_000_000 + 2_000_000 - 1_000_000 + 300_000);
-    const desk1 = mine(await cashUp(db, gm))!;
-    const desk0 = mine(beforeCash) ?? { counts: { cash: 0, transfer: 0 }, totalKobo: 0 };
-    expect(desk1.counts.cash - desk0.counts.cash).toBe(2);
-    expect(desk1.counts.transfer - desk0.counts.transfer).toBe(1);
-    expect(desk1.totalKobo - desk0.totalKobo).toBe(7_300_000);
+    const after = await incomeReport(db, gm, "today");
+    const d0 = before.daily[0]!;
+    const d1 = after.daily[0]!;
+    expect(d1.rooms - d0.rooms).toBe(5_000_000 + 2_000_000 - 1_000_000 + 300_000);
+    expect(d1.restaurantBar - d0.restaurantBar).toBe(700_000);
+    expect(d1.hall - d0.hall).toBe(4_000_000);
+    expect(after.total - before.total).toBe(6_300_000 + 700_000 + 4_000_000);
 
-    const csv = await paymentsForCsv(db, owner, "today");
-    expect(csv.filter((r) => r.reference === b.reference).map((r) => r.kind).sort()).toEqual(["payment", "payment", "payment", "refund"]);
+    const t0 = mine(before);
+    const t1 = mine(after);
+    expect(t1.byMethod.cash - t0.byMethod.cash).toBe(5_300_000);
+    expect(t1.byMethod.transfer - t0.byMethod.transfer).toBe(2_000_000 + 4_000_000);
+    expect(t1.byMethod.pos - t0.byMethod.pos).toBe(700_000);
+
+    const s = await financeSummary(db, gm, "today");
+    expect(s.incomeTotal).toBe(after.total);
+    expect(s.income).toEqual({ rooms: d1.rooms, restaurantBar: d1.restaurantBar, hall: d1.hall });
+
+    const rows = await incomeRows(db, owner, "today");
+    expect(rows.filter((r) => r.reference === b.reference).map((r) => r.correction).sort()).toEqual([false, false, false, true]);
+    expect(rows.some((r) => r.department === "hall" && r.document === "TRF-1")).toBe(true);
   });
 
-  it("are for managers and the owner only", async () => {
-    await rejects(moneyReport(db, desk, "14d"), /role does not allow/);
-    await rejects(cashUp(db, desk), /role does not allow/);
+  it("are for finance, managers and the owner only", async () => {
+    await rejects(incomeReport(db, desk, "14d"), /role does not allow/);
+    await rejects(incomeRows(db, desk, "14d"), /role does not allow/);
     await rejects(occupancyReport(db, desk, "14d"), /role does not allow/);
-    await rejects(paymentsForCsv(db, desk, "14d"), /role does not allow/);
   });
 });
 

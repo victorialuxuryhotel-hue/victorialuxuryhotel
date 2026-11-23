@@ -16,7 +16,7 @@ import { can } from "@/lib/auth/permissions";
 import { formatDate, formatNaira, plural } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 import { requireStaff } from "@/server/auth";
-import { reportRange, type Bucket, type ReportRange } from "@/server/domain/reports";
+import { recentMonths, reportRange, type Bucket, type ReportRange } from "@/server/domain/reports";
 import { activityPageData, moneyPageData, occupancyPageData } from "@/server/queries/reports";
 
 export const metadata: Metadata = { title: "Reports" };
@@ -25,60 +25,79 @@ type Tab = "money" | "occupancy" | "activity";
 type SP = Promise<Record<string, string | string[] | undefined>>;
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 
-const rangeLabel: Record<ReportRange, string> = { today: "Today", "14d": "14 days", month: "This month" };
-const bucketLabel: Record<Bucket, string> = { cash: "cash", transfer: "transfer", cardOnline: "card online", pos: "POS card", other: "other" };
+const fixedLabel = { today: "Today", "14d": "14 days", month: "This month" } as const;
+const monthName = (m: string) => new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`));
+const rangeName = (r: ReportRange) => (r in fixedLabel ? fixedLabel[r as keyof typeof fixedLabel] : monthName(r));
+const METHODS: [Bucket, string][] = [["cash", "Cash"], ["transfer", "Transfer"], ["pos", "POS / card"], ["cardOnline", "Card online"], ["other", "Other"]];
 
 function RangeControl({ tab, range }: { tab: Tab; range: ReportRange }) {
+  const months = recentMonths(hotelToday()).slice(1);
   return (
-    <nav aria-label="Period" className="flex overflow-hidden rounded-md border border-hairline [&>*+*]:border-l [&>*+*]:border-hairline sm:max-w-sm">
-      {(["today", "14d", "month"] as const).map((r) => (
-        <Link
-          key={r}
-          href={`/app/reports?tab=${tab}&range=${r}`}
-          aria-current={r === range ? "page" : undefined}
-          className={cn(
-            "flex min-h-11 flex-1 items-center justify-center px-2 text-sm",
-            r === range ? "text-navy-800 shadow-[inset_0_0_0_1px_var(--color-navy-800)]" : "text-ink-900 hover:bg-ink-900/7",
-          )}
-        >
-          {rangeLabel[r]}
-        </Link>
-      ))}
-    </nav>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <nav aria-label="Period" className="flex overflow-hidden rounded-md border border-hairline [&>*+*]:border-l [&>*+*]:border-hairline sm:w-96">
+        {(["today", "14d", "month"] as const).map((r) => (
+          <Link
+            key={r}
+            href={`/app/reports?tab=${tab}&range=${r}`}
+            aria-current={r === range ? "page" : undefined}
+            className={cn(
+              "flex min-h-11 flex-1 items-center justify-center px-2 text-sm",
+              r === range ? "text-navy-800 shadow-[inset_0_0_0_1px_var(--color-navy-800)]" : "text-ink-900 hover:bg-ink-900/7",
+            )}
+          >
+            {fixedLabel[r]}
+          </Link>
+        ))}
+      </nav>
+      {months.length ? (
+        <form action="/app/reports" className="flex gap-2">
+          <input type="hidden" name="tab" value={tab} />
+          <label htmlFor="month" className="sr-only">Earlier month</label>
+          <select id="month" name="range" defaultValue={months.includes(range) ? range : ""} className="min-h-11 rounded-md border border-hairline bg-ivory-50 px-3 text-sm">
+            <option value="" disabled>Earlier month</option>
+            {months.map((m) => <option key={m} value={m}>{monthName(m)}</option>)}
+          </select>
+          <button type="submit" className={buttonStyles({ variant: "secondary" })}>Show</button>
+        </form>
+      ) : null}
+    </div>
   );
 }
 
 function Bars({ items, label, format, scaleTo }: { items: { day: string; value: number }[]; label: string; format: (v: number) => string; scaleTo?: number }) {
   const max = scaleTo ?? Math.max(1, ...items.map((d) => d.value));
+  const last = items[items.length - 1]!.day;
   return (
     <>
       <div className="flex h-44 items-end gap-1 px-5 pt-4 pb-2" role="img" aria-label={label}>
         {items.map((d) => (
           <div key={d.day} className="group relative min-w-0 flex-1" title={`${formatDate(d.day, { year: false })}: ${format(d.value)}`}>
-            <div className="rounded-t bg-navy-700 transition-colors group-hover:bg-gold-500" style={{ height: `${Math.max(2, (d.value / max) * 140)}px` }} />
+            <div className="rounded-t bg-navy-700 transition-colors group-hover:bg-gold-500" style={{ height: `${Math.max(2, (Math.max(0, d.value) / max) * 140)}px` }} />
           </div>
         ))}
       </div>
       <div className="flex justify-between px-5 pb-4 text-xs text-ink-500">
         <span>{formatDate(items[0]!.day, { year: false })}</span>
-        <span>Today</span>
+        <span>{last === hotelToday() ? "Today" : formatDate(last, { year: false })}</span>
       </div>
     </>
   );
 }
 
 async function Money({ range }: { range: ReportRange }) {
-  const { money, cash, finance } = await moneyPageData(range);
+  const { income, finance } = await moneyPageData(range);
   const line = (label: string, kobo: number, strong = false) => (
     <div className={cn("flex justify-between gap-4 py-2", strong && "border-t border-hairline pt-3 font-semibold text-ink-900")}>
       <dt className={strong ? "" : "text-ink-600"}>{label}</dt>
       <dd className="tabular-nums">{formatNaira(kobo)}</dd>
     </div>
   );
+  const cell = "px-3 py-2.5 text-right tabular-nums whitespace-nowrap";
+  const days = [...income.daily].reverse().filter((d) => d.total !== 0 || d.day === hotelToday());
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader title="Income and expenses" description={`${rangeLabel[range]} · all departments`} />
+        <CardHeader title="Income and expenses" description={`${rangeName(range)} · all departments`} />
         <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
           <div>
             {line("Rooms", finance.income.rooms)}
@@ -92,42 +111,74 @@ async function Money({ range }: { range: ReportRange }) {
             {line("Income after expenses", finance.netKobo, true)}
           </div>
         </dl>
-      </Card>
-      <Card>
-        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm text-ink-500">Received · {rangeLabel[range].toLowerCase()}</p>
-            <p className="mt-1 text-4xl font-semibold tabular-nums text-ink-900">{formatNaira(money.total)}</p>
-            <p className="mt-1 text-xs text-ink-500">Verified payments minus corrections, by the day they were paid (Lagos time).</p>
-          </div>
-          <a href={`/app/reports/payments-csv?range=${range}`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
-            <Download className="size-4" aria-hidden /> Download CSV
+        <div className="flex flex-col gap-2 border-t border-hairline px-5 py-4 sm:flex-row">
+          <a href={`/app/reports/income-csv?range=${range}`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
+            <Download className="size-4" aria-hidden /> Income (CSV)
+          </a>
+          <a href={`/app/reports/expenses-csv?range=${range}`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
+            <Download className="size-4" aria-hidden /> Expenses (CSV)
           </a>
         </div>
-        {money.daily.length > 1 ? (
+      </Card>
+
+      <Card>
+        <CardHeader title="Income by day" description="Money received each day, by department. Days with nothing received are left out." />
+        {income.daily.length > 1 ? (
           <div className="border-t border-hairline">
-            <Bars items={money.daily.map((d) => ({ day: d.day, value: d.kobo }))} label="Bar chart of money received per day" format={formatNaira} />
+            <Bars items={income.daily.map((d) => ({ day: d.day, value: d.total }))} label="Bar chart of income per day" format={formatNaira} />
           </div>
         ) : null}
+        <div className="overflow-x-auto border-t border-hairline">
+          <table className="w-full min-w-[34rem] text-sm">
+            <thead className="text-xs text-ink-500">
+              <tr className="border-b border-hairline">
+                <th scope="col" className="px-5 py-2.5 text-left font-medium">Day</th>
+                <th scope="col" className={cn(cell, "font-medium")}>Rooms</th>
+                <th scope="col" className={cn(cell, "font-medium")}>Restaurant & bar</th>
+                <th scope="col" className={cn(cell, "font-medium")}>Hall</th>
+                <th scope="col" className={cn(cell, "pr-5 font-medium")}>Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-hairline">
+              {days.map((d) => (
+                <tr key={d.day}>
+                  <th scope="row" className="px-5 py-2.5 text-left font-normal text-ink-700">{formatDate(d.day, { year: false })}</th>
+                  <td className={cell}>{formatNaira(d.rooms)}</td>
+                  <td className={cell}>{formatNaira(d.restaurantBar)}</td>
+                  <td className={cell}>{formatNaira(d.hall)}</td>
+                  <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(d.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
+
       <Card>
-        <CardHeader title="Cash-up by staff · today" description="Payments each person took today." />
-        {cash.length === 0 ? (
-          <div className="p-5"><EmptyState title="No payments today yet" /></div>
+        <CardHeader title="Takings by staff and method" description={`${rangeName(range)} · money each person took`} />
+        {income.byStaff.length === 0 ? (
+          <div className="p-5"><EmptyState title="No money taken in this period" /></div>
         ) : (
-          <ul className="divide-y divide-hairline border-t border-hairline">
-            {cash.map((c) => (
-              <li key={c.staffId ?? c.who} className="flex items-center justify-between gap-3 px-5 py-3.5">
-                <span className="min-w-0">
-                  <span className="block font-medium text-ink-900">{c.who}</span>
-                  <span className="block truncate text-sm text-ink-500">
-                    {(Object.entries(c.counts) as [Bucket, number][]).filter(([, n]) => n > 0).map(([b, n]) => `${n} ${bucketLabel[b]}`).join(" · ")}
-                  </span>
-                </span>
-                <span className="shrink-0 text-base font-semibold tabular-nums text-ink-900">{formatNaira(c.totalKobo)}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto border-t border-hairline">
+            <table className="w-full min-w-[40rem] text-sm">
+              <thead className="text-xs text-ink-500">
+                <tr className="border-b border-hairline">
+                  <th scope="col" className="px-5 py-2.5 text-left font-medium">Taken by</th>
+                  {METHODS.map(([, label]) => <th key={label} scope="col" className={cn(cell, "font-medium")}>{label}</th>)}
+                  <th scope="col" className={cn(cell, "pr-5 font-medium")}>Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-hairline">
+                {income.byStaff.map((t) => (
+                  <tr key={t.staffId ?? t.who}>
+                    <th scope="row" className="px-5 py-2.5 text-left font-medium text-ink-900">{t.who}</th>
+                    {METHODS.map(([b]) => <td key={b} className={cn(cell, !t.byMethod[b] && "text-ink-400")}>{t.byMethod[b] ? formatNaira(t.byMethod[b]) : "–"}</td>)}
+                    <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(t.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
     </div>
@@ -140,7 +191,7 @@ async function Occupancy({ range }: { range: ReportRange }) {
     <div className="space-y-6">
       <Card>
         <div className="p-5">
-          <p className="text-sm text-ink-500">Average occupancy · {rangeLabel[range].toLowerCase()}</p>
+          <p className="text-sm text-ink-500">Average occupancy · {rangeName(range).toLowerCase()}</p>
           <p className="mt-1 text-4xl font-semibold tabular-nums text-ink-900">{o.averagePct}%</p>
           <p className="mt-1 text-xs text-ink-500">Rooms with a guest each night, out of {plural(o.roomsInService, "room")}.</p>
         </div>
