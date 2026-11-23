@@ -7,14 +7,13 @@ const files = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(dir, e.name)) : /\.tsx?$/.test(e.name) && !e.name.includes(".test.") ? [join(dir, e.name)] : []));
 
 describe("staff access", () => {
-  it("restaurant & bar and finance can't reach guest contacts or bookings work", () => {
-    for (const role of ["restaurant_bar", "finance"] as const) {
+  it("finance can't reach guest contacts or bookings work", () => {
+    for (const role of ["finance"] as const) {
       expect(can(role, "guests.manage")).toBe(false);
       expect(can(role, "reservations.manage")).toBe(false);
       expect(can(role, "rooms.status")).toBe(false);
     }
     expect(canAny("finance", ["payments.record", "reports.view"])).toBe(true);
-    expect(canAny("restaurant_bar", ["payments.record", "reports.view"])).toBe(false);
   });
 
   it("every staff read names the permission it needs", () => {

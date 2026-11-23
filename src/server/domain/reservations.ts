@@ -333,8 +333,6 @@ export async function checkOutReservation(db: Db, actor: Actor, reservationId: s
     if (res.status !== "checked_in") throw new AppError("INVALID_TRANSITION", "Only checked-in guests can be checked out.");
     const balance = dueOf(res) - (await netPaid(db, res.id));
     const room = res.room_id ? await loadRoom(db, res.room_id) : null;
-    const unpaid = await first<{ kobo: number }>(db, "SELECT coalesce(sum(total_kobo), 0) AS kobo FROM sales WHERE reservation_id = ? AND status = 'room_charge'", res.id);
-    if (unpaid?.kobo) throw new AppError("VALIDATION", `Restaurant & bar charges of ${naira(unpaid.kobo)} are unpaid. Settle them first.`);
     const results = await writeBatch(db, actor, [
       assertVersion(db, "reservations", res.id, res.version),
       db.prepare("UPDATE reservations SET status = 'checked_out' WHERE id = ?").bind(res.id),
@@ -435,11 +433,7 @@ export async function undoAction(db: Db, actor: Actor, reservationId: string, ac
       }
       case "reservation.checked_in":
         if (res.status !== "checked_in") throw tooLate;
-        if (await first(db, "SELECT 1 FROM sales WHERE reservation_id = ? AND status <> 'void'", res.id)) throw tooLate;
-        stmts.push(
-          db.prepare("INSERT INTO _guard (ok) SELECT 0 WHERE EXISTS (SELECT 1 FROM sales WHERE reservation_id = ? AND status <> 'void')").bind(res.id),
-          db.prepare("UPDATE reservations SET status = 'confirmed', checked_in_at = NULL WHERE id = ?").bind(res.id),
-        );
+        stmts.push(db.prepare("UPDATE reservations SET status = 'confirmed', checked_in_at = NULL WHERE id = ?").bind(res.id));
         message = "Check-in undone.";
         break;
       case "reservation.checked_out":

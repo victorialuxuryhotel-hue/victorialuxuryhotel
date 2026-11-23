@@ -101,7 +101,6 @@ async function Money({ range }: { range: ReportRange }) {
         <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
           <div>
             {line("Rooms", finance.income.rooms)}
-            {line("Restaurant & bar", finance.income.restaurantBar)}
             {line("Conference hall", finance.income.hall)}
             {line("Total income", finance.incomeTotal, true)}
           </div>
@@ -129,12 +128,11 @@ async function Money({ range }: { range: ReportRange }) {
           </div>
         ) : null}
         <div className="overflow-x-auto border-t border-hairline">
-          <table className="w-full min-w-[34rem] text-sm">
+          <table className="w-full min-w-[24rem] text-sm">
             <thead className="text-xs text-ink-500">
               <tr className="border-b border-hairline">
                 <th scope="col" className="px-5 py-2.5 text-left font-medium">Day</th>
                 <th scope="col" className={cn(cell, "font-medium")}>Rooms</th>
-                <th scope="col" className={cn(cell, "font-medium")}>Restaurant & bar</th>
                 <th scope="col" className={cn(cell, "font-medium")}>Hall</th>
                 <th scope="col" className={cn(cell, "pr-5 font-medium")}>Total</th>
               </tr>
@@ -144,7 +142,6 @@ async function Money({ range }: { range: ReportRange }) {
                 <tr key={d.day}>
                   <th scope="row" className="px-5 py-2.5 text-left font-normal text-ink-700">{formatDate(d.day, { year: false })}</th>
                   <td className={cell}>{formatNaira(d.rooms)}</td>
-                  <td className={cell}>{formatNaira(d.restaurantBar)}</td>
                   <td className={cell}>{formatNaira(d.hall)}</td>
                   <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(d.total)}</td>
                 </tr>

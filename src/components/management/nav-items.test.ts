@@ -17,12 +17,11 @@ describe("menu by role", () => {
     expect(groups.map((g) => g.label)).toEqual(["Daily work", "Running the hotel"]);
     expect(groups[1]!.items).toEqual(["Dashboard", "Rates & room types", "Reports", "Expenses", "Booking rules"]);
   });
-  it("finance sees money only; restaurant & bar sees the till and stock", () => {
+  it("finance sees money only", () => {
     expect(visible("finance")).toEqual([
       { label: "Daily work", items: ["Payments"] },
       { label: "Running the hotel", items: ["Dashboard", "Reports", "Expenses"] },
     ]);
-    expect(visible("restaurant_bar")).toEqual([{ label: "Daily work", items: ["Restaurant & bar", "Stock"] }]);
   });
   it("the owner also manages staff", () => {
     expect(visible("owner").at(-1)).toEqual({ label: "Owner", items: ["Staff & access"] });

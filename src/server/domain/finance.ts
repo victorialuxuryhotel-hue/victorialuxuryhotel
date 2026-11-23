@@ -69,25 +69,19 @@ export async function listExpenses(db: Db, actor: Actor, range: ReportRange, tod
 export async function financeSummary(db: Db, actor: Actor, range: ReportRange, today = hotelToday()) {
   requireRole(actor, FINANCE);
   const { from, to } = rangeDates(range, today);
-  const [rooms, sales, halls, expenses, settings] = await Promise.all([
+  const [rooms, halls, expenses, settings] = await Promise.all([
     first<{ kobo: number }>(
       db,
       `SELECT coalesce(sum(CASE WHEN kind = 'payment' THEN amount_kobo ELSE -amount_kobo END), 0) AS kobo FROM payments
        WHERE status = 'successful' AND date(paid_at, '+1 hour') BETWEEN ? AND ?`,
       from, to,
     ),
-    first<{ kobo: number }>(
-      db,
-      `SELECT coalesce(sum(total_kobo), 0) AS kobo FROM sales
-       WHERE status IN ('paid', 'settled') AND date(coalesce(settled_at, created_at), '+1 hour') BETWEEN ? AND ?`,
-      from, to,
-    ),
     first<{ kobo: number }>(db, "SELECT coalesce(sum(amount_kobo), 0) AS kobo FROM hall_payments WHERE paid_on BETWEEN ? AND ?", from, to),
     first<{ kobo: number }>(db, "SELECT coalesce(sum(amount_kobo), 0) AS kobo FROM expenses WHERE voided_at IS NULL AND spent_on BETWEEN ? AND ?", from, to),
     first<{ vat_rate_bp: number }>(db, "SELECT vat_rate_bp FROM hotel_settings WHERE id = 1"),
   ]);
-  const income = { rooms: rooms?.kobo ?? 0, restaurantBar: sales?.kobo ?? 0, hall: halls?.kobo ?? 0 };
-  const incomeTotal = income.rooms + income.restaurantBar + income.hall;
+  const income = { rooms: rooms?.kobo ?? 0, hall: halls?.kobo ?? 0 };
+  const incomeTotal = income.rooms + income.hall;
   const rate = settings?.vat_rate_bp ?? 750;
   return { from, to, income, incomeTotal, expensesKobo: expenses?.kobo ?? 0, netKobo: incomeTotal - (expenses?.kobo ?? 0), vatRateBp: rate, vatKobo: vatIncluded(incomeTotal, rate) };
 }

@@ -5,7 +5,7 @@ import { incomeRows, rangeDates, reportRange, type Bucket, type Department } fro
 import { hotelToday } from "@/lib/hotel-date";
 import { vatIncluded } from "@/lib/vat";
 
-const DEPARTMENT: Record<Department, string> = { rooms: "Rooms", restaurantBar: "Restaurant & bar", hall: "Conference hall" };
+const DEPARTMENT: Record<Department, string> = { rooms: "Rooms", hall: "Conference hall" };
 const METHOD: Record<Bucket, string> = { cash: "Cash", transfer: "Bank transfer", pos: "POS / card", cardOnline: "Card (online)", other: "Other" };
 
 export async function GET(request: Request) {

@@ -178,8 +178,8 @@ export async function updateBookingRules(
 
 export const ROLE = "coalesce(department, role)";
 
-export function storedRole(role: StaffRole): { role: "owner" | "general_manager" | "front_desk"; department: "finance" | "restaurant_bar" | null } {
-  return role === "finance" || role === "restaurant_bar" ? { role: "front_desk", department: role } : { role, department: null };
+export function storedRole(role: StaffRole): { role: "owner" | "general_manager" | "front_desk"; department: "finance" | null } {
+  return role === "finance" ? { role: "front_desk", department: role } : { role, department: null };
 }
 
 export type StaffRecord = {

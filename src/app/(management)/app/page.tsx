@@ -42,7 +42,6 @@ async function Revenue() {
 async function Content() {
   const staff = await requireStaff();
   if (staff.role === "front_desk") redirect("/app/today");
-  if (staff.role === "restaurant_bar") redirect("/app/sales");
   const [m, rooms, awaiting, recent] = await Promise.all([movements(), roomBoard(), awaitingPaymentCount(), listReservations({ tab: "all" })]);
   const noRoom = m.arrivals.filter((a) => !a.roomNumber).length;
   const owing = m.departures.filter((d) => d.totalKobo > d.paidKobo).length;

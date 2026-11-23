@@ -37,7 +37,7 @@ export function recentMonths(today: string, count = 12): string[] {
 }
 
 export type Bucket = "cash" | "transfer" | "pos" | "cardOnline" | "other";
-export type Department = "rooms" | "restaurantBar" | "hall";
+export type Department = "rooms" | "hall";
 
 export type IncomeRow = {
   department: Department; at: string; day: string; reference: string; detail: string; method: Bucket;
@@ -62,13 +62,6 @@ export async function incomeRows(db: Db, actor: Actor, range: ReportRange, today
      LEFT JOIN staff_profiles s ON s.id = p.recorded_by
      WHERE p.status = 'successful' AND date(p.paid_at, '+1 hour') BETWEEN ?1 AND ?2
      UNION ALL
-     SELECT 'restaurantBar', coalesce(sa.settled_at, sa.created_at), date(coalesce(sa.settled_at, sa.created_at), '+1 hour'),
-            'Sale ' || sa.number,
-            (CASE sa.outlet WHEN 'bar' THEN 'Bar' ELSE 'Restaurant' END) || CASE WHEN r.reference IS NULL THEN '' ELSE ' · charged to ' || r.reference END,
-            ${bucket("sa.method")}, sa.total_kobo, coalesce(s.full_name, 'Staff'), coalesce(sa.settled_by, sa.sold_by), CAST(sa.number AS TEXT), 0
-     FROM sales sa LEFT JOIN reservations r ON r.id = sa.reservation_id LEFT JOIN staff_profiles s ON s.id = coalesce(sa.settled_by, sa.sold_by)
-     WHERE sa.status IN ('paid', 'settled') AND date(coalesce(sa.settled_at, sa.created_at), '+1 hour') BETWEEN ?1 AND ?2
-     UNION ALL
      SELECT 'hall', hp.created_at, hp.paid_on, h.title, h.customer_name, ${bucket("hp.method")}, hp.amount_kobo,
             coalesce(s.full_name, 'Staff'), hp.recorded_by, hp.reference, 0
      FROM hall_payments hp JOIN hall_bookings h ON h.id = hp.booking_id LEFT JOIN staff_profiles s ON s.id = hp.recorded_by
@@ -86,7 +79,7 @@ export type StaffTakings = { who: string; staffId: string | null; byMethod: Reco
 export async function incomeReport(db: Db, actor: Actor, range: ReportRange, today = hotelToday()) {
   const { from, to, days } = rangeDates(range, today);
   const rows = await incomeRows(db, actor, range, today);
-  const daily = new Map<string, DayIncome>(days.map((day) => [day, { day, rooms: 0, restaurantBar: 0, hall: 0, total: 0 }]));
+  const daily = new Map<string, DayIncome>(days.map((day) => [day, { day, rooms: 0, hall: 0, total: 0 }]));
   const staff = new Map<string, StaffTakings>();
   for (const r of rows) {
     const d = daily.get(r.day);
