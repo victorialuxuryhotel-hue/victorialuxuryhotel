@@ -70,9 +70,9 @@ export async function addPromo(_prev: ActionResult | null, formData: FormData): 
     const v = z
       .object({
         code: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{3,20}$/, "3–20 letters or numbers"),
-        percentOff: z.coerce.number().int().min(1, "1–100").max(100, "1–100"),
+        percentOff: z.coerce.number().int().min(1, "1–90").max(90, "1–90"),
         validUntil: z.union([z.literal(""), z.iso.date()]).transform((d) => d || null),
-        maxUses: z.union([z.literal(""), z.coerce.number().int().positive()]).transform((n) => (n === "" ? null : n)),
+        maxUses: z.union([z.literal(""), z.coerce.number().int().positive().max(100_000)]).transform((n) => (n === "" ? null : n)),
       })
       .safeParse(Object.fromEntries(formData));
     if (!v.success) throw new AppError("VALIDATION", "Check the highlighted fields", { fieldErrors: z.flattenError(v.error).fieldErrors });
