@@ -6,7 +6,6 @@ import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
-  // Fingerprinting; the Worker also strips this if a layer re-adds it.
   poweredByHeader: false,
   images: {
     localPatterns: [
@@ -17,9 +16,6 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: "6mb" },
   },
-  // Security headers (CSP, HSTS, framing, …) are set once on the Worker in
-  // src/lib/security-headers.ts. Do not also set Content-Security-Policy here:
-  // multiple CSP headers AND together and would break Clerk / Paystack / Maps.
   turbopack: {
     rules: {
       "*.css": {
