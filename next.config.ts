@@ -6,6 +6,8 @@ import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  // Fingerprinting; the Worker also strips this if a layer re-adds it.
+  poweredByHeader: false,
   images: {
     // Photos are served by our own /media route (from R2); no remote images,
     // so next/image is never an open proxy.
