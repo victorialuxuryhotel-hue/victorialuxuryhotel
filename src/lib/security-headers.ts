@@ -14,7 +14,7 @@ export const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${CLERK_IMG}`,
   "font-src 'self' data:",
-  `connect-src 'self' ${CLERK} https://api.clerk.com https://clerk-telemetry.com https://*.clerk-telemetry.com ${TURNSTILE} ${PAYSTACK}`,
+  `connect-src 'self' ${CLERK} https://*.clerk.com:* https://api.clerk.com https://clerk-telemetry.com https://*.clerk-telemetry.com ${TURNSTILE} ${PAYSTACK}`,
   `frame-src ${MAPS} ${CLERK} ${TURNSTILE} ${PAYSTACK}`,
   "worker-src 'self' blob:",
   "upgrade-insecure-requests",

@@ -8,6 +8,7 @@ describe("security headers", () => {
     expect(CONTENT_SECURITY_POLICY).toContain("https://*.clerk.com");
     expect(CONTENT_SECURITY_POLICY).toContain("https://www.google.com");
     expect(CONTENT_SECURITY_POLICY).toContain("https://checkout.paystack.com");
+    expect(CONTENT_SECURITY_POLICY).toMatch(/connect-src [^;]*https:\/\/\*\.clerk\.com:\*/);
     expect(BASE_SECURITY_HEADERS.some(([n, v]) => n === "X-Frame-Options" && v === "DENY")).toBe(true);
   });
 
