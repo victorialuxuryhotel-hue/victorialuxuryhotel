@@ -2,7 +2,7 @@ import { AppError } from "@/lib/errors";
 import { formatNaira } from "@/lib/format";
 import { hotelToday } from "@/lib/hotel-date";
 import { vatIncluded } from "@/lib/vat";
-import { activity, all, FINANCE, first, requireRole, uuid, writeBatch, type Actor, type Db } from "../db";
+import { activity, activityIfChanged, all, FINANCE, first, requireRole, uuid, writeBatch, type Actor, type Db } from "../db";
 import { rangeDates, type ReportRange } from "./reports";
 
 /**
@@ -43,7 +43,7 @@ export async function voidExpense(db: Db, actor: Actor, id: string, reason: stri
   if (why.length < 3) throw new AppError("VALIDATION", "Give a reason.");
   const [r] = await writeBatch(db, actor, [
     db.prepare("UPDATE expenses SET voided_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), voided_by = ?, void_reason = ? WHERE id = ? AND voided_at IS NULL").bind(actor!.id, why, id),
-    activity(db, "expense.voided", "expense", id, `Expense voided: ${why}`),
+    activityIfChanged(db, "expense.voided", "expense", id, `Expense voided: ${why}`),
   ]);
   if (!r?.meta.changes) throw new AppError("NOT_FOUND", "Expense not found or already voided.");
 }

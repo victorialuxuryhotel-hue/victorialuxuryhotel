@@ -1,7 +1,7 @@
 import { AppError } from "@/lib/errors";
 import { dbErrorToken } from "../db-errors";
 import { hotelDateOf } from "@/lib/hotel-date";
-import { activity, all, ALL_STAFF, first, MANAGERS, OWNER, requireRole, uuid, writeBatch, type Actor, type Db, type StaffRole } from "../db";
+import { activity, activityIfChanged, all, ALL_STAFF, first, MANAGERS, OWNER, requireRole, uuid, writeBatch, type Actor, type Db, type StaffRole } from "../db";
 import { formatNaira } from "@/lib/format";
 
 /**
@@ -356,10 +356,10 @@ export async function addExtra(db: Db, actor: Actor, v: { name: string; priceKob
 export async function setExtraActive(db: Db, actor: Actor, id: string, active: boolean): Promise<void> {
   requireRole(actor, MANAGERS);
   const [r] = await writeBatch(db, actor, [
-    db.prepare("UPDATE extras SET is_active = ? WHERE id = ?").bind(active ? 1 : 0, id),
-    activity(db, active ? "extra.shown" : "extra.hidden", "extra", id, `Extra ${active ? "offered again" : "no longer offered"}`),
+    db.prepare("UPDATE extras SET is_active = ?1 WHERE id = ?2 AND is_active <> ?1").bind(active ? 1 : 0, id),
+    activityIfChanged(db, active ? "extra.shown" : "extra.hidden", "extra", id, `Extra ${active ? "offered again" : "no longer offered"}`),
   ]);
-  if (!r?.meta.changes) throw new AppError("NOT_FOUND", "Extra not found.");
+  if (!r?.meta.changes && !(await first(db, "SELECT 1 FROM extras WHERE id = ?", id))) throw new AppError("NOT_FOUND", "Extra not found.");
 }
 
 export async function addPromo(
@@ -368,6 +368,7 @@ export async function addPromo(
   v: { code: string; percentOff: number; validUntil: string | null; maxUses: number | null },
 ): Promise<string> {
   requireRole(actor, MANAGERS);
+  if (!Number.isInteger(v.percentOff) || v.percentOff < 1 || v.percentOff > 90) throw new AppError("VALIDATION", "Choose 1–90% off.");
   const id = uuid();
   const code = v.code.trim().toUpperCase();
   try {
@@ -386,8 +387,8 @@ export async function addPromo(
 export async function setPromoActive(db: Db, actor: Actor, id: string, active: boolean): Promise<void> {
   requireRole(actor, MANAGERS);
   const [r] = await writeBatch(db, actor, [
-    db.prepare("UPDATE promo_codes SET is_active = ? WHERE id = ?").bind(active ? 1 : 0, id),
-    activity(db, active ? "promo.enabled" : "promo.disabled", "promo_code", id, `Promo code ${active ? "switched on" : "switched off"}`),
+    db.prepare("UPDATE promo_codes SET is_active = ?1 WHERE id = ?2 AND is_active <> ?1").bind(active ? 1 : 0, id),
+    activityIfChanged(db, active ? "promo.enabled" : "promo.disabled", "promo_code", id, `Promo code ${active ? "switched on" : "switched off"}`),
   ]);
-  if (!r?.meta.changes) throw new AppError("NOT_FOUND", "Promo code not found.");
+  if (!r?.meta.changes && !(await first(db, "SELECT 1 FROM promo_codes WHERE id = ?", id))) throw new AppError("NOT_FOUND", "Promo code not found.");
 }

@@ -84,6 +84,19 @@ export function activity(db: Db, action: string, entityType: string, entityId: s
     .bind(action, entityType, entityId, summary, JSON.stringify(metadata));
 }
 
+/** Like `activity`, but writes only if the statement just before it in the batch changed a row. */
+export function activityIfChanged(db: Db, action: string, entityType: string, entityId: string | null, summary: string, metadata: Record<string, unknown> = {}): Stmt {
+  return db
+    .prepare(
+      `INSERT INTO activity_log (actor_id, actor_type, action, entity_type, entity_id, summary, metadata)
+       SELECT (SELECT actor_id FROM _ctx WHERE id = 1),
+              CASE WHEN (SELECT actor_id FROM _ctx WHERE id = 1) IS NULL THEN 'system' ELSE 'staff' END,
+              ?, ?, ?, ?, ?
+       WHERE changes() > 0`,
+    )
+    .bind(action, entityType, entityId, summary, JSON.stringify(metadata));
+}
+
 type Versioned = "reservations" | "payments" | "rooms";
 
 /**

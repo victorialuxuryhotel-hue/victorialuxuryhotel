@@ -1,7 +1,7 @@
 import { AppError } from "@/lib/errors";
 import { formatNaira } from "@/lib/format";
 import { dbErrorToken } from "../db-errors";
-import { activity, all, first, MANAGERS, POS_SELLERS, POS_SETTLERS, requireRole, uuid, writeBatch, type Actor, type Db } from "../db";
+import { activity, activityIfChanged, all, first, retryOnStale, MANAGERS, POS_SELLERS, POS_SETTLERS, requireRole, uuid, writeBatch, type Actor, type Db } from "../db";
 
 /**
  * Restaurant and bar sales. A sale is paid at the counter, or charged to a
@@ -33,10 +33,12 @@ export async function addMenuItem(db: Db, actor: Actor, v: { name: string; outle
 export async function setMenuItem(db: Db, actor: Actor, id: string, v: { priceKobo?: number; active?: boolean }): Promise<void> {
   requireRole(actor, MANAGERS);
   const [r] = await writeBatch(db, actor, [
-    db.prepare("UPDATE menu_items SET price_kobo = coalesce(?, price_kobo), is_active = coalesce(?, is_active) WHERE id = ?").bind(v.priceKobo ?? null, v.active === undefined ? null : v.active ? 1 : 0, id),
-    activity(db, "menu.item_changed", "menu_item", id, v.priceKobo ? `Menu price changed to ${formatNaira(v.priceKobo)}` : `Menu item ${v.active ? "back on" : "taken off"} the menu`),
+    db
+      .prepare("UPDATE menu_items SET price_kobo = coalesce(?1, price_kobo), is_active = coalesce(?2, is_active) WHERE id = ?3 AND (price_kobo <> coalesce(?1, price_kobo) OR is_active <> coalesce(?2, is_active))")
+      .bind(v.priceKobo ?? null, v.active === undefined ? null : v.active ? 1 : 0, id),
+    activityIfChanged(db, "menu.item_changed", "menu_item", id, v.priceKobo ? `Menu price changed to ${formatNaira(v.priceKobo)}` : `Menu item ${v.active ? "back on" : "taken off"} the menu`),
   ]);
-  if (!r?.meta.changes) throw new AppError("NOT_FOUND", "Menu item not found.");
+  if (!r?.meta.changes && !(await first(db, "SELECT 1 FROM menu_items WHERE id = ?", id))) throw new AppError("NOT_FOUND", "Menu item not found.");
 }
 
 /** Guests staying now, for "charge to room". */
@@ -96,19 +98,27 @@ export async function recordSale(
 /** Front desk takes payment for a guest's unpaid restaurant and bar charges (needed before check-out). */
 export async function settleRoomCharges(db: Db, actor: Actor, reservationId: string, method: SaleMethod): Promise<number> {
   requireRole(actor, POS_SETTLERS);
-  const due = await first<{ kobo: number; n: number }>(
-    db,
-    "SELECT coalesce(sum(total_kobo), 0) AS kobo, count(*) AS n FROM sales WHERE reservation_id = ? AND status = 'room_charge'",
-    reservationId,
-  );
-  if (!due?.n) throw new AppError("VALIDATION", "There are no unpaid charges.");
-  await writeBatch(db, actor, [
-    db
-      .prepare("UPDATE sales SET status = 'settled', method = ?, settled_by = ?, settled_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE reservation_id = ? AND status = 'room_charge'")
-      .bind(method, actor.id, reservationId),
-    activity(db, "sale.settled", "reservation", reservationId, `Restaurant & bar charges settled: ${formatNaira(due.kobo)} by ${SALE_METHODS[method].toLowerCase()}`),
-  ]);
-  return due.kobo;
+  return retryOnStale(async () => {
+    const due = await first<{ kobo: number; n: number }>(
+      db,
+      "SELECT coalesce(sum(total_kobo), 0) AS kobo, count(*) AS n FROM sales WHERE reservation_id = ? AND status = 'room_charge'",
+      reservationId,
+    );
+    if (!due?.n) throw new AppError("VALIDATION", "There are no unpaid charges.");
+    await writeBatch(db, actor, [
+      db
+        .prepare(
+          `INSERT INTO _guard (ok) SELECT 0 WHERE (SELECT count(*) FROM sales WHERE reservation_id = ?1 AND status = 'room_charge') <> ?2
+             OR (SELECT coalesce(sum(total_kobo), 0) FROM sales WHERE reservation_id = ?1 AND status = 'room_charge') <> ?3`,
+        )
+        .bind(reservationId, due.n, due.kobo),
+      db
+        .prepare("UPDATE sales SET status = 'settled', method = ?, settled_by = ?, settled_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE reservation_id = ? AND status = 'room_charge'")
+        .bind(method, actor.id, reservationId),
+      activity(db, "sale.settled", "reservation", reservationId, `Restaurant & bar charges settled: ${formatNaira(due.kobo)} by ${SALE_METHODS[method].toLowerCase()}`),
+    ]);
+    return due.kobo;
+  });
 }
 
 export async function voidSale(db: Db, actor: Actor, saleId: string, reason: string): Promise<void> {
@@ -117,7 +127,7 @@ export async function voidSale(db: Db, actor: Actor, saleId: string, reason: str
   if (why.length < 3) throw new AppError("VALIDATION", "Give a reason.");
   const [r] = await writeBatch(db, actor, [
     db.prepare("UPDATE sales SET status = 'void', voided_by = ?, void_reason = ? WHERE id = ? AND status IN ('paid', 'room_charge')").bind(actor.id, why, saleId),
-    activity(db, "sale.voided", "sale", saleId, `Sale voided: ${why}`),
+    activityIfChanged(db, "sale.voided", "sale", saleId, `Sale voided: ${why}`),
   ]);
   if (!r?.meta.changes) throw new AppError("INVALID_TRANSITION", "Only open or paid sales can be voided.");
 }
