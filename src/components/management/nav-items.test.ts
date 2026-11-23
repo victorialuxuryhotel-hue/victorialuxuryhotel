@@ -10,7 +10,7 @@ const visible = (role: StaffRole) =>
 
 describe("menu by role", () => {
   it("front desk sees only daily work, never the dashboard", () => {
-    expect(visible("front_desk")).toEqual([{ label: "Daily work", items: ["Today", "Reservations", "Rooms", "Housekeeping", "Guests", "Payments", "Hall bookings"] }]);
+    expect(visible("front_desk")).toEqual([{ label: "Daily work", items: ["Today", "Reservations", "Rooms", "Guests", "Payments", "Hall bookings"] }]);
   });
   it("the general manager also runs the hotel, but has no staff section", () => {
     const groups = visible("general_manager");

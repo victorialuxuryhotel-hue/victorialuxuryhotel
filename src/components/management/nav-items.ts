@@ -1,4 +1,4 @@
-import { BarChart3, BedDouble, BrushCleaning, CalendarCheck, CreditCard, LayoutDashboard, Package, Presentation, Receipt, Settings, ShieldCheck, Sun, Tags, Users, UtensilsCrossed } from "lucide-react";
+import { BarChart3, BedDouble, CalendarCheck, CreditCard, LayoutDashboard, Package, Presentation, Receipt, Settings, ShieldCheck, Sun, Tags, Users, UtensilsCrossed } from "lucide-react";
 import type { Permission } from "@/lib/auth/permissions";
 
 export type NavItem = { href: string; label: string; icon: typeof Sun; permission?: readonly Permission[] };
@@ -11,7 +11,6 @@ export const managementNavGroups: readonly NavGroup[] = [
       { href: "/app/today", label: "Today", icon: Sun, permission: ["reservations.manage"] },
       { href: "/app/reservations", label: "Reservations", icon: CalendarCheck, permission: ["reservations.manage"] },
       { href: "/app/rooms", label: "Rooms", icon: BedDouble, permission: ["rooms.status"] },
-      { href: "/app/housekeeping", label: "Housekeeping", icon: BrushCleaning, permission: ["rooms.status"] },
       { href: "/app/guests", label: "Guests", icon: Users, permission: ["guests.manage"] },
       { href: "/app/payments", label: "Payments", icon: CreditCard, permission: ["payments.record", "reports.view"] },
       { href: "/app/sales", label: "Restaurant & bar", icon: UtensilsCrossed, permission: ["pos.sell"] },
