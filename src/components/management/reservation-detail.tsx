@@ -47,6 +47,7 @@ export function ReservationDetailView({
   backHref,
   paymentsHref,
   receiptHref,
+  billHref,
   guestHref,
   rooms,
   canOverride = false,
@@ -60,6 +61,7 @@ export function ReservationDetailView({
   backHref: string;
   paymentsHref: string;
   receiptHref: (receipt: string) => string;
+  billHref?: string;
   guestHref?: string;
   rooms: RoomOption[];
   canOverride?: boolean;
@@ -142,6 +144,11 @@ export function ReservationDetailView({
               <Wallet className="size-4" aria-hidden /> Record payment
             </Link>
           ) : null}
+          {billHref && (r.status === "checked_in" || r.status === "checked_out") ? (
+            <Link href={billHref} className={buttonStyles({ variant: "secondary" })}>
+              <Printer className="size-4" aria-hidden /> Guest bill
+            </Link>
+          ) : null}
           {r.status === "confirmed" && r.checkIn <= today ? <NoShowButton reservationId={r.id} /> : null}
           {open ? <CancelForm reservationId={r.id} /> : null}
         </div>
@@ -203,9 +210,16 @@ export function ReservationDetailView({
           <Card>
             <CardHeader
               title="Payments"
-              action={balance > 0 && r.status !== "cancelled" && r.status !== "expired" ? (
-                <Link href={paymentsHref} className="text-sm font-medium text-navy-800 hover:text-navy-600">Record payment</Link>
-              ) : undefined}
+              action={
+                <span className="flex gap-4">
+                  {billHref && r.status !== "cancelled" && r.status !== "expired" ? (
+                    <Link href={billHref} className="text-sm font-medium text-navy-800 hover:text-navy-600">Guest bill</Link>
+                  ) : null}
+                  {balance > 0 && r.status !== "cancelled" && r.status !== "expired" ? (
+                    <Link href={paymentsHref} className="text-sm font-medium text-navy-800 hover:text-navy-600">Record payment</Link>
+                  ) : null}
+                </span>
+              }
             />
             <div className="grid grid-cols-3 gap-3 border-b border-hairline p-4 sm:gap-4 sm:p-5">
               <div>

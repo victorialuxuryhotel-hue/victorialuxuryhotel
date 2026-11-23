@@ -208,3 +208,31 @@ export async function reservationIdForReceipt(receiptNumber: string): Promise<st
   const row = await first<{ reservation_id: string }>(await getDb(), "SELECT reservation_id FROM payments WHERE receipt_number = ?", receiptNumber);
   return row?.reservation_id ?? null;
 }
+
+export type BillCharges = {
+  roomKobo: number; nightlyRateKobo: number; nights: number; extrasKobo: number; discountKobo: number; promoCode: string | null;
+  extras: { name: string; unitKobo: number; perNight: boolean; amountKobo: number }[];
+};
+
+export async function getBillCharges(id: string): Promise<BillCharges | null> {
+  await authorizeRead(["reservations.manage", "payments.record", "reports.view"]);
+  const db = await getDb();
+  const [r, extras] = await Promise.all([
+    first<{ total_amount_kobo: number; nightly_rate_kobo: number; nights: number; extras_kobo: number; discount_kobo: number; promo_code: string | null }>(
+      db,
+      "SELECT total_amount_kobo, nightly_rate_kobo, nights, extras_kobo, discount_kobo, promo_code FROM reservations WHERE id = ?",
+      id,
+    ),
+    all<{ name: string; unit_price_kobo: number; per_night: number }>(db, "SELECT name, unit_price_kobo, per_night FROM reservation_extras WHERE reservation_id = ? ORDER BY name", id),
+  ]);
+  if (!r) return null;
+  return {
+    roomKobo: r.total_amount_kobo,
+    nightlyRateKobo: r.nightly_rate_kobo,
+    nights: r.nights,
+    extrasKobo: r.extras_kobo,
+    discountKobo: r.discount_kobo,
+    promoCode: r.promo_code,
+    extras: extras.map((e) => ({ name: e.name, unitKobo: e.unit_price_kobo, perNight: !!e.per_night, amountKobo: e.unit_price_kobo * (e.per_night ? r.nights : 1) })),
+  };
+}

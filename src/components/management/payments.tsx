@@ -128,3 +128,107 @@ export function Receipt({ payment, reservation, forGuest = false, vatRateBp }: {
     </article>
   );
 }
+
+export type BillStay = ReceiptStay & { payments: PaymentRow[]; status: string };
+export type BillLines = {
+  roomKobo: number; nightlyRateKobo: number; nights: number; extrasKobo: number; discountKobo: number; promoCode: string | null;
+  extras: { name: string; unitKobo: number; perNight: boolean; amountKobo: number }[];
+};
+
+export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillStay; lines: BillLines; vatRateBp: number; printedAt: string }) {
+  const extrasListed = lines.extras.reduce((s, e) => s + e.amountKobo, 0);
+  const adjustment = lines.extrasKobo - extrasListed;
+  const paid = stay.payments.filter((p) => p.status === "successful");
+  const balance = stay.totalKobo - stay.paidKobo;
+  const row = "border-b border-hairline";
+  const amount = "py-3 text-right tabular-nums whitespace-nowrap";
+  return (
+    <article className="mx-auto max-w-2xl rounded-card border border-hairline bg-ivory-50 p-5 sm:p-12 print:border-0 print:p-0">
+      <header className="flex flex-col-reverse gap-4 border-b border-hairline pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:pb-8">
+        <div className="flex items-center gap-3">
+          <Logo className="w-10 shrink-0 sm:w-12" />
+          <div>
+            <p className="font-display text-xl text-navy-950 sm:text-2xl">{hotel.name}</p>
+            <p className="text-xs text-ink-500">{hotel.address.line1}, {hotel.address.city}</p>
+            <p className="text-xs text-ink-500">{hotel.phoneDisplay} · {hotel.email}</p>
+          </div>
+        </div>
+        <div className="flex items-baseline justify-between gap-3 sm:block sm:text-right">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-600">Guest bill</p>
+          <p className="font-mono text-sm whitespace-nowrap text-ink-900 sm:mt-1">{stay.reference}</p>
+        </div>
+      </header>
+
+      <dl className="grid grid-cols-2 gap-5 py-6 text-sm sm:grid-cols-3 sm:gap-6 sm:py-8">
+        <div><dt className="text-ink-500">Guest</dt><dd className="mt-1 font-medium text-ink-900">{stay.guestName}</dd></div>
+        <div><dt className="text-ink-500">Room</dt><dd className="mt-1 text-ink-900">{stay.room ? `${stay.room} · ` : ""}{stay.category}</dd></div>
+        <div><dt className="text-ink-500">Printed</dt><dd className="mt-1 text-ink-900">{formatDateTime(printedAt)}</dd></div>
+        <div><dt className="text-ink-500">Arrival</dt><dd className="mt-1 text-ink-900">{formatDate(stay.checkIn)}</dd></div>
+        <div><dt className="text-ink-500">Departure</dt><dd className="mt-1 text-ink-900">{formatDate(stay.checkOut)}</dd></div>
+        <div><dt className="text-ink-500">Nights</dt><dd className="mt-1 text-ink-900">{stay.nights}</dd></div>
+      </dl>
+
+      <table className="w-full text-sm">
+        <thead className="border-y border-hairline text-left text-xs uppercase tracking-wide text-ink-500">
+          <tr><th className="py-3 font-medium">Charges</th><th className="py-3 text-right font-medium">Amount</th></tr>
+        </thead>
+        <tbody>
+          <tr className={row}>
+            <td className="py-3">Room: {stay.category}<p className="text-xs text-ink-500">{plural(lines.nights, "night")} × {formatNaira(lines.nightlyRateKobo)}</p></td>
+            <td className={amount}>{formatNaira(lines.roomKobo)}</td>
+          </tr>
+          {lines.extras.map((e) => (
+            <tr key={e.name} className={row}>
+              <td className="py-3">{e.name}{e.perNight ? <p className="text-xs text-ink-500">{plural(lines.nights, "night")} × {formatNaira(e.unitKobo)}</p> : null}</td>
+              <td className={amount}>{formatNaira(e.amountKobo)}</td>
+            </tr>
+          ))}
+          {adjustment ? (
+            <tr className={row}><td className="py-3">Other extras</td><td className={amount}>{formatNaira(adjustment)}</td></tr>
+          ) : null}
+          {lines.discountKobo ? (
+            <tr className={row}><td className="py-3">Discount{lines.promoCode ? ` (${lines.promoCode})` : ""}</td><td className={amount}>−{formatNaira(lines.discountKobo)}</td></tr>
+          ) : null}
+        </tbody>
+        <tfoot>
+          <tr><td className="pt-3 font-semibold text-ink-900">Total charges</td><td className="pt-3 text-right font-semibold tabular-nums">{formatNaira(stay.totalKobo)}</td></tr>
+          {vatRateBp ? <tr><td className="pt-1 text-xs text-ink-500">Includes VAT ({vatRateBp / 100}%)</td><td className="pt-1 text-right text-xs tabular-nums text-ink-500">{formatNaira(vatIncluded(stay.totalKobo, vatRateBp))}</td></tr> : null}
+        </tfoot>
+      </table>
+
+      <table className="mt-8 w-full text-sm">
+        <thead className="border-y border-hairline text-left text-xs uppercase tracking-wide text-ink-500">
+          <tr><th className="py-3 font-medium">Payments</th><th className="py-3 font-medium">Receipt</th><th className="py-3 text-right font-medium">Amount</th></tr>
+        </thead>
+        <tbody>
+          {paid.length ? (
+            paid.map((p) => (
+              <tr key={p.id} className={row}>
+                <td className="py-3">
+                  {p.kind === "refund" ? "Correction" : p.provider === "paystack" ? "Card (online)" : paymentMethod[p.method]}
+                  <p className="text-xs text-ink-500">{p.paidAt ? formatDateTime(p.paidAt) : ""}</p>
+                </td>
+                <td className="py-3 font-mono text-xs">{p.receiptNumber ?? ""}</td>
+                <td className={amount}>{p.kind === "refund" ? "−" : ""}{formatNaira(p.amountKobo)}</td>
+              </tr>
+            ))
+          ) : (
+            <tr className={row}><td colSpan={3} className="py-3 text-ink-500">No payments yet.</td></tr>
+          )}
+        </tbody>
+        <tfoot>
+          <tr><td colSpan={2} className="pt-3 text-ink-500">Total paid</td><td className="pt-3 text-right tabular-nums">{formatNaira(stay.paidKobo)}</td></tr>
+          <tr>
+            <td colSpan={2} className="pt-2 text-base font-semibold text-ink-900">{balance > 0 ? "Balance due" : balance < 0 ? "Paid over" : "Balance"}</td>
+            <td className="pt-2 text-right text-lg font-semibold tabular-nums">{formatNaira(Math.abs(balance))}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <footer className="mt-12 grid gap-10 border-t border-hairline pt-6 text-xs text-ink-500 sm:grid-cols-2">
+        <p>Thank you for staying with us.</p>
+        <p className="border-t border-ink-400 pt-2 sm:mt-6">Guest signature</p>
+      </footer>
+    </article>
+  );
+}

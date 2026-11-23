@@ -33,6 +33,7 @@ async function Content({ params, searchParams }: PageProps<"/app/reservations/[i
       backHref="/app/reservations"
       paymentsHref={`/app/payments/record?reservation=${r.id}`}
       receiptHref={(n) => `/app/payments/receipt/${n}`}
+      billHref={`/app/reservations/${r.id}/bill`}
       guestHref={`/app/guests/${r.guestId}`}
       rooms={rooms}
       maxGuests={r.maxGuests}
