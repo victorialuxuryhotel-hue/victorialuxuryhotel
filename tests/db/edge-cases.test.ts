@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { addMenuItem, recordSale, settleRoomCharges } from "@/server/domain/pos";
 import { occupancyReport } from "@/server/domain/reports";
-import { assignRoom, checkInReservation, updateRoomStatus } from "@/server/domain/reservations";
-import { day, db, desk, exec, gm, insertReservation, makeCategory, q1, rejects } from "./helpers";
+import { assignRoom, checkInReservation, undoAction, updateRoomStatus } from "@/server/domain/reservations";
+import { day, db, desk, exec, gm, insertReservation, makeCategory, q, q1, rejects } from "./helpers";
 
 async function checkedIn(rooms = 1) {
   const c = await makeCategory(rooms);
@@ -28,6 +29,24 @@ describe("edge cases", () => {
     await rejects(assignRoom(db, desk, id, other), /isn't clean/);
     await updateRoomStatus(db, desk, { roomId: other, readiness: "ready" });
     await assignRoom(db, desk, id, other);
+  });
+
+  it("can't undo a check-in once the guest has room charges", async () => {
+    const { id, undoId } = await checkedIn();
+    const item = await addMenuItem(db, gm, { name: `Malt ${crypto.randomUUID().slice(0, 4)}`, outlet: "bar", priceKobo: 100_000 });
+    await recordSale(db, gm, { outlet: "bar", items: [{ menuItemId: item, quantity: 1 }], reservationId: id });
+    await rejects(undoAction(db, desk, id, undoId), /no longer be undone/);
+  });
+
+  it("settling room charges settles exactly what was totalled, even with a sale arriving at the same time", async () => {
+    const { id } = await checkedIn();
+    const item = await addMenuItem(db, gm, { name: `Zobo ${crypto.randomUUID().slice(0, 4)}`, outlet: "bar", priceKobo: 150_000 });
+    const sell = () => recordSale(db, gm, { outlet: "bar", items: [{ menuItemId: item, quantity: 1 }], reservationId: id });
+    await sell();
+    const [settled] = await Promise.all([settleRoomCharges(db, desk, id, "cash"), sell()]);
+    const rows = await q<{ status: string; total_kobo: number }>("SELECT status, total_kobo FROM sales WHERE reservation_id = ?", id);
+    const settledKobo = rows.filter((r) => r.status === "settled").reduce((s, r) => s + r.total_kobo, 0);
+    expect(settledKobo).toBe(settled);
   });
 
   it("an early check-out stops counting toward occupancy, and occupancy never passes 100%", async () => {

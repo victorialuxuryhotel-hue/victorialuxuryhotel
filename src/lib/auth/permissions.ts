@@ -13,9 +13,14 @@ export type Permission =
   | "activity.view"
   | "staff.manage"
   | "expenses.manage" // record and void expenses
+  | "pos.sell" // restaurant and bar sales
+  | "pos.settle" // take payment for room charges (front desk, at check-out)
+  | "pos.manage" // menu, voids
+  | "inventory.use" // record stock used
+  | "inventory.manage" // stock items, deliveries, adjustments
   | "events.manage"; // conference hall bookings and payments
 
-const frontDesk: Permission[] = ["reservations.manage", "guests.manage", "payments.record", "rooms.status", "events.manage"];
+const frontDesk: Permission[] = ["reservations.manage", "guests.manage", "payments.record", "rooms.status", "pos.settle", "events.manage"];
 const manager: Permission[] = [
   ...frontDesk,
   "payments.override",
@@ -25,6 +30,10 @@ const manager: Permission[] = [
   "reports.view",
   "activity.view",
   "expenses.manage",
+  "pos.sell",
+  "pos.manage",
+  "inventory.use",
+  "inventory.manage",
 ];
 
 const matrix: Record<StaffRole, ReadonlySet<Permission>> = {
@@ -32,10 +41,11 @@ const matrix: Record<StaffRole, ReadonlySet<Permission>> = {
   general_manager: new Set(manager),
   owner: new Set<Permission>([...manager, "staff.manage"]),
   finance: new Set<Permission>(["reports.view", "expenses.manage"]),
+  restaurant_bar: new Set<Permission>(["pos.sell", "inventory.use"]),
 };
 
 export function can(role: StaffRole, permission: Permission): boolean {
-  return matrix[role]?.has(permission) ?? false;
+  return matrix[role].has(permission);
 }
 
 export type PaymentView = "all" | "today" | "mine";

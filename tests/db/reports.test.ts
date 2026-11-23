@@ -3,6 +3,7 @@ import { recordOfflinePayment, recordPaymentCorrection } from "@/server/domain/p
 import { createWebsiteReservation } from "@/server/domain/reservations";
 import { createHallBooking, recordHallPayment } from "@/server/domain/events";
 import { financeSummary } from "@/server/domain/finance";
+import { addMenuItem, recordSale } from "@/server/domain/pos";
 import { csvField, incomeReport, incomeRows, occupancyReport, rangeDates, recentMonths, reportRange } from "@/server/domain/reports";
 import { addDays, hotelInstant, hotelToday } from "@/lib/hotel-date";
 import { day, db, desk, exec, gm, insertReservation, makeCategory, owner, rejects } from "./helpers";
@@ -39,7 +40,7 @@ describe("report ranges (Lagos dates)", () => {
 });
 
 describe("income by day, by staff and method, and the accountant's download", () => {
-  it("covers rooms (net of corrections) and the hall, on the Lagos day", async () => {
+  it("covers rooms (net of corrections), restaurant & bar and the hall, on the Lagos day", async () => {
     const today = hotelToday();
     const before = await incomeReport(db, gm, "today");
     const mine = (r: typeof before) => r.byStaff.find((t) => t.staffId === desk!.id) ?? { byMethod: { cash: 0, transfer: 0, pos: 0 }, total: 0 };
@@ -53,6 +54,8 @@ describe("income by day, by staff and method, and the accountant's download", ()
        VALUES (?, ?, 300000, 'offline', 'cash', 'successful', ?, ?, ?)`,
       crypto.randomUUID(), b.id, hotelInstant(today, "00:30:00"), hotelInstant(today, "00:30:00"), desk!.id,
     );
+    const item = await addMenuItem(db, gm, { name: `Chapman ${crypto.randomUUID().slice(0, 4)}`, outlet: "bar", priceKobo: 350_000 });
+    await recordSale(db, { id: desk!.id, role: "restaurant_bar" }, { outlet: "bar", items: [{ menuItemId: item, quantity: 2 }], method: "pos_terminal" });
     const hall = await createHallBooking(db, desk, {
       title: "AGM", customerName: "Ondo Co-op", phone: null, email: null, guests: 50, priceKobo: 20_000_000, notes: null,
       eventDate: day(200 + Math.floor(Math.random() * 300)), startTime: "08:00", endTime: "09:00", status: "confirmed",
@@ -63,17 +66,19 @@ describe("income by day, by staff and method, and the accountant's download", ()
     const d0 = before.daily[0]!;
     const d1 = after.daily[0]!;
     expect(d1.rooms - d0.rooms).toBe(5_000_000 + 2_000_000 - 1_000_000 + 300_000);
+    expect(d1.restaurantBar - d0.restaurantBar).toBe(700_000);
     expect(d1.hall - d0.hall).toBe(4_000_000);
-    expect(after.total - before.total).toBe(6_300_000 + 4_000_000);
+    expect(after.total - before.total).toBe(6_300_000 + 700_000 + 4_000_000);
 
     const t0 = mine(before);
     const t1 = mine(after);
     expect(t1.byMethod.cash - t0.byMethod.cash).toBe(5_300_000);
     expect(t1.byMethod.transfer - t0.byMethod.transfer).toBe(2_000_000 + 4_000_000);
+    expect(t1.byMethod.pos - t0.byMethod.pos).toBe(700_000);
 
     const s = await financeSummary(db, gm, "today");
     expect(s.incomeTotal).toBe(after.total);
-    expect(s.income).toEqual({ rooms: d1.rooms, hall: d1.hall });
+    expect(s.income).toEqual({ rooms: d1.rooms, restaurantBar: d1.restaurantBar, hall: d1.hall });
 
     const rows = await incomeRows(db, owner, "today");
     expect(rows.filter((r) => r.reference === b.reference).map((r) => r.correction).sort()).toEqual([false, false, false, true]);

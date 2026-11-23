@@ -124,11 +124,13 @@ describe("owner and staff", () => {
     await rejects(createStaffProfile(db, owner, { fullName: "Dup", email: "ada.front@example.com", role: "front_desk" }), /already has an account/);
   });
 
-  it("finance is stored as a department on a front-desk record", async () => {
+  it("finance and restaurant & bar are stored as a department on a front-desk record", async () => {
     const email = `fin-${crypto.randomUUID().slice(0, 6)}@example.com`;
     const id = await createStaffProfile(db, owner, { fullName: "Fola Finance", email, role: "finance" });
     expect(await q1("SELECT role, department FROM staff_profiles WHERE id = ?", id)).toEqual({ role: "front_desk", department: "finance" });
     expect((await linkClerkUser(db, `user_${email}`, email))?.role).toBe("finance");
+    await updateStaffProfile(db, owner, { staffId: id, role: "restaurant_bar", isActive: true });
+    expect(await q1("SELECT role, department FROM staff_profiles WHERE id = ?", id)).toEqual({ role: "front_desk", department: "restaurant_bar" });
     await updateStaffProfile(db, owner, { staffId: id, role: "general_manager", isActive: true });
     expect(await q1("SELECT role, department FROM staff_profiles WHERE id = ?", id)).toEqual({ role: "general_manager", department: null });
     await rejects(exec("UPDATE staff_profiles SET department = 'finance' WHERE id = ?", id), /department_needs_front_desk/);
