@@ -255,6 +255,8 @@ describe("activity log and staff", () => {
   it("always keeps an active owner, and staff are never deleted", async () => {
     await rejects(exec("UPDATE staff_profiles SET is_active = 0 WHERE role = 'owner'"), /last_owner/);
     await rejects(exec("DELETE FROM staff_profiles"), /staff_delete_forbidden/);
+    for (const t of ["payments", "payment_events", "receipt_counters"]) await rejects(exec(`DELETE FROM ${t}`), /payment_immutable/);
+    await rejects(exec("DELETE FROM reservation_status_history"), /history_immutable/);
   });
 
   it("room types and rooms can't be deleted (deactivate instead)", async () => {

@@ -32,6 +32,7 @@ const tokens: Record<string, [ErrorCode, string]> = {
   unsettled_charges: ["VALIDATION", "Restaurant & bar charges are unpaid. Settle them before check-out."],
   stock_move_immutable: ["CONFLICT", "Stock records can't be changed or deleted. Record an adjustment instead."],
   hall_overlap: ["CONFLICT", "The hall is already booked at that time."],
+  history_immutable: ["FORBIDDEN", "Booking history can't be deleted."],
   hall_booking_delete_forbidden: ["FORBIDDEN", "Hall bookings are cancelled, not deleted."],
 };
 
