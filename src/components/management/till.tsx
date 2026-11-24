@@ -7,6 +7,7 @@ import { FormMessage, Input } from "@/components/ui/form";
 import { formatNaira } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 import { cancelOpenOrder, saveOpenOrder, takePayment } from "@/server/pos";
+import { OFFLINE_MESSAGE, safeAction } from "@/lib/safe-action";
 import type { MenuCategory, MenuItem, OpenOrder, Outlet, PayMethod } from "@/server/domain/pos";
 import { PosReceipt, type PosReceiptData } from "./pos-receipt";
 
@@ -18,6 +19,11 @@ const chip = (on: boolean) =>
 const toKobo = (naira: string) => Math.round(Number(naira.replace(/[^\d.]/g, "")) * 100);
 
 type Step = "order" | "pay" | "done";
+
+const OFFLINE = `${OFFLINE_MESSAGE} If the internet stays down, use a numbered paper slip.`;
+const saveSafe = safeAction(saveOpenOrder, OFFLINE);
+const paySafe = safeAction(takePayment, OFFLINE);
+const cancelSafe = safeAction(cancelOpenOrder, OFFLINE);
 
 export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", resume }: {
   menu: MenuItem[]; open: OpenOrder[]; attendant: string; vatRateBp: number; startOutlet?: Outlet; resume?: string;
@@ -32,8 +38,15 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
   const [method, setMethod] = useState<PayMethod>("cash");
   const [given, setGiven] = useState("");
   const [receipt, setReceipt] = useState<PosReceiptData | null>(null);
-  const [saveState, saveAction, saving] = useActionState(saveOpenOrder, null);
-  const [payState, payAction, paying] = useActionState(takePayment, null);
+  const [alreadyPaid, setAlreadyPaid] = useState(false);
+  const [saveState, saveAction, saving] = useActionState(saveSafe, null);
+  const [payState, payAction, paying] = useActionState(paySafe, null);
+  const orderId = useRef<string>(resumeOrder?.id ?? "");
+  const stampId = (e: React.FormEvent<HTMLFormElement>) => {
+    if (!orderId.current) orderId.current = crypto.randomUUID();
+    const input = e.currentTarget.elements.namedItem("id") as HTMLInputElement | null;
+    if (input) input.value = orderId.current;
+  };
 
   const items = menu.filter((m) => m.outlet === outlet && m.is_active);
   const categories = [...new Set(items.map((m) => m.category))];
@@ -49,6 +62,7 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
   const maxFor = (m: MenuItem) => Math.min(99, m.stock_left ?? 99);
 
   const reset = () => {
+    orderId.current = "";
     setCart({});
     setNote("");
     setEditing(null);
@@ -71,7 +85,8 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
   useEffect(() => {
     if (payState?.ok && handledPay.current !== payState && snapshot.current) {
       handledPay.current = payState;
-      setReceipt({ ...snapshot.current, receiptNumber: payState.data.receiptNumber, orderNumber: payState.data.number, paidAt: new Date().toISOString() });
+      setReceipt({ ...snapshot.current, receiptNumber: payState.data.receiptNumber, orderNumber: payState.data.number, paidAt: new Date().toISOString(), totalKobo: payState.data.totalKobo });
+      setAlreadyPaid(payState.data.alreadyPaid);
       setStep("done");
     }
   }, [payState]);
@@ -82,6 +97,7 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
     setCart(Object.fromEntries(o.lines.map((l) => [l.menuItemId, l.quantity])));
     setNote(o.note ?? "");
     setEditing({ id: o.id, number: o.number });
+    orderId.current = o.id;
     setStep("order");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -92,7 +108,7 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
         <div className="flex items-center gap-3 rounded-card border border-success-600/30 bg-success-50 p-4 print:hidden" role="status">
           <CheckCircle2 className="size-6 shrink-0 text-success-700" aria-hidden />
           <div>
-            <p className="font-semibold text-ink-900">Paid: {formatNaira(receipt.totalKobo)}</p>
+            <p className="font-semibold text-ink-900">{alreadyPaid ? "This order was already paid." : "Paid"}: {formatNaira(receipt.totalKobo)}</p>
             {receipt.method === "cash" && receipt.cashReceivedKobo != null ? (
               <p className="text-lg font-semibold text-success-700">Give change: {formatNaira(receipt.cashReceivedKobo - receipt.totalKobo)}</p>
             ) : (
@@ -221,8 +237,8 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
               </label>
               <div className="grid gap-2">
                 <Button size="lg" disabled={!lines.length} onClick={() => setStep("pay")}>Take payment</Button>
-                <form action={saveAction}>
-                  {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
+                <form action={saveAction} onSubmit={stampId}>
+                  <input type="hidden" name="id" defaultValue="" />
                   <input type="hidden" name="outlet" value={outlet} />
                   <input type="hidden" name="lines" value={linesJson} />
                   <input type="hidden" name="note" value={note} />
@@ -235,7 +251,8 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
           ) : (
             <form
               action={payAction}
-              onSubmit={() => {
+              onSubmit={(e) => {
+                stampId(e);
                 snapshot.current = {
                   outlet, receiptNumber: "", orderNumber: 0, paidAt: "", attendant, vatRateBp,
                   lines: lines.map((l) => ({ name: l.item.name, quantity: l.q, unitKobo: l.item.price_kobo })),
@@ -244,7 +261,7 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
               }}
               className="space-y-4"
             >
-              {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
+              <input type="hidden" name="id" defaultValue="" />
               <input type="hidden" name="outlet" value={outlet} />
               <input type="hidden" name="lines" value={linesJson} />
               <input type="hidden" name="note" value={note} />
@@ -313,7 +330,7 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
 
 function OpenOrderRow({ o, onOpen, active }: { o: OpenOrder; onOpen: () => void; active: boolean }) {
   const [confirm, setConfirm] = useState(false);
-  const [state, action, pending] = useActionState(cancelOpenOrder, null);
+  const [state, action, pending] = useActionState(cancelSafe, null);
   return (
     <li className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3", active && "bg-navy-50")}>
       <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">

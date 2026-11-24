@@ -18,15 +18,14 @@ const fail = (err: unknown, event: string) => {
   return toActionError(err);
 };
 const parseLines = (formData: FormData) => lines.parse(JSON.parse(String(formData.get("lines") ?? "[]")));
-const optId = (formData: FormData) => (formData.get("id") ? recordId().parse(formData.get("id")) : undefined);
 
-export type PaidResult = { id: string; number: number; receiptNumber: string; totalKobo: number; changeKobo: number | null };
+export type PaidResult = pos.PaidOrder;
 
 export async function saveOpenOrder(_prev: ActionResult<{ id: string; number: number }> | null, formData: FormData): Promise<ActionResult<{ id: string; number: number }>> {
   try {
     const staff = await authorize("pos.sell");
     const r = await pos.saveOrder(await getDb(), actorOf(staff), {
-      id: optId(formData),
+      id: recordId().parse(formData.get("id")),
       outlet: outlet.parse(formData.get("outlet")),
       lines: parseLines(formData),
       note: z.string().max(120).parse(String(formData.get("note") ?? "")),
@@ -41,10 +40,10 @@ export async function saveOpenOrder(_prev: ActionResult<{ id: string; number: nu
 export async function takePayment(_prev: ActionResult<PaidResult> | null, formData: FormData): Promise<ActionResult<PaidResult>> {
   try {
     const staff = await authorize("pos.sell");
-    const id = optId(formData);
     const cash = formData.get("cashReceived") ? naira.parse(formData.get("cashReceived")) : null;
     const r = await pos.payOrder(await getDb(), actorOf(staff), {
-      ...(id ? { id } : { outlet: outlet.parse(formData.get("outlet")), lines: parseLines(formData) }),
+      id: recordId().parse(formData.get("id")),
+      ...(formData.get("lines") ? { outlet: outlet.parse(formData.get("outlet")), lines: parseLines(formData) } : {}),
       note: z.string().max(120).parse(String(formData.get("note") ?? "")),
       method: method.parse(formData.get("method")),
       cashReceivedKobo: cash,

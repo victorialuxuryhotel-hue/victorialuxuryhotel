@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { safeAction } from "@/lib/safe-action";
 import { FormMessage, Input } from "@/components/ui/form";
 import { cancelOpenOrder, voidSale } from "@/server/pos";
 
@@ -16,7 +17,7 @@ export function PrintReceiptButton() {
 
 export function VoidSaleForm({ id, total }: { id: string; total: string }) {
   const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState(voidSale, null);
+  const [state, action, pending] = useActionState(safeAction(voidSale), null);
   if (state?.ok) return <FormMessage tone="success">Sale voided. Stock has been put back.</FormMessage>;
   if (!open) return <Button variant="ghost" className="text-danger-700 hover:bg-danger-50" onClick={() => setOpen(true)}>Void this sale</Button>;
   return (
@@ -38,7 +39,7 @@ export function VoidSaleForm({ id, total }: { id: string; total: string }) {
 
 export function CancelOrderForm({ id }: { id: string }) {
   const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState(cancelOpenOrder, null);
+  const [state, action, pending] = useActionState(safeAction(cancelOpenOrder), null);
   if (state?.ok) return <FormMessage tone="success">Order cancelled.</FormMessage>;
   if (!open) return <Button variant="ghost" onClick={() => setOpen(true)}>Cancel order</Button>;
   return (

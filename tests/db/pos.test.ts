@@ -48,8 +48,8 @@ describe("restaurant & bar menu", () => {
     await rejects(saveMenuItem(db, gm, { name: "Nope", outlet: "bar", category: "other", priceKobo: 100, available: true, active: true }), /role does not allow/);
     const id = await saveMenuItem(db, mgr, { name: `Suya ${rand()}`, outlet: "restaurant", category: "snacks", priceKobo: 250_000, available: false, active: true });
     expect((await listMenu(db, att)).find((m) => m.id === id)).toMatchObject({ category: "snacks", is_available: 0 });
-    await rejects(payOrder(db, att, { outlet: "restaurant", lines: [{ menuItemId: id, quantity: 1 }], method: "cash" }), /unavailable today/);
-    await rejects(payOrder(db, att, { outlet: "bar", lines: [{ menuItemId: id, quantity: 1 }], method: "cash" }), /unavailable today|on the restaurant menu/);
+    await rejects(payOrder(db, att, { id: crypto.randomUUID(), outlet: "restaurant", lines: [{ menuItemId: id, quantity: 1 }], method: "cash" }), /unavailable today/);
+    await rejects(payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: id, quantity: 1 }], method: "cash" }), /unavailable today|on the restaurant menu/);
   });
 });
 
@@ -58,7 +58,7 @@ describe("selling", () => {
     const mgr = await staff("restaurant_bar_manager");
     const att = await staff("restaurant_bar");
     const { stockId, itemId } = await drink(mgr, 10);
-    const sale = await payOrder(db, att, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 2 }, { menuItemId: itemId, quantity: 1 }], method: "cash", cashReceivedKobo: 500_000 });
+    const sale = await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 2 }, { menuItemId: itemId, quantity: 1 }], method: "cash", cashReceivedKobo: 500_000 });
     expect(sale.totalKobo).toBe(300_000);
     expect(sale.changeKobo).toBe(200_000);
     expect(sale.receiptNumber).toMatch(/^RB-\d{4}-\d{6}$/);
@@ -66,16 +66,16 @@ describe("selling", () => {
     const o = (await getOrder(db, att, sale.id))!;
     expect(o).toMatchObject({ status: "paid", method: "cash", total_kobo: 300_000, cash_received_kobo: 500_000 });
     expect(o.lines).toEqual([expect.objectContaining({ quantity: 3, unit_price_kobo: 100_000 })]);
-    const next = await payOrder(db, att, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "pos_terminal" });
+    const next = await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "pos_terminal" });
     expect(Number(next.receiptNumber.slice(-6))).toBe(Number(sale.receiptNumber.slice(-6)) + 1);
-    await rejects(payOrder(db, att, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash", cashReceivedKobo: 50_000 }), /at least/);
+    await rejects(payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash", cashReceivedKobo: 50_000 }), /at least/);
   });
 
   it("won't sell more than is in stock, and says which item", async () => {
     const mgr = await staff("restaurant_bar_manager");
     const att = await staff("restaurant_bar");
     const { stockId, itemId } = await drink(mgr, 2);
-    await rejects(payOrder(db, att, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 3 }], method: "cash" }), /Not enough Malt .* 2 bottles left, 3 needed/);
+    await rejects(payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 3 }], method: "cash" }), /Not enough Malt .* 2 bottles left, 3 needed/);
     expect(await onHand(stockId)).toBe(2);
     const sold = (await listMenu(db, att)).find((m) => m.id === itemId)!;
     expect(sold.stock_left).toBe(2);
@@ -86,19 +86,20 @@ describe("selling", () => {
     const att = await staff("restaurant_bar");
     const { stockId, itemId } = await drink(mgr, 10);
     const before = await posReport(db, mgr, "today", "bar");
-    const order = await saveOrder(db, att, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], note: "Table 4" });
+    const order = await saveOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], note: "Table 4" });
     await saveOrder(db, att, { id: order.id, outlet: "bar", lines: [{ menuItemId: itemId, quantity: 4 }], note: "Table 4" });
     expect(await onHand(stockId)).toBe(10);
     expect((await posReport(db, mgr, "today", "bar")).salesKobo).toBe(before.salesKobo);
 
-    const results = await Promise.allSettled([1, 2, 3].map(() => payOrder(db, att, { id: order.id, method: "bank_transfer" })));
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const results = await Promise.all([1, 2, 3].map(() => payOrder(db, att, { id: order.id, method: "bank_transfer" })));
+    expect(new Set(results.map((r) => r.receiptNumber)).size).toBe(1);
+    expect(results.filter((r) => !r.alreadyPaid)).toHaveLength(1);
     expect(await onHand(stockId)).toBe(6);
     expect((await posReport(db, mgr, "today", "bar")).salesKobo - before.salesKobo).toBe(400_000);
-    await rejects(saveOrder(db, att, { id: order.id, outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }] }), /already closed/);
+    await rejects(saveOrder(db, att, { id: order.id, outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }] }), /already paid/);
     await rejects(cancelOrder(db, att, order.id, null), /Only unpaid/);
 
-    const dropped = await saveOrder(db, att, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }] });
+    const dropped = await saveOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }] });
     await cancelOrder(db, att, dropped.id, "Customer left");
     expect((await getOrder(db, mgr, dropped.id))!.status).toBe("cancelled");
     await rejects(payOrder(db, att, { id: dropped.id, method: "cash" }), /cancelled/);
@@ -108,7 +109,7 @@ describe("selling", () => {
     const mgr = await staff("restaurant_bar_manager");
     const att = await staff("restaurant_bar");
     const { stockId, itemId } = await drink(mgr, 5);
-    const sale = await payOrder(db, att, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 2 }], method: "cash" });
+    const sale = await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 2 }], method: "cash" });
     await rejects(exec("UPDATE pos_orders SET total_kobo = 1 WHERE id = ?", sale.id), /order_immutable/);
     await rejects(exec("DELETE FROM pos_orders WHERE id = ?", sale.id), /order_immutable/);
     await rejects(exec("UPDATE pos_order_items SET quantity = 1 WHERE order_id = ?", sale.id), /order_immutable/);
@@ -126,8 +127,8 @@ describe("selling", () => {
     const a1 = await staff("restaurant_bar");
     const a2 = await staff("restaurant_bar");
     const { itemId } = await drink(mgr, 10);
-    const s1 = await payOrder(db, a1, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" });
-    const s2 = await payOrder(db, a2, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" });
+    const s1 = await payOrder(db, a1, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" });
+    const s2 = await payOrder(db, a2, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" });
     const today = hotelToday();
     const mine = await listOrders(db, a1, { from: today, to: today });
     expect(mine.some((o) => o.id === s1.id)).toBe(true);
@@ -143,9 +144,9 @@ describe("daily closing", () => {
     const mgr = await staff("restaurant_bar_manager");
     const att = await staff("restaurant_bar");
     const { itemId } = await drink(mgr, 20);
-    await payOrder(db, att, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 3 }], method: "cash" });
-    await payOrder(db, att, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 2 }], method: "pos_terminal" });
-    const open = await saveOrder(db, att, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }] });
+    await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 3 }], method: "cash" });
+    await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 2 }], method: "pos_terminal" });
+    const open = await saveOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }] });
     await rejects(closeDay(db, att, { countedCashKobo: 300_000, explanation: null }), /still unpaid/);
     await cancelOrder(db, att, open.id, null);
 
@@ -154,7 +155,7 @@ describe("daily closing", () => {
     await rejects(closeDay(db, att, { countedCashKobo: 250_000, explanation: null }), /₦500 short\. Say why/);
     const id = await closeDay(db, att, { countedCashKobo: 250_000, explanation: "Gave wrong change" });
     await rejects(closeDay(db, att, { countedCashKobo: 300_000, explanation: null }), /already closed/);
-    await rejects(payOrder(db, att, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" }), /already closed today/);
+    await rejects(payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" }), /already closed today/);
 
     await rejects(verifyClosing(db, att, id, null), /role does not allow/);
     await verifyClosing(db, mgr, id, "Checked the till");
@@ -162,7 +163,7 @@ describe("daily closing", () => {
     await rejects(exec("UPDATE pos_closings SET counted_cash_kobo = 300000 WHERE id = ?", id), /closing_immutable/);
     expect(await q1("SELECT expected_cash_kobo AS e, counted_cash_kobo AS c FROM pos_closings WHERE id = ?", id)).toEqual({ e: 300_000, c: 250_000 });
 
-    const mgrSale = await payOrder(db, mgr, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" });
+    const mgrSale = await payOrder(db, mgr, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" });
     const own = await closeDay(db, mgr, { countedCashKobo: mgrSale.totalKobo, explanation: null });
     await rejects(verifyClosing(db, mgr, own, null), /Another manager or the owner/);
     await verifyClosing(db, owner, own, null);
@@ -178,9 +179,9 @@ describe("restaurant & bar reports and the hotel's books", () => {
     const before = await financeSummary(db, gm, "today");
     const beforeBar = await posReport(db, mgr, "today", "bar");
 
-    await payOrder(db, att, { outlet: "bar", lines: [{ menuItemId: maltId, quantity: 2 }], method: "cash" });
-    const food = await payOrder(db, att, { outlet: "restaurant", lines: [{ menuItemId: rice, quantity: 1 }], method: "bank_transfer" });
-    const oops = await payOrder(db, att, { outlet: "bar", lines: [{ menuItemId: maltId, quantity: 1 }], method: "cash" });
+    await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: maltId, quantity: 2 }], method: "cash" });
+    const food = await payOrder(db, att, { id: crypto.randomUUID(), outlet: "restaurant", lines: [{ menuItemId: rice, quantity: 1 }], method: "bank_transfer" });
+    const oops = await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: maltId, quantity: 1 }], method: "cash" });
     await voidOrder(db, mgr, oops.id, "Wrong drink");
 
     const bar = await posReport(db, mgr, "today", "bar");
@@ -212,7 +213,7 @@ describe("restaurant & bar reports and the hotel's books", () => {
     await recordMove(db, mgr, { itemId: stockId, kind: "wasted", quantity: 2, note: "2 bottles broken" });
     expect(await onHand(stockId)).toBe(4);
     await rejects(recordMove(db, await staff("restaurant_bar"), { itemId: stockId, kind: "received", quantity: 1, note: null }), /role does not allow/);
-    await rejects(payOrder(db, fin, { outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" }), /role does not allow/);
+    await rejects(payOrder(db, fin, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" }), /role does not allow/);
     const rep = await posReport(db, fin, "today", "restaurant");
     expect(rep.expensesKobo).toBeGreaterThanOrEqual(1_500_000);
   });
@@ -221,5 +222,50 @@ describe("restaurant & bar reports and the hotel's books", () => {
     const mgr = await staff("restaurant_bar_manager");
     expect(await q1(`SELECT (CASE WHEN department = 'restaurant_bar' AND department_lead = 1 THEN 'restaurant_bar_manager' ELSE coalesce(department, role) END) AS r FROM staff_profiles WHERE id = ?`, mgr.id)).toEqual({ r: "restaurant_bar_manager" });
     await rejects(exec("UPDATE staff_profiles SET department = 'finance' WHERE id = ?", mgr.id), /lead_needs_restaurant_bar/);
+  });
+
+  it("a retried payment after a dropped connection returns the first receipt and takes stock once", async () => {
+    const mgr = await staff("restaurant_bar_manager");
+    const att = await staff("restaurant_bar");
+    const { stockId, itemId } = await drink(mgr, 10);
+    const id = crypto.randomUUID();
+    const pay = () => payOrder(db, att, { id, outlet: "bar", lines: [{ menuItemId: itemId, quantity: 2 }], method: "cash", cashReceivedKobo: 500_000 });
+    const first = await pay();
+    const again = await pay();
+    expect(again).toMatchObject({ receiptNumber: first.receiptNumber, alreadyPaid: true, changeKobo: 300_000 });
+    const both = await Promise.all([1, 2].map(() => payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" })));
+    expect(both[0]!.receiptNumber).not.toBe(both[1]!.receiptNumber);
+    expect(await onHand(stockId)).toBe(6);
+    const saved = crypto.randomUUID();
+    await Promise.all([1, 2].map(() => saveOrder(db, att, { id: saved, outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }] })));
+    expect((await q("SELECT 1 FROM pos_orders WHERE id = ?", saved)).length).toBe(1);
+  });
+
+  it("a price change while an order is open: the customer pays what the till shows", async () => {
+    const mgr = await staff("restaurant_bar_manager");
+    const att = await staff("restaurant_bar");
+    const itemId = await saveMenuItem(db, mgr, { name: `Fanta ${rand()}`, outlet: "bar", category: "soft_drinks", priceKobo: 70_000, available: true, active: true });
+    const order = await saveOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 2 }] });
+    expect(order.totalKobo).toBe(140_000);
+    await saveMenuItem(db, mgr, { id: itemId, name: (await listMenu(db, mgr)).find((m) => m.id === itemId)!.name, outlet: "bar", category: "soft_drinks", priceKobo: 80_000, available: true, active: true });
+    const paid = await payOrder(db, att, { id: order.id, outlet: "bar", lines: [{ menuItemId: itemId, quantity: 2 }], method: "pos_terminal" });
+    expect(paid.totalKobo).toBe(160_000);
+    expect((await getOrder(db, mgr, order.id))!.lines[0]!.unit_price_kobo).toBe(80_000);
+  });
+
+  it("a sale at 1:30am counts toward the night before, in the closing and the reports", async () => {
+    const mgr = await staff("restaurant_bar_manager");
+    const att = await staff("restaurant_bar");
+    const id = crypto.randomUUID();
+    await exec(
+      `INSERT INTO pos_orders (id, number, outlet, status, total_kobo, method, receipt_number, created_by, paid_by, paid_at, created_at)
+       VALUES (?, 900000 + abs(random() % 99999), 'bar', 'paid', 150000, 'cash', ?, ?, ?, '2026-03-11T00:30:00.000Z', '2026-03-11T00:20:00.000Z')`,
+      id, `RB-TEST-${rand()}`, att.id, att.id,
+    );
+    expect((await closingSummary(db, mgr, att.id, "2026-03-10")).byMethod.cash).toBe(150_000);
+    expect((await closingSummary(db, mgr, att.id, "2026-03-11")).sales).toBe(0);
+    const march = await posReport(db, mgr, "2026-03", "bar", "2026-03-31");
+    expect(march.daily.find((d) => d.day === "2026-03-10")!.kobo).toBeGreaterThanOrEqual(150_000);
+    expect(march.daily.find((d) => d.day === "2026-03-11")!.kobo).toBe(0);
   });
 });

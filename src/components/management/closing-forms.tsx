@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { safeAction } from "@/lib/safe-action";
 import { FormMessage, Input, Textarea } from "@/components/ui/form";
 import { formatNaira } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
@@ -9,7 +10,7 @@ import { closeMyDay, signOffClosing } from "@/server/pos";
 
 export function CloseDayForm({ expectedCashKobo, openOrders }: { expectedCashKobo: number; openOrders: number }) {
   const [counted, setCounted] = useState("");
-  const [state, action, pending] = useActionState(closeMyDay, null);
+  const [state, action, pending] = useActionState(safeAction(closeMyDay), null);
   const countedKobo = counted === "" ? null : Math.round(Number(counted) * 100);
   const diff = countedKobo == null ? null : countedKobo - expectedCashKobo;
   if (state?.ok) return <FormMessage tone="success">Your day is closed. A manager will check and sign it off.</FormMessage>;
@@ -41,7 +42,7 @@ export function CloseDayForm({ expectedCashKobo, openOrders }: { expectedCashKob
 
 export function SignOffForm({ id }: { id: string }) {
   const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState(signOffClosing, null);
+  const [state, action, pending] = useActionState(safeAction(signOffClosing), null);
   if (state?.ok) return <span className="text-sm text-success-700">Signed off</span>;
   if (!open) return <Button size="sm" onClick={() => setOpen(true)}>Sign off</Button>;
   return (

@@ -1,6 +1,6 @@
 import { AppError } from "@/lib/errors";
 import { formatNaira } from "@/lib/format";
-import { addDays, hotelInstant, hotelToday } from "@/lib/hotel-date";
+import { addDays, businessDate, businessDayStart } from "@/lib/hotel-date";
 import { dbErrorToken } from "../db-errors";
 import {
   activity,
@@ -32,7 +32,7 @@ export const ORDER_STATUS: Record<OrderStatus, string> = { open: "Unpaid", paid:
 
 const ALL_POS = [...new Set([...POS_SELLERS, ...POS_VIEWERS])] as StaffRole[];
 const naira = (k: number) => formatNaira(k).replace(/\s/g, "");
-const dayStart = (d: string) => hotelInstant(d, "00:00:00");
+const dayStart = (d: string) => businessDayStart(d);
 
 // ---------------------------------------------------------------------------
 // Menu
@@ -184,7 +184,7 @@ async function checkStock(db: Db, lines: { menuItemId: string; quantity: number 
 }
 
 async function assertNotClosed(db: Db, staffId: string): Promise<void> {
-  if (await first(db, "SELECT 1 FROM pos_closings WHERE staff_id = ? AND business_date = ?", staffId, hotelToday())) {
+  if (await first(db, "SELECT 1 FROM pos_closings WHERE staff_id = ? AND business_date = ?", staffId, businessDate())) {
     throw new AppError("CONFLICT", "You've already closed today's sales. Ask a manager if you need to sell more today.");
   }
 }
@@ -242,79 +242,121 @@ async function payFailed(db: Db, err: unknown, lines: { menuItemId: string; quan
   throw err;
 }
 
-/** Save an unpaid order (new, or replace an open order's items). Not a sale until paid. */
+const isUnique = (err: unknown) => err instanceof AppError && dbErrorToken(err.cause) === "unique";
+
+async function orderState(db: Db, id: string) {
+  return first<{ status: OrderStatus; outlet: Outlet; total_kobo: number }>(db, "SELECT status, outlet, total_kobo FROM pos_orders WHERE id = ?", id);
+}
+
+const replaceLines = (db: Db, id: string, priced: Priced[], totalKobo: number, note: string | null) => [
+  db.prepare("DELETE FROM pos_order_items WHERE order_id = ?").bind(id),
+  ...lineInserts(db, id, priced),
+  db.prepare("UPDATE pos_orders SET total_kobo = ?, note = ? WHERE id = ? AND status = 'open'").bind(totalKobo, note, id),
+  db.prepare("INSERT INTO _guard (ok) SELECT 0 WHERE changes() = 0"),
+];
+
+/**
+ * Save an unpaid order. The till makes the order's id when the order starts, so
+ * saving again (or a retry after a dropped connection) updates the same order.
+ */
 export async function saveOrder(
   db: Db,
   actor: Actor,
-  v: { id?: string; outlet: Outlet; lines: OrderLine[]; note?: string | null },
+  v: { id: string; outlet: Outlet; lines: OrderLine[]; note?: string | null },
 ): Promise<{ id: string; number: number; totalKobo: number }> {
   requireRole(actor, POS_SELLERS);
   await assertNotClosed(db, actor.id);
   const { priced, totalKobo } = await price(db, v.outlet, v.lines);
   await checkStock(db, priced);
   const note = v.note?.trim().slice(0, 120) || null;
-  const id = v.id ?? uuid();
-  if (v.id) {
-    const cur = await first<{ status: OrderStatus; outlet: Outlet }>(db, "SELECT status, outlet FROM pos_orders WHERE id = ?", v.id);
-    if (!cur) throw new AppError("NOT_FOUND", "Order not found.");
-    if (cur.status !== "open") throw new AppError("INVALID_TRANSITION", "This order is already closed.");
-    if (cur.outlet !== v.outlet) throw new AppError("VALIDATION", "An order stays with the counter it was opened at.");
-    await writeBatch(db, actor, [
-      db.prepare("DELETE FROM pos_order_items WHERE order_id = ?").bind(id),
-      ...lineInserts(db, id, priced),
-      db.prepare("UPDATE pos_orders SET total_kobo = ?, note = ? WHERE id = ? AND status = 'open'").bind(totalKobo, note, id),
-      db.prepare("INSERT INTO _guard (ok) SELECT 0 WHERE changes() = 0"),
-    ]).catch((err) => payFailed(db, err, priced));
-  } else {
-    await writeBatch(db, actor, [
-      ...orderInsert(db, id, v.outlet, totalKobo, note, actor.id),
-      ...lineInserts(db, id, priced),
-      activity(db, "pos.order_opened", "pos_order", id, `${OUTLETS[v.outlet]} order opened: ${naira(totalKobo)} (unpaid)`),
-    ]);
-  }
-  const row = await first<{ number: number }>(db, "SELECT number FROM pos_orders WHERE id = ?", id);
-  return { id, number: row!.number, totalKobo };
-}
-
-/** Take payment. Pass `id` for a saved order, or `outlet` + `lines` to sell straight away. */
-export async function payOrder(
-  db: Db,
-  actor: Actor,
-  v: { id?: string; outlet?: Outlet; lines?: OrderLine[]; note?: string | null; method: PayMethod; cashReceivedKobo?: number | null },
-): Promise<{ id: string; number: number; receiptNumber: string; totalKobo: number; changeKobo: number | null }> {
-  requireRole(actor, POS_SELLERS);
-  if (!(v.method in PAY_METHODS)) throw new AppError("VALIDATION", "Choose how the customer paid.");
-  await assertNotClosed(db, actor.id);
-  let id: string;
-  let totalKobo: number;
-  let lines: { menuItemId: string; quantity: number }[];
-  const stmts = [];
-  if (v.id) {
-    const cur = await first<{ status: OrderStatus; total_kobo: number; outlet: Outlet }>(db, "SELECT status, total_kobo, outlet FROM pos_orders WHERE id = ?", v.id);
+  const update = async () => {
+    const cur = await orderState(db, v.id);
     if (!cur) throw new AppError("NOT_FOUND", "Order not found.");
     if (cur.status === "paid") throw new AppError("CONFLICT", "This order is already paid.");
     if (cur.status !== "open") throw new AppError("INVALID_TRANSITION", "This order was cancelled.");
-    id = v.id;
-    totalKobo = cur.total_kobo;
-    lines = await all<{ menuItemId: string; quantity: number }>(db, "SELECT menu_item_id AS menuItemId, quantity FROM pos_order_items WHERE order_id = ?", id);
-    if (!lines.length) throw new AppError("VALIDATION", "Add at least one item.");
-  } else {
-    if (!v.outlet || !v.lines) throw new AppError("VALIDATION", "Add at least one item.");
-    const p = await price(db, v.outlet, v.lines);
-    id = uuid();
+    if (cur.outlet !== v.outlet) throw new AppError("VALIDATION", "An order stays with the counter it was opened at.");
+    await writeBatch(db, actor, replaceLines(db, v.id, priced, totalKobo, note)).catch((err) => payFailed(db, err, priced));
+  };
+  if (await orderState(db, v.id)) await update();
+  else {
+    try {
+      await writeBatch(db, actor, [
+        ...orderInsert(db, v.id, v.outlet, totalKobo, note, actor.id),
+        ...lineInserts(db, v.id, priced),
+        activity(db, "pos.order_opened", "pos_order", v.id, `${OUTLETS[v.outlet]} order opened: ${naira(totalKobo)} (unpaid)`),
+      ]);
+    } catch (err) {
+      if (!isUnique(err)) throw err;
+      await update();
+    }
+  }
+  const row = await first<{ number: number }>(db, "SELECT number FROM pos_orders WHERE id = ?", v.id);
+  return { id: v.id, number: row!.number, totalKobo };
+}
+
+export type PaidOrder = { id: string; number: number; receiptNumber: string; totalKobo: number; changeKobo: number | null; alreadyPaid: boolean };
+
+async function paidResult(db: Db, id: string, alreadyPaid: boolean): Promise<PaidOrder> {
+  const r = await first<{ number: number; receipt_number: string; total_kobo: number; cash_received_kobo: number | null }>(
+    db,
+    "SELECT number, receipt_number, total_kobo, cash_received_kobo FROM pos_orders WHERE id = ? AND status IN ('paid', 'void')",
+    id,
+  );
+  if (!r) throw new AppError("CONFLICT", "This order was just changed. Reload and check it.");
+  return { id, number: r.number, receiptNumber: r.receipt_number, totalKobo: r.total_kobo, changeKobo: r.cash_received_kobo == null ? null : r.cash_received_kobo - r.total_kobo, alreadyPaid };
+}
+
+/**
+ * Take payment for the order with this id. With `lines`, the order is created or
+ * updated to exactly those lines at today's prices first (what the screen shows),
+ * in the same step. Paying the same id again returns the first receipt: a retry
+ * after a dropped connection never records a second sale.
+ */
+export async function payOrder(
+  db: Db,
+  actor: Actor,
+  v: { id: string; outlet?: Outlet; lines?: OrderLine[]; note?: string | null; method: PayMethod; cashReceivedKobo?: number | null },
+): Promise<PaidOrder> {
+  requireRole(actor, POS_SELLERS);
+  if (!(v.method in PAY_METHODS)) throw new AppError("VALIDATION", "Choose how the customer paid.");
+  const cur = await orderState(db, v.id);
+  if (cur?.status === "paid" || cur?.status === "void") return paidResult(db, v.id, true);
+  if (cur?.status === "cancelled") throw new AppError("INVALID_TRANSITION", "This order was cancelled.");
+  await assertNotClosed(db, actor.id);
+
+  let totalKobo: number;
+  let lines: { menuItemId: string; quantity: number }[];
+  const stmts = [];
+  const note = v.note?.trim().slice(0, 120) || null;
+  if (v.lines) {
+    const outlet = cur?.outlet ?? v.outlet;
+    if (!outlet) throw new AppError("VALIDATION", "Choose the counter.");
+    if (cur && v.outlet && v.outlet !== cur.outlet) throw new AppError("VALIDATION", "An order stays with the counter it was opened at.");
+    const p = await price(db, outlet, v.lines);
     totalKobo = p.totalKobo;
     lines = p.priced;
-    stmts.push(...orderInsert(db, id, v.outlet, totalKobo, v.note?.trim().slice(0, 120) || null, actor.id), ...lineInserts(db, id, p.priced));
+    stmts.push(...(cur ? replaceLines(db, v.id, p.priced, totalKobo, note) : [...orderInsert(db, v.id, outlet, totalKobo, note, actor.id), ...lineInserts(db, v.id, p.priced)]));
+  } else {
+    if (!cur) throw new AppError("NOT_FOUND", "Order not found.");
+    totalKobo = cur.total_kobo;
+    lines = await all<{ menuItemId: string; quantity: number }>(db, "SELECT menu_item_id AS menuItemId, quantity FROM pos_order_items WHERE order_id = ?", v.id);
+    if (!lines.length) throw new AppError("VALIDATION", "Add at least one item.");
   }
   await checkStock(db, lines);
   const cash = validCash(v.method, totalKobo, v.cashReceivedKobo);
   stmts.push(
-    ...payStatements(db, id, actor.id, v.method, totalKobo, cash),
-    activity(db, "pos.order_paid", "pos_order", id, `Sale ${naira(totalKobo)} paid by ${PAY_METHODS[v.method].toLowerCase()}`, { method: v.method, total_kobo: totalKobo }),
+    ...payStatements(db, v.id, actor.id, v.method, totalKobo, cash),
+    activity(db, "pos.order_paid", "pos_order", v.id, `Sale ${naira(totalKobo)} paid by ${PAY_METHODS[v.method].toLowerCase()}`, { method: v.method, total_kobo: totalKobo }),
   );
-  await writeBatch(db, actor, stmts).catch((err) => payFailed(db, err, lines));
-  const row = await first<{ number: number; receipt_number: string }>(db, "SELECT number, receipt_number FROM pos_orders WHERE id = ?", id);
-  return { id, number: row!.number, receiptNumber: row!.receipt_number, totalKobo, changeKobo: cash == null ? null : cash - totalKobo };
+  try {
+    await writeBatch(db, actor, stmts);
+  } catch (err) {
+    const now = await orderState(db, v.id);
+    if (now?.status === "paid" || now?.status === "void") return paidResult(db, v.id, true);
+    if (isUnique(err)) throw new AppError("CONFLICT", "This order was just changed. Try again.");
+    await payFailed(db, err, lines);
+  }
+  return paidResult(db, v.id, false);
 }
 
 /** Drop an unpaid order. It stays on record as cancelled. */
@@ -402,7 +444,7 @@ export async function listOrders(db: Db, actor: Actor, f: OrderFilter, limit = 2
     where.push(`(o.receipt_number LIKE ? OR ${Number.isInteger(n) && n > 0 ? "o.number = ? OR" : ""} EXISTS (SELECT 1 FROM pos_order_items i WHERE i.order_id = o.id AND i.name LIKE ?))`);
     params.push(`%${q.toUpperCase()}%`, ...(Number.isInteger(n) && n > 0 ? [n] : []), `%${q}%`);
   }
-  return all<OrderRow>(db, `${ORDER_SELECT} WHERE ${where.join(" AND ")} ORDER BY o.created_at DESC LIMIT ${Math.min(limit, 1000)}`, ...params);
+  return all<OrderRow>(db, `${ORDER_SELECT} WHERE ${where.join(" AND ")} ORDER BY o.created_at DESC LIMIT ${Math.min(limit, 20_000)}`, ...params);
 }
 
 export type OrderDetail = OrderRow & {
@@ -435,7 +477,7 @@ export type ClosingSummary = {
   sales: number; salesKobo: number; byMethod: Record<PayMethod, number>; voids: number; voidsKobo: number; openOrders: number; expensesKobo: number;
 };
 
-export async function closingSummary(db: Db, actor: Actor, staffId: string, date = hotelToday()): Promise<ClosingSummary> {
+export async function closingSummary(db: Db, actor: Actor, staffId: string, date = businessDate()): Promise<ClosingSummary> {
   requireRole(actor, ALL_POS);
   if (staffId !== actor.id && !sees(actor)) throw new AppError("FORBIDDEN", "You can only close your own sales.");
   const from = dayStart(date);
@@ -473,7 +515,7 @@ export async function closingSummary(db: Db, actor: Actor, staffId: string, date
 
 export async function closeDay(db: Db, actor: Actor, v: { countedCashKobo: number; explanation: string | null }): Promise<string> {
   requireRole(actor, POS_SELLERS);
-  const date = hotelToday();
+  const date = businessDate();
   const s = await closingSummary(db, actor, actor.id, date);
   if (s.openOrders) throw new AppError("VALIDATION", `${s.openOrders === 1 ? "1 order is" : `${s.openOrders} orders are`} still unpaid. Take payment or cancel ${s.openOrders === 1 ? "it" : "them"} first.`);
   if (!Number.isInteger(v.countedCashKobo) || v.countedCashKobo < 0 || v.countedCashKobo > 10_000_000_000) throw new AppError("VALIDATION", "Enter the cash you counted.");
