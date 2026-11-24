@@ -27,7 +27,7 @@ BEGIN
   INSERT INTO activity_log (actor_id, actor_type, action, entity_type, entity_id, summary, metadata)
   VALUES ((SELECT actor_id FROM _ctx WHERE id = 1),
           CASE WHEN (SELECT actor_id FROM _ctx WHERE id = 1) IS NULL THEN 'system' ELSE 'staff' END,
-          'staff.role_changed', 'staff', NEW.id,
+          'staff.role_changed', 'staff_profile', NEW.id,
           NEW.full_name || CASE WHEN NEW.department_lead = 1
             THEN CASE WHEN NEW.department IS NULL THEN ' is now Hotel Manager' ELSE ' is now Restaurant/Bar Manager' END
             ELSE ' is no longer a department manager' END,
