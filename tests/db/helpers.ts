@@ -70,6 +70,7 @@ export async function insertReservation(input: {
   checkOut: string;
   roomId?: string | null;
   status?: "pending_payment" | "confirmed";
+  unpaid?: boolean;
   rateKobo?: number;
   holdMinutes?: number;
   guestId?: string;
@@ -87,9 +88,39 @@ export async function insertReservation(input: {
     input.checkIn, input.checkOut, rate, rate * nights, input.status ?? "pending_payment", input.source ?? "staff",
     input.status === "confirmed" ? null : iso((input.holdMinutes ?? 60) * 60_000),
   );
+  if (input.status === "confirmed" && !input.unpaid) await payInFull(id);
   return id;
+}
+
+/** Records the whole balance as one cash payment, straight into the table (a confirmed booking is a paid one). */
+export async function payInFull(reservationId: string) {
+  const due = await q1<{ due: number; paid: number }>(
+    `SELECT (r.total_amount_kobo + r.extras_kobo + r.room_change_kobo - r.discount_kobo) AS due,
+            (SELECT coalesce(sum(CASE WHEN kind = 'payment' THEN amount_kobo ELSE -amount_kobo END), 0) FROM payments WHERE reservation_id = r.id AND status = 'successful') AS paid
+     FROM reservations r WHERE r.id = ?`,
+    reservationId,
+  );
+  if (due.due - due.paid <= 0) return;
+  const at = new Date().toISOString();
+  await exec(
+    `INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, status, paid_at, verified_at, recorded_by)
+     VALUES (?, ?, ?, 'offline', 'cash', 'successful', ?, ?, ?)`,
+    crypto.randomUUID(), reservationId, due.due - due.paid, at, at, desk!.id,
+  );
 }
 
 export const status = async (reservationId: string) => (await q1<{ status: string }>("SELECT status FROM reservations WHERE id = ?", reservationId)).status;
 
 export const lapseHold = (reservationId: string) => exec("UPDATE reservations SET hold_expires_at = ? WHERE id = ?", iso(-60_000), reservationId);
+
+/** Inserts a successful payment row directly, for tests about reporting several payments (the app itself takes one full payment). */
+export async function rawPayment(reservationId: string, amountKobo: number, opts: { method?: string; paidAt?: string; recordedBy?: string } = {}) {
+  const id = crypto.randomUUID();
+  const at = opts.paidAt ?? new Date().toISOString();
+  await exec(
+    `INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, status, paid_at, verified_at, recorded_by, created_at)
+     VALUES (?, ?, ?, 'offline', ?, 'successful', ?, ?, ?, ?)`,
+    id, reservationId, amountKobo, opts.method ?? "cash", at, at, opts.recordedBy ?? desk!.id, at,
+  );
+  return id;
+}

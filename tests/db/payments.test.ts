@@ -146,28 +146,30 @@ describe("offline payments", () => {
     await rejects(offline(b.id, 100, { confirmReceived: false }), /Confirm that the hotel has received/);
   });
 
-  it("a part payment is recorded but doesn't confirm; the balance does", async () => {
+  it("bookings are paid in full: a part payment is refused, the full amount confirms", async () => {
     const b = await heldBooking(1, 5_000_000);
-    const part = await offline(b.id, 4_000_000);
-    expect(part.outcome).toBe("part_paid");
-    expect(part.receiptNumber).toMatch(/^RCT-/);
+    await rejects(offline(b.id, 4_000_000), /paid in full\. Record the full ₦100,000 balance/);
     expect(await status(b.id)).toBe("pending_payment");
-    expect((await offline(b.id, 6_000_000)).outcome).toBe("confirmed");
+    const full = await offline(b.id, 10_000_000);
+    expect(full.outcome).toBe("confirmed");
+    expect(full.receiptNumber).toMatch(/^RCT-/);
     expect(await status(b.id)).toBe("confirmed");
   });
 
   it("refuses overpayment, future dates, very old dates and duplicate references", async () => {
     const b = await heldBooking(1, 5_000_000);
-    await rejects(offline(b.id, 10_000_100), /more than the .* balance due/);
+    await rejects(offline(b.id, 10_000_100), /paid in full/);
     await rejects(offline(b.id, 100, { paidOn: day(1) }), /can't be in the future/);
     await rejects(offline(b.id, 100, { paidOn: day(-61) }), /older than 60 days/);
-    await offline(b.id, 100, { reference: "TRF-DUP-9" });
-    await rejects(offline(b.id, 100, { reference: "TRF-DUP-9" }), /already been recorded/, "CONFLICT");
+    const ref = `TRF-DUP-${crypto.randomUUID().slice(0, 6)}`;
+    await offline(b.id, 10_000_000, { reference: ref });
+    const b2 = await heldBooking(1, 5_000_000);
+    await rejects(offline(b2.id, 10_000_000, { reference: ref }), /already been recorded/, "CONFLICT");
   });
 
   it("records who took the money, audits it and queues a receipt email", async () => {
     const b = await heldBooking();
-    const { paymentId } = await offline(b.id, 1_000_000);
+    const { paymentId } = await offline(b.id, 10_000_000);
     expect((await q1<{ recorded_by: string }>("SELECT recorded_by FROM payments WHERE id = ?", paymentId)).recorded_by).toBe(desk!.id);
     const log = await q1<{ actor_id: string; summary: string }>("SELECT actor_id, summary FROM activity_log WHERE entity_id = ? AND action = 'payment.recorded'", b.id);
     expect(log.actor_id).toBe(desk!.id);
@@ -233,10 +235,11 @@ describe("other booking workflows", () => {
 describe("email outbox", () => {
   it("queues confirmations for overrides and cancellations, once each", async () => {
     const b = await heldBooking(2);
-    await overridePaymentRequirement(db, gm, b.id, "confirm", "Corporate client, pays on invoice");
+    await rejects(overridePaymentRequirement(db, gm, b.id, "confirm", "Corporate client, pays on invoice"), /only when paid in full/);
+    await overridePaymentRequirement(db, gm, b.id, "extend", "Paying by transfer tomorrow morning");
     await cancelReservation(db, gm, b.id, "Plans changed");
     const kinds = (await q<{ kind: string }>("SELECT kind FROM email_outbox WHERE reservation_id = ? ORDER BY created_at", b.id)).map((k) => k.kind);
-    expect(kinds).toEqual(["booking_confirmed", "reservation_cancelled"]);
+    expect(kinds).toEqual(["reservation_cancelled"]);
   });
 
   it("is written in the same transaction: a failed confirmation queues nothing", async () => {
@@ -251,7 +254,7 @@ describe("email outbox", () => {
   it("two senders never claim the same email", async () => {
     for (let i = 0; i < 4; i++) {
       const b = await heldBooking();
-      await offline(b.id, 100);
+      await offline(b.id, 10_000_000);
     }
     const [a, c] = await Promise.all([claimOutbox(db, { limit: 50 }), claimOutbox(db, { limit: 50 })]);
     const ids = [...a, ...c].map((r) => r.id);
@@ -261,7 +264,7 @@ describe("email outbox", () => {
 
   it("retries with back-off and gives up after five attempts", async () => {
     const b = await heldBooking();
-    const { paymentId } = await offline(b.id, 100);
+    const { paymentId } = await offline(b.id, 10_000_000);
     const row = await q1<{ id: string }>("SELECT id FROM email_outbox WHERE payment_id = ?", paymentId);
     for (let attempt = 1; attempt <= 5; attempt++) {
       await exec("UPDATE email_outbox SET next_attempt_at = ? WHERE id = ?", iso(-1000), row.id);
@@ -277,7 +280,7 @@ describe("email outbox", () => {
 
   it("claims a given reservation's emails first", async () => {
     const b = await heldBooking();
-    await offline(b.id, 100);
+    await offline(b.id, 10_000_000);
     const claimed = await claimOutbox(db, { reservationId: b.id });
     expect(claimed.length).toBeGreaterThan(0);
     expect(claimed.every((c) => c.reservation_id === b.id)).toBe(true);
@@ -310,20 +313,20 @@ describe("payment corrections (payments are never edited)", () => {
 
   it("can't exceed the original payment, needs a reason, and is managers only", async () => {
     const b = await heldBooking(1, 5_000_000);
-    const pay = await offline(b.id, 4_000_000);
+    const pay = await offline(b.id, 10_000_000);
     await rejects(recordPaymentCorrection(db, desk, { paymentId: pay.paymentId, amountKobo: 100, reason: "Wrong amount" }), /role does not allow/);
     await rejects(recordPaymentCorrection(db, gm, { paymentId: pay.paymentId, amountKobo: 100, reason: "x" }), /Say what was wrong/);
     await recordPaymentCorrection(db, gm, { paymentId: pay.paymentId, amountKobo: 3_000_000, reason: "Partly wrong" });
-    await rejects(recordPaymentCorrection(db, gm, { paymentId: pay.paymentId, amountKobo: 1_000_100, reason: "Wrong again" }), /At most .* can still be corrected/);
+    await rejects(recordPaymentCorrection(db, gm, { paymentId: pay.paymentId, amountKobo: 7_000_100, reason: "Wrong again" }), /At most .* can still be corrected/);
   });
 
   it("the database refuses an unlinked or oversized correction", async () => {
     const b = await heldBooking(1, 5_000_000);
-    const pay = await offline(b.id, 1_000_000);
+    const pay = await offline(b.id, 10_000_000);
     await rejects(
       exec(
         `INSERT INTO payments (id, reservation_id, kind, amount_kobo, provider, method, status, paid_at, verified_at, recorded_by, corrects_payment_id)
-         VALUES (?, ?, 'refund', 2000000, 'offline', 'cash', 'successful', ?, ?, ?, ?)`,
+         VALUES (?, ?, 'refund', 20000000, 'offline', 'cash', 'successful', ?, ?, ?, ?)`,
         crypto.randomUUID(), b.id, iso(0), iso(0), desk!.id, pay.paymentId,
       ),
       /invalid_correction/,

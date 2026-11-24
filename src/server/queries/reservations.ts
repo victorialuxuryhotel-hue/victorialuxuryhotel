@@ -9,7 +9,7 @@ import { all, first, getDb } from "../db";
 import { cleanSearch } from "../db-errors";
 
 const LIST_COLUMNS = `
-  r.id, r.reference, r.check_in, r.check_out, r.guest_count, (r.total_amount_kobo + r.extras_kobo - r.discount_kobo) AS total_amount_kobo, r.status, r.source, r.hold_expires_at, r.attention_reason,
+  r.id, r.reference, r.check_in, r.check_out, r.guest_count, (r.total_amount_kobo + r.extras_kobo + r.room_change_kobo - r.discount_kobo) AS total_amount_kobo, r.status, r.source, r.hold_expires_at, r.attention_reason,
   g.full_name AS guest_name, g.phone AS guest_phone, c.name AS category_name, rm.room_number,
   (SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
      FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful') AS paid_kobo`;
@@ -210,7 +210,7 @@ export async function reservationIdForReceipt(receiptNumber: string): Promise<st
 }
 
 export type BillCharges = {
-  roomKobo: number; nightlyRateKobo: number; nights: number; extrasKobo: number; discountKobo: number; promoCode: string | null;
+  roomKobo: number; nightlyRateKobo: number; nights: number; extrasKobo: number; roomChangeKobo: number; discountKobo: number; promoCode: string | null;
   extras: { name: string; unitKobo: number; perNight: boolean; amountKobo: number }[];
 };
 
@@ -218,9 +218,9 @@ export async function getBillCharges(id: string): Promise<BillCharges | null> {
   await authorizeRead(["reservations.manage", "payments.record", "reports.view"]);
   const db = await getDb();
   const [r, extras] = await Promise.all([
-    first<{ total_amount_kobo: number; nightly_rate_kobo: number; nights: number; extras_kobo: number; discount_kobo: number; promo_code: string | null }>(
+    first<{ total_amount_kobo: number; nightly_rate_kobo: number; nights: number; extras_kobo: number; room_change_kobo: number; discount_kobo: number; promo_code: string | null }>(
       db,
-      "SELECT total_amount_kobo, nightly_rate_kobo, nights, extras_kobo, discount_kobo, promo_code FROM reservations WHERE id = ?",
+      "SELECT total_amount_kobo, nightly_rate_kobo, nights, extras_kobo, room_change_kobo, discount_kobo, promo_code FROM reservations WHERE id = ?",
       id,
     ),
     all<{ name: string; unit_price_kobo: number; per_night: number }>(db, "SELECT name, unit_price_kobo, per_night FROM reservation_extras WHERE reservation_id = ? ORDER BY name", id),
@@ -231,6 +231,7 @@ export async function getBillCharges(id: string): Promise<BillCharges | null> {
     nightlyRateKobo: r.nightly_rate_kobo,
     nights: r.nights,
     extrasKobo: r.extras_kobo,
+    roomChangeKobo: r.room_change_kobo,
     discountKobo: r.discount_kobo,
     promoCode: r.promo_code,
     extras: extras.map((e) => ({ name: e.name, unitKobo: e.unit_price_kobo, perNight: !!e.per_night, amountKobo: e.unit_price_kobo * (e.per_night ? r.nights : 1) })),

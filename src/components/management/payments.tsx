@@ -131,7 +131,7 @@ export function Receipt({ payment, reservation, forGuest = false, vatRateBp }: {
 
 export type BillStay = ReceiptStay & { payments: PaymentRow[]; status: string };
 export type BillLines = {
-  roomKobo: number; nightlyRateKobo: number; nights: number; extrasKobo: number; discountKobo: number; promoCode: string | null;
+  roomKobo: number; nightlyRateKobo: number; nights: number; extrasKobo: number; roomChangeKobo: number; discountKobo: number; promoCode: string | null;
   extras: { name: string; unitKobo: number; perNight: boolean; amountKobo: number }[];
 };
 
@@ -185,6 +185,9 @@ export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillSta
           ))}
           {adjustment ? (
             <tr className={row}><td className="py-3">Other extras</td><td className={amount}>{formatNaira(adjustment)}</td></tr>
+          ) : null}
+          {lines.roomChangeKobo ? (
+            <tr className={row}><td className="py-3">Room change to a higher room type</td><td className={amount}>{formatNaira(lines.roomChangeKobo)}</td></tr>
           ) : null}
           {lines.discountKobo ? (
             <tr className={row}><td className="py-3">Discount{lines.promoCode ? ` (${lines.promoCode})` : ""}</td><td className={amount}>−{formatNaira(lines.discountKobo)}</td></tr>

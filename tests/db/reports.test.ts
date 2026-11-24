@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { recordOfflinePayment, recordPaymentCorrection } from "@/server/domain/payments";
+import { recordPaymentCorrection } from "@/server/domain/payments";
 import { createWebsiteReservation } from "@/server/domain/reservations";
 import { createHallBooking, recordHallPayment } from "@/server/domain/events";
 import { financeSummary } from "@/server/domain/finance";
 import { payOrder, saveMenuItem } from "@/server/domain/pos";
 import { csvField, incomeReport, incomeRows, occupancyReport, rangeDates, recentMonths, reportRange } from "@/server/domain/reports";
 import { addDays, hotelInstant, hotelToday } from "@/lib/hotel-date";
-import { day, db, desk, exec, gm, insertReservation, makeCategory, owner, rejects } from "./helpers";
+import { day, db, desk, exec, gm, insertReservation, makeCategory, owner, rejects, rawPayment } from "./helpers";
 
 async function booking() {
   const c = await makeCategory(1, { rateKobo: 10_000_000 });
@@ -46,9 +46,9 @@ describe("income by day, by staff and method, and the accountant's download", ()
     const mine = (r: typeof before) => r.byStaff.find((t) => t.staffId === desk!.id) ?? { byMethod: { cash: 0, transfer: 0, pos: 0 }, total: 0 };
 
     const b = await booking();
-    const p1 = await recordOfflinePayment(db, desk, { reservationId: b.id, amountKobo: 5_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
-    await recordOfflinePayment(db, desk, { reservationId: b.id, amountKobo: 2_000_000, method: "bank_transfer", paidOn: day(0), confirmReceived: true });
-    await recordPaymentCorrection(db, gm, { paymentId: p1.paymentId, amountKobo: 1_000_000, reason: "Typed too much" });
+    const p1 = await rawPayment(b.id, 5_000_000, { method: "cash" });
+    await rawPayment(b.id, 2_000_000, { method: "bank_transfer" });
+    await recordPaymentCorrection(db, gm, { paymentId: p1, amountKobo: 1_000_000, reason: "Typed too much" });
     await exec(
       `INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, status, paid_at, verified_at, recorded_by)
        VALUES (?, ?, 300000, 'offline', 'cash', 'successful', ?, ?, ?)`,

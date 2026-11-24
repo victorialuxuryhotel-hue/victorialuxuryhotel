@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createWebsiteReservation } from "@/server/domain/reservations";
-import { recordOfflinePayment } from "@/server/domain/payments";
+
 import { frontDeskSummary, listPaymentsFor } from "@/server/domain/payment-list";
 import { addDays, hotelInstant, hotelToday } from "@/lib/hotel-date";
-import { day, db, desk, exec, gm, makeCategory, owner } from "./helpers";
+import { day, db, desk, exec, gm, makeCategory, owner, rawPayment } from "./helpers";
 
 async function booking() {
   const c = await makeCategory(1, { rateKobo: 10_000_000 });
@@ -13,8 +13,9 @@ async function booking() {
   });
 }
 
-const pay = (actor: typeof desk, reservationId: string, paidOn: string, amountKobo: number) =>
-  recordOfflinePayment(db, actor, { reservationId, amountKobo, method: "cash", paidOn, confirmReceived: true });
+const pay = async (actor: typeof desk, reservationId: string, paidOn: string, amountKobo: number, method = "cash") => ({
+  paymentId: await rawPayment(reservationId, amountKobo, { method, paidAt: paidOn === hotelToday() ? new Date().toISOString() : hotelInstant(paidOn, "12:00:00"), recordedBy: actor!.id }),
+});
 
 async function payAt(reservationId: string, paidAt: string, amountKobo: number, recordedBy: string) {
   const id = crypto.randomUUID();

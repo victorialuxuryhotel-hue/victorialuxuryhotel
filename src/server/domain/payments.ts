@@ -241,7 +241,7 @@ export async function recordOfflinePayment(
     const paid = await netPaid(db, res.id);
     const balance = dueOf(res) - paid;
     if (balance <= 0) throw new AppError("VALIDATION", "This reservation is already paid in full.");
-    if (input.amountKobo > balance) throw new AppError("VALIDATION", `That is more than the ${naira(balance)} balance due.`);
+    if (input.amountKobo !== balance) throw new AppError("VALIDATION", `Bookings are paid in full. Record the full ${naira(balance)} balance.`);
 
     const paymentId = input.paymentId ?? uuid();
     const settle = await settleStatements(db, res, paid + input.amountKobo);

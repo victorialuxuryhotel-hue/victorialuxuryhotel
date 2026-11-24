@@ -179,7 +179,7 @@ describe("front desk lifecycle", () => {
     await checkInReservation(db, desk, r);
     expect(await status(r)).toBe("checked_in");
     const { balance } = await checkOutReservation(db, desk, r);
-    expect(balance).toBe(10_000_000);
+    expect(balance).toBe(0);
     expect(await status(r)).toBe("checked_out");
     expect((await q1<{ readiness: string }>("SELECT readiness FROM rooms WHERE id = ?", c.roomIds[0])).readiness).toBe("needs_cleaning");
     const actions = await q<{ action: string; actor_id: string }>("SELECT action, actor_id FROM activity_log WHERE entity_id = ? ORDER BY id", r);
@@ -242,17 +242,12 @@ describe("payment override (managers only, reason required, audited)", () => {
     await rejects(overridePaymentRequirement(db, desk, r.id, "confirm", "Trusted corporate guest"), /role does not allow/, "FORBIDDEN");
   });
 
-  it("GM confirms with a reason, recorded in history and the activity log", async () => {
+  it("nobody can confirm a booking without full payment, not even a manager", async () => {
     const c = await makeCategory(1);
     const r = await staffBooking(c.id, day(40), day(41));
-    await rejects(overridePaymentRequirement(db, gm, r.id, "confirm", "ok"), /Give a reason/);
-    await overridePaymentRequirement(db, gm, r.id, "confirm", "Corporate account, invoiced monthly");
-    expect(await status(r.id)).toBe("confirmed");
-    const h = await q1<{ reason: string; changed_by: string }>("SELECT reason, changed_by FROM reservation_status_history WHERE reservation_id = ? AND to_status = 'confirmed'", r.id);
-    expect(h).toEqual({ reason: "Corporate account, invoiced monthly", changed_by: gm!.id });
-    const log = await q1<{ actor_id: string; summary: string }>("SELECT actor_id, summary FROM activity_log WHERE entity_id = ? AND action = 'reservation.payment_override'", r.id);
-    expect(log.actor_id).toBe(gm!.id);
-    expect(log.summary).toMatch(/Corporate account/);
+    await rejects(overridePaymentRequirement(db, gm, r.id, "confirm", "Corporate account, invoiced monthly"), /only when paid in full/);
+    await rejects(overridePaymentRequirement(db, owner, r.id, "confirm", "Corporate account, invoiced monthly"), /only when paid in full/);
+    expect(await status(r.id)).toBe("pending_payment");
   });
 
   it("extends a hold, and re-checks availability if the hold had already lapsed", async () => {
@@ -305,11 +300,10 @@ describe("concurrent staff actions", () => {
     const r = await staffBooking(c.id, day(40), day(41));
     const results = await Promise.allSettled([
       cancelReservation(db, desk, r.id, "Desk one cancels"),
-      overridePaymentRequirement(db, gm, r.id, "confirm", "Desk two confirms"),
+      cancelReservation(db, gm, r.id, "Desk two cancels too"),
     ]);
     expect(results.filter((x) => x.status === "fulfilled")).toHaveLength(1);
-    const final = await status(r.id);
-    expect(["cancelled", "confirmed"]).toContain(final);
+    expect(await status(r.id)).toBe("cancelled");
     const rejected = results.find((x) => x.status === "rejected") as PromiseRejectedResult;
     expect(rejected.reason.message).toMatch(/Only upcoming|Only reservations awaiting payment|just changed by someone else/);
   });

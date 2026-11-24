@@ -4,7 +4,8 @@ export function cancellationRuleText(freeHours: number, feePct: number, checkInT
   const hours = `${freeHours} hours before check-in`;
   return [
     `Free cancellation up to ${hours} (check-in is from ${checkInTime.slice(0, 5)}).`,
-    `Within ${freeHours} hours of check-in, or if you don't arrive, ${feePct}% of the room price is charged. Extras you didn't use are refunded in full.`,
+    `Within ${freeHours} hours of check-in, ${feePct}% of the room price is charged. Extras you didn't use are refunded in full.`,
+    "If you don't arrive, the booking is forfeited.",
     `You can change your dates for free up to ${hours}, if rooms are available.`,
     refunds,
   ].join(" ");

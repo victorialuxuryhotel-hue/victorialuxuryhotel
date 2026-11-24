@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { occupancyReport } from "@/server/domain/reports";
 import { recordOfflinePayment } from "@/server/domain/payments";
-import { assignRoom, checkInReservation, markNoShow, undoAction, updateRoomStatus } from "@/server/domain/reservations";
+import { assignRoom, changeReservationDates, checkInReservation, checkOutReservation, markNoShow, undoAction, updateRoomStatus } from "@/server/domain/reservations";
 import { day, db, desk, exec, gm, insertReservation, makeCategory, q1, rejects } from "./helpers";
 
 async function checkedIn(rooms = 1) {
@@ -45,27 +45,37 @@ describe("edge cases", () => {
     expect((await q1<{ n: number }>("SELECT count(*) AS n FROM rooms WHERE is_active = 1")).n).toBe(after.roomsInService);
   });
 
-  it("a no-show keeps the late-cancellation fee and flags the rest for refund; undo clears it", async () => {
+  it("a no-show forfeits the booking: everything paid is kept, nothing is flagged for refund; undo clears it", async () => {
     const c = await makeCategory(1, { rateKobo: 5_500_000 });
     const id = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2), status: "confirmed", rateKobo: 5_500_000 });
-    await recordOfflinePayment(db, desk, { reservationId: id, amountKobo: 11_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
     const { undoId } = await markNoShow(db, desk, id);
-    const after = await q1<{ status: string; cancellation_fee_kobo: number; attention_reason: string | null }>(
-      "SELECT status, cancellation_fee_kobo, attention_reason FROM reservations WHERE id = ?", id);
-    expect(after.status).toBe("no_show");
-    expect(after.cancellation_fee_kobo).toBe(5_500_000);
-    expect(after.attention_reason).toMatch(/^No-show\. Refund ₦55,000 \(fee kept: ₦55,000\)\.$/);
-
+    expect(await q1("SELECT status, cancellation_fee_kobo AS fee, attention_reason AS note FROM reservations WHERE id = ?", id)).toEqual({ status: "no_show", fee: 11_000_000, note: null });
     await undoAction(db, desk, id, undoId!);
-    const undone = await q1<{ status: string; cancellation_fee_kobo: number | null; attention_reason: string | null }>(
-      "SELECT status, cancellation_fee_kobo, attention_reason FROM reservations WHERE id = ?", id);
-    expect(undone).toEqual({ status: "confirmed", cancellation_fee_kobo: null, attention_reason: null });
+    expect(await q1("SELECT status, cancellation_fee_kobo AS fee FROM reservations WHERE id = ?", id)).toEqual({ status: "confirmed", fee: null });
   });
 
-  it("an unpaid no-show has no fee and nothing to refund", async () => {
-    const c = await makeCategory(1);
+  it("moving to a dearer room type charges the difference for the nights left; undo removes it; a manager can waive it", async () => {
+    const std = await makeCategory(2, { rateKobo: 5_500_000 });
+    const dlx = await makeCategory(2, { rateKobo: 7_500_000 });
+    const id = await insertReservation({ categoryId: std.id, checkIn: day(0), checkOut: day(3), roomId: std.roomIds[0], status: "confirmed", rateKobo: 5_500_000 });
+    const { undoId, chargeKobo } = await assignRoom(db, desk, id, dlx.roomIds[0]!);
+    expect(chargeKobo).toBe(3 * 2_000_000);
+    await rejects(checkInReservation(db, desk, id), /₦60,000 still to pay/);
+    await undoAction(db, desk, id, undoId!);
+    expect((await q1<{ c: number }>("SELECT room_change_kobo AS c FROM reservations WHERE id = ?", id)).c).toBe(0);
+    await rejects(assignRoom(db, desk, id, dlx.roomIds[1]!, { waiveCharge: true }), /Only a manager/);
+    expect((await assignRoom(db, gm, id, dlx.roomIds[1]!, { waiveCharge: true })).chargeKobo).toBe(0);
+    expect((await assignRoom(db, desk, id, std.roomIds[1]!)).chargeKobo).toBe(0);
+  });
+
+  it("extending a stay leaves the extra to pay, and the guest can't check out until it's paid", async () => {
+    const c = await makeCategory(1, { rateKobo: 5_000_000 });
     const id = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
-    await markNoShow(db, desk, id);
-    expect(await q1("SELECT cancellation_fee_kobo AS fee, attention_reason AS note FROM reservations WHERE id = ?", id)).toEqual({ fee: 0, note: null });
+    await assignRoom(db, desk, id, c.roomIds[0]!);
+    await checkInReservation(db, desk, id);
+    await changeReservationDates(db, desk, id, day(0), day(2));
+    await rejects(checkOutReservation(db, desk, id), /₦50,000 still to pay/);
+    await recordOfflinePayment(db, desk, { reservationId: id, amountKobo: 5_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
+    expect((await checkOutReservation(db, desk, id)).balance).toBe(0);
   });
 });

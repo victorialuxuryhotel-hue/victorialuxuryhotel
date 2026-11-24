@@ -74,7 +74,7 @@ describe("guest accounts", () => {
     const e = mail();
     const r = await book(e, 50);
     const paymentId = crypto.randomUUID();
-    const input = { reservationId: r.id, paymentId, amountKobo: 1_000_000, method: "cash" as const, paidOn: day(0), confirmReceived: true };
+    const input = { reservationId: r.id, paymentId, amountKobo: 11_000_000, method: "cash" as const, paidOn: day(0), confirmReceived: true };
     const [a, b] = await Promise.all([recordOfflinePayment(db, desk, input), recordOfflinePayment(db, desk, input)]);
     expect(a.receiptNumber).toBe(b.receiptNumber);
     expect((await q1<{ n: number }>("SELECT count(*) AS n FROM payments WHERE reservation_id = ?", r.id)).n).toBe(1);

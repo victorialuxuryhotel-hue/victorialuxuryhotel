@@ -43,11 +43,11 @@ export type GuestBooking = {
 export async function guestBookings(db: Db, email: string): Promise<GuestBooking[]> {
   const rows = await all<{
     id: string; reference: string; public_token: string; status: string; check_in: string; check_out: string; nights: number; guest_count: number;
-    category: string; total_amount_kobo: number; extras_kobo: number; discount_kobo: number; paid: number;
+    category: string; total_amount_kobo: number; extras_kobo: number; room_change_kobo: number; discount_kobo: number; paid: number;
   }>(
     db,
     `SELECT r.id, r.reference, r.public_token, r.status, r.check_in, r.check_out, r.nights, r.guest_count, c.name AS category,
-            r.total_amount_kobo, r.extras_kobo, r.discount_kobo,
+            r.total_amount_kobo, r.extras_kobo, r.room_change_kobo, r.discount_kobo,
             (SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
                FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful') AS paid
      FROM reservations r JOIN guests g ON g.id = r.guest_id JOIN room_categories c ON c.id = r.category_id
@@ -60,7 +60,7 @@ export async function guestBookings(db: Db, email: string): Promise<GuestBooking
     const upcoming = (r.status === "pending_payment" || r.status === "confirmed") && Date.parse(hotelInstant(r.check_in, rule.checkInTime)) > Date.now();
     return {
       id: r.id, reference: r.reference, token: r.public_token, status: r.status, checkIn: r.check_in, checkOut: r.check_out,
-      nights: r.nights ?? 0, guests: r.guest_count, category: r.category, dueKobo: r.total_amount_kobo + r.extras_kobo - r.discount_kobo, paidKobo: r.paid,
+      nights: r.nights ?? 0, guests: r.guest_count, category: r.category, dueKobo: r.total_amount_kobo + r.extras_kobo + r.room_change_kobo - r.discount_kobo, paidKobo: r.paid,
       canCancel: upcoming,
       canChange: upcoming && !(r.paid > 0 && cancellationFee(r.total_amount_kobo, r.check_in, rule) > 0),
       feeIfCancelledKobo: r.status === "confirmed" ? cancellationFee(r.total_amount_kobo, r.check_in, rule) : 0,
@@ -75,7 +75,7 @@ async function cancelRule(db: Db): Promise<Rule> {
     db,
     "SELECT check_in_time, free_cancel_hours, late_cancel_fee_pct FROM hotel_settings WHERE id = 1",
   );
-  return { checkInTime: s?.check_in_time ?? "14:00", freeHours: s?.free_cancel_hours ?? 48, feePct: s?.late_cancel_fee_pct ?? 50 };
+  return { checkInTime: s?.check_in_time ?? "14:00", freeHours: s?.free_cancel_hours ?? 24, feePct: s?.late_cancel_fee_pct ?? 50 };
 }
 
 export function cancellationFee(roomTotalKobo: number, checkIn: string, rule: Rule, at = Date.now()): number {

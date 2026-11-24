@@ -19,8 +19,8 @@ export async function revenueSummary() {
     first<{ booked: number; outstanding: number }>(
       db,
       `SELECT
-         coalesce(sum(CASE WHEN substr(check_in, 1, 7) = ?1 THEN (total_amount_kobo + extras_kobo - discount_kobo) ELSE 0 END), 0) AS booked,
-         coalesce(sum(max(0, (total_amount_kobo + extras_kobo - discount_kobo) - (
+         coalesce(sum(CASE WHEN substr(check_in, 1, 7) = ?1 THEN (total_amount_kobo + extras_kobo + room_change_kobo - discount_kobo) ELSE 0 END), 0) AS booked,
+         coalesce(sum(max(0, (total_amount_kobo + extras_kobo + room_change_kobo - discount_kobo) - (
            SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
            FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful'))), 0) AS outstanding
        FROM reservations r WHERE status IN ('confirmed', 'checked_in', 'checked_out')`,
