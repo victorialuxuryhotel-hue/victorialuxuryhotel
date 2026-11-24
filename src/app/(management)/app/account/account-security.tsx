@@ -16,7 +16,6 @@ export function AccountSecurity() {
           scrollBox: "rounded-none shadow-none",
           profileSection__activeDevices: "!hidden",
           profileSection__passkeys: "!hidden",
-          profileSection__mfa: "!hidden",
           profileSection__connectedAccounts: "!hidden",
           profileSection__enterpriseAccounts: "!hidden",
           profileSection__web3Wallets: "!hidden",

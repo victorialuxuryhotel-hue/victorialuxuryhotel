@@ -12,7 +12,7 @@ export async function startViewAsFrontDesk(): Promise<void> {
   const staff = await getCurrentStaff();
   const { sessionId } = await auth();
   const secret = process.env.VIEW_AS_SECRET ?? "";
-  if (!staff || staff.viewAs || staff.role !== "owner" || !sessionId || secret.length < 32) {
+  if (!staff || staff.viewAs || staff.twoStep || staff.role !== "owner" || !sessionId || secret.length < 32) {
     logger.warn("view_as.refused", { staffId: staff?.id ?? null, hasSecret: secret.length >= 32 });
     redirect("/app/today");
   }

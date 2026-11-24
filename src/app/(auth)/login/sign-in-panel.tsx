@@ -17,7 +17,7 @@ function friendly(code: string | undefined, fallback: string | undefined): strin
     case "form_password_or_identifier_incorrect":
       return "That username or password isn't right. Check them and try again.";
     case "form_code_incorrect":
-      return "That code isn't right. Check the latest email and try again.";
+      return "That code isn't right. Check it and try again.";
     case "verification_expired":
       return "That code has expired. Send a new one.";
     case "too_many_requests":
@@ -34,7 +34,8 @@ export function SignInPanel({ next }: { next?: string }) {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"password" | "code">("password");
+  const [step, setStep] = useState<"password" | "code" | "app">("password");
+  const [backup, setBackup] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
   const busy = fetchStatus === "fetching" || !signIn;
@@ -69,6 +70,10 @@ export function SignInPanel({ next }: { next?: string }) {
       return;
     }
     if (signIn.status === "complete") return finish();
+    if (signIn.status === "needs_second_factor" && signIn.supportedSecondFactors.some((f) => f.strategy === "totp")) {
+      setStep("app");
+      return;
+    }
     if (signIn.status === "needs_client_trust" || signIn.status === "needs_second_factor") {
       if (await sendDeviceCode()) setStep("code");
       return;
@@ -79,7 +84,12 @@ export function SignInPanel({ next }: { next?: string }) {
   const verifyCode = async () => {
     if (!signIn) return;
     setMessage(null);
-    const { error } = await signIn.mfa.verifyEmailCode({ code: code.trim() });
+    const { error } =
+      step === "app"
+        ? backup
+          ? await signIn.mfa.verifyBackupCode({ code: code.trim() })
+          : await signIn.mfa.verifyTOTP({ code: code.trim() })
+        : await signIn.mfa.verifyEmailCode({ code: code.trim() });
     if (error) {
       setMessage(friendly(error.code, error.longMessage));
       return;
@@ -87,6 +97,51 @@ export function SignInPanel({ next }: { next?: string }) {
     if (signIn.status === "complete") return finish();
     setMessage("Something went wrong. Please try again.");
   };
+
+  if (step === "app") {
+    return (
+      <form
+        className="space-y-5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void verifyCode();
+        }}
+      >
+        <p className="text-sm text-ink-600">
+          {backup ? "Enter one of the backup codes you saved when you set up the app." : "Open your authenticator app and enter the 6-digit code for Victoria Luxury Hotel."}
+        </p>
+        {message ? <FormMessage>{message}</FormMessage> : null}
+        <Field label={backup ? "Backup code" : "Code"} htmlFor="code">
+          <Input
+            id="code"
+            name="code"
+            inputMode={backup ? "text" : "numeric"}
+            autoComplete="one-time-code"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={backup ? 20 : 6}
+            value={code}
+            onChange={(e) => setCode(backup ? e.target.value.trim() : e.target.value.replace(/\D/g, ""))}
+            autoFocus
+            required
+            className="text-center text-xl tracking-[0.3em] tabular-nums"
+          />
+        </Field>
+        <Button type="submit" size="lg" pending={busy} disabled={code.length < 6} className="w-full">Continue</Button>
+        <button
+          type="button"
+          onClick={() => {
+            setCode("");
+            setMessage(null);
+            setBackup((b) => !b);
+          }}
+          className="min-h-11 text-sm text-navy-800 underline-offset-2 hover:underline"
+        >
+          {backup ? "Use the app code instead" : "Lost your phone? Use a backup code"}
+        </button>
+      </form>
+    );
+  }
 
   if (step === "code") {
     return (

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export const proxy = clerkMiddleware(async (auth, request) => {
   const path = request.nextUrl.pathname;
-  if (path === "/app" || path.startsWith("/app/")) {
+  if (path === "/app" || path.startsWith("/app/") || path.startsWith("/two-step")) {
     const { userId } = await auth();
     if (!userId) {
       const url = new URL("/login", request.url);
@@ -14,5 +14,5 @@ export const proxy = clerkMiddleware(async (auth, request) => {
 });
 
 export const config = {
-  matcher: ["/app/:path*", "/login", "/auth/:path*"],
+  matcher: ["/app/:path*", "/login", "/auth/:path*", "/two-step/:path*"],
 };

@@ -8,11 +8,18 @@ import type { StaffRole } from "@/domain/status";
 import { canAny, type Permission } from "@/lib/auth/permissions";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { TWO_STEP_ROLES, twoStepOptional, twoStepState, type TwoStepState } from "@/lib/auth/two-step";
 import { verifyViewAs } from "@/lib/auth/view-as-token";
 import { first, getDb, VIEW_AS_READ_ONLY, type Actor } from "./db";
 import { LAST_SEEN_EVERY_MS, linkClerkUser, ROLE, touchLastSeen, type StaffRecord } from "./domain/admin";
 
-export type Staff = { id: string; fullName: string; email: string; role: StaffRole; viewAs?: boolean };
+export type Staff = { id: string; fullName: string; email: string; role: StaffRole; viewAs?: boolean; twoStep?: TwoStepState };
+
+async function currentTwoStep(role: StaffRole, secondFactorAge: number | undefined, claims: Record<string, unknown> | null): Promise<TwoStepState | undefined> {
+  if (!TWO_STEP_ROLES.includes(role) || twoStepOptional(process.env.TWO_STEP_OPTIONAL, process.env.NEXT_PUBLIC_SITE_URL)) return undefined;
+  const totp = typeof claims?.totp === "boolean" ? claims.totp : Boolean((await currentUser())?.totpEnabled);
+  return twoStepState(role, totp, secondFactorAge);
+}
 
 export const VIEW_AS_COOKIE = "vl_view_as";
 
@@ -26,7 +33,7 @@ async function viewingAsFrontDesk(staffId: string, sessionId: string | null): Pr
 
 export const getCurrentStaff = cache(async (): Promise<Staff | null> => {
   await connection();
-  const { userId, sessionId } = await auth();
+  const { userId, sessionId, factorVerificationAge, sessionClaims } = await auth();
   if (!userId) return null;
 
   const db = await getDb();
@@ -46,6 +53,8 @@ export const getCurrentStaff = cache(async (): Promise<Staff | null> => {
   if (!record.last_seen_at || Date.now() - Date.parse(record.last_seen_at) > LAST_SEEN_EVERY_MS) {
     await touchLastSeen(db, record.id).catch((err: unknown) => logger.warn("auth.last_seen_failed", { error: err instanceof Error ? err.message : "error" }));
   }
+  const twoStep = await currentTwoStep(record.role, factorVerificationAge?.[1], sessionClaims as Record<string, unknown> | null);
+  if (twoStep) return { id: record.id, fullName: record.full_name, email: record.email, role: record.role, twoStep };
   if (record.role === "owner" && (await viewingAsFrontDesk(record.id, sessionId ?? null))) {
     return { id: record.id, fullName: record.full_name, email: record.email, role: "front_desk", viewAs: true };
   }
@@ -55,6 +64,7 @@ export const getCurrentStaff = cache(async (): Promise<Staff | null> => {
 export async function requireStaff(): Promise<Staff> {
   const staff = await getCurrentStaff();
   if (!staff) redirect("/login?denied=1");
+  if (staff.twoStep) redirect("/two-step/security");
   return staff;
 }
 
@@ -67,6 +77,7 @@ export async function authorize(permission?: Permission): Promise<Staff> {
 export async function authorizeRead(permission?: Permission | readonly Permission[]): Promise<Staff> {
   const staff = await getCurrentStaff();
   if (!staff) throw new AppError("UNAUTHENTICATED", "Your session has ended. Please sign in again.");
+  if (staff.twoStep) throw new AppError("FORBIDDEN", "Set up two-step sign-in first.");
   if (permission && !canAny(staff.role, permission)) {
     throw new AppError("FORBIDDEN", "Your role does not allow this action.");
   }
