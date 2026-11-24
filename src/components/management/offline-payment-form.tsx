@@ -55,8 +55,8 @@ export function OfflinePaymentForm({
       {state && !state.ok && !state.fieldErrors ? <FormMessage>{state.message}</FormMessage> : null}
       <div hidden={Boolean(review)} className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Amount received (₦)" htmlFor="amount" error={err("amount")}>
-          <Input id="amount" name="amount" inputMode="decimal" defaultValue={String(balance / 100)} required />
+        <Field label="Amount received (₦)" htmlFor="amount" hint="Bookings are paid in full, so this is the whole balance." error={err("amount")}>
+          <Input id="amount" name="amount" inputMode="decimal" value={String(balance / 100)} readOnly aria-readonly className="bg-ivory-100 font-semibold tabular-nums" />
         </Field>
         <Field label="Method" htmlFor="method" error={err("method")}>
           <Select id="method" name="method" defaultValue="cash">
