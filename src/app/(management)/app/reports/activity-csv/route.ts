@@ -1,3 +1,4 @@
+import { logDownload } from "@/server/csv";
 import { actorOf, authorizeRead } from "@/server/auth";
 import { getDb } from "@/server/db";
 import { activityCategory, activityForCsv } from "@/server/domain/activity";
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
       csvField(r.action),
     ].join(","),
   );
+  await logDownload(staff, `the activity log, ${from} to ${to}`, { from, to });
   return new Response([header.map(csvField).join(","), ...lines].join("\r\n") + "\r\n", {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

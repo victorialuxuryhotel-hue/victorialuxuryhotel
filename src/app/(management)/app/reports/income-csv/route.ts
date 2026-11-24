@@ -1,5 +1,5 @@
 import { actorOf, authorizeRead } from "@/server/auth";
-import { csvResponse, deniedResponse, lagosDate, lagosTime, naira } from "@/server/csv";
+import { csvResponse, deniedResponse, lagosDate, lagosTime, naira, logDownload } from "@/server/csv";
 import { first, getDb } from "@/server/db";
 import { incomeRows, rangeDates, reportDepartment, reportRange, type Bucket, type Department } from "@/server/domain/reports";
 import { hotelToday } from "@/lib/hotel-date";
@@ -25,6 +25,7 @@ export async function GET(request: Request) {
     first<{ vat_rate_bp: number }>(db, "SELECT vat_rate_bp FROM hotel_settings WHERE id = 1"),
   ]);
   const rate = settings?.vat_rate_bp ?? 750;
+  await logDownload(staff, `income, ${from} to ${to}${dept ? ` (${DEPARTMENT[dept]})` : ""}`, { from, to, dept });
   return csvResponse(
     `income-${dept ? `${DEPARTMENT[dept].toLowerCase().replace(/[^a-z]+/g, "-")}-` : ""}${from}-to-${to}.csv`,
     ["Date", "Time", "Department", "Reference", "Details", "Method", "Type", "Amount (NGN)", `VAT included at ${rate / 100}% (NGN)`, "Receipt / no.", "Taken by"],

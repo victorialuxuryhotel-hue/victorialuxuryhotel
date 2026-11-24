@@ -2,13 +2,14 @@ import { hotelToday } from "@/lib/hotel-date";
 import { MANAGERS, all, first, requireRole, type Actor, type Db } from "../db";
 import { rangeDates, type ReportRange } from "./reports";
 
-export type ActivityCategory = "all" | "bookings" | "payments" | "rooms" | "staff";
+export type ActivityCategory = "all" | "bookings" | "payments" | "rooms" | "staff" | "exports";
 
 export const ACTIVITY_CATEGORIES: Record<Exclude<ActivityCategory, "all">, { label: string; prefixes: string[] }> = {
   bookings: { label: "Bookings", prefixes: ["reservation."] },
   payments: { label: "Payments", prefixes: ["payment."] },
   rooms: { label: "Rooms", prefixes: ["room."] },
   staff: { label: "Staff & settings", prefixes: ["staff.", "settings.", "category.", "photo."] },
+  exports: { label: "Downloads", prefixes: ["export."] },
 };
 
 export const ROUTINE_ACTIONS = ["payment.started", "room.status_updated", "staff.view_as_started", "staff.view_as_ended"] as const;
