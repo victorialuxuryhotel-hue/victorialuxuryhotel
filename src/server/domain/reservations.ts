@@ -405,17 +405,15 @@ export async function markNoShow(db: Db, actor: Actor, reservationId: string): P
     if (res.status !== "confirmed") throw new AppError("INVALID_TRANSITION", "Only confirmed reservations can be marked as no-show.");
     if (res.check_in > hotelToday()) throw new AppError("VALIDATION", "The guest isn't due yet.");
     const paid = await netPaid(db, res.id);
-    const fee = paid;
-    const refund = 0;
-    const note = null;
+    const note = paid > 0 ? `No-show. ${naira(paid)} paid. Keep or refund is for the general manager to decide.` : null;
     const results = await writeBatch(db, actor, [
       assertNetPaid(db, res.id, paid),
       assertVersion(db, "reservations", res.id, res.version),
       db
-        .prepare("UPDATE reservations SET status = 'no_show', cancellation_fee_kobo = ?, attention_reason = coalesce(?, attention_reason) WHERE id = ?")
-        .bind(fee, note, res.id),
-      activity(db, "reservation.no_show", "reservation", res.id, `${res.reference} marked as no-show${paid ? `: ${naira(paid)} forfeited` : ""}`, {
-        paid_kobo: paid, fee_kobo: fee, refund_kobo: refund,
+        .prepare("UPDATE reservations SET status = 'no_show', attention_reason = coalesce(?, attention_reason) WHERE id = ?")
+        .bind(note, res.id),
+      activity(db, "reservation.no_show", "reservation", res.id, `${res.reference} marked as no-show${paid ? `: ${naira(paid)} paid, waiting for a keep or refund decision` : ""}`, {
+        paid_kobo: paid,
       }),
     ]);
     return { undoId: results.at(-1)?.meta.last_row_id ?? null };

@@ -45,13 +45,13 @@ describe("edge cases", () => {
     expect((await q1<{ n: number }>("SELECT count(*) AS n FROM rooms WHERE is_active = 1")).n).toBe(after.roomsInService);
   });
 
-  it("a no-show forfeits the booking: everything paid is kept, nothing is flagged for refund; undo clears it", async () => {
+  it("a no-show keeps the payment on hold for the general manager to decide; undo clears the flag", async () => {
     const c = await makeCategory(1, { rateKobo: 5_500_000 });
     const id = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2), status: "confirmed", rateKobo: 5_500_000 });
     const { undoId } = await markNoShow(db, desk, id);
-    expect(await q1("SELECT status, cancellation_fee_kobo AS fee, attention_reason AS note FROM reservations WHERE id = ?", id)).toEqual({ status: "no_show", fee: 11_000_000, note: null });
+    expect(await q1("SELECT status, cancellation_fee_kobo AS fee, attention_reason AS note FROM reservations WHERE id = ?", id)).toEqual({ status: "no_show", fee: null, note: "No-show. ₦110,000 paid. Keep or refund is for the general manager to decide." });
     await undoAction(db, desk, id, undoId!);
-    expect(await q1("SELECT status, cancellation_fee_kobo AS fee FROM reservations WHERE id = ?", id)).toEqual({ status: "confirmed", fee: null });
+    expect(await q1("SELECT status, cancellation_fee_kobo AS fee, attention_reason AS note FROM reservations WHERE id = ?", id)).toEqual({ status: "confirmed", fee: null, note: null });
   });
 
   it("moving to a dearer room type charges the difference for the nights left; undo removes it; a manager can waive it", async () => {

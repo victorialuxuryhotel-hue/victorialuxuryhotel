@@ -6,7 +6,7 @@ describe("cancellation policy", () => {
     const text = cancellationRuleText(48, 50, "14:00:00");
     expect(text).toContain("Free cancellation up to 48 hours before check-in (check-in is from 14:00).");
     expect(text).toContain("Within 48 hours of check-in, 50% of the room price is charged.");
-    expect(text).toContain("If you don't arrive, the booking is forfeited.");
+    expect(text).not.toMatch(/don't arrive/);
     expect(text).toContain("Extras you didn't use are refunded in full.");
     expect(text).toContain("change your dates for free up to 48 hours before check-in");
     expect(cancellationRuleText(24, 0)).toBe("Free cancellation up to check-in. Refunds go back to the original payment method.");
