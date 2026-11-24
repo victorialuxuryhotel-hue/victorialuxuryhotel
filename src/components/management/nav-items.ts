@@ -1,4 +1,4 @@
-import { BarChart3, BedDouble, CalendarCheck, CreditCard, LayoutDashboard, Package, Presentation, Receipt, Settings, ShieldCheck, Sun, Tags, Users, UtensilsCrossed } from "lucide-react";
+import { BarChart3, BedDouble, BookOpen, CalendarCheck, ClipboardCheck, CreditCard, LayoutDashboard, Package, Presentation, Receipt, ScrollText, Settings, ShieldCheck, Sun, Tags, TrendingUp, Users, UtensilsCrossed } from "lucide-react";
 import type { Permission } from "@/lib/auth/permissions";
 
 export type NavItem = { href: string; label: string; icon: typeof Sun; permission?: readonly Permission[] };
@@ -13,9 +13,18 @@ export const managementNavGroups: readonly NavGroup[] = [
       { href: "/app/rooms", label: "Rooms", icon: BedDouble, permission: ["rooms.status"] },
       { href: "/app/guests", label: "Guests", icon: Users, permission: ["guests.manage"] },
       { href: "/app/payments", label: "Payments", icon: CreditCard, permission: ["payments.record", "reports.view"] },
-      { href: "/app/sales", label: "Restaurant & bar", icon: UtensilsCrossed, permission: ["pos.sell"] },
       { href: "/app/events", label: "Hall bookings", icon: Presentation, permission: ["events.manage"] },
-      { href: "/app/stock", label: "Stock", icon: Package, permission: ["inventory.use"] },
+    ],
+  },
+  {
+    label: "Restaurant & bar",
+    items: [
+      { href: "/app/sales", label: "Till", icon: UtensilsCrossed, permission: ["pos.sell"] },
+      { href: "/app/sales/orders", label: "Orders & receipts", icon: ScrollText, permission: ["pos.sell", "pos.view"] },
+      { href: "/app/sales/closing", label: "Daily closing", icon: ClipboardCheck, permission: ["pos.sell", "pos.view"] },
+      { href: "/app/sales/menu", label: "Menu", icon: BookOpen, permission: ["pos.manage"] },
+      { href: "/app/stock", label: "Stock", icon: Package, permission: ["inventory.view", "inventory.manage"] },
+      { href: "/app/sales/reports", label: "Sales reports", icon: TrendingUp, permission: ["pos.view"] },
     ],
   },
   {

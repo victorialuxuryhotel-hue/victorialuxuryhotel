@@ -1,4 +1,5 @@
 import "server-only";
+import { financeSummary } from "../domain/finance";
 import type { PaymentRow } from "@/domain/views";
 import { addDays, hotelDateOf, hotelToday } from "@/lib/hotel-date";
 import { actorOf, authorizeRead } from "../auth";
@@ -86,4 +87,38 @@ export async function listPayments(opts: { view?: string; page?: number; size?: 
 export async function frontDeskPayments() {
   const staff = await authorizeRead("payments.record");
   return frontDeskSummary(await getDb(), actorOf(staff));
+}
+
+export async function departmentsOverview() {
+  const staff = await authorizeRead("reports.view");
+  const db = await getDb();
+  const actor = actorOf(staff);
+  const today = hotelToday();
+  const [day, month, counts] = await Promise.all([
+    financeSummary(db, actor, "today", today),
+    financeSummary(db, actor, "month", today),
+    first<{ in_house: number; rooms: number; bookings: number; halls: number; restaurant: number; bar: number }>(
+      db,
+      `SELECT (SELECT count(*) FROM reservations WHERE status = 'checked_in') AS in_house,
+              (SELECT count(*) FROM rooms WHERE is_active = 1) AS rooms,
+              (SELECT count(*) FROM reservations WHERE status IN ('confirmed', 'checked_in', 'checked_out') AND substr(check_in, 1, 7) = ?1) AS bookings,
+              (SELECT count(*) FROM hall_bookings WHERE status = 'confirmed' AND event_date >= ?2) AS halls,
+              (SELECT count(*) FROM pos_orders WHERE status = 'paid' AND outlet = 'restaurant' AND date(paid_at, '+1 hour') = ?2) AS restaurant,
+              (SELECT count(*) FROM pos_orders WHERE status = 'paid' AND outlet = 'bar' AND date(paid_at, '+1 hour') = ?2) AS bar`,
+      today.slice(0, 7),
+      today,
+    ),
+  ]);
+  const dept = (k: string) => month.departments.find((d) => d.key === k)!;
+  const c = counts ?? { in_house: 0, rooms: 0, bookings: 0, halls: 0, restaurant: 0, bar: 0 };
+  return {
+    rows: [
+      { key: "rooms", label: "Hotel rooms", today: day.income.rooms, month: month.income.rooms, expenses: dept("rooms").expensesKobo, note: `${c.in_house} of ${c.rooms} rooms occupied · ${c.bookings} ${c.bookings === 1 ? "booking" : "bookings"} this month`, href: "/app/reports?tab=money&range=month&dept=rooms" },
+      { key: "restaurant", label: "Restaurant", today: day.income.restaurant, month: month.income.restaurant, expenses: dept("restaurant").expensesKobo, note: `${c.restaurant} ${c.restaurant === 1 ? "sale" : "sales"} today`, href: "/app/sales/reports?range=month&outlet=restaurant" },
+      { key: "bar", label: "Bar", today: day.income.bar, month: month.income.bar, expenses: dept("bar").expensesKobo, note: `${c.bar} ${c.bar === 1 ? "sale" : "sales"} today`, href: "/app/sales/reports?range=month&outlet=bar" },
+      { key: "hall", label: "Conference hall", today: day.income.hall, month: month.income.hall, expenses: dept("hall").expensesKobo, note: `${c.halls} confirmed ${c.halls === 1 ? "event" : "events"} coming up`, href: "/app/events" },
+    ],
+    general: dept("general").expensesKobo,
+    total: { today: day.incomeTotal, month: month.incomeTotal, expenses: month.expensesKobo, net: month.netKobo },
+  };
 }

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils/cn";
 import { addExpense, cancelExpense } from "@/server/finance";
 import type { ExpenseCategory, ExpenseRow } from "@/server/domain/finance";
 
-const departmentLabel: Record<string, string> = { rooms: "Rooms", restaurant_bar: "Restaurant & bar", hall: "Conference hall" };
+const departmentLabel: Record<string, string> = { rooms: "Rooms", restaurant: "Restaurant", bar: "Bar", hall: "Conference hall" };
 
 export function ExpenseForm({ today, categories, methods, departments }: { today: string; categories: Record<string, string>; methods: Record<string, string>; departments: Record<string, string> }) {
   const [state, action, pending] = useActionState(addExpense, null);
@@ -29,7 +29,7 @@ export function ExpenseForm({ today, categories, methods, departments }: { today
         </Select>
       </Field>
       <Field label="Department" htmlFor="edept" error={err("department")}>
-        <Select id="edept" name="department" defaultValue="general">{Object.entries(departments).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
+        <Select id="edept" name="department" defaultValue={Object.keys(departments)[0]}>{Object.entries(departments).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
       </Field>
       <Field label="Amount (₦)" htmlFor="eamt" error={err("amount")}><Input id="eamt" name="amount" type="number" min={1} step="any" inputMode="decimal" required /></Field>
       <Field label="What for" htmlFor="edesc" error={err("description")} className="sm:col-span-2"><Input id="edesc" name="description" placeholder="Diesel for generator" required /></Field>

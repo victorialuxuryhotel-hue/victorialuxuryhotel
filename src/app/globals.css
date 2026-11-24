@@ -109,3 +109,18 @@
 @keyframes delayed-show { from { opacity: 0; } to { opacity: 1; } }
 .delayed-show { animation: delayed-show 150ms ease-out 300ms both; }
 @media (prefers-reduced-motion: reduce) { .delayed-show { animation-duration: 1ms; } }
+
+@media print {
+  body:has(.pos-receipt[data-print]) * {
+    visibility: hidden;
+  }
+  body:has(.pos-receipt[data-print]) .pos-receipt[data-print],
+  body:has(.pos-receipt[data-print]) .pos-receipt[data-print] * {
+    visibility: visible;
+  }
+  body:has(.pos-receipt[data-print]) .pos-receipt[data-print] {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 80mm;
+  }
+}

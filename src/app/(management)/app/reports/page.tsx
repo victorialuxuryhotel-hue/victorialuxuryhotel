@@ -30,7 +30,7 @@ const monthName = (m: string) => new Intl.DateTimeFormat("en-GB", { month: "long
 const rangeName = (r: ReportRange) => (r in fixedLabel ? fixedLabel[r as keyof typeof fixedLabel] : monthName(r));
 const METHODS: [Bucket, string][] = [["cash", "Cash"], ["transfer", "Transfer"], ["pos", "POS / card"], ["cardOnline", "Card online"], ["other", "Other"]];
 
-const DEPARTMENTS: [Department | null, string][] = [[null, "All departments"], ["rooms", "Rooms"], ["restaurantBar", "Restaurant & bar"], ["hall", "Conference hall"]];
+const DEPARTMENTS: [Department | null, string][] = [[null, "All departments"], ["rooms", "Rooms"], ["restaurant", "Restaurant"], ["bar", "Bar"], ["hall", "Conference hall"]];
 const deptQuery = (d: Department | null) => (d ? `&dept=${d}` : "");
 
 function DeptControl({ range, dept }: { range: ReportRange; dept: Department | null }) {
@@ -191,14 +191,15 @@ async function Money({ range, dept }: { range: ReportRange; dept: Department | n
           </div>
         ) : null}
         <div className="overflow-x-auto border-t border-hairline">
-          <table className={cn("w-full text-sm", dept ? "" : "min-w-[34rem]")}>
+          <table className={cn("w-full text-sm", dept ? "" : "min-w-[40rem]")}>
             <thead className="text-xs text-ink-500">
               <tr className="border-b border-hairline">
                 <th scope="col" className="px-5 py-2.5 text-left font-medium">Day</th>
                 {dept ? null : (
                   <>
                     <th scope="col" className={cn(cell, "font-medium")}>Rooms</th>
-                    <th scope="col" className={cn(cell, "font-medium")}>Restaurant & bar</th>
+                    <th scope="col" className={cn(cell, "font-medium")}>Restaurant</th>
+                    <th scope="col" className={cn(cell, "font-medium")}>Bar</th>
                     <th scope="col" className={cn(cell, "font-medium")}>Hall</th>
                   </>
                 )}
@@ -212,7 +213,8 @@ async function Money({ range, dept }: { range: ReportRange; dept: Department | n
                   {dept ? null : (
                     <>
                       <td className={cell}>{formatNaira(d.rooms)}</td>
-                      <td className={cell}>{formatNaira(d.restaurantBar)}</td>
+                      <td className={cell}>{formatNaira(d.restaurant)}</td>
+                      <td className={cell}>{formatNaira(d.bar)}</td>
                       <td className={cell}>{formatNaira(d.hall)}</td>
                     </>
                   )}

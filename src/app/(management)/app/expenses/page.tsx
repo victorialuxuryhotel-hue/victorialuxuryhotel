@@ -17,7 +17,7 @@ import { reportRange, type ReportRange } from "@/server/domain/reports";
 
 export const metadata: Metadata = { title: "Expenses" };
 
-const ranges: Record<ReportRange, string> = { today: "Today", "14d": "14 days", month: "This month" };
+const ranges: Partial<Record<ReportRange, string>> = { today: "Today", "14d": "14 days", month: "This month" };
 
 async function Content({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const staff = await requireStaff();
@@ -31,7 +31,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     <div className="space-y-6 px-4 py-6 lg:px-8">
       <Card>
         <CardHeader title="Record an expense" description="Mistakes can be voided, not deleted." />
-        <ExpenseForm today={today} categories={EXPENSE_CATEGORIES} methods={EXPENSE_METHODS} departments={EXPENSE_DEPARTMENTS} />
+        <ExpenseForm today={today} categories={EXPENSE_CATEGORIES} methods={EXPENSE_METHODS} departments={staff.role === "restaurant_bar_manager" ? { restaurant: EXPENSE_DEPARTMENTS.restaurant, bar: EXPENSE_DEPARTMENTS.bar } : EXPENSE_DEPARTMENTS} />
       </Card>
       <nav aria-label="Period" className="flex overflow-hidden rounded-md border border-hairline sm:max-w-sm [&>*+*]:border-l [&>*+*]:border-hairline">
         {(Object.keys(ranges) as ReportRange[]).map((r) => (

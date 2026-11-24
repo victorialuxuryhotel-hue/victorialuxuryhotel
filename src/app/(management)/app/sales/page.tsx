@@ -1,50 +1,65 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 import { AccessDenied } from "@/components/management/access-denied";
 import { PageHeader } from "@/components/management/page-header";
-import { MenuManager, SalesList, Till } from "@/components/management/till";
-import { Card, CardHeader } from "@/components/ui/card";
+import { Till } from "@/components/management/till";
 import { LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
 import { formatNaira } from "@/lib/format";
-import { hotelToday } from "@/lib/hotel-date";
+import { recordId } from "@/lib/ids";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
-import { getDb } from "@/server/db";
-import { inHouseGuests, listMenu, salesToday } from "@/server/domain/pos";
+import { first, getDb } from "@/server/db";
+import { closingSummary, listMenu, openOrders } from "@/server/domain/pos";
+import { hotelToday } from "@/lib/hotel-date";
 
-export const metadata: Metadata = { title: "Restaurant & bar" };
+export const metadata: Metadata = { title: "Till" };
 
-async function Content() {
+async function Content({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const staff = await requireStaff();
   if (!can(staff.role, "pos.sell")) return <AccessDenied />;
   const reader = await authorizeRead("pos.sell");
+  const actor = actorOf(reader);
   const db = await getDb();
-  const [menu, guests, sales] = await Promise.all([listMenu(db, actorOf(reader)), inHouseGuests(db, actorOf(reader)), salesToday(db, actorOf(reader), hotelToday())]);
-  const manage = can(staff.role, "pos.manage");
-  const taken = sales.filter((s) => s.status === "paid" || s.status === "settled").reduce((t, s) => t + s.total_kobo, 0);
-  const onRooms = sales.filter((s) => s.status === "room_charge").reduce((t, s) => t + s.total_kobo, 0);
+  const sp = await searchParams;
+  const resume = typeof sp.order === "string" && recordId().safeParse(sp.order).success ? sp.order : undefined;
+  const [menu, open, mine, settings, closed] = await Promise.all([
+    listMenu(db, actor),
+    openOrders(db, actor),
+    closingSummary(db, actor, staff.id),
+    first<{ vat_rate_bp: number }>(db, "SELECT vat_rate_bp FROM hotel_settings WHERE id = 1"),
+    first(db, "SELECT 1 FROM pos_closings WHERE staff_id = ? AND business_date = ?", staff.id, hotelToday()),
+  ]);
+  const low = can(staff.role, "inventory.manage") ? menu.filter((m) => m.stock_left != null && m.stock_left <= 5) : [];
   return (
     <div className="space-y-6 px-4 py-6 lg:px-8">
-      <Till menu={menu} guests={guests} />
-      <Card>
-        <CardHeader title="Today" description={`${formatNaira(taken)} taken · ${formatNaira(onRooms)} on rooms, paid at check-out`} />
-        <SalesList sales={sales} canVoid={manage} />
-      </Card>
-      {manage ? (
-        <Card>
-          <CardHeader title="Menu" description="Prices include VAT." />
-          <MenuManager menu={menu} />
-        </Card>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-600">
+        <span>Your sales today: <b className="tabular-nums text-ink-900">{mine.sales}</b> · <b className="tabular-nums text-ink-900">{formatNaira(mine.salesKobo)}</b></span>
+        <span>Cash to hand in: <b className="tabular-nums text-ink-900">{formatNaira(mine.byMethod.cash)}</b></span>
+        <Link href="/app/sales/orders" className="font-medium text-navy-800 hover:underline">Orders & receipts</Link>
+        <Link href="/app/sales/closing" className="font-medium text-navy-800 hover:underline">Close my day</Link>
+      </div>
+      {low.length ? (
+        <p role="status" className="rounded-md border border-warning-600/30 bg-warning-50 px-4 py-3 text-sm text-warning-700">
+          Running low: {low.map((m) => `${m.name} (${m.stock_left} left)`).join(", ")}. <Link href="/app/stock" className="font-medium underline">Stock</Link>
+        </p>
       ) : null}
+      {closed ? (
+        <p role="status" className="rounded-md border border-hairline bg-ivory-50 px-4 py-3 text-sm text-ink-700">
+          You&apos;ve closed today&apos;s sales. <Link href="/app/sales/closing" className="font-medium text-navy-800 underline">See your closing</Link>
+        </p>
+      ) : (
+        <Till menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 750} resume={resume} />
+      )}
     </div>
   );
 }
 
-export default function SalesPage() {
+export default function TillPage(props: PageProps<"/app/sales">) {
   return (
     <>
-      <PageHeader title="Restaurant & bar" description="Take payment, or charge a guest's room." />
-      <Suspense fallback={<LoadingState />}><Content /></Suspense>
+      <PageHeader title="Till" description="Restaurant & bar orders and payments." />
+      <Suspense fallback={<LoadingState />}><Content searchParams={props.searchParams} /></Suspense>
     </>
   );
 }

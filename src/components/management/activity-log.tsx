@@ -12,7 +12,7 @@ import { Pager } from "./pager";
 
 export type ActivityParams = { range: ReportRange; cat: ActivityCategory; who?: string; routine: boolean; page: number };
 
-const rangeLabel: Record<ReportRange, string> = { today: "Today", "14d": "14 days", month: "This month" };
+const rangeLabel: Partial<Record<ReportRange, string>> = { today: "Today", "7d": "7 days", "14d": "14 days", month: "This month" };
 const time = (iso: string) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" }).format(new Date(iso));
 
 export function activityHref(p: ActivityParams, change: Partial<ActivityParams> = {}): string {

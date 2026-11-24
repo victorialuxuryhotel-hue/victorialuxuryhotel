@@ -12,14 +12,66 @@ import { Card, CardHeader, Stat, StatGrid } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
 import { formatDate, formatNaira } from "@/lib/format";
+import { cn } from "@/lib/utils/cn";
 import { requireStaff } from "@/server/auth";
-import { awaitingPaymentCount, revenueSummary } from "@/server/queries/dashboard";
+import { awaitingPaymentCount, departmentsOverview, revenueSummary } from "@/server/queries/dashboard";
 import { listReservations, movements } from "@/server/queries/reservations";
 import { roomBoard } from "@/server/queries/rooms";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 const href = (r: { id: string }) => `/app/reservations/${r.id}`;
+
+async function Departments() {
+  const d = await departmentsOverview();
+  const cell = "px-4 py-3 text-right tabular-nums whitespace-nowrap";
+  return (
+    <Card>
+      <CardHeader title="Departments" description="Each department's money, kept separate. This month unless shown." />
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[44rem] text-sm">
+          <thead className="text-xs text-ink-500">
+            <tr className="border-b border-hairline">
+              <th scope="col" className="px-5 py-2.5 text-left font-medium">Department</th>
+              <th scope="col" className={cn(cell, "font-medium")}>Today</th>
+              <th scope="col" className={cn(cell, "font-medium")}>This month</th>
+              <th scope="col" className={cn(cell, "font-medium")}>Expenses</th>
+              <th scope="col" className={cn(cell, "pr-5 font-medium")}>After expenses</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-hairline">
+            {d.rows.map((r) => (
+              <tr key={r.key}>
+                <th scope="row" className="px-5 py-3 text-left font-normal">
+                  <Link href={r.href} className="font-medium text-ink-900 hover:underline">{r.label}</Link>
+                  <span className="block text-xs text-ink-500">{r.note}</span>
+                </th>
+                <td className={cell}>{formatNaira(r.today)}</td>
+                <td className={cell}>{formatNaira(r.month)}</td>
+                <td className={cell}>{formatNaira(r.expenses)}</td>
+                <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(r.month - r.expenses)}</td>
+              </tr>
+            ))}
+            <tr>
+              <th scope="row" className="px-5 py-3 text-left font-normal text-ink-700">Whole hotel <span className="block text-xs text-ink-500">Shared costs: diesel, salaries and the like</span></th>
+              <td className={cell}>–</td>
+              <td className={cell}>–</td>
+              <td className={cell}>{formatNaira(d.general)}</td>
+              <td className={cn(cell, "pr-5")}>{d.general ? `−${formatNaira(d.general)}` : formatNaira(0)}</td>
+            </tr>
+            <tr className="bg-ivory-100 font-semibold text-ink-900">
+              <th scope="row" className="px-5 py-3 text-left">Overall business</th>
+              <td className={cell}>{formatNaira(d.total.today)}</td>
+              <td className={cell}>{formatNaira(d.total.month)}</td>
+              <td className={cell}>{formatNaira(d.total.expenses)}</td>
+              <td className={cn(cell, "pr-5")}>{formatNaira(d.total.net)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
 
 async function Revenue() {
   const r = await revenueSummary();
@@ -42,7 +94,7 @@ async function Revenue() {
 async function Content() {
   const staff = await requireStaff();
   if (staff.role === "front_desk") redirect("/app/today");
-  if (staff.role === "restaurant_bar") redirect("/app/sales");
+  if (staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager") redirect("/app/sales");
   const [m, rooms, awaiting, recent] = await Promise.all([movements(), roomBoard(), awaitingPaymentCount(), listReservations({ tab: "all" })]);
   const noRoom = m.arrivals.filter((a) => !a.roomNumber).length;
   const owing = m.departures.filter((d) => d.totalKobo > d.paidKobo).length;
@@ -74,7 +126,10 @@ async function Content() {
       </div>
 
       {can(staff.role, "reports.view") ? (
-        <Suspense fallback={<LoadingState label="Loading revenue…" />}><Revenue /></Suspense>
+        <>
+          <Suspense fallback={<LoadingState label="Loading departments…" />}><Departments /></Suspense>
+          <Suspense fallback={<LoadingState label="Loading revenue…" />}><Revenue /></Suspense>
+        </>
       ) : null}
 
       <Card>

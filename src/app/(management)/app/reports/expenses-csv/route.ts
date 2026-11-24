@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   }
   const q = new URL(request.url).searchParams;
   const range = reportRange(q.get("range") ?? undefined);
-  const dept = ({ rooms: "rooms", restaurantBar: "restaurant_bar", hall: "hall", general: "general" } as const)[q.get("dept") as "rooms"] ?? undefined;
+  const dept = ({ rooms: "rooms", restaurant: "restaurant", bar: "bar", hall: "hall", general: "general" } as const)[q.get("dept") as "rooms"] ?? undefined;
   const { from, to, rows } = await listExpenses(await getDb(), actorOf(staff), range, undefined, { limit: 10_000, department: dept });
   return csvResponse(
     `expenses-${from}-to-${to}.csv`,
