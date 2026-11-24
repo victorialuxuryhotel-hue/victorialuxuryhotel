@@ -154,18 +154,16 @@ export function OverrideForm({ reservationId }: { reservationId: string }) {
   const [state, action, pending] = useActionState(overridePayment, null);
   return (
     <details className="mt-6 rounded-card border border-hairline bg-ivory-50 p-4 text-sm">
-      <summary className="cursor-pointer font-medium text-ink-900">Manager options: confirm without full payment, or extend the hold</summary>
+      <summary className="cursor-pointer font-medium text-ink-900">Manager option: hold the room longer</summary>
       <form action={action} onSubmit={keepValues(action)} className="mt-4 space-y-3">
         <input type="hidden" name="reservationId" value={reservationId} />
         <Field label="Reason" htmlFor="override-reason">
-          <Input id="override-reason" name="reason" required minLength={5} placeholder="e.g. Corporate guest, company paying on invoice" />
+          <Input id="override-reason" name="reason" required minLength={5} placeholder="e.g. Guest is sending the transfer tomorrow" />
         </Field>
         {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
-        {state?.ok ? <FormMessage tone="success">Done. The override is recorded.</FormMessage> : null}
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" name="action" value="extend" variant="secondary" pending={pending}>Extend hold by 24 hours</Button>
-          <Button type="submit" name="action" value="confirm" pending={pending}>Confirm anyway</Button>
-        </div>
+        {state?.ok ? <FormMessage tone="success">Done. The room is held 24 hours more.</FormMessage> : null}
+        <p className="text-xs text-ink-500">The booking is confirmed only when it is paid in full.</p>
+        <Button type="submit" name="action" value="extend" variant="secondary" pending={pending}>Hold 24 hours more</Button>
       </form>
     </details>
   );

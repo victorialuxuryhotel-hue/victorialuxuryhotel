@@ -51,6 +51,8 @@ export function ReservationDetailView({
   guestHref,
   rooms,
   canOverride = false,
+  canApprove = false,
+  canManage = true,
   maxGuests,
   justCreated,
   paidReceipt,
@@ -65,6 +67,8 @@ export function ReservationDetailView({
   guestHref?: string;
   rooms: RoomOption[];
   canOverride?: boolean;
+  canApprove?: boolean;
+  canManage?: boolean;
   maxGuests: number;
   justCreated?: boolean;
   paidReceipt?: string;
@@ -137,9 +141,9 @@ export function ReservationDetailView({
           ) : null}
         </div>
         <div className="hidden flex-wrap items-start gap-2 lg:flex">
-          {r.status === "confirmed" ? <CheckInButton reservationId={r.id} roomNumber={r.roomNumber} disabledReason={checkInBlocker} /> : null}
-          {r.status === "checked_in" ? <CheckOutButton reservationId={r.id} balanceKobo={balance} /> : null}
-          {balance > 0 && r.status !== "cancelled" && r.status !== "expired" ? (
+          {canManage && r.status === "confirmed" ? <CheckInButton reservationId={r.id} roomNumber={r.roomNumber} disabledReason={checkInBlocker} /> : null}
+          {canManage && r.status === "checked_in" ? <CheckOutButton reservationId={r.id} balanceKobo={balance} /> : null}
+          {canManage && balance > 0 && r.status !== "cancelled" && r.status !== "expired" ? (
             <Link href={paymentsHref} className={buttonStyles({ variant: "secondary" })}>
               <Wallet className="size-4" aria-hidden /> Record payment
             </Link>
@@ -149,18 +153,18 @@ export function ReservationDetailView({
               <Printer className="size-4" aria-hidden /> Guest bill
             </Link>
           ) : null}
-          {r.status === "confirmed" && r.checkIn <= today ? <NoShowButton reservationId={r.id} /> : null}
-          {open ? <CancelForm reservationId={r.id} /> : null}
+          {canManage && r.status === "confirmed" && r.checkIn <= today ? <NoShowButton reservationId={r.id} /> : null}
+          {canManage && open ? <CancelForm reservationId={r.id} /> : null}
         </div>
       </div>
 
-      {steps ? <div className="mt-5 lg:max-w-md"><StepList steps={steps} /></div> : null}
+      {canManage && steps ? <div className="mt-5 lg:max-w-md"><StepList steps={steps} /></div> : null}
 
       {r.status === "pending_payment" && canOverride ? <div className="hidden lg:block"><OverrideForm reservationId={r.id} /></div> : null}
-      {r.status === "pending_payment" && !canOverride ? (
+      {canManage && r.status === "pending_payment" && !canOverride ? (
         <p className="mt-6 hidden rounded-card border border-hairline bg-ivory-50 p-4 text-sm text-ink-700 lg:block">
           <span className="mr-2 rounded-full bg-ivory-200 px-2 py-0.5 text-xs font-medium text-ink-600">Manager</span>
-          To confirm without full payment or hold the room longer, ask {manager ? `${manager.name} (${staffRole[manager.role]})` : "a manager"}.
+          To hold the room longer, ask {manager ? `${manager.name} (${staffRole[manager.role]})` : "a manager"}.
         </p>
       ) : null}
 
@@ -170,7 +174,7 @@ export function ReservationDetailView({
           <div className="flex-1">
             <p className="font-medium">Needs attention</p>
             <p className="mt-0.5">{r.attention}</p>
-            {canOverride ? <ResolveAttentionForm reservationId={r.id} /> : <p className="mt-1 text-xs">A manager marks this resolved once it&apos;s sorted.</p>}
+            {canApprove ? <ResolveAttentionForm reservationId={r.id} /> : <p className="mt-1 text-xs">The general manager marks this resolved once it&apos;s sorted.</p>}
           </div>
         </div>
       ) : null}
@@ -190,13 +194,13 @@ export function ReservationDetailView({
                 {r.roomNumber ? `Room ${r.roomNumber}` : <span className="text-ink-400">Not assigned</span>}
               </Fact>
             </div>
-            {r.specialRequests && r.status !== "checked_in" && !open ? (
+            {r.specialRequests && !(canManage && (r.status === "checked_in" || open)) ? (
               <div className="border-t border-hairline px-5 py-4">
                 <p className="text-xs uppercase tracking-wide text-ink-500">Special requests</p>
                 <p className="mt-1 text-sm text-ink-700">{r.specialRequests}</p>
               </div>
             ) : null}
-            {open || r.status === "checked_in" ? (
+            {canManage && (open || r.status === "checked_in") ? (
               <div className="border-t border-hairline xl:border-0">
                 <Collapsible id="change-stay" title="Change dates or room">
                   <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
@@ -272,7 +276,7 @@ export function ReservationDetailView({
                         </Link>
                       ) : null}
                     </div>
-                    {canOverride && p.kind !== "refund" && p.status === "successful" && p.amountKobo - (p.correctedKobo ?? 0) > 0 ? (
+                    {canApprove && p.kind !== "refund" && p.status === "successful" && p.amountKobo - (p.correctedKobo ?? 0) > 0 ? (
                       <CorrectPaymentForm
                         paymentId={p.id}
                         reservationId={r.id}
@@ -332,7 +336,7 @@ export function ReservationDetailView({
           </Card>
         </div>
       </div>
-      <NextStepBar key={r.status} r={r} today={today} paymentsHref={paymentsHref} canOverride={canOverride} manager={manager ?? null} />
+      {canManage ? <NextStepBar key={r.status} r={r} today={today} paymentsHref={paymentsHref} canOverride={canOverride} manager={manager ?? null} /> : null}
     </div>
     </ActionFeedbackProvider>
   );

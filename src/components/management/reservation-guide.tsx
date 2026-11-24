@@ -84,13 +84,10 @@ function OverrideInline({ id }: { id: string }) {
   return (
     <form action={action} onSubmit={keepValues(action)} className="mt-4 space-y-3 rounded-card border border-hairline p-4">
       <input type="hidden" name="reservationId" value={id} />
-      <Field label="Reason" htmlFor="ovr-why"><Input id="ovr-why" name="reason" required minLength={5} placeholder="e.g. Company paying on invoice" /></Field>
+      <Field label="Reason" htmlFor="ovr-why"><Input id="ovr-why" name="reason" required minLength={5} placeholder="e.g. Guest is sending the transfer tomorrow" /></Field>
       {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
-      {state?.ok ? <FormMessage tone="success">Done. The override is recorded.</FormMessage> : null}
-      <div className="grid grid-cols-2 gap-2.5">
-        <Button type="submit" name="action" value="extend" variant="secondary" size="lg" pending={pending}>Hold 24h more</Button>
-        <Button type="submit" name="action" value="confirm" size="lg" pending={pending}>Confirm now</Button>
-      </div>
+      {state?.ok ? <FormMessage tone="success">Done. The room is held 24 hours more.</FormMessage> : null}
+      <Button type="submit" name="action" value="extend" size="lg" className="w-full" pending={pending}>Hold 24 hours more</Button>
     </form>
   );
 }
@@ -160,9 +157,9 @@ export function NextStepBar({ r, today, paymentsHref, canOverride, manager = nul
     const due = r.checkIn <= today;
     options.push({ label: "Mark as no-show", hint: due ? "Closes the booking and releases the room" : `Available from ${formatDate(r.checkIn, { year: false })}`, onSelect: () => setSheet("noshow"), disabled: !due });
   }
-  if (r.status === "pending_payment" && canOverride) options.push({ label: "Confirm without payment", hint: "Managers only · reason recorded", onSelect: () => setSheet("override") });
+  if (r.status === "pending_payment" && canOverride) options.push({ label: "Hold the room longer", hint: "Managers only · reason recorded", onSelect: () => setSheet("override") });
   if (r.status === "pending_payment" && !canOverride) {
-    options.push({ label: "Confirm without payment", hint: "A manager does this · tap to ask", onSelect: () => setSheet("ask"), manager: true });
+    options.push({ label: "Hold the room longer", hint: "A manager does this · tap to ask", onSelect: () => setSheet("ask"), manager: true });
   }
   if (open) options.push({ label: "Cancel booking", hint: "Releases the room", onSelect: () => setSheet("cancel") });
 
@@ -206,7 +203,7 @@ export function NextStepBar({ r, today, paymentsHref, canOverride, manager = nul
         {sheet === "cancel" ? <CancelConfirm r={r} onKeep={() => setSheet("menu")} /> : null}
         {sheet === "noshow" ? <NoShowConfirm r={r} onKeep={() => setSheet("menu")} /> : null}
         {sheet === "override" ? <OverrideInline id={r.id} /> : null}
-        {sheet === "ask" ? <AskManager manager={manager} what="confirm this booking without full payment" onBack={() => setSheet("menu")} /> : null}
+        {sheet === "ask" ? <AskManager manager={manager} what="hold this room longer" onBack={() => setSheet("menu")} /> : null}
       </BottomSheet>
     </>
   );

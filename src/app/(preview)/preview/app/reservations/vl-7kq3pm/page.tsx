@@ -25,6 +25,7 @@ async function Content({ searchParams }: Props) {
       maxGuests={2}
       rooms={[{ id: "r201", number: "201", category: "Deluxe", ready: true }, { id: "r206", number: "206", category: "Deluxe", ready: false }, { id: "r301", number: "301", category: "Suite", ready: true }]}
       canOverride
+      canApprove
     />
   );
 }

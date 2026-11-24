@@ -1,4 +1,4 @@
-import { canAny } from "@/lib/auth/permissions";
+import { can, canAny } from "@/lib/auth/permissions";
 import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -68,13 +68,19 @@ async function Content({ searchParams }: { searchParams: SP }) {
   );
 }
 
+async function NewReservationButton() {
+  const staff = await requireStaff();
+  if (!can(staff.role, "reservations.manage")) return null;
+  return <Link href="/app/reservations/new" className={buttonStyles()}><CalendarPlus className="size-4" aria-hidden />New reservation</Link>;
+}
+
 export default function ReservationsPage(props: PageProps<"/app/reservations">) {
   return (
     <>
       <PageHeader
         title="Reservations"
         description="All bookings in one place."
-        actions={<Link href="/app/reservations/new" className={buttonStyles()}><CalendarPlus className="size-4" aria-hidden />New reservation</Link>}
+        actions={<Suspense fallback={null}><NewReservationButton /></Suspense>}
       />
       <div className="px-4 py-6 lg:px-8">
         <Suspense fallback={<LoadingState />}>

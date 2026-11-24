@@ -38,6 +38,8 @@ async function Content({ params, searchParams }: PageProps<"/app/reservations/[i
       rooms={rooms}
       maxGuests={r.maxGuests}
       canOverride={canOverride}
+      canApprove={can(staff.role, "payments.approve")}
+      canManage={can(staff.role, "reservations.manage")}
       manager={manager}
       justCreated={sp.created === "1"}
       paidReceipt={typeof sp.paid === "string" && /^RCT-\d{4}-\d{6}$/.test(sp.paid) ? sp.paid : undefined}
