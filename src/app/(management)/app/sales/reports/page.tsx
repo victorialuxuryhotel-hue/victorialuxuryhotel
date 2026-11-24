@@ -9,7 +9,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
 import { formatDate, formatNaira } from "@/lib/format";
-import { hotelToday } from "@/lib/hotel-date";
+import { businessDate } from "@/lib/hotel-date";
 import { cn } from "@/lib/utils/cn";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { getDb } from "@/server/db";
@@ -61,8 +61,8 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     return `/app/sales/reports?${p}`;
   };
   const rangeName = range in FIXED ? FIXED[range as keyof typeof FIXED] : monthName(range);
-  const months = recentMonths(hotelToday()).slice(1);
-  const days = [...r.daily].reverse().filter((d) => d.kobo || d.day === hotelToday());
+  const months = recentMonths(businessDate()).slice(1);
+  const days = [...r.daily].reverse().filter((d) => d.kobo || d.day === businessDate());
   const stat = (label: string, value: string, sub?: string, bad = false) => (
     <div className="rounded-card border border-hairline bg-ivory-50 p-4">
       <p className="text-xs text-ink-500">{label}</p>

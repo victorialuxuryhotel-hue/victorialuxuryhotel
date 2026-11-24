@@ -1,7 +1,7 @@
 import "server-only";
 import { financeSummary } from "../domain/finance";
 import type { PaymentRow } from "@/domain/views";
-import { addDays, hotelDateOf, hotelToday } from "@/lib/hotel-date";
+import { addDays, businessDaySql, hotelDateOf, hotelToday } from "@/lib/hotel-date";
 import { actorOf, authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
 import { frontDeskSummary, listPaymentsFor } from "../domain/payment-list";
@@ -103,8 +103,8 @@ export async function departmentsOverview() {
               (SELECT count(*) FROM rooms WHERE is_active = 1) AS rooms,
               (SELECT count(*) FROM reservations WHERE status IN ('confirmed', 'checked_in', 'checked_out') AND substr(check_in, 1, 7) = ?1) AS bookings,
               (SELECT count(*) FROM hall_bookings WHERE status = 'confirmed' AND event_date >= ?2) AS halls,
-              (SELECT count(*) FROM pos_orders WHERE status = 'paid' AND outlet = 'restaurant' AND date(paid_at, '+1 hour') = ?2) AS restaurant,
-              (SELECT count(*) FROM pos_orders WHERE status = 'paid' AND outlet = 'bar' AND date(paid_at, '+1 hour') = ?2) AS bar`,
+              (SELECT count(*) FROM pos_orders WHERE status = 'paid' AND outlet = 'restaurant' AND ${businessDaySql("paid_at")} = ?2) AS restaurant,
+              (SELECT count(*) FROM pos_orders WHERE status = 'paid' AND outlet = 'bar' AND ${businessDaySql("paid_at")} = ?2) AS bar`,
       today.slice(0, 7),
       today,
     ),

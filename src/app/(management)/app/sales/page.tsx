@@ -11,7 +11,7 @@ import { recordId } from "@/lib/ids";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { first, getDb } from "@/server/db";
 import { closingSummary, listMenu, openOrders } from "@/server/domain/pos";
-import { hotelToday } from "@/lib/hotel-date";
+import { businessDate } from "@/lib/hotel-date";
 
 export const metadata: Metadata = { title: "Till" };
 
@@ -28,7 +28,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     openOrders(db, actor),
     closingSummary(db, actor, staff.id),
     first<{ vat_rate_bp: number }>(db, "SELECT vat_rate_bp FROM hotel_settings WHERE id = 1"),
-    first(db, "SELECT 1 FROM pos_closings WHERE staff_id = ? AND business_date = ?", staff.id, hotelToday()),
+    first(db, "SELECT 1 FROM pos_closings WHERE staff_id = ? AND business_date = ?", staff.id, businessDate()),
   ]);
   const low = can(staff.role, "inventory.manage") ? menu.filter((m) => m.stock_left != null && m.stock_left <= 5) : [];
   return (

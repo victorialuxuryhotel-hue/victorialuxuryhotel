@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     return deniedResponse(err);
   }
   const f = orderFilters(new URL(request.url).searchParams);
-  const rows = await listOrders(await getDb(), actorOf(staff), f, 1000);
+  const rows = await listOrders(await getDb(), actorOf(staff), f, 20_000);
   return csvResponse(
     `restaurant-bar-orders-${f.from}-to-${f.to}.csv`,
     ["Date", "Time", "Order", "Receipt", "Counter", "Status", "Items", "Paid by", "Amount (NGN)", "Attendant", "Table or customer"],

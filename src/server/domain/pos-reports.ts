@@ -1,19 +1,19 @@
-import { addDays, hotelInstant, hotelToday } from "@/lib/hotel-date";
+import { addDays, businessDate, businessDayStart, businessDaySql } from "@/lib/hotel-date";
 import { all, first, POS_VIEWERS, requireRole, type Actor, type Db } from "../db";
 import { rangeDates, type ReportRange } from "./reports";
 import type { MenuCategory, Outlet, PayMethod } from "./pos";
 
 export type PosRange = ReportRange;
-export const posRangeDates = (range: PosRange, today = hotelToday()) => rangeDates(range, today);
+export const posRangeDates = (range: PosRange, today = businessDate()) => rangeDates(range, today);
 
-const DAY = "date(o.paid_at, '+1 hour')";
+const DAY = businessDaySql("o.paid_at");
 
 /** Sales, stock and money for the restaurant & bar, optionally one counter. Voided sales are counted separately, never as sales. */
-export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: Outlet | null = null, today = hotelToday()) {
+export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: Outlet | null = null, today = businessDate()) {
   requireRole(actor, POS_VIEWERS);
   const { from, to, days } = posRangeDates(range, today);
-  const start = hotelInstant(from, "00:00:00");
-  const end = hotelInstant(addDays(to, 1), "00:00:00");
+  const start = businessDayStart(from);
+  const end = businessDayStart(addDays(to, 1));
   const out = outlet ? "AND o.outlet = ?" : "";
   const args = (...a: unknown[]) => [...a, ...(outlet ? [outlet] : [])];
   const PAID = `o.status = 'paid' AND o.paid_at >= ? AND o.paid_at < ? ${out}`;

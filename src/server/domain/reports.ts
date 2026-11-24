@@ -1,4 +1,4 @@
-import { addDays, hotelToday } from "@/lib/hotel-date";
+import { addDays, businessDaySql, hotelToday } from "@/lib/hotel-date";
 import { FINANCE, all, first, requireRole, type Actor, type Db } from "../db";
 
 export type ReportRange = "today" | "7d" | "14d" | "month" | `${number}-${number}`;
@@ -63,11 +63,11 @@ export async function incomeRows(db: Db, actor: Actor, range: ReportRange, today
      LEFT JOIN staff_profiles s ON s.id = p.recorded_by
      WHERE p.status = 'successful' AND date(p.paid_at, '+1 hour') BETWEEN ?1 AND ?2
      UNION ALL
-     SELECT o.outlet, o.paid_at, date(o.paid_at, '+1 hour'), 'Order ' || o.number,
+     SELECT o.outlet, o.paid_at, ${businessDaySql("o.paid_at")}, 'Order ' || o.number,
             (CASE o.outlet WHEN 'bar' THEN 'Bar' ELSE 'Restaurant' END) || ' · ' || o.receipt_number,
             ${bucket("o.method")}, o.total_kobo, coalesce(s.full_name, 'Staff'), o.paid_by, o.receipt_number, 0
      FROM pos_orders o LEFT JOIN staff_profiles s ON s.id = o.paid_by
-     WHERE o.status = 'paid' AND date(o.paid_at, '+1 hour') BETWEEN ?1 AND ?2
+     WHERE o.status = 'paid' AND ${businessDaySql("o.paid_at")} BETWEEN ?1 AND ?2
      UNION ALL
      SELECT 'hall', hp.created_at, hp.paid_on, h.title, h.customer_name, ${bucket("hp.method")}, hp.amount_kobo,
             coalesce(s.full_name, 'Staff'), hp.recorded_by, hp.reference, 0

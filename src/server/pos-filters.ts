@@ -1,5 +1,5 @@
 import "server-only";
-import { hotelToday, isIsoDate } from "@/lib/hotel-date";
+import { businessDate, isIsoDate } from "@/lib/hotel-date";
 import { recordId } from "@/lib/ids";
 import { ORDER_STATUS, OUTLETS, PAY_METHODS, type OrderFilter, type OrderStatus, type Outlet, type PayMethod } from "./domain/pos";
 
@@ -10,7 +10,7 @@ const read = (sp: SP, k: string) => {
 };
 
 export function orderFilters(sp: SP): OrderFilter {
-  const today = hotelToday();
+  const today = businessDate();
   const from = isIsoDate(read(sp, "from")) && read(sp, "from") <= today ? read(sp, "from") : today;
   const to = isIsoDate(read(sp, "to")) && read(sp, "to") >= from && read(sp, "to") <= today ? read(sp, "to") : from;
   return {

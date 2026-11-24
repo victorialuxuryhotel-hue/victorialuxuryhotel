@@ -1,6 +1,6 @@
 import { AppError } from "@/lib/errors";
 import { formatNaira } from "@/lib/format";
-import { hotelToday } from "@/lib/hotel-date";
+import { businessDaySql, hotelToday } from "@/lib/hotel-date";
 import { vatIncluded } from "@/lib/vat";
 import { activity, activityIfChanged, all, EXPENSE_RECORDERS, FINANCE, first, requireRole, uuid, writeBatch, type Actor, type Db } from "../db";
 import { rangeDates, type ReportRange } from "./reports";
@@ -89,7 +89,7 @@ export async function financeSummary(db: Db, actor: Actor, range: ReportRange, t
     ),
     all<{ outlet: "restaurant" | "bar"; kobo: number }>(
       db,
-      `SELECT outlet, sum(total_kobo) AS kobo FROM pos_orders WHERE status = 'paid' AND date(paid_at, '+1 hour') BETWEEN ? AND ? GROUP BY outlet`,
+      `SELECT outlet, sum(total_kobo) AS kobo FROM pos_orders WHERE status = 'paid' AND ${businessDaySql("paid_at")} BETWEEN ? AND ? GROUP BY outlet`,
       from, to,
     ),
     first<{ kobo: number }>(db, "SELECT coalesce(sum(amount_kobo), 0) AS kobo FROM hall_payments WHERE paid_on BETWEEN ? AND ?", from, to),

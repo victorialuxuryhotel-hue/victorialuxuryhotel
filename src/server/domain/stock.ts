@@ -1,5 +1,5 @@
 import { AppError } from "@/lib/errors";
-import { addDays, hotelInstant } from "@/lib/hotel-date";
+import { addDays, businessDayStart } from "@/lib/hotel-date";
 import { dbErrorToken } from "../db-errors";
 import { activity, activityIfChanged, all, first, POS_MANAGERS, requireRole, STOCK_VIEWERS, uuid, writeBatch, type Actor, type Db, type StaffRole } from "../db";
 
@@ -91,8 +91,8 @@ export async function stockMoves(db: Db, actor: Actor, f: { from?: string; to?: 
   requireRole(actor, VIEW);
   const where: string[] = [];
   const params: unknown[] = [];
-  if (f.from) { where.push("m.created_at >= ?"); params.push(hotelInstant(f.from, "00:00:00")); }
-  if (f.to) { where.push("m.created_at < ?"); params.push(hotelInstant(addDays(f.to, 1), "00:00:00")); }
+  if (f.from) { where.push("m.created_at >= ?"); params.push(businessDayStart(f.from)); }
+  if (f.to) { where.push("m.created_at < ?"); params.push(businessDayStart(addDays(f.to, 1))); }
   if (f.kind) { where.push("m.kind = ?"); params.push(f.kind); }
   if (f.itemId) { where.push("m.item_id = ?"); params.push(f.itemId); }
   return all<MoveRow>(

@@ -3,7 +3,7 @@ import { csvResponse, deniedResponse, lagosDate, lagosTime } from "@/server/csv"
 import { getDb } from "@/server/db";
 import { rangeDates, reportRange } from "@/server/domain/reports";
 import { MOVE_KINDS, stockMoves } from "@/server/domain/stock";
-import { hotelToday } from "@/lib/hotel-date";
+import { businessDate } from "@/lib/hotel-date";
 
 export async function GET(request: Request) {
   let staff;
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   } catch (err) {
     return deniedResponse(err);
   }
-  const { from, to } = rangeDates(reportRange(new URL(request.url).searchParams.get("range") ?? undefined), hotelToday());
+  const { from, to } = rangeDates(reportRange(new URL(request.url).searchParams.get("range") ?? undefined), businessDate());
   const rows = await stockMoves(await getDb(), actorOf(staff), { from, to, limit: 5000 });
   return csvResponse(
     `stock-movements-${from}-to-${to}.csv`,

@@ -8,7 +8,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { can, canAny } from "@/lib/auth/permissions";
 import { formatDate, formatDateTime, formatNaira } from "@/lib/format";
-import { addDays, hotelToday } from "@/lib/hotel-date";
+import { addDays, businessDate, businessDaySql } from "@/lib/hotel-date";
 import { cn } from "@/lib/utils/cn";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { all, getDb } from "@/server/db";
@@ -44,7 +44,7 @@ async function Content() {
   const reader = await authorizeRead(["pos.sell", "pos.view"]);
   const actor = actorOf(reader);
   const db = await getDb();
-  const today = hotelToday();
+  const today = businessDate();
   const seller = can(staff.role, "pos.sell");
   const viewer = can(staff.role, "pos.view");
   const [mine, closings, notClosed] = await Promise.all([
@@ -54,7 +54,7 @@ async function Content() {
       ? all<{ name: string; kobo: number }>(
           db,
           `SELECT s.full_name AS name, sum(o.total_kobo) AS kobo FROM pos_orders o JOIN staff_profiles s ON s.id = o.paid_by
-           WHERE o.status = 'paid' AND date(o.paid_at, '+1 hour') = ? AND NOT EXISTS (SELECT 1 FROM pos_closings c WHERE c.staff_id = o.paid_by AND c.business_date = ?)
+           WHERE o.status = 'paid' AND ${businessDaySql("o.paid_at")} = ? AND NOT EXISTS (SELECT 1 FROM pos_closings c WHERE c.staff_id = o.paid_by AND c.business_date = ?)
            GROUP BY o.paid_by ORDER BY s.full_name`,
           today, today,
         )

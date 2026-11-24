@@ -11,13 +11,15 @@ import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { Input, Select } from "@/components/ui/form";
 import { can, canAny } from "@/lib/auth/permissions";
 import { formatDateTime, formatNaira } from "@/lib/format";
-import { hotelToday } from "@/lib/hotel-date";
+import { businessDate } from "@/lib/hotel-date";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { all, getDb } from "@/server/db";
 import { listOrders, ORDER_STATUS, OUTLETS, PAY_METHODS, type OrderStatus } from "@/server/domain/pos";
 import { orderFilters } from "@/server/pos-filters";
 
 export const metadata: Metadata = { title: "Orders & receipts" };
+
+const LIMIT = 200;
 
 const tone: Record<OrderStatus, Tone> = { open: "warning", paid: "success", cancelled: "neutral", void: "danger" };
 
@@ -30,7 +32,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   const f = orderFilters(sp);
   const viewer = can(staff.role, "pos.view");
   const [orders, people] = await Promise.all([
-    listOrders(db, actorOf(reader), f),
+    listOrders(db, actorOf(reader), f, LIMIT),
     viewer
       ? all<{ id: string; name: string }>(db, "SELECT DISTINCT s.id, s.full_name AS name FROM pos_orders o JOIN staff_profiles s ON s.id = coalesce(o.paid_by, o.created_by) ORDER BY s.full_name")
       : Promise.resolve([]),
@@ -40,8 +42,8 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   return (
     <div className="space-y-5 px-4 py-6 lg:px-8">
       <form className="grid gap-3 rounded-card border border-hairline bg-ivory-50 p-4 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
-        <label className="text-[13px] text-ink-700">From<Input type="date" name="from" defaultValue={f.from} max={hotelToday()} className="mt-1" /></label>
-        <label className="text-[13px] text-ink-700">To<Input type="date" name="to" defaultValue={f.to} max={hotelToday()} className="mt-1" /></label>
+        <label className="text-[13px] text-ink-700">From<Input type="date" name="from" defaultValue={f.from} max={businessDate()} className="mt-1" /></label>
+        <label className="text-[13px] text-ink-700">To<Input type="date" name="to" defaultValue={f.to} max={businessDate()} className="mt-1" /></label>
         <label className="text-[13px] text-ink-700">Paid by
           <Select name="method" defaultValue={f.method ?? ""} className="mt-1">
             <option value="">Any method</option>
@@ -82,6 +84,11 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           {orders.length} order{orders.length === 1 ? "" : "s"} · paid <b className="tabular-nums text-ink-900">{formatNaira(paid.reduce((s, o) => s + o.total_kobo, 0))}</b>
           {viewer ? null : " · showing your orders"}
         </p>
+        {orders.length >= LIMIT ? (
+          <p role="status" className="w-full rounded-md border border-warning-600/30 bg-warning-50 px-4 py-2 text-sm text-warning-700">
+            Showing the latest {LIMIT} orders. Narrow the dates or filters to see the rest{viewer ? ", or download them all" : ""}.
+          </p>
+        ) : null}
         {viewer ? (
           <a href={`/app/sales/orders/csv?${query}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Download (CSV)</a>
         ) : null}

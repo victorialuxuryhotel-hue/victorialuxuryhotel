@@ -29,3 +29,14 @@ export function hotelTimeNow(at: Date = new Date()): string {
 export function hotelInstant(date: string, time: string): string {
   return new Date(`${date}T${time}+01:00`).toISOString();
 }
+
+/** Restaurant & bar trading day: it starts at 05:00 Lagos time, so a sale at 1am belongs to the night before. */
+export const BUSINESS_DAY_START_HOUR = 5;
+export function businessDate(at: Date = new Date()): string {
+  return hotelToday(new Date(at.getTime() - BUSINESS_DAY_START_HOUR * 3_600_000));
+}
+export function businessDayStart(date: string): string {
+  return hotelInstant(date, `${String(BUSINESS_DAY_START_HOUR).padStart(2, "0")}:00:00`);
+}
+/** SQL for the trading day of a UTC timestamp column (Lagos is UTC+1, minus the 5-hour start). */
+export const businessDaySql = (col: string) => `date(${col}, '${1 - BUSINESS_DAY_START_HOUR} hours')`;
