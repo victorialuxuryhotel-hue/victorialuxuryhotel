@@ -12,7 +12,7 @@ import { formatDate } from "@/lib/format";
 import { keepValues } from "@/lib/forms";
 import { hotelDateOf } from "@/lib/hotel-date";
 import { cn } from "@/lib/utils/cn";
-import { inviteStaff, makeOwner, updateStaff } from "@/server/staff";
+import { inviteStaff, makeOwner, resendInvite, updateStaff } from "@/server/staff";
 
 const fieldError = (state: ActionResult<unknown> | null, name: string) => (state && !state.ok ? state.fieldErrors?.[name]?.[0] : undefined);
 
@@ -97,6 +97,19 @@ function InviteForm({ onDone }: { onDone: () => void }) {
   );
 }
 
+function ResendInvite({ staffId }: { staffId: string }) {
+  const [state, action, pending] = useActionState(resendInvite, null);
+  return (
+    <form action={action} className="space-y-2 border-t border-hairline pt-5">
+      <input type="hidden" name="staffId" value={staffId} />
+      {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
+      {state?.ok ? <FormMessage tone="success">Invitation sent again to {state.data.email}.</FormMessage> : null}
+      <Button type="submit" variant="secondary" pending={pending} className="w-full">Send the invitation again</Button>
+      <p className="text-xs text-ink-500">The earlier link stops working.</p>
+    </form>
+  );
+}
+
 function ManageForm({ s, isSelf, onDone }: { s: StaffRow; isSelf: boolean; onDone: () => void }) {
   const [state, action, pending] = useActionState(updateStaff, null);
   const [ownerState, ownerAction, ownerPending] = useActionState(makeOwner, null);
@@ -147,6 +160,8 @@ function ManageForm({ s, isSelf, onDone }: { s: StaffRow; isSelf: boolean; onDon
           )}
         </div>
       ) : null}
+
+      {s.isActive && s.invited ? <ResendInvite staffId={s.id} /> : null}
 
       {!isSelf ? (
         <form action={action} onSubmit={keepValues(action)} className="border-t border-hairline pt-5">

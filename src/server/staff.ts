@@ -7,7 +7,7 @@ import { publicEnv } from "@/lib/env";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize } from "./auth";
-import { first, getDb } from "./db";
+import { activity, first, getDb, writeBatch } from "./db";
 import { createStaffProfile, promoteToOwner, updateStaffProfile } from "./domain/admin";
 
 const roleSchema = z.enum(["owner", "general_manager", "hotel_manager", "front_desk", "finance", "restaurant_bar", "restaurant_bar_manager"]);
@@ -28,6 +28,16 @@ const inviteSchema = z.object({
 
 const clerkCode = (err: unknown) => (err as { errors?: Array<{ code?: string }> })?.errors?.[0]?.code;
 
+type Clerk = Awaited<ReturnType<typeof clerkClient>>;
+
+async function revokePendingInvitations(clerk: Clerk, email: string): Promise<void> {
+  const { data } = await clerk.invitations.getInvitationList({ status: "pending", query: email });
+  await Promise.all(data.filter((i) => i.emailAddress.toLowerCase() === email).map((i) => clerk.invitations.revokeInvitation(i.id)));
+}
+
+const sendInvitation = (clerk: Clerk, email: string) =>
+  clerk.invitations.createInvitation({ emailAddress: email, redirectUrl: `${publicEnv().NEXT_PUBLIC_SITE_URL}/auth/accept`, notify: true, ignoreExisting: true });
+
 export async function inviteStaff(_prev: ActionResult<{ email: string }> | null, formData: FormData): Promise<ActionResult<{ email: string }>> {
   try {
     const me = await authorize("staff.manage");
@@ -42,13 +52,7 @@ export async function inviteStaff(_prev: ActionResult<{ email: string }> | null,
     const clerk = await clerkClient();
     let invitationId: string;
     try {
-      const invitation = await clerk.invitations.createInvitation({
-        emailAddress: email,
-        redirectUrl: `${publicEnv().NEXT_PUBLIC_SITE_URL}/auth/accept`,
-        notify: true,
-        ignoreExisting: true,
-      });
-      invitationId = invitation.id;
+      invitationId = (await sendInvitation(clerk, email)).id;
     } catch (err) {
       if (clerkCode(err) === "duplicate_record") throw new AppError("CONFLICT", "An invitation is already waiting for this email.");
       throw new AppError("INTERNAL", "Could not send the invitation. Please try again.", { cause: err });
@@ -83,19 +87,45 @@ export async function updateStaff(_prev: ActionResult | null, formData: FormData
     const { staffId, role, isActive, phone } = parsed.data;
     const record = await updateStaffProfile(await getDb(), actorOf(me), { staffId, role, isActive, phone: phone === undefined ? undefined : phone || null });
 
-    if (record.clerk_user_id) {
-      const clerk = await clerkClient();
-      try {
+    const clerk = await clerkClient();
+    try {
+      if (record.clerk_user_id) {
         if (isActive) await clerk.users.unbanUser(record.clerk_user_id);
         else await clerk.users.banUser(record.clerk_user_id);
-      } catch (err) {
-        logger.error("staff.clerk_lock_failed", err, { staffId });
+      } else if (!isActive) {
+        await revokePendingInvitations(clerk, record.email);
       }
+    } catch (err) {
+      logger.error("staff.clerk_lock_failed", err, { staffId });
     }
     refresh();
     return ok(undefined);
   } catch (err) {
     if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("staff.update_failed", err);
+    return toActionError(err);
+  }
+}
+
+export async function resendInvite(_prev: ActionResult<{ email: string }> | null, formData: FormData): Promise<ActionResult<{ email: string }>> {
+  try {
+    const me = await authorize("staff.manage");
+    const staffId = z.uuid().parse(formData.get("staffId"));
+    const db = await getDb();
+    const s = await first<{ email: string; is_active: number; clerk_user_id: string | null }>(db, "SELECT email, is_active, clerk_user_id FROM staff_profiles WHERE id = ?", staffId);
+    if (!s) throw new AppError("NOT_FOUND", "Staff member not found.");
+    if (s.clerk_user_id) throw new AppError("CONFLICT", "They have already signed in.");
+    if (!s.is_active) throw new AppError("CONFLICT", "Restore their access first.");
+    const clerk = await clerkClient();
+    try {
+      await revokePendingInvitations(clerk, s.email);
+      await sendInvitation(clerk, s.email);
+    } catch (err) {
+      throw new AppError("INTERNAL", "Could not send the invitation. Please try again.", { cause: err });
+    }
+    await writeBatch(db, actorOf(me), [activity(db, "staff.invite_resent", "staff_profile", staffId, `Invitation sent again to ${s.email}`)]);
+    return ok({ email: s.email });
+  } catch (err) {
+    if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("staff.invite_resend_failed", err);
     return toActionError(err);
   }
 }
