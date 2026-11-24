@@ -102,7 +102,6 @@ export const POS_SELLERS = ["owner", "restaurant_bar", "restaurant_bar_manager"]
 export const POS_MANAGERS = ["owner", "restaurant_bar_manager"] as const;
 export const POS_VIEWERS = ["owner", "general_manager", "finance", "restaurant_bar_manager"] as const;
 export const STOCK_VIEWERS = ["owner", "general_manager", "finance", "restaurant_bar_manager"] as const;
-export const EXPENSE_RECORDERS = ["owner", "general_manager", "finance", "restaurant_bar_manager"] as const;
 export const EVENTS_STAFF = ["owner", "general_manager", "front_desk"] as const;
 
 export const VIEW_AS_READ_ONLY = "You're viewing as front desk, which is read-only. Exit view to make changes.";

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addExtra, addPromo, setExtraActive, setPromoActive } from "@/server/domain/admin";
 import { createHallBooking, recordHallPayment, setHallStatus } from "@/server/domain/events";
-import { recordExpense, voidExpense } from "@/server/domain/finance";
 import { day, db, gm, q, rejects } from "./helpers";
 
 const rand = () => crypto.randomUUID().slice(0, 6);
@@ -30,14 +29,6 @@ describe("repeated and concurrent actions", () => {
     expect(await logCount(extra)).toBe(e0 + 1);
     expect(await logCount(promo)).toBe(p0 + 1);
     await rejects(setExtraActive(db, gm, crypto.randomUUID(), true), /not found/);
-  });
-
-  it("voiding an expense twice logs once", async () => {
-    const id = await recordExpense(db, gm, { spentOn: day(0), category: "other", description: "Bulbs", amountKobo: 50_000, method: "cash", reference: null });
-    await voidExpense(db, gm, id, "Duplicate");
-    const n = await logCount(id);
-    await rejects(voidExpense(db, gm, id, "Duplicate"), /already voided/);
-    expect(await logCount(id)).toBe(n);
   });
 
   it("two hall payments at once can't overpay", async () => {

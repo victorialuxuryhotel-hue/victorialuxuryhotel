@@ -474,7 +474,7 @@ export async function getOrder(db: Db, actor: Actor, id: string): Promise<OrderD
 // ---------------------------------------------------------------------------
 
 export type ClosingSummary = {
-  sales: number; salesKobo: number; byMethod: Record<PayMethod, number>; voids: number; voidsKobo: number; openOrders: number; expensesKobo: number;
+  sales: number; salesKobo: number; byMethod: Record<PayMethod, number>; voids: number; voidsKobo: number; openOrders: number;
 };
 
 export async function closingSummary(db: Db, actor: Actor, staffId: string, date = businessDate()): Promise<ClosingSummary> {
@@ -482,7 +482,7 @@ export async function closingSummary(db: Db, actor: Actor, staffId: string, date
   if (staffId !== actor.id && !sees(actor)) throw new AppError("FORBIDDEN", "You can only close your own sales.");
   const from = dayStart(date);
   const to = dayStart(addDays(date, 1));
-  const [paid, voided, open, spent] = await Promise.all([
+  const [paid, voided, open] = await Promise.all([
     all<{ method: PayMethod; n: number; kobo: number }>(
       db,
       "SELECT method, count(*) AS n, sum(total_kobo) AS kobo FROM pos_orders WHERE status = 'paid' AND paid_by = ? AND paid_at >= ? AND paid_at < ? GROUP BY method",
@@ -494,11 +494,6 @@ export async function closingSummary(db: Db, actor: Actor, staffId: string, date
       staffId, from, to,
     ),
     first<{ n: number }>(db, "SELECT count(*) AS n FROM pos_orders WHERE status = 'open' AND created_by = ?", staffId),
-    first<{ kobo: number }>(
-      db,
-      "SELECT coalesce(sum(amount_kobo), 0) AS kobo FROM expenses WHERE voided_at IS NULL AND department IN ('restaurant', 'bar') AND spent_on = ? AND recorded_by = ?",
-      date, staffId,
-    ),
   ]);
   const byMethod: Record<PayMethod, number> = { cash: 0, bank_transfer: 0, pos_terminal: 0 };
   for (const p of paid) byMethod[p.method] = p.kobo;
@@ -509,7 +504,6 @@ export async function closingSummary(db: Db, actor: Actor, staffId: string, date
     voids: voided?.n ?? 0,
     voidsKobo: voided?.kobo ?? 0,
     openOrders: open?.n ?? 0,
-    expensesKobo: spent?.kobo ?? 0,
   };
 }
 

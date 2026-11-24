@@ -18,10 +18,10 @@ const fieldError = (state: ActionResult<unknown> | null, name: string) => (state
 
 const ROLE_HELP: Record<Exclude<StaffRole, "owner">, string> = {
   front_desk: "Bookings, check-in and out, room payments, room status and hall bookings.",
-  general_manager: "Everything front desk does, plus prices, reports, refunds, discounts and expenses. Can view the restaurant & bar.",
-  finance: "Reports, payments and expenses for every department. No bookings or rooms.",
+  general_manager: "Everything front desk does, plus prices, reports, refunds and discounts. Can view the restaurant & bar.",
+  finance: "Sales, payments and reports for every department. No bookings or rooms.",
   restaurant_bar: "The restaurant & bar till: take orders and payments, print receipts, close their day.",
-  restaurant_bar_manager: "Runs the restaurant & bar: till, menu and prices, stock, voids, expenses, daily closing sign-off and reports.",
+  restaurant_bar_manager: "Runs the restaurant & bar: till, menu and prices, stock, voids, daily closing sign-off and reports.",
 };
 const ASSIGNABLE = ["front_desk", "restaurant_bar", "restaurant_bar_manager", "finance", "general_manager"] as const;
 

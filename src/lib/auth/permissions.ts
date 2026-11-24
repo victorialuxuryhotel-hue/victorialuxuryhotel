@@ -12,7 +12,6 @@ export type Permission =
   | "reports.view"
   | "activity.view"
   | "staff.manage"
-  | "expenses.manage"
   | "pos.sell"
   | "pos.view"
   | "pos.manage"
@@ -29,7 +28,6 @@ const manager: Permission[] = [
   "settings.manage",
   "reports.view",
   "activity.view",
-  "expenses.manage",
   "pos.view",
   "inventory.view",
 ];
@@ -38,9 +36,9 @@ const matrix: Record<StaffRole, ReadonlySet<Permission>> = {
   front_desk: new Set(frontDesk),
   general_manager: new Set(manager),
   owner: new Set<Permission>([...manager, "staff.manage", "pos.sell", "pos.manage", "inventory.manage"]),
-  finance: new Set<Permission>(["reports.view", "expenses.manage", "pos.view", "inventory.view"]),
+  finance: new Set<Permission>(["reports.view", "pos.view", "inventory.view"]),
   restaurant_bar: new Set<Permission>(["pos.sell"]),
-  restaurant_bar_manager: new Set<Permission>(["pos.sell", "pos.view", "pos.manage", "inventory.view", "inventory.manage", "expenses.manage"]),
+  restaurant_bar_manager: new Set<Permission>(["pos.sell", "pos.view", "pos.manage", "inventory.view", "inventory.manage"]),
 };
 
 export function can(role: StaffRole, permission: Permission): boolean {

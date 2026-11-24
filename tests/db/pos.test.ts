@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Actor, StaffRole } from "@/server/db";
-import { financeSummary, recordExpense } from "@/server/domain/finance";
+import { financeSummary } from "@/server/domain/finance";
 import {
   cancelOrder,
   closeDay,
@@ -200,22 +200,17 @@ describe("restaurant & bar reports and the hotel's books", () => {
     expect(rows.some((r) => r.document === oops.receiptNumber)).toBe(false);
   });
 
-  it("restaurant & bar managers record their own department's expenses and stock waste; finance can view but not sell", async () => {
+  it("restaurant & bar managers record stock waste; finance can view reports but not sell", async () => {
     const mgr = await staff("restaurant_bar_manager");
     const fin = await staff("finance");
     const { stockId, itemId } = await drink(mgr, 6);
-    await recordExpense(db, mgr, { spentOn: hotelToday(), category: "cooking_gas", description: "Gas refill", amountKobo: 1_500_000, method: "cash", reference: null, department: "restaurant" });
-    await rejects(
-      recordExpense(db, mgr, { spentOn: hotelToday(), category: "fuel", description: "Diesel", amountKobo: 100, method: "cash", reference: null, department: "general" }),
-      /restaurant or bar expenses only/,
-    );
     await rejects(recordMove(db, mgr, { itemId: stockId, kind: "wasted", quantity: 2, note: null }), /Say what happened/);
     await recordMove(db, mgr, { itemId: stockId, kind: "wasted", quantity: 2, note: "2 bottles broken" });
     expect(await onHand(stockId)).toBe(4);
     await rejects(recordMove(db, await staff("restaurant_bar"), { itemId: stockId, kind: "received", quantity: 1, note: null }), /role does not allow/);
     await rejects(payOrder(db, fin, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" }), /role does not allow/);
     const rep = await posReport(db, fin, "today", "restaurant");
-    expect(rep.expensesKobo).toBeGreaterThanOrEqual(1_500_000);
+    expect(rep).not.toHaveProperty("expensesKobo");
   });
 
   it("stores the Restaurant/Bar Manager role and keeps it to a restaurant & bar record", async () => {

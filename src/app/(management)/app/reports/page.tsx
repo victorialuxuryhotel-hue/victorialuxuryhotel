@@ -123,49 +123,35 @@ async function Money({ range, dept }: { range: ReportRange; dept: Department | n
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader title="Income and expenses" description={`${rangeName(range)} · ${deptName.toLowerCase()}`} />
+        <CardHeader title="Sales and payments" description={`${rangeName(range)} · ${deptName.toLowerCase()}`} />
         {mine ? (
           <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
-            <div>
-              {line("Income", mine.incomeKobo)}
-              {line(`VAT included (${finance.vatRateBp / 100}%)`, mine.vatKobo)}
-            </div>
-            <div>
-              {line("Expenses", mine.expensesKobo)}
-              {line("Income after expenses", mine.netKobo, true)}
-            </div>
+            <div>{line("Received", mine.incomeKobo, true)}</div>
+            <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, mine.vatKobo)}</div>
           </dl>
         ) : (
           <>
             <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
-              <div>
-                {line("Total income", finance.incomeTotal)}
-                {line(`VAT included in income (${finance.vatRateBp / 100}%)`, finance.vatKobo)}
-              </div>
-              <div>
-                {line("Total expenses", finance.expensesKobo)}
-                {line("Income after expenses", finance.netKobo, true)}
-              </div>
+              <div>{line("Total received", finance.incomeTotal, true)}</div>
+              <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, finance.vatKobo)}</div>
             </dl>
             <div className="overflow-x-auto border-t border-hairline">
-              <table className="w-full min-w-[30rem] text-sm">
+              <table className="w-full min-w-[24rem] text-sm">
                 <thead className="text-xs text-ink-500">
                   <tr className="border-b border-hairline">
                     <th scope="col" className="px-5 py-2.5 text-left font-medium">Department</th>
-                    <th scope="col" className={cn(cell, "font-medium")}>Income</th>
-                    <th scope="col" className={cn(cell, "font-medium")}>Expenses</th>
-                    <th scope="col" className={cn(cell, "pr-5 font-medium")}>After expenses</th>
+                    <th scope="col" className={cn(cell, "font-medium")}>VAT included</th>
+                    <th scope="col" className={cn(cell, "pr-5 font-medium")}>Received</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
                   {finance.departments.map((d) => (
                     <tr key={d.key}>
                       <th scope="row" className="px-5 py-2.5 text-left font-medium text-ink-900">
-                        {d.key === "general" ? d.label : <Link href={`/app/reports?tab=money&range=${range}&dept=${d.key}`} className="hover:underline">{d.label}</Link>}
+                        <Link href={`/app/reports?tab=money&range=${range}&dept=${d.key}`} className="hover:underline">{d.label}</Link>
                       </th>
-                      <td className={cell}>{d.key === "general" ? "–" : formatNaira(d.incomeKobo)}</td>
-                      <td className={cell}>{formatNaira(d.expensesKobo)}</td>
-                      <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(d.netKobo)}</td>
+                      <td className={cell}>{formatNaira(d.vatKobo)}</td>
+                      <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(d.incomeKobo)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -176,9 +162,6 @@ async function Money({ range, dept }: { range: ReportRange; dept: Department | n
         <div className="flex flex-col gap-2 border-t border-hairline px-5 py-4 sm:flex-row">
           <a href={`/app/reports/income-csv?range=${range}${deptQuery(dept)}`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
             <Download className="size-4" aria-hidden /> Income (CSV)
-          </a>
-          <a href={`/app/reports/expenses-csv?range=${range}${deptQuery(dept)}`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
-            <Download className="size-4" aria-hidden /> Expenses (CSV)
           </a>
         </div>
       </Card>

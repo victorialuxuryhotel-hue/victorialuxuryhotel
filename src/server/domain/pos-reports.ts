@@ -17,7 +17,7 @@ export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: O
   const out = outlet ? "AND o.outlet = ?" : "";
   const args = (...a: unknown[]) => [...a, ...(outlet ? [outlet] : [])];
   const PAID = `o.status = 'paid' AND o.paid_at >= ? AND o.paid_at < ? ${out}`;
-  const [byDay, byItem, byCategory, byStaff, byMethod, voids, expenses, closings, stock, moves] = await Promise.all([
+  const [byDay, byItem, byCategory, byStaff, byMethod, voids, closings, stock, moves] = await Promise.all([
     all<{ day: string; kobo: number; n: number }>(db, `SELECT ${DAY} AS day, sum(o.total_kobo) AS kobo, count(*) AS n FROM pos_orders o WHERE ${PAID} GROUP BY day`, ...args(start, end)),
     all<{ name: string; outlet: Outlet; qty: number; kobo: number }>(
       db,
@@ -42,11 +42,6 @@ export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: O
       db,
       `SELECT count(*) AS n, coalesce(sum(o.total_kobo), 0) AS kobo FROM pos_orders o WHERE o.status = 'void' AND o.paid_at >= ? AND o.paid_at < ? ${out}`,
       ...args(start, end),
-    ),
-    first<{ kobo: number }>(
-      db,
-      `SELECT coalesce(sum(amount_kobo), 0) AS kobo FROM expenses WHERE voided_at IS NULL AND spent_on BETWEEN ? AND ? AND department IN (${outlet ? "?" : "'restaurant', 'bar'"})`,
-      from, to, ...(outlet ? [outlet] : []),
     ),
     all<{ n: number; diff: number; unverified: number }>(
       db,
@@ -79,7 +74,6 @@ export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: O
   return {
     from, to, outlet, sales, salesKobo, daily, byItem, byCategory, byStaff, byMethod: method,
     voids: voids?.n ?? 0, voidsKobo: voids?.kobo ?? 0,
-    expensesKobo: expenses?.kobo ?? 0, netKobo: salesKobo - (expenses?.kobo ?? 0),
     closings: closings[0] ?? { n: 0, diff: 0, unverified: 0 },
     stock, lowStock: stock.filter((s) => s.quantity <= s.min_quantity), stockMoves: [...stockMoves.values()].sort((a, b) => a.name.localeCompare(b.name)),
   };

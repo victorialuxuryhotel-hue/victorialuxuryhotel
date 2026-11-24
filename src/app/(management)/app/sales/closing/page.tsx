@@ -31,7 +31,6 @@ function Summary({ s }: { s: ClosingSummary }) {
       <div>
         {line("Voided sales", `${s.voids} · ${formatNaira(s.voidsKobo)}`)}
         {line("Unpaid orders", String(s.openOrders))}
-        {line("Expenses you recorded", formatNaira(s.expensesKobo))}
         {line("Cash expected", formatNaira(s.byMethod.cash), true)}
       </div>
     </dl>

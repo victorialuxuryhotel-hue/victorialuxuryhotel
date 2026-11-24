@@ -95,10 +95,8 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {stat("Sales", formatNaira(r.salesKobo), `${r.sales} completed · ${rangeName.toLowerCase()}`)}
-        {stat("Expenses", formatNaira(r.expensesKobo))}
-        {stat("After expenses", formatNaira(r.netKobo), undefined, r.netKobo < 0)}
         {stat("Voided", formatNaira(r.voidsKobo), `${r.voids} sale${r.voids === 1 ? "" : "s"}`)}
         {stat("Closing differences", formatNaira(Math.abs(r.closings.diff)), `${r.closings.diff < 0 ? "short" : r.closings.diff > 0 ? "over" : "none"} · ${r.closings.unverified} not signed off`, r.closings.diff !== 0)}
       </div>
@@ -107,7 +105,6 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         <a href={`/app/sales/orders/csv?from=${r.from}&to=${r.to}${outlet ? `&outlet=${outlet}` : ""}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Orders (CSV)</a>
         <a href={`/app/sales/reports/items-csv?range=${range}${outlet ? `&outlet=${outlet}` : ""}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Sales by item (CSV)</a>
         <a href={`/app/sales/reports/stock-csv?range=${range}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Stock (CSV)</a>
-        <a href={`/app/reports/expenses-csv?range=${range}${outlet ? `&dept=${outlet}` : ""}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Expenses (CSV)</a>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">

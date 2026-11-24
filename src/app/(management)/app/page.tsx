@@ -27,16 +27,14 @@ async function Departments() {
   const cell = "px-4 py-3 text-right tabular-nums whitespace-nowrap";
   return (
     <Card>
-      <CardHeader title="Departments" description="Each department's money, kept separate. This month unless shown." />
+      <CardHeader title="Departments" description="Money received by each department, kept separate." />
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[44rem] text-sm">
+        <table className="w-full min-w-[34rem] text-sm">
           <thead className="text-xs text-ink-500">
             <tr className="border-b border-hairline">
               <th scope="col" className="px-5 py-2.5 text-left font-medium">Department</th>
               <th scope="col" className={cn(cell, "font-medium")}>Today</th>
-              <th scope="col" className={cn(cell, "font-medium")}>This month</th>
-              <th scope="col" className={cn(cell, "font-medium")}>Expenses</th>
-              <th scope="col" className={cn(cell, "pr-5 font-medium")}>After expenses</th>
+              <th scope="col" className={cn(cell, "pr-5 font-medium")}>This month</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-hairline">
@@ -47,24 +45,13 @@ async function Departments() {
                   <span className="block text-xs text-ink-500">{r.note}</span>
                 </th>
                 <td className={cell}>{formatNaira(r.today)}</td>
-                <td className={cell}>{formatNaira(r.month)}</td>
-                <td className={cell}>{formatNaira(r.expenses)}</td>
-                <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(r.month - r.expenses)}</td>
+                <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(r.month)}</td>
               </tr>
             ))}
-            <tr>
-              <th scope="row" className="px-5 py-3 text-left font-normal text-ink-700">Whole hotel <span className="block text-xs text-ink-500">Shared costs: diesel, salaries and the like</span></th>
-              <td className={cell}>–</td>
-              <td className={cell}>–</td>
-              <td className={cell}>{formatNaira(d.general)}</td>
-              <td className={cn(cell, "pr-5")}>{d.general ? `−${formatNaira(d.general)}` : formatNaira(0)}</td>
-            </tr>
             <tr className="bg-ivory-100 font-semibold text-ink-900">
-              <th scope="row" className="px-5 py-3 text-left">Overall business</th>
+              <th scope="row" className="px-5 py-3 text-left">Whole business</th>
               <td className={cell}>{formatNaira(d.total.today)}</td>
-              <td className={cell}>{formatNaira(d.total.month)}</td>
-              <td className={cell}>{formatNaira(d.total.expenses)}</td>
-              <td className={cn(cell, "pr-5")}>{formatNaira(d.total.net)}</td>
+              <td className={cn(cell, "pr-5")}>{formatNaira(d.total.month)}</td>
             </tr>
           </tbody>
         </table>

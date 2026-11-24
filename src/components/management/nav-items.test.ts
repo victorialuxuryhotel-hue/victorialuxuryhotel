@@ -16,20 +16,19 @@ describe("menu by role", () => {
     const groups = visible("general_manager");
     expect(groups.map((g) => g.label)).toEqual(["Daily work", "Restaurant & bar", "Running the hotel"]);
     expect(groups[1]!.items).toEqual(["Orders & receipts", "Daily closing", "Stock", "Sales reports"]);
-    expect(groups[2]!.items).toEqual(["Dashboard", "Rates & room types", "Reports", "Expenses", "Booking rules"]);
+    expect(groups[2]!.items).toEqual(["Dashboard", "Rates & room types", "Reports", "Booking rules"]);
   });
   it("finance sees money only, including the restaurant & bar's", () => {
     expect(visible("finance")).toEqual([
       { label: "Daily work", items: ["Payments"] },
       { label: "Restaurant & bar", items: ["Orders & receipts", "Daily closing", "Stock", "Sales reports"] },
-      { label: "Running the hotel", items: ["Dashboard", "Reports", "Expenses"] },
+      { label: "Running the hotel", items: ["Dashboard", "Reports"] },
     ]);
   });
   it("restaurant & bar attendants see the till, their orders and closing; their manager runs the whole department", () => {
     expect(visible("restaurant_bar")).toEqual([{ label: "Restaurant & bar", items: ["Till", "Orders & receipts", "Daily closing"] }]);
     expect(visible("restaurant_bar_manager")).toEqual([
       { label: "Restaurant & bar", items: ["Till", "Orders & receipts", "Daily closing", "Menu", "Stock", "Sales reports"] },
-      { label: "Running the hotel", items: ["Expenses"] },
     ]);
   });
   it("the owner also manages staff", () => {
