@@ -21,9 +21,9 @@
     "staff:create-owner": "node scripts/create-owner.mts",
     "mock:integrations": "node tests/mocks/integrations-mock.mjs",
     "cf:typegen": "wrangler types --env-interface CloudflareEnv --include-env=false cloudflare-env.d.ts",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "cf:build": "opennextjs-cloudflare build && node scripts/strip-build-secrets.mjs",
+    "cf:preview": "pnpm cf:build && opennextjs-cloudflare preview",
+    "cf:deploy": "pnpm cf:build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@clerk/nextjs": "7.9.25",
