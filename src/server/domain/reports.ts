@@ -1,13 +1,13 @@
 import { addDays, hotelToday } from "@/lib/hotel-date";
 import { FINANCE, all, first, requireRole, type Actor, type Db } from "../db";
 
-export type ReportRange = "today" | "14d" | "month" | `${number}-${number}`;
+export type ReportRange = "today" | "7d" | "14d" | "month" | `${number}-${number}`;
 
 const MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/;
 export const FIRST_MONTH = "2026-11";
 
 export function reportRange(range: string | undefined, today = hotelToday()): ReportRange {
-  if (range === "today" || range === "month") return range;
+  if (range === "today" || range === "month" || range === "7d") return range;
   if (range && MONTH.test(range) && range >= FIRST_MONTH && range <= today.slice(0, 7)) return range === today.slice(0, 7) ? "month" : (range as ReportRange);
   return "14d";
 }
@@ -16,6 +16,7 @@ export function rangeDates(range: ReportRange, today: string): { from: string; t
   let from = today;
   let to = today;
   if (range === "14d") from = addDays(today, -13);
+  else if (range === "7d") from = addDays(today, -6);
   else if (range === "month") from = `${today.slice(0, 7)}-01`;
   else if (range !== "today") {
     from = `${range}-01`;
@@ -37,7 +38,7 @@ export function recentMonths(today: string, count = 12): string[] {
 }
 
 export type Bucket = "cash" | "transfer" | "pos" | "cardOnline" | "other";
-export type Department = "rooms" | "restaurantBar" | "hall";
+export type Department = "rooms" | "restaurant" | "bar" | "hall";
 
 export type IncomeRow = {
   department: Department; at: string; day: string; reference: string; detail: string; method: Bucket;
@@ -62,12 +63,11 @@ export async function incomeRows(db: Db, actor: Actor, range: ReportRange, today
      LEFT JOIN staff_profiles s ON s.id = p.recorded_by
      WHERE p.status = 'successful' AND date(p.paid_at, '+1 hour') BETWEEN ?1 AND ?2
      UNION ALL
-     SELECT 'restaurantBar', coalesce(sa.settled_at, sa.created_at), date(coalesce(sa.settled_at, sa.created_at), '+1 hour'),
-            'Sale ' || sa.number,
-            (CASE sa.outlet WHEN 'bar' THEN 'Bar' ELSE 'Restaurant' END) || CASE WHEN r.reference IS NULL THEN '' ELSE ' · charged to ' || r.reference END,
-            ${bucket("sa.method")}, sa.total_kobo, coalesce(s.full_name, 'Staff'), coalesce(sa.settled_by, sa.sold_by), CAST(sa.number AS TEXT), 0
-     FROM sales sa LEFT JOIN reservations r ON r.id = sa.reservation_id LEFT JOIN staff_profiles s ON s.id = coalesce(sa.settled_by, sa.sold_by)
-     WHERE sa.status IN ('paid', 'settled') AND date(coalesce(sa.settled_at, sa.created_at), '+1 hour') BETWEEN ?1 AND ?2
+     SELECT o.outlet, o.paid_at, date(o.paid_at, '+1 hour'), 'Order ' || o.number,
+            (CASE o.outlet WHEN 'bar' THEN 'Bar' ELSE 'Restaurant' END) || ' · ' || o.receipt_number,
+            ${bucket("o.method")}, o.total_kobo, coalesce(s.full_name, 'Staff'), o.paid_by, o.receipt_number, 0
+     FROM pos_orders o LEFT JOIN staff_profiles s ON s.id = o.paid_by
+     WHERE o.status = 'paid' AND date(o.paid_at, '+1 hour') BETWEEN ?1 AND ?2
      UNION ALL
      SELECT 'hall', hp.created_at, hp.paid_on, h.title, h.customer_name, ${bucket("hp.method")}, hp.amount_kobo,
             coalesce(s.full_name, 'Staff'), hp.recorded_by, hp.reference, 0
@@ -84,13 +84,13 @@ export type DayIncome = { day: string } & Record<Department, number> & { total: 
 export type StaffTakings = { who: string; staffId: string | null; byMethod: Record<Bucket, number>; total: number };
 
 export function reportDepartment(value: string | null | undefined): Department | null {
-  return value === "rooms" || value === "restaurantBar" || value === "hall" ? value : null;
+  return value === "rooms" || value === "restaurant" || value === "bar" || value === "hall" ? value : null;
 }
 
 export async function incomeReport(db: Db, actor: Actor, range: ReportRange, today = hotelToday(), department: Department | null = null) {
   const { from, to, days } = rangeDates(range, today);
   const rows = (await incomeRows(db, actor, range, today)).filter((r) => !department || r.department === department);
-  const daily = new Map<string, DayIncome>(days.map((day) => [day, { day, rooms: 0, restaurantBar: 0, hall: 0, total: 0 }]));
+  const daily = new Map<string, DayIncome>(days.map((day) => [day, { day, rooms: 0, restaurant: 0, bar: 0, hall: 0, total: 0 }]));
   const staff = new Map<string, StaffTakings>();
   for (const r of rows) {
     const d = daily.get(r.day);

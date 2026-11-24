@@ -1,26 +1,26 @@
 import type { StaffRole } from "@/domain/status";
 
 export type Permission =
-  | "reservations.manage" // create, edit, assign rooms, check in/out, cancel
+  | "reservations.manage"
   | "guests.manage"
-  | "payments.record" // offline payments, after confirming receipt
-  | "payments.override" // confirm without full payment / extend a hold
-  | "rooms.status" // readiness and maintenance
-  | "rooms.configure" // add rooms, change category
-  | "categories.manage" // names, rates, photos, visibility
-  | "settings.manage" // booking rules, extras, promo codes, VAT
-  | "reports.view" // revenue summaries
+  | "payments.record"
+  | "payments.override"
+  | "rooms.status"
+  | "rooms.configure"
+  | "categories.manage"
+  | "settings.manage"
+  | "reports.view"
   | "activity.view"
   | "staff.manage"
-  | "expenses.manage" // record and void expenses
-  | "pos.sell" // restaurant and bar sales
-  | "pos.settle" // take payment for room charges (front desk, at check-out)
-  | "pos.manage" // menu, voids
-  | "inventory.use" // record stock used
-  | "inventory.manage" // stock items, deliveries, adjustments
-  | "events.manage"; // conference hall bookings and payments
+  | "expenses.manage"
+  | "pos.sell"
+  | "pos.view"
+  | "pos.manage"
+  | "inventory.view"
+  | "inventory.manage"
+  | "events.manage";
 
-const frontDesk: Permission[] = ["reservations.manage", "guests.manage", "payments.record", "rooms.status", "pos.settle", "events.manage"];
+const frontDesk: Permission[] = ["reservations.manage", "guests.manage", "payments.record", "rooms.status", "events.manage"];
 const manager: Permission[] = [
   ...frontDesk,
   "payments.override",
@@ -30,22 +30,21 @@ const manager: Permission[] = [
   "reports.view",
   "activity.view",
   "expenses.manage",
-  "pos.sell",
-  "pos.manage",
-  "inventory.use",
-  "inventory.manage",
+  "pos.view",
+  "inventory.view",
 ];
 
 const matrix: Record<StaffRole, ReadonlySet<Permission>> = {
   front_desk: new Set(frontDesk),
   general_manager: new Set(manager),
-  owner: new Set<Permission>([...manager, "staff.manage"]),
-  finance: new Set<Permission>(["reports.view", "expenses.manage"]),
-  restaurant_bar: new Set<Permission>(["pos.sell", "inventory.use"]),
+  owner: new Set<Permission>([...manager, "staff.manage", "pos.sell", "pos.manage", "inventory.manage"]),
+  finance: new Set<Permission>(["reports.view", "expenses.manage", "pos.view", "inventory.view"]),
+  restaurant_bar: new Set<Permission>(["pos.sell"]),
+  restaurant_bar_manager: new Set<Permission>(["pos.sell", "pos.view", "pos.manage", "inventory.view", "inventory.manage", "expenses.manage"]),
 };
 
 export function can(role: StaffRole, permission: Permission): boolean {
-  return matrix[role].has(permission);
+  return matrix[role]?.has(permission) ?? false;
 }
 
 export type PaymentView = "all" | "today" | "mine";

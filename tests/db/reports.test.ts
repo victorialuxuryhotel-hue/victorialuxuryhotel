@@ -3,7 +3,7 @@ import { recordOfflinePayment, recordPaymentCorrection } from "@/server/domain/p
 import { createWebsiteReservation } from "@/server/domain/reservations";
 import { createHallBooking, recordHallPayment } from "@/server/domain/events";
 import { financeSummary } from "@/server/domain/finance";
-import { addMenuItem, recordSale } from "@/server/domain/pos";
+import { payOrder, saveMenuItem } from "@/server/domain/pos";
 import { csvField, incomeReport, incomeRows, occupancyReport, rangeDates, recentMonths, reportRange } from "@/server/domain/reports";
 import { addDays, hotelInstant, hotelToday } from "@/lib/hotel-date";
 import { day, db, desk, exec, gm, insertReservation, makeCategory, owner, rejects } from "./helpers";
@@ -54,8 +54,8 @@ describe("income by day, by staff and method, and the accountant's download", ()
        VALUES (?, ?, 300000, 'offline', 'cash', 'successful', ?, ?, ?)`,
       crypto.randomUUID(), b.id, hotelInstant(today, "00:30:00"), hotelInstant(today, "00:30:00"), desk!.id,
     );
-    const item = await addMenuItem(db, gm, { name: `Chapman ${crypto.randomUUID().slice(0, 4)}`, outlet: "bar", priceKobo: 350_000 });
-    await recordSale(db, { id: desk!.id, role: "restaurant_bar" }, { outlet: "bar", items: [{ menuItemId: item, quantity: 2 }], method: "pos_terminal" });
+    const item = await saveMenuItem(db, owner, { name: `Chapman ${crypto.randomUUID().slice(0, 4)}`, outlet: "bar", category: "soft_drinks", priceKobo: 350_000, available: true, active: true });
+    await payOrder(db, { id: desk!.id, role: "restaurant_bar" }, { outlet: "bar", lines: [{ menuItemId: item, quantity: 2 }], method: "pos_terminal" });
     const hall = await createHallBooking(db, desk, {
       title: "AGM", customerName: "Ondo Co-op", phone: null, email: null, guests: 50, priceKobo: 20_000_000, notes: null,
       eventDate: day(200 + Math.floor(Math.random() * 300)), startTime: "08:00", endTime: "09:00", status: "confirmed",
@@ -66,7 +66,7 @@ describe("income by day, by staff and method, and the accountant's download", ()
     const d0 = before.daily[0]!;
     const d1 = after.daily[0]!;
     expect(d1.rooms - d0.rooms).toBe(5_000_000 + 2_000_000 - 1_000_000 + 300_000);
-    expect(d1.restaurantBar - d0.restaurantBar).toBe(700_000);
+    expect(d1.bar - d0.bar).toBe(700_000);
     expect(d1.hall - d0.hall).toBe(4_000_000);
     expect(after.total - before.total).toBe(6_300_000 + 700_000 + 4_000_000);
 
@@ -78,7 +78,7 @@ describe("income by day, by staff and method, and the accountant's download", ()
 
     const s = await financeSummary(db, gm, "today");
     expect(s.incomeTotal).toBe(after.total);
-    expect(s.income).toEqual({ rooms: d1.rooms, restaurantBar: d1.restaurantBar, hall: d1.hall });
+    expect(s.income).toEqual({ rooms: d1.rooms, restaurant: d1.restaurant, bar: d1.bar, hall: d1.hall });
 
     const rows = await incomeRows(db, owner, "today");
     expect(rows.filter((r) => r.reference === b.reference).map((r) => r.correction).sort()).toEqual([false, false, false, true]);

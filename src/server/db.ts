@@ -12,7 +12,7 @@ export async function getDb(): Promise<Db> {
 }
 
 export type Actor = { id: string; role: StaffRole; readOnly?: boolean } | null;
-export type StaffRole = "owner" | "general_manager" | "front_desk" | "finance" | "restaurant_bar";
+export type StaffRole = "owner" | "general_manager" | "front_desk" | "finance" | "restaurant_bar" | "restaurant_bar_manager";
 
 export const now = () => new Date().toISOString();
 export const uuid = () => crypto.randomUUID();
@@ -98,9 +98,11 @@ export const ALL_STAFF = ["owner", "general_manager", "front_desk"] as const;
 export const MANAGERS = ["owner", "general_manager"] as const;
 export const OWNER = ["owner"] as const;
 export const FINANCE = ["owner", "general_manager", "finance"] as const;
-export const POS_SELLERS = ["owner", "general_manager", "restaurant_bar"] as const;
-export const POS_SETTLERS = ["owner", "general_manager", "front_desk"] as const;
-export const STOCK_USERS = ["owner", "general_manager", "restaurant_bar"] as const;
+export const POS_SELLERS = ["owner", "restaurant_bar", "restaurant_bar_manager"] as const;
+export const POS_MANAGERS = ["owner", "restaurant_bar_manager"] as const;
+export const POS_VIEWERS = ["owner", "general_manager", "finance", "restaurant_bar_manager"] as const;
+export const STOCK_VIEWERS = ["owner", "general_manager", "finance", "restaurant_bar_manager"] as const;
+export const EXPENSE_RECORDERS = ["owner", "general_manager", "finance", "restaurant_bar_manager"] as const;
 export const EVENTS_STAFF = ["owner", "general_manager", "front_desk"] as const;
 
 export const VIEW_AS_READ_ONLY = "You're viewing as front desk, which is read-only. Exit view to make changes.";

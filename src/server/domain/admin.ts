@@ -176,10 +176,11 @@ export async function updateBookingRules(
   ]);
 }
 
-export const ROLE = "coalesce(department, role)";
+export const ROLE = "(CASE WHEN department = 'restaurant_bar' AND department_lead = 1 THEN 'restaurant_bar_manager' ELSE coalesce(department, role) END)";
 
-export function storedRole(role: StaffRole): { role: "owner" | "general_manager" | "front_desk"; department: "finance" | "restaurant_bar" | null } {
-  return role === "finance" || role === "restaurant_bar" ? { role: "front_desk", department: role } : { role, department: null };
+export function storedRole(role: StaffRole): { role: "owner" | "general_manager" | "front_desk"; department: "finance" | "restaurant_bar" | null; lead: 0 | 1 } {
+  if (role === "restaurant_bar_manager") return { role: "front_desk", department: "restaurant_bar", lead: 1 };
+  return role === "finance" || role === "restaurant_bar" ? { role: "front_desk", department: role, lead: 0 } : { role, department: null, lead: 0 };
 }
 
 export type StaffRecord = {
@@ -193,8 +194,8 @@ export async function createStaffProfile(db: Db, actor: Actor, v: { fullName: st
   try {
     await writeBatch(db, actor, [
       db
-        .prepare("INSERT INTO staff_profiles (id, full_name, email, role, department, phone) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(id, v.fullName.trim(), v.email.trim().toLowerCase(), storedRole(v.role).role, storedRole(v.role).department, v.phone?.trim() || null),
+        .prepare("INSERT INTO staff_profiles (id, full_name, email, role, department, department_lead, phone) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .bind(id, v.fullName.trim(), v.email.trim().toLowerCase(), storedRole(v.role).role, storedRole(v.role).department, storedRole(v.role).lead, v.phone?.trim() || null),
     ]);
   } catch (err) {
     conflictOnUnique(err, "Someone with this email already has an account.");
@@ -226,10 +227,12 @@ export async function updateStaffProfile(
   }
   const [result] = await writeBatch(db, actor, [
     v.phone === undefined
-      ? db.prepare("UPDATE staff_profiles SET role = ?, department = ?, is_active = ? WHERE id = ?").bind(storedRole(v.role).role, storedRole(v.role).department, v.isActive ? 1 : 0, v.staffId)
+      ? db
+          .prepare("UPDATE staff_profiles SET role = ?, department = ?, department_lead = ?, is_active = ? WHERE id = ?")
+          .bind(storedRole(v.role).role, storedRole(v.role).department, storedRole(v.role).lead, v.isActive ? 1 : 0, v.staffId)
       : db
-          .prepare("UPDATE staff_profiles SET role = ?, department = ?, is_active = ?, phone = ? WHERE id = ?")
-          .bind(storedRole(v.role).role, storedRole(v.role).department, v.isActive ? 1 : 0, v.phone?.trim() || null, v.staffId),
+          .prepare("UPDATE staff_profiles SET role = ?, department = ?, department_lead = ?, is_active = ?, phone = ? WHERE id = ?")
+          .bind(storedRole(v.role).role, storedRole(v.role).department, storedRole(v.role).lead, v.isActive ? 1 : 0, v.phone?.trim() || null, v.staffId),
   ]).catch((err: unknown) => {
     if (err instanceof AppError && dbErrorToken(err.cause) === "last_owner") throw new AppError("CONFLICT", "The hotel must always have at least one active owner.");
     throw err;
@@ -244,7 +247,7 @@ export async function promoteToOwner(db: Db, actor: Actor, staffId: string): Pro
   if (!current) throw new AppError("NOT_FOUND", "Staff member not found.");
   if (!current.is_active) throw new AppError("VALIDATION", "Restore their access before making them owner.");
   if (current.role !== "owner") {
-    await writeBatch(db, actor, [db.prepare("UPDATE staff_profiles SET role = 'owner', department = NULL WHERE id = ? AND is_active = 1").bind(staffId)]);
+    await writeBatch(db, actor, [db.prepare("UPDATE staff_profiles SET role = 'owner', department = NULL, department_lead = 0 WHERE id = ? AND is_active = 1").bind(staffId)]);
   }
   return (await first<StaffRecord>(db, `SELECT id, clerk_user_id, full_name, email, ${ROLE} AS role, is_active FROM staff_profiles WHERE id = ?`, staffId))!;
 }

@@ -32,18 +32,18 @@ describe("finance", () => {
   it("each department has its own income, expenses and result; whole-hotel costs stay separate", async () => {
     const before = await financeSummary(db, gm, "today");
     const dept = (sum: typeof before, key: string) => sum.departments.find((d) => d.key === key)!;
-    await recordExpense(db, gm, { spentOn: day(0), category: "food_drink", description: "Drinks restock", amountKobo: 900_000, method: "cash", reference: null, department: "restaurant_bar" });
+    await recordExpense(db, gm, { spentOn: day(0), category: "food_drink", description: "Drinks restock", amountKobo: 900_000, method: "cash", reference: null, department: "bar" });
     await recordExpense(db, gm, { spentOn: day(0), category: "fuel", description: "Diesel", amountKobo: 1_200_000, method: "cash", reference: null });
     const after = await financeSummary(db, gm, "today");
-    expect(dept(after, "restaurantBar").expensesKobo - dept(before, "restaurantBar").expensesKobo).toBe(900_000);
+    expect(dept(after, "bar").expensesKobo - dept(before, "bar").expensesKobo).toBe(900_000);
     expect(dept(after, "general").expensesKobo - dept(before, "general").expensesKobo).toBe(1_200_000);
     expect(dept(after, "rooms").expensesKobo).toBe(dept(before, "rooms").expensesKobo);
     expect(after.expensesKobo - before.expensesKobo).toBe(2_100_000);
     expect(after.departments.reduce((t, d) => t + d.netKobo, 0)).toBe(after.netKobo);
     for (const d of after.departments) expect(d.netKobo).toBe(d.incomeKobo - d.expensesKobo);
 
-    const bar = await listExpenses(db, gm, "today", undefined, { department: "restaurant_bar" });
-    expect(bar.rows.every((r) => r.department === "restaurant_bar")).toBe(true);
+    const bar = await listExpenses(db, gm, "today", undefined, { department: "bar" });
+    expect(bar.rows.every((r) => r.department === "bar")).toBe(true);
     expect(bar.rows.some((r) => r.description === "Drinks restock")).toBe(true);
 
     const all = await incomeReport(db, gm, "today");
