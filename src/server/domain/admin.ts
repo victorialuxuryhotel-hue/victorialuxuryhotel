@@ -176,10 +176,12 @@ export async function updateBookingRules(
   ]);
 }
 
-export const ROLE = "(CASE WHEN department = 'restaurant_bar' AND department_lead = 1 THEN 'restaurant_bar_manager' ELSE coalesce(department, role) END)";
+export const ROLE =
+  "(CASE WHEN department_lead = 1 AND department = 'restaurant_bar' THEN 'restaurant_bar_manager' WHEN department_lead = 1 AND department IS NULL AND role = 'front_desk' THEN 'hotel_manager' ELSE coalesce(department, role) END)";
 
 export function storedRole(role: StaffRole): { role: "owner" | "general_manager" | "front_desk"; department: "finance" | "restaurant_bar" | null; lead: 0 | 1 } {
   if (role === "restaurant_bar_manager") return { role: "front_desk", department: "restaurant_bar", lead: 1 };
+  if (role === "hotel_manager") return { role: "front_desk", department: null, lead: 1 };
   return role === "finance" || role === "restaurant_bar" ? { role: "front_desk", department: role, lead: 0 } : { role, department: null, lead: 0 };
 }
 

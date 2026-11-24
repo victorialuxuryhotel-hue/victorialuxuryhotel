@@ -1,5 +1,5 @@
 import { addDays, businessDaySql, hotelToday } from "@/lib/hotel-date";
-import { FINANCE, all, first, requireRole, type Actor, type Db } from "../db";
+import { HOTEL_REPORTERS, all, first, requireRole, type Actor, type Db } from "../db";
 
 export type ReportRange = "today" | "7d" | "14d" | "month" | `${number}-${number}`;
 
@@ -49,7 +49,7 @@ const bucket = (col: string, provider = "NULL") => `CASE WHEN ${provider} = 'pay
   WHEN ${col} = 'bank_transfer' THEN 'transfer' WHEN ${col} IN ('pos_terminal', 'card') THEN 'pos' ELSE 'other' END`;
 
 export async function incomeRows(db: Db, actor: Actor, range: ReportRange, today = hotelToday()): Promise<IncomeRow[]> {
-  requireRole(actor, FINANCE);
+  requireRole(actor, HOTEL_REPORTERS);
   const { from, to } = rangeDates(range, today);
   const rows = await all<Omit<IncomeRow, "correction"> & { correction: number }>(
     db,
@@ -77,7 +77,7 @@ export async function incomeRows(db: Db, actor: Actor, range: ReportRange, today
     from,
     to,
   );
-  return rows.map((r) => ({ ...r, correction: !!r.correction }));
+  return rows.map((r) => ({ ...r, correction: !!r.correction })).filter((r) => actor.role !== "hotel_manager" || r.department === "rooms");
 }
 
 export type DayIncome = { day: string } & Record<Department, number> & { total: number };
@@ -113,7 +113,7 @@ const STAY_END =
   "(CASE WHEN r.status = 'checked_out' AND r.checked_out_at IS NOT NULL THEN min(r.check_out, max(date(r.check_in, '+1 day'), date(r.checked_out_at, '+1 hour'))) ELSE r.check_out END)";
 
 export async function occupancyReport(db: Db, actor: Actor, range: ReportRange, today = hotelToday()) {
-  requireRole(actor, FINANCE);
+  requireRole(actor, HOTEL_REPORTERS);
   const { from, to } = rangeDates(range, today);
   const [rooms, nights, byType] = await Promise.all([
     first<{ n: number }>(db, "SELECT count(*) AS n FROM rooms WHERE is_active = 1"),

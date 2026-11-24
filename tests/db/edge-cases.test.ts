@@ -63,7 +63,7 @@ describe("edge cases", () => {
     await rejects(checkInReservation(db, desk, id), /₦60,000 still to pay/);
     await undoAction(db, desk, id, undoId!);
     expect((await q1<{ c: number }>("SELECT room_change_kobo AS c FROM reservations WHERE id = ?", id)).c).toBe(0);
-    await rejects(assignRoom(db, desk, id, dlx.roomIds[1]!, { waiveCharge: true }), /Only a manager/);
+    await rejects(assignRoom(db, desk, id, dlx.roomIds[1]!, { waiveCharge: true }), /Only the general manager or owner/);
     expect((await assignRoom(db, gm, id, dlx.roomIds[1]!, { waiveCharge: true })).chargeKobo).toBe(0);
     expect((await assignRoom(db, desk, id, std.roomIds[1]!)).chargeKobo).toBe(0);
   });

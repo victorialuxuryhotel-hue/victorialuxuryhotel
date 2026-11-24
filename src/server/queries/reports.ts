@@ -6,14 +6,14 @@ import { financeSummary } from "../domain/finance";
 import { incomeReport, occupancyReport, type Department, type ReportRange } from "../domain/reports";
 
 export async function moneyPageData(range: ReportRange, department: Department | null = null) {
-  const staff = await authorizeRead("reports.view");
+  const staff = await authorizeRead(["reports.view", "reports.hotel"]);
   const db = await getDb();
   const [income, finance] = await Promise.all([incomeReport(db, actorOf(staff), range, undefined, department), financeSummary(db, actorOf(staff), range)]);
   return { income, finance };
 }
 
 export async function occupancyPageData(range: ReportRange) {
-  const staff = await authorizeRead("reports.view");
+  const staff = await authorizeRead(["reports.view", "reports.hotel"]);
   return occupancyReport(await getDb(), actorOf(staff), range);
 }
 

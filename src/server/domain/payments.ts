@@ -8,7 +8,7 @@ import {
   ALL_STAFF,
   assertVersion,
   first,
-  MANAGERS,
+  MONEY_APPROVERS,
   now,
   requireRole,
   retryOnStale,
@@ -288,7 +288,7 @@ export async function recordPaymentCorrection(
   actor: Actor,
   input: { paymentId: string; amountKobo: number; reason: string },
 ): Promise<{ receiptNumber: string; balanceKobo: number }> {
-  requireRole(actor, MANAGERS);
+  requireRole(actor, MONEY_APPROVERS);
   const why = (input.reason ?? "").trim();
   if (why.length < 5) throw new AppError("VALIDATION", "Say what was wrong (it is kept with the payment).");
   if (!Number.isInteger(input.amountKobo) || input.amountKobo <= 0) throw new AppError("VALIDATION", "Enter the amount to correct.");

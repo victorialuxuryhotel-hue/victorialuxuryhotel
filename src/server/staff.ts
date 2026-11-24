@@ -10,7 +10,7 @@ import { actorOf, authorize } from "./auth";
 import { first, getDb } from "./db";
 import { createStaffProfile, promoteToOwner, updateStaffProfile } from "./domain/admin";
 
-const roleSchema = z.enum(["owner", "general_manager", "front_desk", "finance", "restaurant_bar", "restaurant_bar_manager"]);
+const roleSchema = z.enum(["owner", "general_manager", "hotel_manager", "front_desk", "finance", "restaurant_bar", "restaurant_bar_manager"]);
 
 const phoneSchema = z
   .string()
@@ -22,7 +22,7 @@ const phoneSchema = z
 const inviteSchema = z.object({
   fullName: z.string().trim().min(2, "Enter the person's full name").max(120),
   email: z.email("Enter a valid email").transform((e) => e.toLowerCase()),
-  role: z.enum(["general_manager", "front_desk", "finance", "restaurant_bar", "restaurant_bar_manager"], "Choose a role"),
+  role: z.enum(["general_manager", "hotel_manager", "front_desk", "finance", "restaurant_bar", "restaurant_bar_manager"], "Choose a role"),
   phone: phoneSchema,
 });
 

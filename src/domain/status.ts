@@ -50,7 +50,8 @@ export const staffRole = {
   general_manager: "General manager",
   front_desk: "Front desk",
   finance: "Finance",
-  restaurant_bar: "Restaurant & bar attendant",
+  hotel_manager: "Hotel manager",
+  restaurant_bar: "Restaurant & bar salesperson",
   restaurant_bar_manager: "Restaurant & bar manager",
 } as const;
 export type StaffRole = keyof typeof staffRole;

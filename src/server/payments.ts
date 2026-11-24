@@ -55,7 +55,7 @@ const correctionSchema = z.object({
 
 export async function correctPayment(_prev: ActionResult<{ receiptNumber: string }> | null, formData: FormData): Promise<ActionResult<{ receiptNumber: string }>> {
   try {
-    const staff = await authorize("payments.override");
+    const staff = await authorize("payments.approve");
     const parsed = correctionSchema.safeParse(Object.fromEntries(formData));
     if (!parsed.success) throw new AppError("VALIDATION", "Check the highlighted fields", { fieldErrors: z.flattenError(parsed.error).fieldErrors });
     const v = parsed.data;

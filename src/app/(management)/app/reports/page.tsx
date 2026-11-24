@@ -12,7 +12,7 @@ import { Tabs } from "@/components/management/toolbar";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
-import { can } from "@/lib/auth/permissions";
+import { can, canAny } from "@/lib/auth/permissions";
 import { formatDate, formatNaira, plural } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 import { requireStaff } from "@/server/auth";
@@ -293,11 +293,12 @@ async function Activity({ sp }: { sp: Record<string, string | string[] | undefin
 
 async function Content({ searchParams }: { searchParams: SP }) {
   const staff = await requireStaff();
-  if (!can(staff.role, "reports.view")) return <AccessDenied />;
+  if (!canAny(staff.role, ["reports.view", "reports.hotel"])) return <AccessDenied />;
+  const hotelOnly = !can(staff.role, "reports.view");
   const sp = await searchParams;
   const tab: Tab = str(sp.tab) === "occupancy" ? "occupancy" : str(sp.tab) === "activity" ? "activity" : "money";
   const range = reportRange(str(sp.range));
-  const dept = tab === "money" ? reportDepartment(str(sp.dept)) : null;
+  const dept = tab === "money" ? (hotelOnly ? "rooms" : reportDepartment(str(sp.dept))) : null;
   return (
     <>
       <div className="bg-ivory-50">
@@ -318,7 +319,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
           )
         ) : (
           <>
-            {tab === "money" ? <DeptControl range={range} dept={dept} /> : null}
+            {tab === "money" && !hotelOnly ? <DeptControl range={range} dept={dept} /> : null}
             <RangeControl tab={tab} range={range} dept={dept} />
             {tab === "money" ? <Money range={range} dept={dept} /> : <Occupancy range={range} />}
           </>

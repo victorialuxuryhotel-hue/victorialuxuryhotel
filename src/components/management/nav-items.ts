@@ -32,7 +32,7 @@ export const managementNavGroups: readonly NavGroup[] = [
     items: [
       { href: "/app", label: "Dashboard", icon: LayoutDashboard, permission: ["reports.view"] },
       { href: "/app/rooms/categories", label: "Rates & room types", icon: Tags, permission: ["categories.manage"] },
-      { href: "/app/reports", label: "Reports", icon: BarChart3, permission: ["reports.view"] },
+      { href: "/app/reports", label: "Reports", icon: BarChart3, permission: ["reports.view", "reports.hotel"] },
       { href: "/app/settings", label: "Booking rules", icon: Settings, permission: ["settings.manage"] },
     ],
   },

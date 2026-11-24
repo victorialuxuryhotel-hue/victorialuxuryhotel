@@ -22,10 +22,20 @@ export type ActivityFilter = { range: ReportRange; category: ActivityCategory; a
 
 export type ActivityEntry = { id: number; created_at: string; day: string; action: string; summary: string; actor: string | null; actor_type: string };
 
-function where(f: ActivityFilter, today: string): { sql: string; params: unknown[] } {
+/** Department managers see their own department's activity only. */
+const SCOPE: Partial<Record<NonNullable<Actor>["role"], string[]>> = {
+  hotel_manager: ["reservation.", "payment.", "room.", "guest.", "category.", "photo.", "settings.", "hall.", "extra.", "promo."],
+};
+
+function where(f: ActivityFilter, today: string, role: NonNullable<Actor>["role"]): { sql: string; params: unknown[] } {
   const { from, to } = rangeDates(f.range, today);
   const parts = ["date(a.created_at, '+1 hour') BETWEEN ? AND ?"];
   const params: unknown[] = [from, to];
+  const scope = SCOPE[role];
+  if (scope) {
+    parts.push(`(${scope.map(() => "a.action LIKE ?").join(" OR ")})`);
+    params.push(...scope.map((p) => `${p}%`));
+  }
   if (f.category !== "all") {
     const prefixes = ACTIVITY_CATEGORIES[f.category].prefixes;
     parts.push(`(${prefixes.map(() => "a.action LIKE ?").join(" OR ")})`);
@@ -44,7 +54,7 @@ function where(f: ActivityFilter, today: string): { sql: string; params: unknown
 
 export async function listActivity(db: Db, actor: Actor, f: ActivityFilter, today = hotelToday()): Promise<{ rows: ActivityEntry[]; total: number }> {
   requireRole(actor, MANAGERS);
-  const w = where(f, today);
+  const w = where(f, today, actor.role);
   const page = Math.max(1, f.page);
   const [rows, count] = await Promise.all([
     all<ActivityEntry>(
@@ -61,7 +71,7 @@ export async function listActivity(db: Db, actor: Actor, f: ActivityFilter, toda
 
 export async function activityForCsv(db: Db, actor: Actor, f: Omit<ActivityFilter, "page" | "size">, today = hotelToday()): Promise<ActivityEntry[]> {
   requireRole(actor, MANAGERS);
-  const w = where({ ...f, page: 1, size: 0 }, today);
+  const w = where({ ...f, page: 1, size: 0 }, today, actor.role);
   return all<ActivityEntry>(
     db,
     `SELECT a.id, a.created_at, date(a.created_at, '+1 hour') AS day, a.action, a.summary, s.full_name AS actor, a.actor_type

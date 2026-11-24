@@ -10,6 +10,7 @@ import {
   assertVersion,
   first,
   MANAGERS,
+  MONEY_APPROVERS,
   now,
   requireRole,
   retryOnStale,
@@ -269,7 +270,7 @@ export async function assignRoom(
   opts: { waiveCharge?: boolean } = {},
 ): Promise<{ undoId: number | null; chargeKobo: number }> {
   requireRole(actor, ALL_STAFF);
-  if (opts.waiveCharge && !MANAGERS.includes(actor.role as (typeof MANAGERS)[number])) throw new AppError("FORBIDDEN", "Only a manager can give a free upgrade.");
+  if (opts.waiveCharge && !MONEY_APPROVERS.includes(actor.role as (typeof MONEY_APPROVERS)[number])) throw new AppError("FORBIDDEN", "Only the general manager or owner can give a free upgrade.");
   return retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
     if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) {
@@ -622,7 +623,7 @@ export async function changeDates(db: Db, actor: Actor, reservationId: string, c
 }
 
 export async function resolveAttention(db: Db, actor: Actor, reservationId: string, note: string): Promise<void> {
-  requireRole(actor, MANAGERS);
+  requireRole(actor, MONEY_APPROVERS);
   const how = (note ?? "").trim();
   if (how.length < 5) throw new AppError("VALIDATION", "Describe how this was resolved.");
   await retryOnStale(async () => {

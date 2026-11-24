@@ -5,11 +5,13 @@ export type Permission =
   | "guests.manage"
   | "payments.record"
   | "payments.override"
+  | "payments.approve"
   | "rooms.status"
   | "rooms.configure"
   | "categories.manage"
   | "settings.manage"
   | "reports.view"
+  | "reports.hotel"
   | "activity.view"
   | "staff.manage"
   | "pos.sell"
@@ -23,6 +25,7 @@ const frontDesk: Permission[] = ["reservations.manage", "guests.manage", "paymen
 const manager: Permission[] = [
   ...frontDesk,
   "payments.override",
+  "payments.approve",
   "rooms.configure",
   "categories.manage",
   "settings.manage",
@@ -32,7 +35,18 @@ const manager: Permission[] = [
   "inventory.view",
 ];
 
+const hotelManager: Permission[] = [
+  ...frontDesk,
+  "payments.override",
+  "rooms.configure",
+  "categories.manage",
+  "settings.manage",
+  "reports.hotel",
+  "activity.view",
+];
+
 const matrix: Record<StaffRole, ReadonlySet<Permission>> = {
+  hotel_manager: new Set(hotelManager),
   front_desk: new Set(frontDesk),
   general_manager: new Set(manager),
   owner: new Set<Permission>([...manager, "staff.manage", "pos.sell", "pos.manage", "inventory.manage"]),
@@ -48,7 +62,7 @@ export function can(role: StaffRole, permission: Permission): boolean {
 export type PaymentView = "all" | "today" | "mine";
 
 export function allowedPaymentViews(role: StaffRole): readonly PaymentView[] {
-  return can(role, "reports.view") ? ["all"] : ["today", "mine"];
+  return can(role, "reports.view") || can(role, "reports.hotel") ? ["all"] : ["today", "mine"];
 }
 
 export function effectivePaymentView(role: StaffRole, requested: string | undefined): PaymentView {

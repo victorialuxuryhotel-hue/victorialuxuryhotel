@@ -175,7 +175,7 @@ export async function changeDates(_prev: ActionResult | null, formData: FormData
 
 export async function resolveAttention(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   return run("reservation.resolve_attention", async () => {
-    const staff = await authorize("payments.override");
+    const staff = await authorize("payments.approve");
     const reservationId = id.parse(formData.get("reservationId"));
     await engine.resolveAttention(await getDb(), actorOf(staff), reservationId, String(formData.get("note") ?? ""));
     refresh();
