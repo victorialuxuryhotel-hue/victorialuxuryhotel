@@ -212,26 +212,18 @@ export async function reservationIdForReceipt(receiptNumber: string): Promise<st
 export type BillCharges = {
   roomKobo: number; nightlyRateKobo: number; nights: number; extrasKobo: number; discountKobo: number; promoCode: string | null;
   extras: { name: string; unitKobo: number; perNight: boolean; amountKobo: number }[];
-  roomCharges: { number: number; outlet: "restaurant" | "bar"; items: string; totalKobo: number; settled: boolean; method: string | null; at: string; settledAt: string | null }[];
 };
 
 export async function getBillCharges(id: string): Promise<BillCharges | null> {
   await authorizeRead(["reservations.manage", "payments.record", "reports.view"]);
   const db = await getDb();
-  const [r, extras, charges] = await Promise.all([
+  const [r, extras] = await Promise.all([
     first<{ total_amount_kobo: number; nightly_rate_kobo: number; nights: number; extras_kobo: number; discount_kobo: number; promo_code: string | null }>(
       db,
       "SELECT total_amount_kobo, nightly_rate_kobo, nights, extras_kobo, discount_kobo, promo_code FROM reservations WHERE id = ?",
       id,
     ),
     all<{ name: string; unit_price_kobo: number; per_night: number }>(db, "SELECT name, unit_price_kobo, per_night FROM reservation_extras WHERE reservation_id = ? ORDER BY name", id),
-    all<{ number: number; outlet: "restaurant" | "bar"; items: string | null; total_kobo: number; status: string; method: string | null; created_at: string; settled_at: string | null }>(
-      db,
-      `SELECT s.number, s.outlet, s.total_kobo, s.status, s.method, s.created_at, s.settled_at,
-              (SELECT group_concat(i.quantity || ' × ' || i.name, ', ') FROM sale_items i WHERE i.sale_id = s.id) AS items
-       FROM sales s WHERE s.reservation_id = ? AND s.status IN ('room_charge', 'settled') ORDER BY s.created_at`,
-      id,
-    ),
   ]);
   if (!r) return null;
   return {
@@ -242,8 +234,5 @@ export async function getBillCharges(id: string): Promise<BillCharges | null> {
     discountKobo: r.discount_kobo,
     promoCode: r.promo_code,
     extras: extras.map((e) => ({ name: e.name, unitKobo: e.unit_price_kobo, perNight: !!e.per_night, amountKobo: e.unit_price_kobo * (e.per_night ? r.nights : 1) })),
-    roomCharges: charges.map((c) => ({
-      number: c.number, outlet: c.outlet, items: c.items ?? "", totalKobo: c.total_kobo, settled: c.status === "settled", method: c.method, at: c.created_at, settledAt: c.settled_at,
-    })),
   };
 }
