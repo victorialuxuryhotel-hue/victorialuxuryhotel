@@ -10,13 +10,14 @@ export type Step = { title: string; detail: string; state: "done" | "now" | "lat
 export function reservationSteps(r: R, today: string): Step[] | null {
   if (!["pending_payment", "confirmed", "checked_in", "checked_out"].includes(r.status)) return null;
   const balance = r.totalKobo - r.paidKobo;
-  const paid = r.status !== "pending_payment";
+  // Paid means nothing is owed: a later charge (room change, extension, extras) reopens this step.
+  const paid = r.status !== "pending_payment" && balance <= 0;
   const inHouse = r.status === "checked_in" || r.status === "checked_out";
   return [
     { title: "Booked", detail: `${r.source === "website" ? "Website" : "At the desk"} · ${formatDate(r.createdAt.slice(0, 10), { weekday: false, year: false })}`, state: "done" },
     paid
-      ? { title: "Paid", detail: balance > 0 ? `${formatNaira(balance)} still owed` : "Paid in full", state: "done" }
-      : { title: "Take payment", detail: `${formatNaira(balance)} due before check-in`, state: "now" },
+      ? { title: "Paid", detail: "Paid in full", state: "done" }
+      : { title: "Take payment", detail: r.status === "pending_payment" ? `${formatNaira(balance)} owed before check-in` : `${formatNaira(balance)} owed`, state: "now" },
     r.roomNumber
       ? { title: "Room assigned", detail: `Room ${r.roomNumber}`, state: "done" }
       : { title: "Assign a room", detail: paid ? "Choose a ready room" : "After payment", state: paid ? "now" : "later" },

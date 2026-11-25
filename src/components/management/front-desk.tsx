@@ -5,7 +5,9 @@ import { EmptyState } from "@/components/ui/feedback";
 import type { ReservationRow } from "@/domain/views";
 import { formatDate, formatNaira, nightsBetween, plural } from "@/lib/format";
 import { ReservationBadge } from "./badges";
-import { CheckInButton, CheckOutButton } from "./reservation-actions";
+import { nextStep } from "@/domain/next-step";
+import { hotelToday } from "@/lib/hotel-date";
+import { CheckInButton, CheckOutButton, TakePaymentLink } from "./reservation-actions";
 
 export function MovementList({
   kind,
@@ -19,11 +21,12 @@ export function MovementList({
   hrefFor: (r: ReservationRow) => string;
 }) {
   const arrivals = kind === "arrivals";
+  const today = hotelToday();
   return (
     <Card>
       <CardHeader
         title={title ?? (arrivals ? "Arrivals" : "Departures")}
-        description={arrivals ? "Assign a ready room, then check the guest in." : "Settle any balance, then check the guest out."}
+        description={arrivals ? "Assign a ready room, then check the guest in." : "Take any payment owed, then check the guest out."}
         action={<span className="rounded-full bg-ivory-200 px-2.5 py-0.5 text-sm font-semibold tabular-nums">{rows.length}</span>}
       />
       {rows.length === 0 ? (
@@ -46,19 +49,23 @@ export function MovementList({
                     {plural(nightsBetween(r.checkIn, r.checkOut), "night")}
                     {arrivals ? "" : ` · since ${formatDate(r.checkIn, { year: false, weekday: false })}`}
                   </p>
-                  {balance > 0 ? <p className="mt-1 text-sm font-medium text-warning-700">{formatNaira(balance)} outstanding</p> : null}
+                  {balance > 0 ? <p className="mt-1 text-sm font-medium text-warning-700">{formatNaira(balance)} owed</p> : null}
                 </div>
-                {arrivals ? (
-                  r.status === "pending_payment" ? (
-                    <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "secondary", className: "min-h-10 shrink-0 whitespace-nowrap" })}>Take payment</Link>
-                  ) : !r.roomNumber ? (
-                    <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "secondary", className: "min-h-10 shrink-0 whitespace-nowrap" })}>Assign room</Link>
-                  ) : (
-                    <div className="shrink-0 [&_button]:whitespace-nowrap"><CheckInButton reservationId={r.id} roomNumber={r.roomNumber} /></div>
-                  )
-                ) : (
-                  <div className="shrink-0 [&_button]:whitespace-nowrap"><CheckOutButton reservationId={r.id} balanceKobo={balance} size="sm" /></div>
-                )}
+                {(() => {
+                  const step = nextStep(r, today);
+                  switch (step.kind) {
+                    case "take_payment":
+                      return <div className="shrink-0"><TakePaymentLink reservationId={r.id} balanceKobo={step.owedKobo} size="sm" /></div>;
+                    case "assign_room":
+                      return <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "secondary", className: "min-h-10 shrink-0 whitespace-nowrap" })}>Assign room</Link>;
+                    case "check_in":
+                      return <div className="shrink-0 [&_button]:whitespace-nowrap"><CheckInButton reservationId={r.id} roomNumber={r.roomNumber} /></div>;
+                    case "check_out":
+                      return <div className="shrink-0 [&_button]:whitespace-nowrap"><CheckOutButton reservationId={r.id} balanceKobo={0} size="sm" /></div>;
+                    default:
+                      return <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "ghost", className: "min-h-10 shrink-0" })}>Open</Link>;
+                  }
+                })()}
               </li>
             );
           })}

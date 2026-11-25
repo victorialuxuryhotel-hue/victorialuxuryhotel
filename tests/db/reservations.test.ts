@@ -167,7 +167,7 @@ describe("room assignment", () => {
     const r2 = await staffBooking(std.id, day(40), day(41)); // standard is free again after the upgrade
     const extraSuiteRoom = await makeRoom(suite.id);
     await exec("UPDATE rooms SET service_status = 'maintenance' WHERE id = ?", extraSuiteRoom);
-    await rejects(assignRoom(db, desk, r2.id, suite.roomIds[0]!), /capacity left|already booked/);
+    await rejects(assignRoom(db, desk, r2.id, suite.roomIds[0]!), /are free on all of these nights|already booked/);
   });
 });
 
@@ -190,7 +190,7 @@ describe("front desk lifecycle", () => {
   it("will not check in before arrival, without a room, unpaid, or into an unready room", async () => {
     const c = await makeCategory(2);
     const future = await insertReservation({ categoryId: c.id, checkIn: day(3), checkOut: day(4), status: "confirmed" });
-    await rejects(checkInReservation(db, desk, future), /Arrival is not until/);
+    await rejects(checkInReservation(db, desk, future), /arrives on .*Check-in opens that day/);
     const noRoom = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
     await rejects(checkInReservation(db, desk, noRoom), /Assign a room/);
     const unpaid = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1) });
@@ -205,7 +205,7 @@ describe("front desk lifecycle", () => {
     const r = await staffBooking(c.id, day(40), day(41));
     await rejects(cancelReservation(db, desk, r.id, " "), /Give a reason/);
     await cancelReservation(db, desk, r.id, "Guest changed plans");
-    await rejects(cancelReservation(db, desk, r.id, "again"), /Only upcoming/);
+    await rejects(cancelReservation(db, desk, r.id, "again"), /hasn't started can be cancelled/);
     const h = await q1<{ reason: string; changed_by: string }>("SELECT reason, changed_by FROM reservation_status_history WHERE reservation_id = ? AND to_status = 'cancelled'", r.id);
     expect(h).toEqual({ reason: "Guest changed plans", changed_by: desk!.id });
   });
@@ -239,7 +239,7 @@ describe("payment override (managers only, reason required, audited)", () => {
   it("front desk cannot override", async () => {
     const c = await makeCategory(1);
     const r = await staffBooking(c.id, day(40), day(41));
-    await rejects(overridePaymentRequirement(db, desk, r.id, "confirm", "Trusted corporate guest"), /role does not allow/, "FORBIDDEN");
+    await rejects(overridePaymentRequirement(db, desk, r.id, "confirm", "Trusted corporate guest"), /role can't do this/, "FORBIDDEN");
   });
 
   it("nobody can confirm a booking without full payment, not even a manager", async () => {
@@ -305,7 +305,7 @@ describe("concurrent staff actions", () => {
     expect(results.filter((x) => x.status === "fulfilled")).toHaveLength(1);
     expect(await status(r.id)).toBe("cancelled");
     const rejected = results.find((x) => x.status === "rejected") as PromiseRejectedResult;
-    expect(rejected.reason.message).toMatch(/Only upcoming|Only reservations awaiting payment|just changed by someone else/);
+    expect(rejected.reason.message).toMatch(/hasn't started can be cancelled|Only a booking awaiting payment|just changed by someone else/);
   });
 });
 

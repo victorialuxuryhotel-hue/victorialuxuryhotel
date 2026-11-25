@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BedDouble, CalendarDays, Clock, Mail, Phone, Printer, Users, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BedDouble, CalendarDays, Clock, Mail, Phone, Printer, Users } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Collapsible } from "@/components/ui/collapsible";
@@ -17,6 +17,7 @@ import {
   ChangeDatesForm,
   CheckInButton,
   CheckOutButton,
+  TakePaymentLink,
   DetailsForm,
   NoShowButton,
   OverrideForm,
@@ -27,6 +28,7 @@ import { ActionFeedbackProvider } from "./action-feedback";
 import { CorrectPaymentForm } from "./payment-correction";
 import type { ManagerToAsk } from "@/server/domain/admin";
 import { NextStepBar } from "./reservation-guide";
+import { nextStep } from "@/domain/next-step";
 import { reservationSteps, StepList } from "./reservation-steps";
 
 function Fact({ icon: Icon, label, children }: { icon: typeof CalendarDays; label: string; children: React.ReactNode }) {
@@ -86,20 +88,19 @@ export function ReservationDetailView({
   const receiptsById = new Map(r.payments.map((p) => [p.id, p.receiptNumber]));
   const open = r.status === "confirmed" || r.status === "pending_payment";
   const steps = reservationSteps(r, today);
-  const checkInBlocker =
-    r.status !== "confirmed" ? undefined : !r.roomNumber ? "Assign a room first" : r.checkIn > today ? `Arrival is ${formatDate(r.checkIn)}` : undefined;
+  const step = nextStep(r, today);
 
   return (
     <ActionFeedbackProvider>
     <div className="px-4 py-6 lg:px-8">
       <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-900">
-        <ArrowLeft className="size-4" aria-hidden /> Reservations
+        <ArrowLeft className="size-4" aria-hidden /> Bookings
       </Link>
 
       {justCreated ? (
         <div className="mt-4">
           <FormMessage tone="success">
-            Reservation {r.reference} created. The room is held until {r.holdExpiresAt ? formatDateTime(r.holdExpiresAt) : "payment"}. Record payment to confirm it.
+            Booking {r.reference} created. The room is held until {r.holdExpiresAt ? formatDateTime(r.holdExpiresAt) : "payment"}. Take payment to confirm it.
           </FormMessage>
         </div>
       ) : null}
@@ -141,13 +142,12 @@ export function ReservationDetailView({
           ) : null}
         </div>
         <div className="hidden flex-wrap items-start gap-2 lg:flex">
-          {canManage && r.status === "confirmed" ? <CheckInButton reservationId={r.id} roomNumber={r.roomNumber} disabledReason={checkInBlocker} /> : null}
-          {canManage && r.status === "checked_in" ? <CheckOutButton reservationId={r.id} balanceKobo={balance} /> : null}
-          {canManage && balance > 0 && r.status !== "cancelled" && r.status !== "expired" ? (
-            <Link href={paymentsHref} className={buttonStyles({ variant: "secondary" })}>
-              <Wallet className="size-4" aria-hidden /> Record payment
-            </Link>
+          {canManage && step.kind === "take_payment" ? <TakePaymentLink reservationId={r.id} balanceKobo={step.owedKobo} /> : null}
+          {canManage && step.kind === "check_in" ? <CheckInButton reservationId={r.id} roomNumber={r.roomNumber} /> : null}
+          {canManage && (step.kind === "assign_room" || step.kind === "wait_for_arrival") ? (
+            <CheckInButton reservationId={r.id} disabledReason={step.kind === "assign_room" ? "Assign a room first" : `Arrival is ${formatDate(step.checkIn)}`} />
           ) : null}
+          {canManage && step.kind === "check_out" ? <CheckOutButton reservationId={r.id} balanceKobo={0} /> : null}
           {billHref && (r.status === "checked_in" || r.status === "checked_out") ? (
             <Link href={billHref} className={buttonStyles({ variant: "secondary" })}>
               <Printer className="size-4" aria-hidden /> Guest bill
@@ -219,9 +219,6 @@ export function ReservationDetailView({
                   {billHref && r.status !== "cancelled" && r.status !== "expired" ? (
                     <Link href={billHref} className="text-sm font-medium text-navy-800 hover:text-navy-600">Guest bill</Link>
                   ) : null}
-                  {balance > 0 && r.status !== "cancelled" && r.status !== "expired" ? (
-                    <Link href={paymentsHref} className="text-sm font-medium text-navy-800 hover:text-navy-600">Record payment</Link>
-                  ) : null}
                 </span>
               }
             />
@@ -236,7 +233,7 @@ export function ReservationDetailView({
                 <p className="mt-1 text-base sm:text-lg font-semibold tabular-nums text-success-700">{formatNaira(r.paidKobo)}</p>
               </div>
               <div>
-                <p className="text-xs text-ink-500">Balance</p>
+                <p className="text-xs text-ink-500">Owed</p>
                 <p className={`mt-1 text-base font-semibold tabular-nums sm:text-lg ${balance > 0 ? "text-warning-700" : "text-ink-900"}`}>{formatNaira(Math.max(0, balance))}</p>
                 <PaidProgress paidKobo={r.paidKobo} totalKobo={r.totalKobo} format={formatNaira} />
               </div>
@@ -263,7 +260,7 @@ export function ReservationDetailView({
                         {p.correctedKobo ? <span className="ml-2 text-xs font-normal text-ink-500">{formatNaira(p.correctedKobo)} corrected</span> : null}
                       </p>
                       <p className="text-xs text-ink-500">
-                        {paymentMethod[p.method]} · {p.provider === "paystack" ? "Paystack" : `Recorded by ${p.recordedBy ?? "staff"}`}
+                        {paymentMethod[p.method]} · {p.provider === "paystack" ? "Paid online" : `Taken by ${p.recordedBy ?? "staff"}`}
                         {p.paidAt ? ` · ${formatDateTime(p.paidAt)}` : ""}
                       </p>
                     </div>

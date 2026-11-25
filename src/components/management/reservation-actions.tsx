@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { LogIn, LogOut, XCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { LogIn, LogOut, Wallet, XCircle } from "lucide-react";
+import { Button, buttonStyles } from "@/components/ui/button";
 import { Stepper } from "@/components/ui/stepper";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { formatNaira } from "@/lib/format";
@@ -13,8 +14,23 @@ import { keepValues } from "@/lib/forms";
 
 export type RoomOption = { id: string; number: string; category: string; ready: boolean };
 
-export function CheckInButton({ reservationId, roomNumber, disabledReason }: { reservationId: string; roomNumber?: string; disabledReason?: string }) {
+type Size = "sm" | "md" | "lg";
+
+/** Shown instead of check-in or check-out while money is owed: the server refuses both until the balance is paid. */
+export function TakePaymentLink({ reservationId, balanceKobo, size = "md" }: { reservationId: string; balanceKobo: number; size?: Size }) {
+  return (
+    <Link
+      href={`/app/payments/record?reservation=${reservationId}`}
+      className={buttonStyles({ size, variant: size === "sm" ? "secondary" : "primary", className: size === "lg" ? "w-full" : "whitespace-nowrap" })}
+    >
+      <Wallet className="size-4" aria-hidden /> Take payment · {formatNaira(balanceKobo)}
+    </Link>
+  );
+}
+
+export function CheckInButton({ reservationId, roomNumber, disabledReason, balanceKobo = 0, size }: { reservationId: string; roomNumber?: string; disabledReason?: string; balanceKobo?: number; size?: Size }) {
   const feedback = useActionFeedback();
+  if (balanceKobo > 0) return <TakePaymentLink reservationId={reservationId} balanceKobo={balanceKobo} size={size} />;
   if (disabledReason) {
     return (
       <Button disabled title={disabledReason}>
@@ -36,17 +52,17 @@ export function CheckInButton({ reservationId, roomNumber, disabledReason }: { r
   );
 }
 
-export function CheckOutButton({ reservationId, balanceKobo, size }: { reservationId: string; balanceKobo: number; size?: "sm" | "md" }) {
+export function CheckOutButton({ reservationId, balanceKobo, size }: { reservationId: string; balanceKobo: number; size?: Size }) {
   const feedback = useActionFeedback();
+  if (balanceKobo > 0) return <TakePaymentLink reservationId={reservationId} balanceKobo={balanceKobo} size={size} />;
   return (
     <ActionButton
       action={checkOut}
       fields={{ reservationId }}
-      size={size}
+      size={size === "lg" ? "md" : size}
       variant={size === "sm" ? "secondary" : "primary"}
-      confirm={balanceKobo > 0 ? `${formatNaira(balanceKobo)} is still outstanding. Check out anyway?` : undefined}
       onSuccess={(d) => feedback({
-        message: `Checked out. The room is marked for cleaning.${d.balanceKobo > 0 ? ` ${formatNaira(d.balanceKobo)} is still outstanding.` : ""}`,
+        message: "Checked out. The room is marked for cleaning.",
         undo: d.undoId ? { reservationId, undoId: d.undoId } : undefined,
       })}
     >
@@ -117,7 +133,7 @@ export function AssignRoomForm({
               <optgroup label={booked}>{sameCategory.map((r) => <option key={r.id} value={r.id}>{label(r)}</option>)}</optgroup>
             ) : null}
             {others.length ? (
-              <optgroup label="Other categories (upgrade or move)">
+              <optgroup label="Other room types (upgrade or move)">
                 {others.map((r) => <option key={r.id} value={r.id}>{label(r)} · {r.category}</option>)}
               </optgroup>
             ) : null}
@@ -144,7 +160,7 @@ export function CancelForm({ reservationId }: { reservationId: string }) {
         </Field>
         {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
         <p className="text-xs text-ink-500">Any refund is handled separately, according to the hotel&apos;s cancellation policy.</p>
-        <Button type="submit" variant="danger" pending={pending} className="w-full">Cancel reservation</Button>
+        <Button type="submit" variant="danger" pending={pending} className="w-full">Cancel booking</Button>
       </form>
     </details>
   );

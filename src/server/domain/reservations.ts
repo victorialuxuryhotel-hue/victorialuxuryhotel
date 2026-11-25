@@ -1,5 +1,5 @@
 import { AppError } from "@/lib/errors";
-import { formatNaira } from "@/lib/format";
+import { formatDate, formatNaira } from "@/lib/format";
 import { hotelToday, nightsBetween } from "@/lib/hotel-date";
 import { dbErrorToken } from "../db-errors";
 import {
@@ -20,6 +20,7 @@ import {
   type Db,
   type Stmt,
 } from "../db";
+import { cancellationFee, cancelRule } from "./cancellation-rule";
 import { freeUnits, validateStay } from "./inventory";
 
 export type ReservationRow = {
@@ -46,15 +47,13 @@ export type ReservationRow = {
 };
 
 export const dueOf = (r: Pick<ReservationRow, "total_amount_kobo" | "extras_kobo" | "room_change_kobo" | "discount_kobo">) => r.total_amount_kobo + r.extras_kobo + r.room_change_kobo - r.discount_kobo;
-export const DUE_SQL = "(r.total_amount_kobo + r.extras_kobo + r.room_change_kobo - r.discount_kobo)";
-
 export const RES_COLUMNS = `id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count,
   nightly_rate_kobo, total_amount_kobo, status, source, hold_expires_at, attention_reason, version, extras_kobo, room_change_kobo, discount_pct, discount_kobo`;
 const SELECT_RES = `SELECT ${RES_COLUMNS} FROM reservations`;
 
 export async function loadReservation(db: Db, id: string): Promise<ReservationRow> {
   const res = await first<ReservationRow>(db, `${SELECT_RES} WHERE id = ?`, id);
-  if (!res) throw new AppError("NOT_FOUND", "Reservation not found.");
+  if (!res) throw new AppError("NOT_FOUND", "Booking not found.");
   return res;
 }
 
@@ -274,7 +273,7 @@ export async function assignRoom(
   return retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
     if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) {
-      throw new AppError("INVALID_TRANSITION", "Rooms can only be assigned to upcoming or in-house reservations.");
+      throw new AppError("INVALID_TRANSITION", "A room can only be given to a booking that hasn't ended.");
     }
     const room = await loadRoom(db, roomId);
     if (!room || !room.is_active) throw new AppError("NOT_FOUND", "Room not found.");
@@ -288,7 +287,7 @@ export async function assignRoom(
       const from = res.check_in > hotelToday() ? res.check_in : hotelToday();
       if ((await freeUnits(db, room.category_id, from, res.check_out, res.id)) <= 0) {
         const cat = await first<{ name: string }>(db, "SELECT name FROM room_categories WHERE id = ?", room.category_id);
-        throw new AppError("UNAVAILABLE", `No ${cat?.name ?? "room"} capacity left for these dates.`);
+        throw new AppError("UNAVAILABLE", cat ? `No ${cat.name} rooms are free on all of these nights.` : "No rooms of that type are free on all of these nights.");
       }
     }
 
@@ -316,7 +315,7 @@ export async function assignRoom(
     } catch (err) {
       rethrow(err, {
         room_overlap: new AppError("CONFLICT", `Room ${room.room_number} is already booked for some of these nights.`),
-        no_capacity: new AppError("UNAVAILABLE", "No capacity left in that room type for these dates."),
+        no_capacity: new AppError("UNAVAILABLE", "No rooms of that type are free on all of these nights."),
       });
     }
   });
@@ -330,16 +329,16 @@ export async function checkInReservation(db: Db, actor: Actor, reservationId: st
       throw new AppError(
         "INVALID_TRANSITION",
         res.status === "pending_payment"
-          ? "This reservation is awaiting payment. Record the full payment first."
+          ? "This booking is awaiting payment. Take the full payment first."
           : res.status === "checked_in"
             ? "This guest is already checked in."
-            : "Only confirmed reservations can be checked in.",
+            : "Only confirmed bookings can be checked in.",
       );
     }
     const today = hotelToday();
-    if (res.check_in > today) throw new AppError("VALIDATION", `Arrival is not until ${res.check_in}.`);
+    if (res.check_in > today) throw new AppError("VALIDATION", `This guest arrives on ${formatDate(res.check_in, { year: false })}. Check-in opens that day.`);
     const owed = dueOf(res) - (await netPaid(db, res.id));
-    if (owed > 0) throw new AppError("VALIDATION", `${naira(owed)} still to pay. Record the payment before check-in.`);
+    if (owed > 0) throw new AppError("VALIDATION", `${naira(owed)} owed. Take the payment before check-in.`);
     if (res.check_out <= today) throw new AppError("VALIDATION", "This stay has already ended.");
     if (!res.room_id) throw new AppError("VALIDATION", "Assign a room before checking in.");
     const room = (await loadRoom(db, res.room_id))!;
@@ -362,7 +361,7 @@ export async function checkOutReservation(db: Db, actor: Actor, reservationId: s
     const res = await loadReservation(db, reservationId);
     if (res.status !== "checked_in") throw new AppError("INVALID_TRANSITION", "Only checked-in guests can be checked out.");
     const balance = dueOf(res) - (await netPaid(db, res.id));
-    if (balance > 0) throw new AppError("VALIDATION", `${naira(balance)} still to pay. Record the payment before check-out.`);
+    if (balance > 0) throw new AppError("VALIDATION", `${naira(balance)} owed. Take the payment before check-out.`);
     const room = res.room_id ? await loadRoom(db, res.room_id) : null;
     const results = await writeBatch(db, actor, [
       assertVersion(db, "reservations", res.id, res.version),
@@ -384,17 +383,26 @@ export async function cancelReservation(db: Db, actor: Actor, reservationId: str
   if (why.length < 3) throw new AppError("VALIDATION", "Give a reason for the cancellation.");
   await retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
-    if (res.status !== "pending_payment" && res.status !== "confirmed") throw new AppError("INVALID_TRANSITION", "Only upcoming reservations can be cancelled.");
-    await writeBatch(
-      db,
-      actor,
-      [
-        assertVersion(db, "reservations", res.id, res.version),
-        db.prepare("UPDATE reservations SET status = 'cancelled', cancellation_reason = ? WHERE id = ?").bind(why, res.id),
-        activity(db, "reservation.cancelled", "reservation", res.id, `${res.reference} cancelled: ${why}`),
-      ],
-      why,
-    );
+    if (res.status !== "pending_payment" && res.status !== "confirmed") throw new AppError("INVALID_TRANSITION", "Only a booking that hasn't started can be cancelled. For a guest already in house, change the check-out date instead.");
+    const paid = await netPaid(db, res.id);
+    const fee = paid > 0 ? Math.min(paid, cancellationFee(res.total_amount_kobo, res.check_in, await cancelRule(db))) : 0;
+    const refund = Math.max(0, paid - fee);
+    const stmts = [
+      assertNetPaid(db, res.id, paid),
+      assertVersion(db, "reservations", res.id, res.version),
+      db.prepare("UPDATE reservations SET status = 'cancelled', cancellation_reason = ?, cancellation_fee_kobo = ? WHERE id = ?").bind(why, paid > 0 ? fee : null, res.id),
+      activity(db, "reservation.cancelled", "reservation", res.id, `${res.reference} cancelled: ${why}${paid ? ` (${naira(paid)} paid: fee ${naira(fee)}, refund ${naira(refund)})` : ""}`, {
+        paid_kobo: paid, fee_kobo: fee, refund_kobo: refund,
+      }),
+    ];
+    if (refund > 0) {
+      stmts.push(
+        db
+          .prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?")
+          .bind(`Cancelled by staff. Refund ${naira(refund)} (fee kept: ${naira(fee)}). For the general manager to approve.`, res.id),
+      );
+    }
+    await writeBatch(db, actor, stmts, why);
   });
 }
 
@@ -402,7 +410,7 @@ export async function markNoShow(db: Db, actor: Actor, reservationId: string): P
   requireRole(actor, ALL_STAFF);
   return retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
-    if (res.status !== "confirmed") throw new AppError("INVALID_TRANSITION", "Only confirmed reservations can be marked as no-show.");
+    if (res.status !== "confirmed") throw new AppError("INVALID_TRANSITION", "Only a paid booking whose guest hasn't arrived can be marked as a no-show.");
     if (res.check_in > hotelToday()) throw new AppError("VALIDATION", "The guest isn't due yet.");
     const paid = await netPaid(db, res.id);
     const note = paid > 0 ? `No-show. ${naira(paid)} paid. Keep or refund is for the general manager to decide.` : null;
@@ -424,7 +432,7 @@ export async function updateReservationDetails(db: Db, actor: Actor, reservation
   requireRole(actor, ALL_STAFF);
   await retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
-    if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) throw new AppError("INVALID_TRANSITION", "This reservation is closed.");
+    if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) throw new AppError("INVALID_TRANSITION", "This booking has ended (checked out, cancelled or a no-show), so its dates and room can't change. Make a new booking instead.");
     const cat = await first<{ max_occupancy: number }>(db, "SELECT max_occupancy FROM room_categories WHERE id = ?", res.category_id);
     const max = cat?.max_occupancy ?? 1;
     if (!Number.isInteger(guests) || guests < 1 || guests > max) throw new AppError("VALIDATION", `This room type sleeps up to ${max}.`);
@@ -447,7 +455,7 @@ export async function undoAction(db: Db, actor: Actor, reservationId: string, ac
       "SELECT id, action, actor_id, entity_id, metadata, created_at FROM activity_log WHERE id = ?",
       activityId,
     );
-    const tooLate = new AppError("CONFLICT", "That can no longer be undone. Make the change again from the reservation.");
+    const tooLate = new AppError("CONFLICT", "That can no longer be undone. Make the change again from the booking.");
     if (!entry || entry.entity_id !== reservationId || !(UNDOABLE as readonly string[]).includes(entry.action)) throw tooLate;
     if (entry.actor_id !== actor.id) throw new AppError("FORBIDDEN", "Only the person who made a change can undo it.");
     if (Date.now() - Date.parse(entry.created_at) > UNDO_WINDOW_MS) throw tooLate;
@@ -518,15 +526,15 @@ export async function overridePaymentRequirement(
 ): Promise<void> {
   requireRole(actor, MANAGERS);
   const why = (reason ?? "").trim();
-  if (why.length < 5) throw new AppError("VALIDATION", "Give a reason (it is recorded in the activity log).");
-  if (action === "confirm") throw new AppError("VALIDATION", "Bookings are confirmed only when paid in full. Record the payment, or extend the hold.");
-  if (action !== "extend") throw new AppError("VALIDATION", "Unknown action.");
+  if (why.length < 5) throw new AppError("VALIDATION", "Give a reason (it's saved in Activity).");
+  if (action === "confirm") throw new AppError("VALIDATION", "Bookings are confirmed only when paid in full. Take the payment, or hold the room longer.");
+  if (action !== "extend") throw new AppError("VALIDATION", "That button didn't work as expected. Reload the page and try again.");
   if (action === "extend" && (!Number.isInteger(extendHours) || extendHours < 1 || extendHours > 336)) {
-    throw new AppError("VALIDATION", "Extend by 1 hour to 14 days.");
+    throw new AppError("VALIDATION", "Hold the room longer by 1 hour to 14 days.");
   }
   await retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
-    if (res.status !== "pending_payment") throw new AppError("INVALID_TRANSITION", "Only reservations awaiting payment can be overridden.");
+    if (res.status !== "pending_payment") throw new AppError("INVALID_TRANSITION", "Only a booking awaiting payment can be held longer.");
     const lapsedMessage = new AppError("UNAVAILABLE", "The hold has lapsed and this room type is now fully booked for those dates.");
     if (!isHoldLive(res) && (await freeUnits(db, res.category_id, res.check_in, res.check_out, res.id)) <= 0) throw lapsedMessage;
 
@@ -566,7 +574,7 @@ export async function changeReservationDates(db: Db, actor: Actor, reservationId
 export async function changeDates(db: Db, actor: Actor, reservationId: string, checkIn: string, checkOut: string, byGuest = false): Promise<void> {
   await retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
-    if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) throw new AppError("INVALID_TRANSITION", "This reservation is closed.");
+    if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) throw new AppError("INVALID_TRANSITION", "This booking has ended (checked out, cancelled or a no-show), so its dates and room can't change. Make a new booking instead.");
     if (res.status === "checked_in" && checkIn !== res.check_in) throw new AppError("VALIDATION", "The guest is in house: only the check-out date can change.");
     validateStay(checkIn, checkOut, res.guest_count, res.status === "checked_in");
     if (checkIn === res.check_in && checkOut === res.check_out) return;
@@ -677,7 +685,7 @@ export async function updateRoomStatus(
     const UPCOMING = `room_id = ?1 AND check_out > ?2 AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))`;
     if (input.serviceStatus === "maintenance" && room.service_status !== "maintenance") {
       const booked = await first<{ reference: string; check_in: string }>(db, `SELECT reference, check_in FROM reservations WHERE ${UPCOMING} ORDER BY check_in LIMIT 1`, room.id, hotelToday());
-      if (booked) throw new AppError("CONFLICT", `Room ${room.room_number} is booked (${booked.reference}, from ${booked.check_in}). Move that booking to another room first.`);
+      if (booked) throw new AppError("CONFLICT", `Room ${room.room_number} is booked from ${formatDate(booked.check_in, { year: false })} (${booked.reference}). Move that booking to another room first.`);
     }
     const readiness = input.readiness ?? room.readiness;
     const service = input.serviceStatus ?? room.service_status;
@@ -725,23 +733,6 @@ export async function updateGuest(
   } catch (err) {
     rethrow(err, { unique: new AppError("CONFLICT", "Another guest already uses this email.") });
   }
-}
-
-export async function listAssignableRooms(db: Db, reservationId: string) {
-  const res = await loadReservation(db, reservationId);
-  return all<{ id: string; room_number: string; category_id: string; readiness: string }>(
-    db,
-    `SELECT rm.id, rm.room_number, rm.category_id, rm.readiness FROM rooms rm
-     WHERE rm.is_active = 1 AND rm.service_status = 'in_service'
-       AND NOT EXISTS (
-         SELECT 1 FROM reservations r WHERE r.room_id = rm.id AND r.id <> ?1
-           AND r.status IN ('pending_payment', 'confirmed', 'checked_in')
-           AND r.check_in < ?3 AND ?2 < r.check_out)
-     ORDER BY rm.room_number`,
-    res.id,
-    res.check_in,
-    res.check_out,
-  );
 }
 
 export async function validPromo(db: Db, code: string): Promise<{ code: string; percent_off: number }> {

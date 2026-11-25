@@ -11,7 +11,7 @@ import { getReservation, hotelToday } from "@/server/queries/reservations";
 import { assignableRooms } from "@/server/queries/rooms";
 import { managerToAskForDesk } from "@/server/queries/settings";
 
-export const metadata: Metadata = { title: "Reservation" };
+export const metadata: Metadata = { title: "Booking" };
 
 async function Content({ params, searchParams }: PageProps<"/app/reservations/[id]">) {
   const staff = await requireStaff();

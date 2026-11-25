@@ -14,6 +14,7 @@ import type { ManagerToAsk } from "@/server/domain/admin";
 import { cancelReservation, markNoShow, overridePayment } from "@/server/reservations";
 import { useActionFeedback, withFeedback } from "./action-feedback";
 import { CheckInButton, CheckOutButton } from "./reservation-actions";
+import { nextStep } from "@/domain/next-step";
 
 type R = Pick<
   ReservationDetail,
@@ -129,29 +130,27 @@ export function NextStepBar({ r, today, paymentsHref, canOverride, manager = nul
   const canPay = balance > 0 && r.status !== "cancelled" && r.status !== "expired";
   const full = "w-full [&_form]:w-full [&_form]:items-stretch [&_button]:h-12 [&_button]:w-full [&_button]:text-base";
 
-  let primary: React.ReactNode = null;
-  let primaryIsPayment = false;
-  if (r.status === "pending_payment" && canPay) {
-    primary = <Link href={paymentsHref} className={buttonStyles({ size: "lg", className: "w-full" })}>Take payment · {formatNaira(balance)}</Link>;
-    primaryIsPayment = true;
-  } else if (r.status === "confirmed" && !r.roomNumber) {
-    primary = <a href="#change-stay" className={buttonStyles({ size: "lg", className: "w-full" })}>Assign a room</a>;
-  } else if (r.status === "confirmed") {
-    const blocker = r.checkIn > today ? `Arrives ${formatDate(r.checkIn, { year: false })}` : undefined;
-    primary = blocker ? (
-      <Button size="lg" disabled className="w-full">Check in · {blocker}</Button>
-    ) : (
-      <div className={full}><CheckInButton reservationId={r.id} roomNumber={r.roomNumber} /></div>
-    );
-  } else if (r.status === "checked_in") {
-    primary = <div className={full}><CheckOutButton reservationId={r.id} balanceKobo={balance} /></div>;
-  } else if (canPay) {
-    primary = <Link href={paymentsHref} className={buttonStyles({ size: "lg", className: "w-full" })}>Record payment · {formatNaira(balance)}</Link>;
-    primaryIsPayment = true;
-  }
+  const step = nextStep(r, today);
+  const primaryIsPayment = step.kind === "take_payment";
+  const primary: React.ReactNode = (() => {
+    switch (step.kind) {
+      case "take_payment":
+        return <Link href={paymentsHref} className={buttonStyles({ size: "lg", className: "w-full" })}>Take payment · {formatNaira(step.owedKobo)}</Link>;
+      case "assign_room":
+        return <a href="#change-stay" className={buttonStyles({ size: "lg", className: "w-full" })}>Assign a room</a>;
+      case "wait_for_arrival":
+        return <Button size="lg" disabled className="w-full">Check in · Arrives {formatDate(step.checkIn, { year: false })}</Button>;
+      case "check_in":
+        return <div className={full}><CheckInButton reservationId={r.id} roomNumber={r.roomNumber} size="lg" /></div>;
+      case "check_out":
+        return <div className={full}><CheckOutButton reservationId={r.id} balanceKobo={0} size="lg" /></div>;
+      default:
+        return null;
+    }
+  })();
 
   const options: Array<{ label: string; hint: string; onSelect?: () => void; href?: string; disabled?: boolean; manager?: boolean }> = [];
-  if (canPay && !primaryIsPayment) options.push({ label: "Record a payment", hint: `${formatNaira(balance)} still owed`, href: paymentsHref });
+  if (canPay && !primaryIsPayment) options.push({ label: "Take payment", hint: `${formatNaira(balance)} owed`, href: paymentsHref });
   if (!closed) options.push({ label: "Change dates or room", hint: "Price updates automatically", href: "#change-stay" });
   if (r.status === "confirmed") {
     const due = r.checkIn <= today;
