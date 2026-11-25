@@ -21,7 +21,7 @@ async function Content() {
       firstName={staff.fullName.split(" ")[0] ?? staff.fullName}
       greeting={greeting(Number(hotelTimeNow().slice(0, 2)))}
       today={m.today}
-      needs={needsYouNow(m.arrivals, rooms)}
+      needs={needsYouNow(m, rooms)}
       arrivals={m.arrivals}
       departures={m.departures}
       inHouse={m.inHouse}

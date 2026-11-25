@@ -112,12 +112,15 @@ export async function movements(day?: string) {
   await authorizeRead(["reservations.manage", "reports.view"]);
   const db = await getDb();
   const d = day ?? today();
-  const [arrivals, departures, inHouse] = await Promise.all([
+  const [arrivals, departures, inHouse, missed] = await Promise.all([
     all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_in = ? AND r.status IN ('confirmed', 'pending_payment') ORDER BY r.created_at`, d),
+    // Overdue guests first (oldest check-out date), then today's.
     all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_out <= ? AND r.status = 'checked_in' ORDER BY r.check_out`, d),
     all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.status = 'checked_in' ORDER BY r.check_out`),
+    // Paid, due before today, never checked in: still holding a room until someone decides.
+    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_in < ? AND r.status = 'confirmed' ORDER BY r.check_in`, d),
   ]);
-  return { today: d, arrivals: arrivals.map(toRow), departures: departures.map(toRow), inHouse: inHouse.map(toRow) };
+  return { today: d, arrivals: arrivals.map(toRow), departures: departures.map(toRow), inHouse: inHouse.map(toRow), missed: missed.map(toRow) };
 }
 
 export async function getReservation(

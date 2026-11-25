@@ -71,17 +71,18 @@ export function CheckOutButton({ reservationId, balanceKobo, size }: { reservati
   );
 }
 
-export function NoShowButton({ reservationId }: { reservationId: string }) {
+export function NoShowButton({ reservationId, size }: { reservationId: string; size?: Size }) {
   const feedback = useActionFeedback();
   return (
     <ActionButton
       action={markNoShow}
       fields={{ reservationId }}
-      variant="ghost"
+      variant={size === "sm" ? "secondary" : "ghost"}
+      size={size === "lg" ? "md" : size}
       confirm="Mark this guest as a no-show? The room is released for tonight."
       onSuccess={(d) => feedback({ message: "Marked as a no-show. The room is released.", undo: d.undoId ? { reservationId, undoId: d.undoId } : undefined })}
     >
-      No-show
+      {size === "sm" ? "Mark no-show" : "No-show"}
     </ActionButton>
   );
 }

@@ -6,7 +6,7 @@ import type { ReservationRow } from "@/domain/views";
 import { formatDate, formatNaira, nightsBetween, plural } from "@/lib/format";
 import { ReservationBadge } from "./badges";
 import { nextStep } from "@/domain/next-step";
-import { hotelToday } from "@/lib/hotel-date";
+import { cn } from "@/lib/utils/cn";
 import { CheckInButton, CheckOutButton, TakePaymentLink } from "./reservation-actions";
 
 export function MovementList({
@@ -14,19 +14,21 @@ export function MovementList({
   rows,
   hrefFor,
   title,
+  today,
 }: {
   kind: "arrivals" | "departures";
   title?: string;
   rows: ReservationRow[];
   hrefFor: (r: ReservationRow) => string;
+  /** Hotel date, worked out by the page on the server (reading the clock while rendering breaks prerendering). */
+  today: string;
 }) {
   const arrivals = kind === "arrivals";
-  const today = hotelToday();
   return (
     <Card>
       <CardHeader
         title={title ?? (arrivals ? "Arrivals" : "Departures")}
-        description={arrivals ? "Assign a ready room, then check the guest in." : "Take any payment owed, then check the guest out."}
+        description={arrivals ? "Payment first, then a clean room, then the key." : "Take any payment owed, then check the guest out."}
         action={<span className="rounded-full bg-ivory-200 px-2.5 py-0.5 text-sm font-semibold tabular-nums">{rows.length}</span>}
       />
       {rows.length === 0 ? (
@@ -37,12 +39,14 @@ export function MovementList({
         <ul className="divide-y divide-hairline">
           {rows.map((r) => {
             const balance = r.totalKobo - r.paidKobo;
+            const overdue = !arrivals && r.checkOut < today;
             return (
-              <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5 sm:py-4">
+              <li key={r.id} className={cn("flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5 sm:py-4", overdue && "bg-danger-50")}>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link href={hrefFor(r)} className="font-medium text-ink-900 hover:text-navy-700">{r.guestName}</Link>
                     <ReservationBadge status={r.status} />
+                    {overdue ? <span className="rounded-full border border-danger-600/30 bg-white px-2 py-0.5 text-xs font-semibold text-danger-700">Overdue since {formatDate(r.checkOut, { year: false })}</span> : null}
                   </div>
                   <p className="mt-1 truncate text-sm text-ink-500">
                     {r.category} · {r.roomNumber ? `Room ${r.roomNumber}` : <span className="text-warning-700">no room assigned</span>} ·{" "}

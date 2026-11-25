@@ -96,7 +96,7 @@ async function Content() {
       </StatGrid>
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <MovementList kind="arrivals" rows={m.arrivals} hrefFor={href} />
+        <MovementList kind="arrivals" rows={m.arrivals} hrefFor={href} today={m.today} />
         <Card>
           <CardHeader title="Rooms right now" action={<Link href="/app/rooms" className="text-sm font-medium text-navy-800">Room board</Link>} />
           <div className="p-5">

@@ -13,7 +13,15 @@ export default function Page() {
       firstName="Bisi"
       greeting={greeting(9)}
       today={today}
-      needs={needsYouNow(arrivals, board)}
+      needs={needsYouNow(
+        {
+          today,
+          arrivals,
+          inHouse: reservations.filter((r) => r.status === "checked_in"),
+          missed: reservations.filter((r) => r.status === "confirmed" && r.checkIn < today),
+        },
+        board,
+      )}
       arrivals={arrivals}
       departures={departures}
       inHouse={reservations.filter((r) => r.status === "checked_in")}
