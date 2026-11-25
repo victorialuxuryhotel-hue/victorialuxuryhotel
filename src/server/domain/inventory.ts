@@ -1,6 +1,13 @@
 import { AppError } from "@/lib/errors";
 import { addDays, hotelToday, isIsoDate, nightsBetween } from "@/lib/hotel-date";
-import { first, type Db, type Stmt } from "../db";
+import { all, first, type Db, type Stmt } from "../db";
+
+/**
+ * When a stay stops holding its room. A checked-in guest holds the room until they are checked
+ * out, whatever the booking dates say: an overstay runs to at least tomorrow (hotel time, UTC+1).
+ * Matches the database rules in migrations/0014_occupied_until_checked_out.sql.
+ */
+export const stayEndSql = (a: string) => `(CASE WHEN ${a}.status = 'checked_in' THEN max(${a}.check_out, date('now', '+1 hour', '+1 day')) ELSE ${a}.check_out END)`;
 
 export const LIVE_SQL = `(r.status IN ('confirmed', 'checked_in') OR (r.status = 'pending_payment' AND r.hold_expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))`;
 
@@ -12,7 +19,7 @@ export async function freeUnits(db: Db, categoryId: string, checkIn: string, che
        - coalesce((
            SELECT max((
              SELECT count(*) FROM reservations r LEFT JOIN rooms rm ON rm.id = r.room_id
-             WHERE r.check_in <= c.d AND r.check_out > c.d AND r.id IS NOT ?4 AND ${LIVE_SQL}
+             WHERE r.check_in <= c.d AND ${stayEndSql("r")} > c.d AND r.id IS NOT ?4 AND ${LIVE_SQL}
                AND coalesce(rm.category_id, r.category_id) = ?1
            ))
            FROM calendar c WHERE c.d >= ?2 AND c.d < ?3
@@ -47,7 +54,7 @@ export async function searchAvailability(db: Db, checkIn: string, checkOut: stri
          - coalesce((
              SELECT max((
                SELECT count(*) FROM reservations r LEFT JOIN rooms rm ON rm.id = r.room_id
-               WHERE r.check_in <= cal.d AND r.check_out > cal.d AND ${LIVE_SQL}
+               WHERE r.check_in <= cal.d AND ${stayEndSql("r")} > cal.d AND ${LIVE_SQL}
                  AND coalesce(rm.category_id, r.category_id) = c.id
              ))
              FROM calendar cal WHERE cal.d >= ?1 AND cal.d < ?2
@@ -74,7 +81,7 @@ export async function freeNights(db: Db, slugs: string[], from: string, to: stri
       `SELECT c.slug, cal.d,
          (SELECT count(*) FROM rooms WHERE category_id = c.id AND is_active = 1 AND service_status = 'in_service')
          > (SELECT count(*) FROM reservations r LEFT JOIN rooms rm ON rm.id = r.room_id
-            WHERE r.check_in <= cal.d AND r.check_out > cal.d AND ${LIVE_SQL}
+            WHERE r.check_in <= cal.d AND ${stayEndSql("r")} > cal.d AND ${LIVE_SQL}
               AND coalesce(rm.category_id, r.category_id) = c.id) AS is_free
        FROM room_categories c JOIN calendar cal ON cal.d >= ?1 AND cal.d < ?2
        WHERE c.is_active = 1 AND c.slug IN (${slugs.map((_, i) => `?${i + 3}`).join(", ")})`,
@@ -105,7 +112,7 @@ export function autoAssignRoomStatements(db: Db, reservationId: string): Stmt[] 
              AND NOT EXISTS (
                SELECT 1 FROM reservations o WHERE o.room_id = rm.id AND o.id <> reservations.id
                  AND o.status IN ('pending_payment', 'confirmed', 'checked_in')
-                 AND o.check_in < reservations.check_out AND reservations.check_in < o.check_out)
+                 AND o.check_in < reservations.check_out AND reservations.check_in < ${stayEndSql("o")})
            ORDER BY rm.readiness = 'ready' DESC, length(rm.room_number), rm.room_number
            LIMIT 1)
          WHERE id = ? AND room_id IS NULL`,
@@ -122,4 +129,33 @@ export function autoAssignRoomStatements(db: Db, reservationId: string): Stmt[] 
       )
       .bind(reservationId),
   ];
+}
+
+/** Stays that put a guest in a room today: everyone checked in (whatever their dates), plus today's arrivals and departures. */
+export function roomStays(db: Db, today: string) {
+  return all<{ id: string; room_id: string; status: string; check_in: string; check_out: string; guest_name: string }>(
+    db,
+    `SELECT r.id, r.room_id, r.status, r.check_in, r.check_out, g.full_name AS guest_name
+     FROM reservations r JOIN guests g ON g.id = r.guest_id
+     WHERE r.room_id IS NOT NULL AND r.status IN ('checked_in', 'confirmed', 'pending_payment')
+       AND (r.status = 'checked_in' OR (r.check_in <= ?1 AND r.check_out >= ?1))`,
+    today,
+  );
+}
+
+/** Rooms in service and free for every night of the stay. A room with a guest checked in is never free. */
+export function freeRooms(db: Db, reservationId: string, checkIn: string, checkOut: string) {
+  return all<{ id: string; room_number: string; readiness: string; category_name: string }>(
+    db,
+    `SELECT rm.id, rm.room_number, rm.readiness, c.name AS category_name
+     FROM rooms rm JOIN room_categories c ON c.id = rm.category_id
+     WHERE rm.is_active = 1 AND rm.service_status = 'in_service'
+       AND NOT EXISTS (
+         SELECT 1 FROM reservations r
+         WHERE r.room_id = rm.id AND r.id <> ?1 AND r.status IN ('pending_payment', 'confirmed', 'checked_in')
+           AND r.check_in < ?3 AND ${stayEndSql("r")} > ?2)`,
+    reservationId,
+    checkIn,
+    checkOut,
+  );
 }

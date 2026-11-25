@@ -21,7 +21,7 @@ import {
   type Stmt,
 } from "../db";
 import { cancellationFee, cancelRule } from "./cancellation-rule";
-import { freeUnits, validateStay } from "./inventory";
+import { freeUnits, stayEndSql, validateStay } from "./inventory";
 
 export type ReservationRow = {
   id: string;
@@ -279,6 +279,19 @@ export async function assignRoom(
     if (!room || !room.is_active) throw new AppError("NOT_FOUND", "Room not found.");
     if (room.service_status !== "in_service") throw new AppError("UNAVAILABLE", `Room ${room.room_number} is under maintenance.`);
     if (res.room_id === roomId) return { undoId: null, chargeKobo: 0 };
+    const occupant = await first<{ full_name: string; check_out: string }>(
+      db,
+      `SELECT g.full_name, o.check_out FROM reservations o JOIN guests g ON g.id = o.guest_id
+       WHERE o.room_id = ? AND o.id <> ? AND o.status = 'checked_in' AND o.check_in < ? AND ? < ${stayEndSql("o")}`,
+      roomId,
+      res.id,
+      res.check_out,
+      res.check_in,
+    );
+    if (occupant) {
+      const overdue = occupant.check_out < hotelToday() ? `, due out ${formatDate(occupant.check_out, { year: false })}` : "";
+      throw new AppError("CONFLICT", `Room ${room.room_number} is occupied: ${occupant.full_name} is checked in${overdue}. Check them out first, or choose another room.`);
+    }
     if (res.status === "checked_in" && room.readiness !== "ready") throw new AppError("UNAVAILABLE", `Room ${room.room_number} isn't clean yet. Mark it ready first.`);
 
     const oldRoom = res.room_id ? await loadRoom(db, res.room_id) : null;

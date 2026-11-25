@@ -33,6 +33,26 @@ Check the files you review are the ones that will run: `shasum -a 256 migrations
 | `UPDATE hotel_settings SET free_cancel_hours = 24` | Changes one setting from its current value to 24. This can be changed afterwards in Booking rules. |
 | Recreate the 3 staff manager triggers | Allows the Hotel Manager role (a front-desk record marked as manager). No rows changed. |
 
+### What 0014 changes (added 25 Nov, after the QA pass)
+
+`migrations/0014_occupied_until_checked_out.sql`
+
+| Statement | Effect on existing data |
+|---|---|
+| Recreate `reservations_no_room_overlap_insert/update` | A checked-in guest now holds their room until they are checked out, even after their check-out date. No rows changed. |
+| Recreate `reservations_capacity_insert/update` | The same guest also counts against their room type, so the website can't sell it again. No rows changed. |
+
+These are rules checked on new writes only. If the live data already has two live bookings in one room
+(an overstayer plus a new arrival), nothing fails on migration: the front desk sees the clash on the room
+board and must move one of them. Check first:
+
+```sql
+SELECT a.reference, b.reference, a.room_id FROM reservations a JOIN reservations b
+  ON a.room_id = b.room_id AND a.id < b.id
+ WHERE a.status = 'checked_in' AND b.status IN ('confirmed', 'pending_payment', 'checked_in')
+   AND b.check_in < max(a.check_out, date('now', '+1 hour', '+1 day'));
+```
+
 ### Proof that data is kept
 
 On 24 Nov 2026 a read-only export of the live database was loaded into a local SQLite copy. Both migrations were applied to it with foreign keys on, matching D1. Before and after:
@@ -128,7 +148,7 @@ These are deliberately **not final** in the app:
 
 1. Rotate keys and set the Cloudflare secrets (section 2).
 2. Set up the Clerk production instance (section 3).
-3. Record the Time Travel bookmark, then apply 0012 and 0013 (section 1).
+3. Record the Time Travel bookmark, then apply 0012, 0013 and 0014 (section 1).
 4. Build (`pnpm cf:build`; it must report no secrets), upload, compare `wrangler versions view` secrets, remove `EMAIL_ALLOWLIST` if inherited, and deploy.
 5. In the app: deactivate the 3 demo staff (they're linked to development Clerk users). Create the first owner with `scripts/create-owner.mts`. Sign in and set up the authenticator app. Then invite the real staff.
 6. Remove the demo data from the live site: `npx wrangler d1 execute victoria-hotel-db --remote --file db/demo-live-undo.sql` (switches off the demo extras, the WELCOME10 promo code, demo menu and stock items, and clears the demo room descriptions). Check it first: it only switches things off, it deletes nothing.

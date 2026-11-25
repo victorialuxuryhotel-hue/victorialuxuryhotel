@@ -5,6 +5,7 @@ import { hotelToday } from "@/lib/hotel-date";
 import { mediaUrl } from "@/lib/media";
 import { authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
+import { freeRooms, roomStays } from "../domain/inventory";
 
 export type BoardRoom = RoomTile & { categoryId: string; serviceStatus: "in_service" | "maintenance"; reservationId?: string };
 
@@ -18,13 +19,7 @@ export async function roomBoard(): Promise<BoardRoom[]> {
       `SELECT rm.id, rm.room_number, rm.floor, rm.readiness, rm.service_status, rm.maintenance_note, rm.category_id, c.name AS category_name
        FROM rooms rm JOIN room_categories c ON c.id = rm.category_id WHERE rm.is_active = 1`,
     ),
-    all<{ id: string; room_id: string; status: string; check_in: string; check_out: string; guest_name: string }>(
-      db,
-      `SELECT r.id, r.room_id, r.status, r.check_in, r.check_out, g.full_name AS guest_name
-       FROM reservations r JOIN guests g ON g.id = r.guest_id
-       WHERE r.room_id IS NOT NULL AND r.status IN ('checked_in', 'confirmed', 'pending_payment') AND r.check_in <= ?1 AND r.check_out >= ?1`,
-      today,
-    ),
+    roomStays(db, today),
   ]);
 
   const byRoom = new Map<string, typeof stays>();
@@ -61,19 +56,7 @@ export async function roomBoard(): Promise<BoardRoom[]> {
 
 export async function assignableRooms(reservationId: string, checkIn: string, checkOut: string) {
   await authorizeRead("reservations.manage");
-  const rows = await all<{ id: string; room_number: string; readiness: string; category_name: string }>(
-    await getDb(),
-    `SELECT rm.id, rm.room_number, rm.readiness, c.name AS category_name
-     FROM rooms rm JOIN room_categories c ON c.id = rm.category_id
-     WHERE rm.is_active = 1 AND rm.service_status = 'in_service'
-       AND NOT EXISTS (
-         SELECT 1 FROM reservations r
-         WHERE r.room_id = rm.id AND r.id <> ?1 AND r.status IN ('pending_payment', 'confirmed', 'checked_in')
-           AND r.check_in < ?3 AND r.check_out > ?2)`,
-    reservationId,
-    checkIn,
-    checkOut,
-  );
+  const rows = await freeRooms(await getDb(), reservationId, checkIn, checkOut);
   return rows
     .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
     .map((r) => ({ id: r.id, number: r.room_number, category: r.category_name, ready: r.readiness === "ready" }));

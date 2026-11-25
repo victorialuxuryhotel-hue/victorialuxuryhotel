@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { freeNights, searchAvailability } from "@/server/domain/inventory";
+import { freeNights, freeRooms, roomStays, searchAvailability } from "@/server/domain/inventory";
 import {
   assignRoom,
   cancelReservation,
@@ -140,6 +140,45 @@ describe("creating reservations", () => {
   it("requires a staff member (never a website visitor)", async () => {
     const c = await makeCategory(1);
     await rejects(createStaffReservation(db, null, { categoryId: c.id, checkIn: day(40), checkOut: day(41), guests: 1, source: "phone", fullName: "X Y" }), /session has ended/, "UNAUTHENTICATED");
+  });
+});
+
+describe("a room is occupied from check-in until check-out", () => {
+  /** A guest checked in to the category's first room whose check-out date passed two days ago. */
+  async function overstay(rooms: number) {
+    const c = await makeCategory(rooms);
+    const stay = await insertReservation({ categoryId: c.id, checkIn: day(-4), checkOut: day(-2), roomId: c.roomIds[0], status: "confirmed" });
+    await exec("UPDATE reservations SET status = 'checked_in' WHERE id = ?", stay);
+    return { c, stay, room: c.roomIds[0]! };
+  }
+  const free = async (categoryId: string, from: string, to: string) =>
+    (await searchAvailability(db, from, to, 1)).find((r) => r.category_id === categoryId)?.is_available;
+
+  it("the room board shows the overstayed room as occupied", async () => {
+    const { stay, room } = await overstay(2);
+    expect((await roomStays(db, day(0))).find((s) => s.room_id === room)).toMatchObject({ id: stay, status: "checked_in" });
+  });
+
+  it("the room picker never offers it", async () => {
+    const { c, room } = await overstay(2);
+    const b = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2), status: "confirmed" });
+    const offered = (await freeRooms(db, b, day(0), day(2))).map((r) => r.id);
+    expect(offered).not.toContain(room);
+    expect(offered).toContain(c.roomIds[1]);
+  });
+
+  it("assigning it fails with a clear message, and works once the guest is checked out", async () => {
+    const { c, stay, room } = await overstay(2);
+    const b = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2), status: "confirmed" });
+    await rejects(assignRoom(db, desk, b, room), /is occupied: .* is checked in, due out .* Check them out first/, "CONFLICT");
+    await exec("UPDATE reservations SET status = 'checked_out' WHERE id = ?", stay);
+    await assignRoom(db, desk, b, room);
+  });
+
+  it("the website has one room fewer of that type for tonight", async () => {
+    const { c } = await overstay(1);
+    expect(await free(c.id, day(0), day(1))).toBe(false);
+    expect(await free(c.id, day(1), day(2))).toBe(true);
   });
 });
 

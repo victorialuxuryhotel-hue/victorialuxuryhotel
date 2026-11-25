@@ -27,6 +27,26 @@ describe("room overlap", () => {
     await rejects(insertReservation({ categoryId: c.id, checkIn: day(11), checkOut: day(12), roomId: c.roomIds[0] }), /room_overlap/);
   });
 
+  it("a guest still checked in after their check-out date keeps the room", async () => {
+    const c = await makeCategory(2);
+    const stay = await insertReservation({ categoryId: c.id, checkIn: day(-3), checkOut: day(-1), roomId: c.roomIds[0], status: "confirmed" });
+    await exec("UPDATE reservations SET status = 'checked_in' WHERE id = ?", stay);
+    await rejects(insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), roomId: c.roomIds[0] }), /room_overlap/);
+    const later = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1) });
+    await rejects(exec("UPDATE reservations SET room_id = ? WHERE id = ?", c.roomIds[0], later), /room_overlap/);
+    // Once they are checked out, the room is free again.
+    await exec("UPDATE reservations SET status = 'checked_out' WHERE id = ?", stay);
+    await exec("UPDATE reservations SET room_id = ? WHERE id = ?", c.roomIds[0], later);
+  });
+
+  it("an overstaying guest counts against their room type", async () => {
+    const c = await makeCategory(1);
+    const stay = await insertReservation({ categoryId: c.id, checkIn: day(-3), checkOut: day(-1), roomId: c.roomIds[0], status: "confirmed" });
+    await exec("UPDATE reservations SET status = 'checked_in' WHERE id = ?", stay);
+    await rejects(insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2) }), /no_capacity/);
+    await insertReservation({ categoryId: c.id, checkIn: day(1), checkOut: day(2) });
+  });
+
   it("lets exactly one of two simultaneous assignments of the same room succeed", async () => {
     const c = await makeCategory(2);
     const a = await insertReservation({ categoryId: c.id, checkIn: day(20), checkOut: day(22) });
