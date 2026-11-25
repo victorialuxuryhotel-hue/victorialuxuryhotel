@@ -140,6 +140,11 @@ export function ReservationDetailView({
             <span className="font-mono">{r.reference}</span> · {bookingSource[r.source]} · created {formatDateTime(r.createdAt)}
             {r.createdBy ? ` by ${r.createdBy}` : ""}
           </p>
+          {/* One money line, so the first thing staff read is whether anything is owed. */}
+          <p className="mt-2 text-[15px] tabular-nums text-ink-700">
+            Total {formatNaira(r.totalKobo + (r.pendingKobo ?? 0))} · Paid {formatNaira(r.paidKobo)} ·{" "}
+            <span className={balance > 0 ? "font-semibold text-warning-700" : "text-ink-700"}>{balance > 0 ? `Owes ${formatNaira(balance)}` : "Nothing owed"}</span>
+          </p>
           {r.status === "pending_payment" && r.holdExpiresAt ? (
             <p className="mt-2 flex items-center gap-1.5 text-sm text-warning-700">
               <Clock className="size-4" aria-hidden /> Held until {formatDateTime(r.holdExpiresAt)}, then released if unpaid
@@ -188,40 +193,6 @@ export function ReservationDetailView({
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <div className="space-y-6">
-          <Card>
-            <CardHeader title="Stay" />
-            <div className="grid grid-cols-2 gap-x-4 gap-y-5 p-4 sm:gap-6 sm:p-5">
-              <Fact icon={CalendarDays} label="Dates">
-                {formatDate(r.checkIn)} → {formatDate(r.checkOut)}
-                <p className="text-sm text-ink-500">{plural(r.nights, "night")}</p>
-              </Fact>
-              <Fact icon={Users} label="Guests">{plural(r.guests, "guest")}</Fact>
-              <Fact icon={BedDouble} label="Booked">{r.category}</Fact>
-              <Fact icon={BedDouble} label="Room">
-                {r.roomNumber ? `Room ${r.roomNumber}` : <span className="text-ink-400">Not assigned</span>}
-              </Fact>
-            </div>
-            {r.specialRequests && !(canManage && (r.status === "checked_in" || open)) ? (
-              <div className="border-t border-hairline px-5 py-4">
-                <p className="text-xs uppercase tracking-wide text-ink-500">Special requests</p>
-                <p className="mt-1 text-sm text-ink-700">{r.specialRequests}</p>
-              </div>
-            ) : null}
-            {canManage && (open || r.status === "checked_in") ? (
-              <div className="border-t border-hairline xl:border-0">
-                <Collapsible id="change-stay" title={r.status === "pending_payment" ? "Change dates" : "Change dates or room"}>
-                  <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
-                  <ChangeDatesForm reservationId={r.id} checkIn={r.checkIn} checkOut={r.checkOut} inHouse={r.status === "checked_in"} />
-                  {r.status === "pending_payment" ? (
-                    <p className="border-t border-hairline bg-ivory-50 px-5 py-4 text-sm text-ink-600">A room is given automatically once the booking is paid.</p>
-                  ) : (
-                    <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} specialRequests={r.specialRequests} />
-                  )}
-                </Collapsible>
-              </div>
-            ) : null}
-          </Card>
-
           <Card>
             <CardHeader
               title="Payments"
@@ -311,6 +282,40 @@ export function ReservationDetailView({
                 </ul>
                 <p className="mt-2 text-xs text-ink-500">No money was received for these. They&apos;re kept for checking with Paystack.</p>
               </details>
+            ) : null}
+          </Card>
+
+          <Card>
+            <CardHeader title="Stay" />
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5 p-4 sm:gap-6 sm:p-5">
+              <Fact icon={CalendarDays} label="Dates">
+                {formatDate(r.checkIn)} → {formatDate(r.checkOut)}
+                <p className="text-sm text-ink-500">{plural(r.nights, "night")}</p>
+              </Fact>
+              <Fact icon={Users} label="Guests">{plural(r.guests, "guest")}</Fact>
+              <Fact icon={BedDouble} label="Booked">{r.category}</Fact>
+              <Fact icon={BedDouble} label="Room">
+                {r.roomNumber ? `Room ${r.roomNumber}` : <span className="text-ink-400">Not assigned</span>}
+              </Fact>
+            </div>
+            {r.specialRequests && !(canManage && (r.status === "checked_in" || open)) ? (
+              <div className="border-t border-hairline px-5 py-4">
+                <p className="text-xs uppercase tracking-wide text-ink-500">Special requests</p>
+                <p className="mt-1 text-sm text-ink-700">{r.specialRequests}</p>
+              </div>
+            ) : null}
+            {canManage && (open || r.status === "checked_in") ? (
+              <div className="border-t border-hairline xl:border-0">
+                <Collapsible id="change-stay" title={r.status === "pending_payment" ? "Change dates" : "Change dates or room"}>
+                  <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
+                  <ChangeDatesForm reservationId={r.id} checkIn={r.checkIn} checkOut={r.checkOut} inHouse={r.status === "checked_in"} />
+                  {r.status === "pending_payment" ? (
+                    <p className="border-t border-hairline bg-ivory-50 px-5 py-4 text-sm text-ink-600">A room is given automatically once the booking is paid.</p>
+                  ) : (
+                    <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} specialRequests={r.specialRequests} />
+                  )}
+                </Collapsible>
+              </div>
             ) : null}
           </Card>
         </div>

@@ -5,7 +5,7 @@ import { hotelToday } from "@/lib/hotel-date";
 import { mediaUrl } from "@/lib/media";
 import { authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
-import { freeRooms, roomStays } from "../domain/inventory";
+import { roomChoices, roomStays } from "../domain/inventory";
 
 export type BoardRoom = RoomTile & { categoryId: string; serviceStatus: "in_service" | "maintenance"; reservationId?: string };
 
@@ -56,10 +56,8 @@ export async function roomBoard(): Promise<BoardRoom[]> {
 
 export async function assignableRooms(reservationId: string, checkIn: string, checkOut: string) {
   await authorizeRead("reservations.manage");
-  const rows = await freeRooms(await getDb(), reservationId, checkIn, checkOut);
-  return rows
-    .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
-    .map((r) => ({ id: r.id, number: r.room_number, category: r.category_name, ready: r.readiness === "ready" }));
+  const rows = await roomChoices(await getDb(), reservationId, checkIn, checkOut, hotelToday());
+  return rows.map((r) => ({ id: r.id, number: r.room_number, category: r.category_name, ready: r.readiness === "ready", blocked: r.blocked ?? undefined }));
 }
 
 export async function listCategories(): Promise<CategoryRow[]> {

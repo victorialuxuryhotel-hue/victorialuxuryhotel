@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { freeNights, freeRooms, roomStays, searchAvailability } from "@/server/domain/inventory";
+import { freeNights, roomChoices, roomStays, searchAvailability } from "@/server/domain/inventory";
 import {
   assignRoom,
   cancelReservation,
@@ -159,12 +159,25 @@ describe("a room is occupied from check-in until check-out", () => {
     expect((await roomStays(db, day(0))).find((s) => s.room_id === room)).toMatchObject({ id: stay, status: "checked_in" });
   });
 
-  it("the room picker never offers it", async () => {
+  it("the room picker never offers it: it's greyed with who is in it", async () => {
     const { c, room } = await overstay(2);
     const b = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2), status: "confirmed" });
-    const offered = (await freeRooms(db, b, day(0), day(2))).map((r) => r.id);
-    expect(offered).not.toContain(room);
-    expect(offered).toContain(c.roomIds[1]);
+    const choices = await roomChoices(db, b, day(0), day(2), day(0));
+    expect(choices.find((r) => r.id === room)?.blocked).toMatch(/^Occupied · /);
+    expect(choices.find((r) => r.id === c.roomIds[1])?.blocked).toBeNull();
+  });
+
+  it("the picker greys rooms out of order, booked, or not clean for a guest arriving today", async () => {
+    const c = await makeCategory(3);
+    await exec("UPDATE rooms SET service_status = 'maintenance' WHERE id = ?", c.roomIds[0]);
+    await exec("UPDATE rooms SET readiness = 'needs_cleaning' WHERE id = ?", c.roomIds[1]);
+    const other = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
+    await exec("UPDATE reservations SET room_id = ? WHERE id = ?", c.roomIds[2], other);
+    const b = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
+    const why = async (checkIn: string, checkOut: string) => Object.fromEntries((await roomChoices(db, b, checkIn, checkOut, day(0))).filter((r) => c.roomIds.includes(r.id)).map((r) => [r.id, r.blocked]));
+    expect(await why(day(0), day(1))).toEqual({ [c.roomIds[0]!]: "Out of order", [c.roomIds[1]!]: "To clean", [c.roomIds[2]!]: expect.stringMatching(/^Booked · /) });
+    // For a later arrival, today's cleaning doesn't matter.
+    expect((await why(day(5), day(6)))[c.roomIds[1]!]).toBeNull();
   });
 
   it("assigning it fails with a clear message, and works once the guest is checked out", async () => {

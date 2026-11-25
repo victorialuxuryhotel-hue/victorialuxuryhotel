@@ -143,19 +143,37 @@ export function roomStays(db: Db, today: string) {
   );
 }
 
-/** Rooms in service and free for every night of the stay. A room with a guest checked in is never free. */
-export function freeRooms(db: Db, reservationId: string, checkIn: string, checkOut: string) {
-  return all<{ id: string; room_number: string; readiness: string; category_name: string }>(
+export type RoomChoice = { id: string; room_number: string; category_name: string; readiness: string; blocked: string | null };
+
+/**
+ * Every room for the room picker, with why it can't be chosen (UX brief): only free rooms can be
+ * picked, and for a guest arriving today or already in house only clean ones. Others are shown
+ * greyed: "Occupied · Adeyemi", "Booked · Eze", "Out of order", "Being cleaned", "To clean".
+ */
+export async function roomChoices(db: Db, reservationId: string, checkIn: string, checkOut: string, today: string): Promise<RoomChoice[]> {
+  const rows = await all<{ id: string; room_number: string; category_name: string; readiness: string; service_status: string; holder: string | null; holder_status: string | null }>(
     db,
-    `SELECT rm.id, rm.room_number, rm.readiness, c.name AS category_name
+    `SELECT rm.id, rm.room_number, c.name AS category_name, rm.readiness, rm.service_status,
+            (SELECT g.full_name FROM reservations r JOIN guests g ON g.id = r.guest_id
+              WHERE r.room_id = rm.id AND r.id <> ?1 AND r.status IN ('pending_payment', 'confirmed', 'checked_in')
+                AND r.check_in < ?3 AND ${stayEndSql("r")} > ?2 ORDER BY r.status = 'checked_in' DESC LIMIT 1) AS holder,
+            (SELECT r.status FROM reservations r
+              WHERE r.room_id = rm.id AND r.id <> ?1 AND r.status IN ('pending_payment', 'confirmed', 'checked_in')
+                AND r.check_in < ?3 AND ${stayEndSql("r")} > ?2 ORDER BY r.status = 'checked_in' DESC LIMIT 1) AS holder_status
      FROM rooms rm JOIN room_categories c ON c.id = rm.category_id
-     WHERE rm.is_active = 1 AND rm.service_status = 'in_service'
-       AND NOT EXISTS (
-         SELECT 1 FROM reservations r
-         WHERE r.room_id = rm.id AND r.id <> ?1 AND r.status IN ('pending_payment', 'confirmed', 'checked_in')
-           AND r.check_in < ?3 AND ${stayEndSql("r")} > ?2)`,
+     WHERE rm.is_active = 1`,
     reservationId,
     checkIn,
     checkOut,
   );
+  const last = (name: string) => name.trim().split(/\s+/).at(-1) ?? name;
+  return rows
+    .map((r) => {
+      let blocked: string | null = null;
+      if (r.service_status === "maintenance") blocked = "Out of order";
+      else if (r.holder) blocked = `${r.holder_status === "checked_in" ? "Occupied" : "Booked"} · ${last(r.holder)}`;
+      else if (checkIn <= today && r.readiness !== "ready") blocked = r.readiness === "cleaning_in_progress" ? "Being cleaned" : "To clean";
+      return { id: r.id, room_number: r.room_number, category_name: r.category_name, readiness: r.readiness, blocked };
+    })
+    .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }));
 }

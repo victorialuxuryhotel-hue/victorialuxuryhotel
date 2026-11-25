@@ -12,7 +12,8 @@ import { ActionButton } from "./action-form";
 import { useActionFeedback, withFeedback } from "./action-feedback";
 import { keepValues } from "@/lib/forms";
 
-export type RoomOption = { id: string; number: string; category: string; ready: boolean };
+/** blocked: why this room can't be chosen now ("Occupied · Adeyemi", "To clean", "Out of order"). */
+export type RoomOption = { id: string; number: string; category: string; ready: boolean; blocked?: string };
 
 type Size = "sm" | "md" | "lg";
 
@@ -116,7 +117,12 @@ export function AssignRoomForm({
   );
   const sameCategory = rooms.filter((r) => r.category === booked);
   const others = rooms.filter((r) => r.category !== booked);
-  const label = (r: RoomOption) => `Room ${r.number}${r.ready ? "" : " (not ready yet)"}`;
+  const label = (r: RoomOption) => `Room ${r.number}${r.blocked ? ` · ${r.blocked}` : ""}`;
+  const option = (r: RoomOption, withType = false) => (
+    <option key={r.id} value={r.id} disabled={Boolean(r.blocked) || r.number === current}>
+      {label(r)}{withType ? ` · ${r.category}` : ""}{r.number === current ? " (current)" : ""}
+    </option>
+  );
   return (
     <form action={action} onSubmit={keepValues(action)} className="flex flex-col gap-3 border-t border-hairline bg-ivory-50 px-5 py-4">
       <input type="hidden" name="reservationId" value={reservationId} />
@@ -130,14 +136,14 @@ export function AssignRoomForm({
         <Field label={current ? `Change room (now ${current})` : "Assign a room"} htmlFor="room" className="flex-1">
           <Select id="room" name="roomId" value={chosen} onChange={(e) => setChosen(e.target.value)} required>
             <option value="" disabled>
-              {rooms.length ? `Choose a room` : "No free rooms for these dates"}
+              {rooms.some((r) => !r.blocked) ? "Choose a room" : "No free rooms for these dates"}
             </option>
             {sameCategory.length ? (
-              <optgroup label={booked}>{sameCategory.map((r) => <option key={r.id} value={r.id}>{label(r)}</option>)}</optgroup>
+              <optgroup label={booked}>{sameCategory.map((r) => option(r))}</optgroup>
             ) : null}
             {others.length ? (
               <optgroup label="Other room types (upgrade or move)">
-                {others.map((r) => <option key={r.id} value={r.id}>{label(r)} · {r.category}</option>)}
+                {others.map((r) => option(r, true))}
               </optgroup>
             ) : null}
           </Select>
