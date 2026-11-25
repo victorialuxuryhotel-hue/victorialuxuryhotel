@@ -1,3 +1,4 @@
+import { stayPrice } from "@/domain/pricing";
 import { AppError } from "@/lib/errors";
 import { formatDate, formatNaira } from "@/lib/format";
 import { hotelToday, nightsBetween } from "@/lib/hotel-date";
@@ -125,7 +126,6 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
   }
 
   const nights = nightsBetween(input.checkIn, input.checkOut);
-  const total = cat.nightly_rate_kobo * nights;
 
   const ids = [...new Set(input.extraIds ?? [])].slice(0, 20);
   const extras = ids.length
@@ -136,12 +136,15 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
       )
     : [];
   if (extras.length !== ids.length) throw new AppError("VALIDATION", "One of the extras is no longer available. Please choose again.");
-  const extrasKobo = extras.reduce((sum, e) => sum + e.price_kobo * (e.per_night ? nights : 1), 0);
 
   const code = input.promoCode?.trim().toUpperCase() || null;
   const promo = code ? await validPromo(db, code) : null;
   const discountPct = promo?.percent_off ?? 0;
-  const discountKobo = Math.round((total * discountPct) / 100);
+  // The same function the booking form uses to show the total.
+  const price = stayPrice({ nightlyRateKobo: cat.nightly_rate_kobo, nights, extras: extras.map((e) => ({ priceKobo: e.price_kobo, perNight: e.per_night === 1 })), discountPct });
+  const total = price.roomKobo;
+  const extrasKobo = price.extrasKobo;
+  const discountKobo = price.discountKobo;
   const holdExpiresAt = new Date(Date.now() + input.holdMinutes * 60_000).toISOString();
 
   for (let attempt = 1; ; attempt++) {

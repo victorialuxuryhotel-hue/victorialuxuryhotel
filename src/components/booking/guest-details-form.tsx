@@ -17,6 +17,8 @@ export function GuestDetailsForm({
   total,
   extras = [],
   nights = 1,
+  chosen,
+  onToggle,
 }: {
   action: Action;
   hidden: Record<string, string>;
@@ -24,6 +26,9 @@ export function GuestDetailsForm({
   total?: string;
   extras?: Array<{ id: string; name: string; price_kobo: number; per_night: number }>;
   nights?: number;
+  /** Extras ticked, kept by the page so the totals can follow (see DetailsStep). */
+  chosen?: Set<string>;
+  onToggle?: (id: string, on: boolean) => void;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
   const err = (n: string) => (state && !state.ok ? state.fieldErrors?.[n]?.[0] : undefined);
@@ -52,7 +57,14 @@ export function GuestDetailsForm({
           <div className="mt-3 divide-y divide-hairline rounded-md border border-hairline">
             {extras.map((e) => (
               <label key={e.id} className="flex min-h-13 cursor-pointer items-center gap-3 px-4 py-3 has-[:checked]:bg-navy-50">
-                <input type="checkbox" name="extra" value={e.id} className="size-5 shrink-0 accent-navy-800" />
+                <input
+                  type="checkbox"
+                  name="extra"
+                  value={e.id}
+                  checked={chosen ? chosen.has(e.id) : undefined}
+                  onChange={onToggle ? (ev) => onToggle(e.id, ev.target.checked) : undefined}
+                  className="size-5 shrink-0 accent-navy-800"
+                />
                 <span className="flex-1 text-[15px] text-ink-900">{e.name}</span>
                 <span className="text-right text-sm tabular-nums text-ink-700">
                   {formatNaira(e.price_kobo * (e.per_night ? nights : 1))}
