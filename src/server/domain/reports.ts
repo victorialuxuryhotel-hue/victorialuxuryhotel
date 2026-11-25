@@ -3,6 +3,14 @@ import { HOTEL_REPORTERS, all, first, requireRole, type Actor, type Db } from ".
 
 export type ReportRange = "today" | "7d" | "14d" | "month" | `${number}-${number}`;
 
+const FIXED_RANGE_LABEL = { today: "Today", "7d": "7 days", "14d": "14 days", month: "This month" } as const;
+
+/** A label for any range reportRange() can return: a fixed period, or a past month ("October 2026"). */
+export function rangeLabel(range: ReportRange): string {
+  if (range in FIXED_RANGE_LABEL) return FIXED_RANGE_LABEL[range as keyof typeof FIXED_RANGE_LABEL];
+  return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${range}-01T00:00:00Z`));
+}
+
 const MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/;
 export const FIRST_MONTH = "2026-11";
 

@@ -15,7 +15,7 @@ import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { getDb } from "@/server/db";
 import { MENU_CATEGORIES, OUTLETS, PAY_METHODS, type Outlet, type PayMethod } from "@/server/domain/pos";
 import { posReport, type PosRange } from "@/server/domain/pos-reports";
-import { recentMonths, reportRange } from "@/server/domain/reports";
+import { rangeLabel, recentMonths, reportRange } from "@/server/domain/reports";
 
 export const metadata: Metadata = { title: "Sales reports" };
 
@@ -60,7 +60,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     }
     return `/app/sales/reports?${p}`;
   };
-  const rangeName = range in FIXED ? FIXED[range as keyof typeof FIXED] : monthName(range);
+  const rangeName = rangeLabel(range);
   const months = recentMonths(businessDate()).slice(1);
   const days = [...r.daily].reverse().filter((d) => d.kobo || d.day === businessDate());
   const stat = (label: string, value: string, sub?: string, bad = false) => (
@@ -102,9 +102,16 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <a href={`/app/sales/orders/csv?from=${r.from}&to=${r.to}${outlet ? `&outlet=${outlet}` : ""}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Orders (CSV)</a>
-        <a href={`/app/sales/reports/items-csv?range=${range}${outlet ? `&outlet=${outlet}` : ""}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Sales by item (CSV)</a>
-        <a href={`/app/sales/reports/stock-csv?range=${range}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Stock (CSV)</a>
+        {[
+          ["Orders", `/app/sales/orders/csv?from=${r.from}&to=${r.to}${outlet ? `&outlet=${outlet}` : ""}`],
+          ["Sales by item", `/app/sales/reports/items-csv?range=${range}${outlet ? `&outlet=${outlet}` : ""}`],
+          ["Stock", `/app/sales/reports/stock-csv?range=${range}`],
+        ].map(([label, href]) => (
+          <span key={label} className="inline-flex">
+            <a href={`${href}&format=xlsx`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> {label} (Excel)</a>
+            <a href={href} className={buttonStyles({ variant: "ghost", size: "sm" })} aria-label={`${label} as CSV`}>CSV</a>
+          </span>
+        ))}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -117,8 +124,8 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           <Table head={["Method", "Amount"]} rows={(Object.keys(PAY_METHODS) as PayMethod[]).map((m) => [PAY_METHODS[m], formatNaira(r.byMethod[m])])} empty="No sales." />
         </Card>
         <Card>
-          <CardHeader title="By attendant" />
-          <Table head={["Attendant", "Sales", "Amount"]} rows={r.byStaff.map((s) => [s.who, s.n, formatNaira(s.kobo)])} empty="No sales." />
+          <CardHeader title="By salesperson" />
+          <Table head={["Sold by", "Sales", "Amount"]} rows={r.byStaff.map((s) => [s.who, s.n, formatNaira(s.kobo)])} empty="No sales." />
         </Card>
         <Card>
           <CardHeader title="By category" />

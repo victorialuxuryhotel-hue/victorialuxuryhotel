@@ -4,8 +4,8 @@ import { createWebsiteReservation } from "@/server/domain/reservations";
 import { createHallBooking, recordHallPayment } from "@/server/domain/events";
 import { financeSummary } from "@/server/domain/finance";
 import { payOrder, saveMenuItem } from "@/server/domain/pos";
-import { csvField, incomeReport, incomeRows, occupancyReport, rangeDates, recentMonths, reportRange } from "@/server/domain/reports";
-import { addDays, hotelInstant, hotelToday } from "@/lib/hotel-date";
+import { csvField, incomeReport, incomeRows, occupancyReport, rangeDates, rangeLabel, recentMonths, reportRange } from "@/server/domain/reports";
+import { addDays, businessDate, hotelInstant, hotelToday } from "@/lib/hotel-date";
 import { day, db, desk, exec, gm, insertReservation, makeCategory, owner, rejects, rawPayment } from "./helpers";
 
 async function booking() {
@@ -24,6 +24,11 @@ describe("report ranges (Lagos dates)", () => {
     expect(rangeDates("month", "2026-12-09").days).toHaveLength(9);
     expect(rangeDates("month", "2026-12-01").days).toEqual(["2026-12-01"]);
     expect([reportRange("month"), reportRange("bogus"), reportRange(undefined)]).toEqual(["month", "14d", "14d"]);
+  });
+
+  it("every range the parser can return has a label (the default 14 days used to crash Sales reports)", () => {
+    const ranges = [undefined, "bogus", "today", "7d", "14d", "month", "2026-11"].map((r) => reportRange(r, "2027-01-15"));
+    expect(ranges.map(rangeLabel)).toEqual(["14 days", "14 days", "Today", "7 days", "14 days", "This month", "November 2026"]);
   });
 
   it("a past month runs first to last day; this month or a future one isn't a past month", () => {
@@ -63,18 +68,20 @@ describe("income by day, by staff and method, and the accountant's download", ()
     await recordHallPayment(db, desk, { bookingId: hall, amountKobo: 4_000_000, method: "bank_transfer", paidOn: day(0), reference: "TRF-1" });
 
     const after = await incomeReport(db, gm, "today");
+    // Restaurant & bar sales belong to the trading day (5am to 5am): between midnight and 5am they count for yesterday.
+    const bar = businessDate() === today ? 700_000 : 0;
     const d0 = before.daily[0]!;
     const d1 = after.daily[0]!;
     expect(d1.rooms - d0.rooms).toBe(5_000_000 + 2_000_000 - 1_000_000 + 300_000);
-    expect(d1.bar - d0.bar).toBe(700_000);
+    expect(d1.bar - d0.bar).toBe(bar);
     expect(d1.hall - d0.hall).toBe(4_000_000);
-    expect(after.total - before.total).toBe(6_300_000 + 700_000 + 4_000_000);
+    expect(after.total - before.total).toBe(6_300_000 + bar + 4_000_000);
 
     const t0 = mine(before);
     const t1 = mine(after);
     expect(t1.byMethod.cash - t0.byMethod.cash).toBe(5_300_000);
     expect(t1.byMethod.transfer - t0.byMethod.transfer).toBe(2_000_000 + 4_000_000);
-    expect(t1.byMethod.pos - t0.byMethod.pos).toBe(700_000);
+    expect(t1.byMethod.pos - t0.byMethod.pos).toBe(bar);
 
     const s = await financeSummary(db, gm, "today");
     expect(s.incomeTotal).toBe(after.total);
@@ -86,9 +93,9 @@ describe("income by day, by staff and method, and the accountant's download", ()
   });
 
   it("are for finance, managers and the owner only", async () => {
-    await rejects(incomeReport(db, desk, "14d"), /role does not allow/);
-    await rejects(incomeRows(db, desk, "14d"), /role does not allow/);
-    await rejects(occupancyReport(db, desk, "14d"), /role does not allow/);
+    await rejects(incomeReport(db, desk, "14d"), /role can't do this/);
+    await rejects(incomeRows(db, desk, "14d"), /role can't do this/);
+    await rejects(occupancyReport(db, desk, "14d"), /role can't do this/);
   });
 });
 

@@ -154,8 +154,11 @@ export function ActivityLog({ p, rows, total, people, today, size }: {
         />
       </div>
 
+      <a href={`/app/reports/activity-csv?${csv.toString()}&format=xlsx`} className={buttonStyles({ variant: "ghost", className: "w-full sm:w-auto" })}>
+        <Download className="size-4" aria-hidden /> Download Excel
+      </a>
       <a href={`/app/reports/activity-csv?${csv.toString()}`} className={buttonStyles({ variant: "ghost", className: "w-full sm:w-auto" })}>
-        <Download className="size-4" aria-hidden /> Download CSV
+        <Download className="size-4" aria-hidden /> CSV
       </a>
     </div>
   );

@@ -2,6 +2,7 @@ import "server-only";
 import { toActionError } from "@/lib/errors";
 import type { Staff } from "./auth";
 import { getDb } from "./db";
+import { buildXlsx } from "@/lib/xlsx";
 import { csvField } from "./domain/reports";
 
 export const lagosDate = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
@@ -14,6 +15,22 @@ export function csvResponse(filename: string, header: string[], rows: (string | 
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
+export type DownloadFormat = "csv" | "xlsx";
+
+export const downloadFormat = (request: Request): DownloadFormat => (new URL(request.url).searchParams.get("format") === "xlsx" ? "xlsx" : "csv");
+
+/** A table as CSV, or as an Excel workbook when the request asks for `?format=xlsx`. `filename` is given without an extension. */
+export function tableResponse(request: Request, filename: string, sheetName: string, header: string[], rows: (string | number | null)[][]): Response {
+  if (downloadFormat(request) === "csv") return csvResponse(`${filename}.csv`, header, rows);
+  return new Response(buildXlsx(sheetName, header, rows), {
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}.xlsx"`,
       "Cache-Control": "private, no-store",
     },
   });

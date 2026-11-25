@@ -1,5 +1,5 @@
 import { actorOf, authorizeRead } from "@/server/auth";
-import { csvResponse, deniedResponse, naira, logDownload } from "@/server/csv";
+import { tableResponse, deniedResponse, naira, logDownload } from "@/server/csv";
 import { getDb } from "@/server/db";
 import { MENU_CATEGORIES, OUTLETS, type Outlet } from "@/server/domain/pos";
 import { posReport } from "@/server/domain/pos-reports";
@@ -16,8 +16,10 @@ export async function GET(request: Request) {
   const outlet = q.get("outlet") === "restaurant" || q.get("outlet") === "bar" ? (q.get("outlet") as Outlet) : null;
   const r = await posReport(await getDb(), actorOf(staff), reportRange(q.get("range") ?? undefined), outlet);
   await logDownload(staff, `restaurant & bar sales by item, ${r.from} to ${r.to}`, { from: r.from, to: r.to, outlet });
-  return csvResponse(
-    `restaurant-bar-items-${r.from}-to-${r.to}.csv`,
+  return tableResponse(
+    request,
+    `restaurant-bar-items-${r.from}-to-${r.to}`,
+    "Sales by item",
     ["Item", "Counter", "Quantity sold", "Sales (NGN)"],
     [
       ...r.byItem.map((i) => [i.name, OUTLETS[i.outlet], i.qty, naira(i.kobo)]),

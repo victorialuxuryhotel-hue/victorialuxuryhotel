@@ -64,7 +64,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           </Select>
         </label>
         {viewer ? (
-          <label className="text-[13px] text-ink-700">Attendant
+          <label className="text-[13px] text-ink-700">Sold by
             <Select name="staff" defaultValue={f.staffId ?? ""} className="mt-1">
               <option value="">Everyone</option>
               {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -90,7 +90,10 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           </p>
         ) : null}
         {viewer ? (
-          <a href={`/app/sales/orders/csv?${query}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Download (CSV)</a>
+          <>
+            <a href={`/app/sales/orders/csv?${query}&format=xlsx`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Download (Excel)</a>
+            <a href={`/app/sales/orders/csv?${query}`} className={buttonStyles({ variant: "ghost", size: "sm" })}>CSV</a>
+          </>
         ) : null}
       </div>
 

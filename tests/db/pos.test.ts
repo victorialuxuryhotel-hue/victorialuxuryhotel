@@ -18,7 +18,7 @@ import {
 import { posReport } from "@/server/domain/pos-reports";
 import { incomeRows } from "@/server/domain/reports";
 import { addStockItem, recordMove } from "@/server/domain/stock";
-import { hotelToday } from "@/lib/hotel-date";
+import { businessDate, hotelToday } from "@/lib/hotel-date";
 import { db, exec, gm, owner, q, q1, rejects } from "./helpers";
 
 const rand = () => crypto.randomUUID().slice(0, 6);
@@ -44,8 +44,8 @@ describe("restaurant & bar menu", () => {
   it("managers keep the menu; attendants and the general manager can't; unavailable items can't be sold", async () => {
     const mgr = await staff("restaurant_bar_manager");
     const att = await staff("restaurant_bar");
-    await rejects(saveMenuItem(db, att, { name: "Nope", outlet: "bar", category: "other", priceKobo: 100, available: true, active: true }), /role does not allow/);
-    await rejects(saveMenuItem(db, gm, { name: "Nope", outlet: "bar", category: "other", priceKobo: 100, available: true, active: true }), /role does not allow/);
+    await rejects(saveMenuItem(db, att, { name: "Nope", outlet: "bar", category: "other", priceKobo: 100, available: true, active: true }), /role can't do this/);
+    await rejects(saveMenuItem(db, gm, { name: "Nope", outlet: "bar", category: "other", priceKobo: 100, available: true, active: true }), /role can't do this/);
     const id = await saveMenuItem(db, mgr, { name: `Suya ${rand()}`, outlet: "restaurant", category: "snacks", priceKobo: 250_000, available: false, active: true });
     expect((await listMenu(db, att)).find((m) => m.id === id)).toMatchObject({ category: "snacks", is_available: 0 });
     await rejects(payOrder(db, att, { id: crypto.randomUUID(), outlet: "restaurant", lines: [{ menuItemId: id, quantity: 1 }], method: "cash" }), /unavailable today/);
@@ -113,7 +113,7 @@ describe("selling", () => {
     await rejects(exec("UPDATE pos_orders SET total_kobo = 1 WHERE id = ?", sale.id), /order_immutable/);
     await rejects(exec("DELETE FROM pos_orders WHERE id = ?", sale.id), /order_immutable/);
     await rejects(exec("UPDATE pos_order_items SET quantity = 1 WHERE order_id = ?", sale.id), /order_immutable/);
-    await rejects(voidOrder(db, att, sale.id, "Mistake"), /role does not allow/);
+    await rejects(voidOrder(db, att, sale.id, "Mistake"), /role can't do this/);
     await rejects(voidOrder(db, mgr, sale.id, "x"), /Give a reason/);
     await voidOrder(db, mgr, sale.id, "Rang up twice");
     expect(await onHand(stockId)).toBe(5);
@@ -129,7 +129,7 @@ describe("selling", () => {
     const { itemId } = await drink(mgr, 10);
     const s1 = await payOrder(db, a1, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" });
     const s2 = await payOrder(db, a2, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" });
-    const today = hotelToday();
+    const today = businessDate();
     const mine = await listOrders(db, a1, { from: today, to: today });
     expect(mine.some((o) => o.id === s1.id)).toBe(true);
     expect(mine.some((o) => o.id === s2.id)).toBe(false);
@@ -157,7 +157,7 @@ describe("daily closing", () => {
     await rejects(closeDay(db, att, { countedCashKobo: 300_000, explanation: null }), /already closed/);
     await rejects(payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" }), /already closed today/);
 
-    await rejects(verifyClosing(db, att, id, null), /role does not allow/);
+    await rejects(verifyClosing(db, att, id, null), /role can't do this/);
     await verifyClosing(db, mgr, id, "Checked the till");
     await rejects(verifyClosing(db, mgr, id, null), /already signed off/);
     await rejects(exec("UPDATE pos_closings SET counted_cash_kobo = 300000 WHERE id = ?", id), /closing_immutable/);
@@ -192,10 +192,12 @@ describe("restaurant & bar reports and the hotel's books", () => {
     expect(bar.byCategory.find((c) => c.category === "soft_drinks")!.kobo).toBeGreaterThanOrEqual(200_000);
 
     const after = await financeSummary(db, gm, "today");
-    expect(after.income.bar - before.income.bar).toBe(200_000);
-    expect(after.income.restaurant - before.income.restaurant).toBe(850_000);
+    // The hotel's "today" is the calendar day; sales between midnight and 5am belong to yesterday's trading day.
+    const sameDay = businessDate() === hotelToday();
+    expect(after.income.bar - before.income.bar).toBe(sameDay ? 200_000 : 0);
+    expect(after.income.restaurant - before.income.restaurant).toBe(sameDay ? 850_000 : 0);
     expect(after.income.rooms).toBe(before.income.rooms);
-    const rows = await incomeRows(db, gm, "today");
+    const rows = await incomeRows(db, gm, sameDay ? "today" : "7d");
     expect(rows.find((r) => r.document === food.receiptNumber)).toMatchObject({ department: "restaurant", method: "transfer", kobo: 850_000 });
     expect(rows.some((r) => r.document === oops.receiptNumber)).toBe(false);
   });
@@ -207,8 +209,8 @@ describe("restaurant & bar reports and the hotel's books", () => {
     await rejects(recordMove(db, mgr, { itemId: stockId, kind: "wasted", quantity: 2, note: null }), /Say what happened/);
     await recordMove(db, mgr, { itemId: stockId, kind: "wasted", quantity: 2, note: "2 bottles broken" });
     expect(await onHand(stockId)).toBe(4);
-    await rejects(recordMove(db, await staff("restaurant_bar"), { itemId: stockId, kind: "received", quantity: 1, note: null }), /role does not allow/);
-    await rejects(payOrder(db, fin, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" }), /role does not allow/);
+    await rejects(recordMove(db, await staff("restaurant_bar"), { itemId: stockId, kind: "received", quantity: 1, note: null }), /role can't do this/);
+    await rejects(payOrder(db, fin, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" }), /role can't do this/);
     const rep = await posReport(db, fin, "today", "restaurant");
     expect(rep).not.toHaveProperty("expensesKobo");
   });
