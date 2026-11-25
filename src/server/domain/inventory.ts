@@ -11,24 +11,35 @@ export const stayEndSql = (a: string) => `(CASE WHEN ${a}.status = 'checked_in' 
 
 export const LIVE_SQL = `(r.status IN ('confirmed', 'checked_in') OR (r.status = 'pending_payment' AND r.hold_expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))`;
 
+/** Rooms of a type that can be sold: active and not out of order. */
+export const roomsInServiceSql = (category: string) =>
+  `(SELECT count(*) FROM rooms WHERE category_id = ${category} AND is_active = 1 AND service_status = 'in_service')`;
+
+/**
+ * Stays of a type that hold a room on one night: live bookings and unexpired holds, counted against
+ * the type of the room they're in (a moved guest counts where they sleep), with an overstaying guest
+ * held until checked out. `exclude` leaves out the booking being changed.
+ */
+export const takenOnNightSql = (category: string, night: string, exclude?: string) =>
+  `(SELECT count(*) FROM reservations r LEFT JOIN rooms rm ON rm.id = r.room_id
+    WHERE r.check_in <= ${night} AND ${stayEndSql("r")} > ${night} AND ${LIVE_SQL}
+      AND coalesce(rm.category_id, r.category_id) = ${category}${exclude ? ` AND r.id IS NOT ${exclude}` : ""})`;
+
+/**
+ * THE definition of "free" for one room type on one night. The website search, the staff booking
+ * form, Today and the calendar all count with this, so they can't disagree (tests/db/availability.test.ts).
+ * The database triggers (0014) enforce the same rule at write time; keep them in step.
+ * Negative means overbooked. Nights come from the `calendar` table, which runs to 2045-12-31.
+ */
+export const freeOnNightSql = (category: string, night: string, exclude?: string) =>
+  `(${roomsInServiceSql(category)} - ${takenOnNightSql(category, night, exclude)})`;
+
+/** Free rooms of a type across a stay: the tightest night. */
+const freeForStaySql = (category: string, from: string, to: string, exclude?: string) =>
+  `coalesce((SELECT min(${freeOnNightSql(category, "cal.d", exclude)}) FROM calendar cal WHERE cal.d >= ${from} AND cal.d < ${to}), ${roomsInServiceSql(category)})`;
+
 export async function freeUnits(db: Db, categoryId: string, checkIn: string, checkOut: string, excludeReservationId: string | null = null): Promise<number> {
-  const row = await first<{ free: number }>(
-    db,
-    `SELECT
-       (SELECT count(*) FROM rooms WHERE category_id = ?1 AND is_active = 1 AND service_status = 'in_service')
-       - coalesce((
-           SELECT max((
-             SELECT count(*) FROM reservations r LEFT JOIN rooms rm ON rm.id = r.room_id
-             WHERE r.check_in <= c.d AND ${stayEndSql("r")} > c.d AND r.id IS NOT ?4 AND ${LIVE_SQL}
-               AND coalesce(rm.category_id, r.category_id) = ?1
-           ))
-           FROM calendar c WHERE c.d >= ?2 AND c.d < ?3
-         ), 0) AS free`,
-    categoryId,
-    checkIn,
-    checkOut,
-    excludeReservationId,
-  );
+  const row = await first<{ free: number }>(db, `SELECT ${freeForStaySql("?1", "?2", "?3", "?4")} AS free`, categoryId, checkIn, checkOut, excludeReservationId);
   return row?.free ?? 0;
 }
 
@@ -50,15 +61,7 @@ export async function searchAvailability(db: Db, checkIn: string, checkOut: stri
   const { results } = await db
     .prepare(
       `SELECT c.id AS category_id, c.slug, c.name, c.short_description, c.max_occupancy, c.nightly_rate_kobo,
-         (SELECT count(*) FROM rooms WHERE category_id = c.id AND is_active = 1 AND service_status = 'in_service')
-         - coalesce((
-             SELECT max((
-               SELECT count(*) FROM reservations r LEFT JOIN rooms rm ON rm.id = r.room_id
-               WHERE r.check_in <= cal.d AND ${stayEndSql("r")} > cal.d AND ${LIVE_SQL}
-                 AND coalesce(rm.category_id, r.category_id) = c.id
-             ))
-             FROM calendar cal WHERE cal.d >= ?1 AND cal.d < ?2
-           ), 0) AS free
+         ${freeForStaySql("c.id", "?1", "?2")} AS free
        FROM room_categories c
        WHERE c.is_active = 1
        ORDER BY c.sort_order, c.nightly_rate_kobo`,
@@ -78,11 +81,7 @@ export async function freeNights(db: Db, slugs: string[], from: string, to: stri
   if (slugs.length === 0 || to <= from) return out;
   const { results } = await db
     .prepare(
-      `SELECT c.slug, cal.d,
-         (SELECT count(*) FROM rooms WHERE category_id = c.id AND is_active = 1 AND service_status = 'in_service')
-         > (SELECT count(*) FROM reservations r LEFT JOIN rooms rm ON rm.id = r.room_id
-            WHERE r.check_in <= cal.d AND ${stayEndSql("r")} > cal.d AND ${LIVE_SQL}
-              AND coalesce(rm.category_id, r.category_id) = c.id) AS is_free
+      `SELECT c.slug, cal.d, ${freeOnNightSql("c.id", "cal.d")} > 0 AS is_free
        FROM room_categories c JOIN calendar cal ON cal.d >= ?1 AND cal.d < ?2
        WHERE c.is_active = 1 AND c.slug IN (${slugs.map((_, i) => `?${i + 3}`).join(", ")})`,
     )
