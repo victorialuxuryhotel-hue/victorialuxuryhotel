@@ -98,10 +98,9 @@ or cancelled); applying one before payment needs the General Manager or Owner an
 
 ### What 0018 changes
 
-`migrations/0018_vat_on_receipts.sql`: adds `hotel_settings.vat_on_receipts` (default 0, off). One column;
-the VAT rate is kept. Receipts, bills, the till, reports and the income download show VAT only when
-"Show VAT on receipts and reports" is ticked in Booking rules. Tick it once the hotel confirms it is
-VAT-registered (VAT is outside the contract, Schedule B).
+`migrations/0018_vat_on_receipts.sql`: adds `hotel_settings.vat_on_receipts` and switches it on, because
+the hotel is VAT-registered (confirmed 25 Nov). The rate is kept (7.5%). Receipts, bills, the till, reports and
+the income download show "Includes VAT (7.5%)". It can be switched off in Booking rules if that ever changes.
 
 ### Proof that data is kept
 

@@ -5,17 +5,16 @@ import { incomeReport } from "@/server/domain/reports";
 import { db, desk, exec, gm, owner, rejects } from "./helpers";
 
 describe("finance", () => {
-  it("VAT is off by default (fix 9): no VAT shown until the hotel switches it on in Booking rules", async () => {
+  it("VAT shows at the hotel's rate while 'Show VAT on receipts' is on (it is: the hotel is VAT-registered); off hides it", async () => {
     const fin: Actor = { id: owner!.id, role: "finance" };
-    const off = await financeSummary(db, fin, "month");
-    expect(off).toMatchObject({ vatRateBp: 0, vatKobo: 0 });
-    await exec("UPDATE hotel_settings SET vat_on_receipts = 1 WHERE id = 1");
+    const on = await financeSummary(db, fin, "month");
+    expect(on.vatRateBp).toBe(750);
+    expect(on.vatKobo).toBe(Math.round((on.incomeTotal * 750) / 10_750));
+    await exec("UPDATE hotel_settings SET vat_on_receipts = 0 WHERE id = 1");
     try {
-      const on = await financeSummary(db, fin, "month");
-      expect(on.vatRateBp).toBe(750);
-      expect(on.vatKobo).toBe(Math.round((on.incomeTotal * 750) / 10_750));
+      expect(await financeSummary(db, fin, "month")).toMatchObject({ vatRateBp: 0, vatKobo: 0 });
     } finally {
-      await exec("UPDATE hotel_settings SET vat_on_receipts = 0 WHERE id = 1");
+      await exec("UPDATE hotel_settings SET vat_on_receipts = 1 WHERE id = 1");
     }
   });
 

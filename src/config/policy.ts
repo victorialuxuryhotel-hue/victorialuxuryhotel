@@ -20,5 +20,5 @@ export const policy = {
   /** 7.8 One payer for several rooms: not supported; each booking is paid separately. */
   groupPayments: false,
   // 7.4 Early departure refunds: unused nights refunded on request, approved by the General Manager or Owner.
-  // 7.9 VAT on receipts: off unless switched on in Booking rules.
+  // 7.9 VAT on receipts: on (the hotel is VAT-registered); a Booking rules setting, rate 7.5%.
 } as const;
