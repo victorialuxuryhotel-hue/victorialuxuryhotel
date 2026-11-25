@@ -1,6 +1,8 @@
 import { Sparkles, User, Wrench } from "lucide-react";
 import { roomBoardState, type RoomBoardState } from "@/domain/status";
 import type { RoomTile } from "@/domain/views";
+import { surname } from "@/domain/room-board";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 import { ReadinessBadge } from "./badges";
 import { RoomTile as InteractiveTile } from "./room-tile";
@@ -69,7 +71,9 @@ export function RoomBoard({ rooms, interactive = true }: { rooms: Array<RoomTile
                           <span className="text-lg font-semibold tabular-nums text-ink-900">{r.number}</span>
                           <span className="truncate text-xs text-ink-500">{r.category}</span>
                         </div>
-                        <p className="mt-1 text-xs font-medium text-ink-700">{roomBoardState[r.state].label}</p>
+                        <p className={cn("mt-1 text-xs font-medium", r.due === "overdue" ? "text-danger-700" : "text-ink-700")}>
+                          {r.due === "overdue" && r.until ? `Overdue since ${formatDate(r.until, { year: false })}` : r.due === "today" ? "Due out today" : roomBoardState[r.state].label}
+                        </p>
                         <div className="mt-2 flex min-h-5 min-w-0 items-center gap-1.5 text-xs text-ink-500">
                           {r.state === "maintenance" ? (
                             <>
@@ -78,7 +82,7 @@ export function RoomBoard({ rooms, interactive = true }: { rooms: Array<RoomTile
                           ) : r.guestName ? (
                             <>
                               <User className="size-3.5 shrink-0" aria-hidden />
-                              <span className="truncate">{r.guestName}</span>
+                              <span className="truncate" title={r.guestName}>{surname(r.guestName)}</span>
                             </>
                           ) : r.readiness !== "ready" ? (
                             <>

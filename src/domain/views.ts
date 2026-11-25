@@ -73,6 +73,8 @@ export type RoomTile = {
   guestName?: string;
   until?: string;
   note?: string;
+  /** Occupied rooms: the guest is due out today, or should have left already. */
+  due?: "today" | "overdue";
 };
 
 export type CategoryRow = {

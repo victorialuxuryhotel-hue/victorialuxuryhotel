@@ -59,8 +59,8 @@ export type StaffRole = keyof typeof staffRole;
 export const roomBoardState = {
   occupied: { label: "Occupied", tone: "brand" },
   arriving: { label: "Arriving", tone: "info" },
-  available: { label: "Available", tone: "success" },
-  dirty: { label: "Needs cleaning", tone: "warning" },
-  maintenance: { label: "Maintenance", tone: "danger" },
+  available: { label: "Ready", tone: "success" },
+  dirty: { label: "To clean", tone: "warning" },
+  maintenance: { label: "Out of order", tone: "danger" },
 } as const satisfies Record<string, { label: string; tone: Tone }>;
 export type RoomBoardState = keyof typeof roomBoardState;

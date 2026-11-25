@@ -1,5 +1,5 @@
 import "server-only";
-import type { RoomBoardState } from "@/domain/status";
+import { boardState } from "@/domain/room-board";
 import type { CategoryRow, RoomTile } from "@/domain/views";
 import { hotelToday } from "@/lib/hotel-date";
 import { mediaUrl } from "@/lib/media";
@@ -31,11 +31,10 @@ export async function roomBoard(): Promise<BoardRoom[]> {
       const roomStays = byRoom.get(room.id) ?? [];
       const inHouse = roomStays.find((s) => s.status === "checked_in");
       const arriving = roomStays.find((s) => s.status !== "checked_in" && s.check_in === today);
-      let state: RoomBoardState = "available";
-      if (room.service_status === "maintenance") state = "maintenance";
-      else if (inHouse) state = "occupied";
-      else if (arriving) state = "arriving";
-      else if (room.readiness !== "ready") state = "dirty";
+      const { state, due } = boardState(
+        { serviceStatus: room.service_status, readiness: room.readiness, inHouse: inHouse ? { checkOut: inHouse.check_out } : null, arrivingToday: Boolean(arriving) },
+        today,
+      );
       const stay = inHouse ?? arriving;
       return {
         id: room.id,
@@ -48,6 +47,7 @@ export async function roomBoard(): Promise<BoardRoom[]> {
         serviceStatus: room.service_status,
         guestName: stay?.guest_name,
         until: inHouse?.check_out,
+        due,
         note: room.maintenance_note ?? undefined,
         reservationId: stay?.id,
       };
