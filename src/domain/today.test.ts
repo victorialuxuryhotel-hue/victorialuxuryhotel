@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReservationRow } from "./views";
-import { greeting, needsYouNow, roomCounts, type TodayInput } from "./today";
+import { greeting, needsYouNow, roomCounts, tonightView, type TodayInput, type TonightType } from "./today";
 
 const today = "2026-11-25";
 const base: ReservationRow = {
@@ -101,5 +101,35 @@ describe("greeting", () => {
     expect([greeting(0), greeting(11), greeting(12), greeting(16), greeting(17), greeting(23)]).toEqual([
       "Good morning", "Good morning", "Good afternoon", "Good afternoon", "Good evening", "Good evening",
     ]);
+  });
+});
+
+describe("available tonight (I2)", () => {
+  const t = (name: string, rooms: number, free: number, held = 0): TonightType => ({ categoryId: name.toLowerCase(), name, rateKobo: 4_000_000, rooms, free, held });
+
+  it("shows free of rooms in service per type; a type with none free is full", () => {
+    const v = tonightView([t("Standard", 28, 16, 2), t("Suite", 4, 0)]);
+    expect(v.cards.map((c) => [c.name, c.shown, c.rooms, c.full, c.held])).toEqual([
+      ["Standard", 16, 28, false, 2],
+      ["Suite", 0, 4, true, 0],
+    ]);
+    expect(v.fullyBooked).toBe(false);
+    expect(v.overbooked).toEqual([]);
+  });
+
+  it("fully booked only when every type is full", () => {
+    expect(tonightView([t("Standard", 28, 0, 1), t("Suite", 4, 0)]).fullyBooked).toBe(true);
+    expect(tonightView([t("Standard", 28, 0), t("Suite", 4, 1)]).fullyBooked).toBe(false);
+  });
+
+  it("overbooked: the card shows 0 and the type goes to Needs you now", () => {
+    const v = tonightView([t("Standard", 28, -2), t("Deluxe", 10, 3)]);
+    expect(v.cards[0]).toMatchObject({ shown: 0, full: true });
+    expect(v.overbooked.map((o) => [o.name, o.free])).toEqual([["Standard", -2]]);
+  });
+
+  it("a type with no rooms in service is full, and no types shows nothing", () => {
+    expect(tonightView([t("Apartment", 0, 0)]).cards[0]).toMatchObject({ shown: 0, full: true });
+    expect(tonightView([])).toEqual({ cards: [], fullyBooked: false, overbooked: [] });
   });
 });

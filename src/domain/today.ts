@@ -75,3 +75,20 @@ export function roomCounts(rooms: Pick<RoomTile, "state" | "readiness">[]): Room
 export function greeting(hour: number): string {
   return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 }
+
+/** One room type on one night, from inventory.ts availableOnNight (the shared definition of free). */
+export type TonightType = { categoryId: string; name: string; rateKobo: number; rooms: number; free: number; held: number };
+export type TonightCard = TonightType & { shown: number; full: boolean };
+
+/**
+ * "Available tonight" on Today (interface brief I2). `free` below zero means overbooked: the card
+ * shows 0 and the type goes to Needs you now. `held` counts unpaid holds already taken out of free.
+ */
+export function tonightView(types: TonightType[]): { cards: TonightCard[]; fullyBooked: boolean; overbooked: TonightType[] } {
+  const cards = types.map((t) => ({ ...t, shown: Math.max(0, t.free), full: t.free <= 0 }));
+  return {
+    cards,
+    fullyBooked: cards.length > 0 && cards.every((c) => c.full),
+    overbooked: types.filter((t) => t.free < 0),
+  };
+}

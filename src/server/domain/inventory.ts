@@ -91,6 +91,22 @@ export async function freeNights(db: Db, slugs: string[], from: string, to: stri
   return out;
 }
 
+export type NightRow = { category_id: string; name: string; nightly_rate_kobo: number; rooms: number; free: number; held: number };
+
+/** Every active room type on one night: rooms in service, free (negative = overbooked) and unpaid holds. */
+export async function availableOnNight(db: Db, night: string): Promise<NightRow[]> {
+  return all<NightRow>(
+    db,
+    `SELECT c.id AS category_id, c.name, c.nightly_rate_kobo, ${roomsInServiceSql("c.id")} AS rooms, ${freeOnNightSql("c.id", "?1")} AS free,
+       (SELECT count(*) FROM reservations h LEFT JOIN rooms hr ON hr.id = h.room_id
+        WHERE h.status = 'pending_payment' AND h.hold_expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+          AND h.check_in <= ?1 AND h.check_out > ?1 AND coalesce(hr.category_id, h.category_id) = c.id) AS held
+     FROM room_categories c WHERE c.is_active = 1
+     ORDER BY c.sort_order, c.nightly_rate_kobo`,
+    night,
+  );
+}
+
 export function validateStay(checkIn: string | null | undefined, checkOut: string | null | undefined, guests: number | null | undefined, allowPast = false): asserts checkIn is string {
   if (!checkIn || !checkOut || !isIsoDate(checkIn) || !isIsoDate(checkOut)) throw new AppError("VALIDATION", "Choose check-in and check-out dates.");
   if (checkOut <= checkIn) throw new AppError("VALIDATION", "Check-out must be after check-in.");

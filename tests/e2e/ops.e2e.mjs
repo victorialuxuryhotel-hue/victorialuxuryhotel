@@ -150,6 +150,28 @@ for (const id of pagingIds) {
 }
 
 {
+  // I2: Available tonight on Today. New booking opens the form for tonight with the room type chosen.
+  const { ctx, p } = await as("front_desk");
+  await go(p, "/app/today");
+  await waitForText(p, /Available tonight/i);
+  const card = await p.$("[data-tonight]:has(a[href*='/app/reservations/new?type='])");
+  check("Today shows the room types free tonight with New booking", Boolean(card) || /Fully booked tonight/.test(await text(p)));
+  if (card) {
+    const type = await card.evaluate((el) => el.getAttribute("data-tonight"));
+    check("each card says how many are free of the rooms in service", /\d+ of \d+ free · ₦/.test(await card.evaluate((el) => el.textContent)));
+    await until(async () => {
+      await p.evaluate((t) => document.querySelector(`[data-tonight="${t}"] a`)?.click(), type);
+      await p.waitForSelector("input[name=categoryId]", { timeout: 4000 });
+      return true;
+    }, "New booking opens");
+    const chosen = await until(() => p.evaluate(() => document.querySelector("input[name=categoryId]:checked")?.value ?? null), "type chosen");
+    check("New booking comes with that room type chosen", chosen === type, `${chosen} vs ${type}`);
+    check("and tonight's date", (await p.$eval("input[name=checkIn]", (i) => i.value)) === (await val("SELECT date('now', '-5 hours')")));
+  }
+  await ctx.close();
+}
+
+{
   // H10: front desk shortcuts. "/" jumps to search; Esc closes the Cancel popover.
   const { ctx, p } = await as("front_desk");
   const focusedSearch = () => p.evaluate(() => document.activeElement?.hasAttribute("data-search") ?? false);

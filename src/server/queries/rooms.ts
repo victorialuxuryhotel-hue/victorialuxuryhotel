@@ -1,13 +1,21 @@
 import "server-only";
 import { boardState } from "@/domain/room-board";
+import type { TonightType } from "@/domain/today";
 import type { CategoryRow, RoomTile } from "@/domain/views";
-import { hotelToday } from "@/lib/hotel-date";
+import { hotelToday, tonight } from "@/lib/hotel-date";
 import { mediaUrl } from "@/lib/media";
 import { authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
-import { roomChoices, roomStays } from "../domain/inventory";
+import { availableOnNight, roomChoices, roomStays } from "../domain/inventory";
 
 export type BoardRoom = RoomTile & { categoryId: string; serviceStatus: "in_service" | "maintenance"; reservationId?: string };
+
+/** Room types free tonight (business date), counted exactly as the website and the booking form count. */
+export async function availableTonight(): Promise<TonightType[]> {
+  await authorizeRead("reservations.manage");
+  const rows = await availableOnNight(await getDb(), tonight());
+  return rows.map((r) => ({ categoryId: r.category_id, name: r.name, rateKobo: r.nightly_rate_kobo, rooms: r.rooms, free: r.free, held: r.held }));
+}
 
 export async function roomBoard(): Promise<BoardRoom[]> {
   await authorizeRead(["rooms.status", "reports.view"]);

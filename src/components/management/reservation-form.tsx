@@ -24,7 +24,7 @@ const chip = (on: boolean) =>
     on ? "border-navy-800 bg-navy-50 text-navy-800" : "border-hairline text-ink-900 hover:bg-ink-900/7",
   );
 
-export function ReservationForm({ categories, today, holdHours, aboveTabs = false }: { categories: CategoryRow[]; today: string; holdHours: number; aboveTabs?: boolean }) {
+export function ReservationForm({ categories, today, holdHours, aboveTabs = false, initialCategoryId }: { categories: CategoryRow[]; today: string; holdHours: number; aboveTabs?: boolean; initialCategoryId?: string }) {
   const [state, action, pending] = useActionState(createReservation, null);
   // One id per form: a double tap or a retry after a timeout returns the same booking, not a second hold.
   const [requestId] = useState(() => crypto.randomUUID());
@@ -57,7 +57,7 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
 
   const stayKey = `${checkIn}|${checkOut}`;
   const [freeFor, setFreeFor] = useState<{ key: string; map: Map<string, TypeAvailability> | null }>({ key: "", map: null });
-  const [picked, setPicked] = useState("");
+  const [picked, setPicked] = useState(initialCategoryId ?? "");
   useEffect(() => {
     if (!nights) return;
     let live = true;

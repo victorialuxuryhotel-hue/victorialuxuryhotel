@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CheckCircle2, ChevronRight, Search } from "lucide-react";
+import { BedDouble, CheckCircle2, ChevronRight, Plus, Search } from "lucide-react";
+import { buttonStyles } from "@/components/ui/button";
 import { Input } from "@/components/ui/form";
 import { SlashHint } from "./shortcuts";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
-import type { NeedsYou, RoomCounts } from "@/domain/today";
+import type { NeedsYou, RoomCounts, tonightView } from "@/domain/today";
 import type { ReservationRow } from "@/domain/views";
 import { formatDate, formatNaira } from "@/lib/format";
 import { ActionFeedbackProvider } from "./action-feedback";
@@ -18,6 +19,8 @@ export type TodayLinks = {
   reservation: (id: string) => string;
   pay: (id: string) => string;
   rooms: (state?: "available" | "occupied" | "dirty" | "maintenance") => string;
+  /** New booking for tonight, with the room type chosen. */
+  newBooking: (categoryId: string) => string;
 };
 
 const short = (d: string) => formatDate(d, { year: false });
@@ -94,6 +97,7 @@ export function TodayView({
   departures,
   inHouse,
   counts,
+  tonight,
   links,
   signedIn,
 }: {
@@ -105,11 +109,13 @@ export function TodayView({
   departures: ReservationRow[];
   inHouse: ReservationRow[];
   counts: RoomCounts;
+  tonight: ReturnType<typeof tonightView>;
   links: TodayLinks;
   /** "Signed in as … · Switch user" for the shared front desk computer. */
   signedIn?: ReactNode;
 }) {
   const href = (r: { id: string }) => links.reservation(r.id);
+  const needsCount = needs.length + tonight.overbooked.length;
   return (
     <ActionFeedbackProvider>
       <div className="space-y-6 px-4 py-6 lg:px-8">
@@ -133,10 +139,10 @@ export function TodayView({
 
         <section aria-labelledby="needs">
           <h2 id="needs" className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">
-            Needs you now{needs.length ? ` · ${needs.length}` : ""}
+            Needs you now{needsCount ? ` · ${needsCount}` : ""}
           </h2>
           <Card>
-            {needs.length === 0 ? (
+            {needsCount === 0 ? (
               <div className="flex items-center gap-3 p-5">
                 <CheckCircle2 className="size-6 shrink-0 text-success-700" strokeWidth={1.5} aria-hidden />
                 <div>
@@ -146,6 +152,21 @@ export function TodayView({
               </div>
             ) : (
               <ul className="divide-y divide-hairline">
+                {tonight.overbooked.map((t) => (
+                  <li key={`overbooked-${t.categoryId}`} data-kind="overbooked" className="flex min-h-16 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5">
+                    <span aria-hidden className="size-2 shrink-0 rounded-full bg-danger-600" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium text-ink-900">Overbooked: {t.name} tonight</span>
+                      <span className="block text-sm text-danger-700">
+                        {-t.free} more {t.name} {-t.free === 1 ? "booking" : "bookings"} than rooms in service. Move a guest to another type, or bring a room back into service.
+                      </span>
+                    </span>
+                    <Link href={links.rooms()} className={linkStyle}>
+                      Rooms
+                      <ChevronRight className="size-4" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
                 {needs.map((n) => {
                   const d = describe(n, links);
                   return (
@@ -166,6 +187,8 @@ export function TodayView({
             )}
           </Card>
         </section>
+
+        <TonightSection tonight={tonight} newBooking={links.newBooking} />
 
         <div className="grid gap-6 xl:grid-cols-2">
           <MovementList kind="departures" title="Leaving today" rows={departures} hrefFor={href} today={today} />
@@ -201,5 +224,55 @@ export function TodayView({
         </section>
       </div>
     </ActionFeedbackProvider>
+  );
+}
+
+/** Interface brief I2: what can be sold tonight, per room type, counted as the website and the booking form count. */
+function TonightSection({ tonight, newBooking }: { tonight: ReturnType<typeof tonightView>; newBooking: (categoryId: string) => string }) {
+  if (tonight.cards.length === 0) return null;
+  const held = tonight.cards.reduce((n, c) => n + c.held, 0);
+  return (
+    <section aria-labelledby="tonight">
+      <h2 id="tonight" className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">Available tonight</h2>
+      {tonight.fullyBooked ? (
+        <Card>
+          <div className="flex items-center gap-3 p-5" data-testid="fully-booked">
+            <BedDouble className="size-6 shrink-0 text-ink-400" strokeWidth={1.5} aria-hidden />
+            <div>
+              <p className="font-medium text-ink-900">Fully booked tonight</p>
+              {held ? <p className="text-sm text-ink-500">{held} unpaid {held === 1 ? "hold" : "holds"}: a room comes free if a hold runs out.</p> : null}
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {tonight.cards.map((c) => (
+            <li key={c.categoryId} data-tonight={c.categoryId}>
+              <Card className="flex h-full flex-col gap-3 p-4">
+                <div className="min-w-0">
+                  <p className="font-medium text-ink-900">{c.name}</p>
+                  <p className={cn("text-sm", c.full ? "text-ink-500" : "text-ink-700")}>
+                    {c.full ? (
+                      "Full tonight"
+                    ) : (
+                      <>
+                        <span className="font-semibold tabular-nums text-ink-900">{c.shown}</span> of <span className="tabular-nums">{c.rooms}</span> free · {formatNaira(c.rateKobo)}
+                      </>
+                    )}
+                    {c.held ? <span className="text-ink-500"> · {c.held} on hold</span> : null}
+                  </p>
+                </div>
+                {c.full ? null : (
+                  <Link href={newBooking(c.categoryId)} className={buttonStyles({ variant: "secondary", size: "sm", className: "mt-auto self-start" })}>
+                    <Plus className="size-4" aria-hidden />
+                    New booking
+                  </Link>
+                )}
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
