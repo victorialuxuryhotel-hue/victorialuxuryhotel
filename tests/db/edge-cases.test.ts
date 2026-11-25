@@ -60,7 +60,7 @@ describe("edge cases", () => {
     const id = await insertReservation({ categoryId: std.id, checkIn: day(0), checkOut: day(3), roomId: std.roomIds[0], status: "confirmed", rateKobo: 5_500_000 });
     const { undoId, chargeKobo } = await assignRoom(db, desk, id, dlx.roomIds[0]!);
     expect(chargeKobo).toBe(3 * 2_000_000);
-    await rejects(checkInReservation(db, desk, id), /₦60,000 still to pay/);
+    await rejects(checkInReservation(db, desk, id), /₦60,000 owed/);
     await undoAction(db, desk, id, undoId!);
     expect((await q1<{ c: number }>("SELECT room_change_kobo AS c FROM reservations WHERE id = ?", id)).c).toBe(0);
     await rejects(assignRoom(db, desk, id, dlx.roomIds[1]!, { waiveCharge: true }), /Only the general manager or owner/);
@@ -74,7 +74,7 @@ describe("edge cases", () => {
     await assignRoom(db, desk, id, c.roomIds[0]!);
     await checkInReservation(db, desk, id);
     await changeReservationDates(db, desk, id, day(0), day(2));
-    await rejects(checkOutReservation(db, desk, id), /₦50,000 still to pay/);
+    await rejects(checkOutReservation(db, desk, id), /₦50,000 owed/);
     await recordOfflinePayment(db, desk, { reservationId: id, amountKobo: 5_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
     expect((await checkOutReservation(db, desk, id)).balance).toBe(0);
   });

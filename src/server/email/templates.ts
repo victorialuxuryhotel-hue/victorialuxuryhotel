@@ -98,7 +98,7 @@ export function bookingConfirmedEmail(s: StayInfo & { receiptNumber?: string }, 
   const balance = s.totalKobo - s.paidKobo;
   const intro =
     balance > 0
-      ? `Your ${s.category} room is confirmed. ${formatNaira(balance)} is still to be paid; our team will arrange this with you.`
+      ? `Your ${s.category} room is confirmed. ${formatNaira(balance)} is owed; our team will arrange this with you.`
       : `Your payment has been received and your ${s.category} room is confirmed. We look forward to welcoming you to Akure.`;
   const feature: Feature = { label: "Booking reference", value: s.reference, sub: "Show this at the front desk" };
   const rows: Array<[string, string]> = [
@@ -106,7 +106,7 @@ export function bookingConfirmedEmail(s: StayInfo & { receiptNumber?: string }, 
     ["Check-out", `${formatDate(s.checkOut)}, by ${s.checkOutTime}`],
     ["Room", `${roomText(s)} · ${plural(s.guests, "guest")}`],
     [balance > 0 ? "Paid so far" : "Total paid", formatNaira(s.paidKobo)],
-    ...(balance > 0 ? [["Balance due", formatNaira(balance)] as [string, string]] : []),
+    ...(balance > 0 ? [["Owed", formatNaira(balance)] as [string, string]] : []),
     ...(s.receiptNumber ? [["Receipt", s.receiptNumber] as [string, string]] : []),
   ];
   const buttons: Button[] = [{ label: "Get directions", href: hotel.mapsUrl }, whatsapp];
@@ -132,7 +132,7 @@ export function paymentReceivedEmail(
     ["Booking", s.reference],
     ["Room", `${roomText(s)} · ${plural(s.nights, "night")}`],
     ["Total", formatNaira(s.totalKobo)],
-    ["Balance due", formatNaira(balance)],
+    ["Owed", balance > 0 ? formatNaira(balance) : "Paid in full"],
   ];
   const buttons: Button[] = [...(s.receiptUrl ? [{ label: "View or print receipt", href: s.receiptUrl }] : []), whatsapp];
   const note = "Keep this email as your receipt. If anything looks wrong, reply and our team will check it.";
@@ -144,14 +144,14 @@ export function paymentReceivedEmail(
 }
 
 export function reservationCancelledEmail(s: StayInfo, siteUrl: string) {
-  const heading = "Your reservation has been cancelled";
-  const intro = `Hello ${first(s.guestName)}, reservation ${s.reference} has been cancelled.`;
+  const heading = "Your booking has been cancelled";
+  const intro = `Hello ${first(s.guestName)}, booking ${s.reference} has been cancelled.`;
   const rows: Array<[string, string]> = [["Booking reference", s.reference], ["Room", s.category], ["Dates", `${formatDate(s.checkIn)} to ${formatDate(s.checkOut)}`]];
   const note = s.paidKobo > 0 ? "If a refund is due under our cancellation policy, the hotel will contact you about it." : "If you didn't expect this, please contact us.";
   const buttons = [whatsapp];
   return {
-    subject: `Reservation cancelled: ${s.reference}`,
-    html: layout({ preheader: `Reservation ${s.reference} cancelled`, heading, intro, rows, buttons, note, siteUrl }),
+    subject: `Booking cancelled: ${s.reference}`,
+    html: layout({ preheader: `Booking ${s.reference} cancelled`, heading, intro, rows, buttons, note, siteUrl }),
     text: text(heading, intro, rows, note, undefined, buttons),
   };
 }

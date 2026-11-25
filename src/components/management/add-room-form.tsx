@@ -15,7 +15,7 @@ export function AddRoomForm({ categories }: { categories: Array<{ id: string; na
       {state?.ok ? <FormMessage tone="success">Room added.</FormMessage> : null}
       <div className="grid gap-4 sm:grid-cols-[1fr_1.5fr_1fr_auto] sm:items-start">
         <Field label="Room number" htmlFor="rnum" error={err("roomNumber")}><Input id="rnum" name="roomNumber" required maxLength={10} /></Field>
-        <Field label="Category" htmlFor="rcat" error={err("categoryId")}>
+        <Field label="Room type" htmlFor="rcat" error={err("categoryId")}>
           <Select id="rcat" name="categoryId" defaultValue="" required>
             <option value="" disabled>Choose</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}

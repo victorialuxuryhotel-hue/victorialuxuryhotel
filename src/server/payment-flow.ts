@@ -48,10 +48,10 @@ export async function settlePaystackReference(reference: string, trigger: "callb
   }
 
   const attention: Partial<Record<SettleOutcome, string>> = {
-    amount_mismatch: "Paystack reported a payment that doesn't match the amount due",
+    amount_mismatch: "Paystack reported a payment that doesn't match the amount owed",
     paid_unavailable: "A guest paid after their hold expired and the room type is now full",
-    paid_closed: "Payment received for a cancelled reservation",
-    overpaid: "A reservation has been paid more than once",
+    paid_closed: "Payment received for a cancelled booking",
+    overpaid: "A booking has been paid more than once",
   };
   const bookingRef = reference.split("-").slice(0, 2).join("-").toUpperCase();
   if (attention[outcome]) await alert("payment_attention", attention[outcome]!, { reference: bookingRef });

@@ -51,7 +51,7 @@ describe("extras and promo codes", () => {
   });
 
   it("only managers create extras and codes", async () => {
-    await rejects(addExtra(db, desk, { name: "Nope", priceKobo: 100, perNight: false }), /role does not allow/);
-    await rejects(addPromo(db, desk, { code: "DESKCODE", percentOff: 50, validUntil: null, maxUses: null }), /role does not allow/);
+    await rejects(addExtra(db, desk, { name: "Nope", priceKobo: 100, perNight: false }), /role can't do this/);
+    await rejects(addPromo(db, desk, { code: "DESKCODE", percentOff: 50, validUntil: null, maxUses: null }), /role can't do this/);
   });
 });

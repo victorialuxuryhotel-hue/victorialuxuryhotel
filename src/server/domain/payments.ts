@@ -71,7 +71,7 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number):
       outcome = "paid_unavailable";
     }
   } else if (res.status === "cancelled" || res.status === "no_show") {
-    flag("Payment received for a cancelled reservation. Arrange a refund or rebook.");
+    flag("Payment received for a cancelled booking. Arrange a refund or rebook.");
     outcome = "paid_closed";
   } else {
     outcome = "already_settled"; // confirmed / checked in / checked out
@@ -131,7 +131,7 @@ export async function applyPaystackResult(
       "SELECT id, reservation_id, amount_kobo, status, gateway_response, version FROM payments WHERE provider = 'paystack' AND provider_reference = ?",
       r.reference,
     );
-    if (!pay) throw new AppError("NOT_FOUND", "Unknown payment reference.");
+    if (!pay) throw new AppError("NOT_FOUND", "We couldn't find that payment. If money has left your account, contact the hotel with your bank reference.");
     if (pay.status === "successful") return "already_processed";
     const res = await loadReservation(db, pay.reservation_id);
     const guard = [assertVersion(db, "payments", pay.id, pay.version), assertVersion(db, "reservations", res.id, res.version)];
@@ -146,7 +146,7 @@ export async function applyPaystackResult(
             .bind(`Amount/currency mismatch: expected ${pay.amount_kobo} NGN, Paystack reported ${r.amountKobo} ${r.currency}`, pay.id),
           db
             .prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?")
-            .bind("Paystack reported a payment that does not match the amount due. Check the Paystack dashboard before confirming.", res.id),
+            .bind("Paystack reported a payment that does not match the amount owed. Check the Paystack dashboard before confirming.", res.id),
           activity(db, "payment.mismatch", "reservation", res.id, `Payment ${r.reference} for ${res.reference} did not match the amount due`, {
             expected_kobo: pay.amount_kobo,
             reported_kobo: r.amountKobo,
@@ -236,12 +236,12 @@ export async function recordOfflinePayment(
     if (done) return done;
     const res = await loadReservation(db, input.reservationId);
     if (!["pending_payment", "confirmed", "checked_in", "checked_out", "expired"].includes(res.status)) {
-      throw new AppError("INVALID_TRANSITION", "Payments can't be recorded against a cancelled reservation.");
+      throw new AppError("INVALID_TRANSITION", "Payments can't be taken against a cancelled booking.");
     }
     const paid = await netPaid(db, res.id);
     const balance = dueOf(res) - paid;
-    if (balance <= 0) throw new AppError("VALIDATION", "This reservation is already paid in full.");
-    if (input.amountKobo !== balance) throw new AppError("VALIDATION", `Bookings are paid in full. Record the full ${naira(balance)} balance.`);
+    if (balance <= 0) throw new AppError("VALIDATION", "This booking is already paid in full.");
+    if (input.amountKobo !== balance) throw new AppError("VALIDATION", `Bookings are paid in full. Take the full ${naira(balance)} owed.`);
 
     const paymentId = input.paymentId ?? uuid();
     const settle = await settleStatements(db, res, paid + input.amountKobo);

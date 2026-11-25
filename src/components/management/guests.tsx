@@ -80,7 +80,7 @@ export function GuestProfile({ guest, stays, stayHref }: { guest: GuestRow & { n
         <GuestEditForm guest={guest} />
       </Card>
       <Card>
-        <CardHeader title="Booking history" />
+        <CardHeader title="Activity" />
         <ReservationTable rows={stays} hrefFor={stayHref} />
       </Card>
     </div>

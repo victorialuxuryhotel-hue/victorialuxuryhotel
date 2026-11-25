@@ -34,7 +34,7 @@ async function Content() {
         <GalleryManager photos={gallery} groups={galleryGroups} />
       </Card>
       <p className="text-sm text-ink-500">
-        Room photos are managed on each room type: <Link href="/app/rooms/categories" className="font-medium text-navy-800 underline">Room types &amp; rates</Link>.
+        Room photos are managed on each room type: <Link href="/app/rooms/categories" className="font-medium text-navy-800 underline">Rates &amp; room types</Link>.
       </p>
     </div>
   );

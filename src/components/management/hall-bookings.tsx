@@ -67,7 +67,7 @@ function PaymentForm({ b, today, onDone }: { b: HallBooking; today: string; onDo
       </Field>
       <Field label="Date" htmlFor={`pd-${b.id}`}><Input id={`pd-${b.id}`} name="paidOn" type="date" max={today} defaultValue={today} className="h-11" /></Field>
       <Field label="Reference" optional htmlFor={`pr-${b.id}`}><Input id={`pr-${b.id}`} name="reference" className="h-11 w-36" /></Field>
-      <Button type="submit" size="sm" className="h-11" pending={pending}>Record</Button>
+      <Button type="submit" size="sm" className="h-11" pending={pending}>Take payment</Button>
       {state && !state.ok ? <p className="w-full text-xs text-danger-700">{state.message}</p> : null}
     </form>
   );
@@ -94,7 +94,7 @@ function Row({ b, today }: { b: HallBooking; today: string }) {
       {b.status !== "cancelled" ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {b.status === "enquiry" ? <StatusButton id={b.id} status="confirmed" label="Confirm" variant="secondary" /> : null}
-          {!paying && (!b.price_kobo || b.paid_kobo < b.price_kobo) ? <Button size="sm" variant="secondary" className="h-11" onClick={() => setPaying(true)}>Record payment</Button> : null}
+          {!paying && (!b.price_kobo || b.paid_kobo < b.price_kobo) ? <Button size="sm" variant="secondary" className="h-11" onClick={() => setPaying(true)}>Take payment</Button> : null}
           <StatusButton id={b.id} status="cancelled" label="Cancel" variant="ghost" />
         </div>
       ) : null}

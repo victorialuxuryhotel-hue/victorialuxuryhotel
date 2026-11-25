@@ -49,7 +49,7 @@ export async function setHallStatus(db: Db, actor: Actor, id: string, status: Ex
     db.prepare(`UPDATE hall_bookings SET status = ? WHERE id = ? AND status <> 'cancelled' AND status <> ?`).bind(status, id, status),
     activityIfChanged(db, `hall.${status}`, "hall_booking", id, `Hall booking ${status}`),
   ]);
-  if (!r?.meta.changes) throw new AppError("INVALID_TRANSITION", "That booking can't change to this status.");
+  if (!r?.meta.changes) throw new AppError("INVALID_TRANSITION", "This hall booking is already cancelled, or already at that stage.");
 }
 
 export async function recordHallPayment(
@@ -65,7 +65,7 @@ export async function recordHallPayment(
   );
   if (!b) throw new AppError("NOT_FOUND", "Hall booking not found.");
   if (b.status === "cancelled") throw new AppError("INVALID_TRANSITION", "This booking is cancelled.");
-  if (b.price_kobo > 0 && b.paid + v.amountKobo > b.price_kobo) throw new AppError("VALIDATION", `That's more than the ${formatNaira(b.price_kobo - b.paid)} still due.`);
+  if (b.price_kobo > 0 && b.paid + v.amountKobo > b.price_kobo) throw new AppError("VALIDATION", `That's more than the ${formatNaira(b.price_kobo - b.paid)} owed.`);
   if (v.paidOn > hotelToday()) throw new AppError("VALIDATION", "The date can't be in the future.");
   const id = uuid();
   const [r] = await writeBatch(db, actor, [

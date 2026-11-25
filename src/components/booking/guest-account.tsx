@@ -79,7 +79,7 @@ function ChangeBox({ b, today, onClose }: { b: GuestBooking; today: string; onCl
   const [state, action, pending] = useActionState(changeMyDates, null);
   const [checkIn, setCheckIn] = useState(b.checkIn);
   const [checkOut, setCheckOut] = useState(b.checkOut);
-  if (state?.ok) return <FormMessage tone="success">Dates changed. Any difference in price will be settled with the hotel.</FormMessage>;
+  if (state?.ok) return <FormMessage tone="success">Your new dates are confirmed.</FormMessage>;
   return (
     <form action={action} className="space-y-3 rounded-md border border-hairline p-4">
       <input type="hidden" name="id" value={b.id} />

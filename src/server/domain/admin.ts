@@ -44,14 +44,14 @@ export async function saveCategory(db: Db, actor: Actor, v: CategoryInput): Prom
     ]);
     if (!result?.meta.changes) throw new AppError("NOT_FOUND", "Room type not found.");
   } catch (err) {
-    conflictOnUnique(err, "A category with this name or web address already exists.");
+    conflictOnUnique(err, "A room type with this name or web address already exists.");
   }
   return id;
 }
 
 export async function createRoom(db: Db, actor: Actor, v: { roomNumber: string; categoryId: string; floor: string | null }): Promise<void> {
   requireRole(actor, MANAGERS);
-  if (!(await first(db, "SELECT 1 FROM room_categories WHERE id = ?", v.categoryId))) throw new AppError("VALIDATION", "Choose a category");
+  if (!(await first(db, "SELECT 1 FROM room_categories WHERE id = ?", v.categoryId))) throw new AppError("VALIDATION", "Choose a room type");
   try {
     await writeBatch(db, actor, [
       db.prepare("INSERT INTO rooms (id, room_number, category_id, floor) VALUES (?, ?, ?, ?)").bind(uuid(), v.roomNumber.trim(), v.categoryId, v.floor?.trim() || null),

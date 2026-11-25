@@ -49,13 +49,13 @@ export function OfflinePaymentForm({
         <p className="font-medium text-ink-900">{reservation.guestName} · <span className="font-mono">{reservation.reference}</span></p>
         <p className="mt-1 text-ink-600">
           Total {formatNaira(reservation.totalKobo)} · received {formatNaira(reservation.paidKobo)} ·{" "}
-          <span className="font-medium text-warning-700">balance {formatNaira(balance)}</span>
+          <span className="font-medium text-warning-700">{formatNaira(balance)} owed</span>
         </p>
       </div>
       {state && !state.ok && !state.fieldErrors ? <FormMessage>{state.message}</FormMessage> : null}
       <div hidden={Boolean(review)} className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Amount received (₦)" htmlFor="amount" hint="Bookings are paid in full, so this is the whole balance." error={err("amount")}>
+        <Field label="Amount received (₦)" htmlFor="amount" hint="Bookings are paid in full, so this is everything owed." error={err("amount")}>
           <Input id="amount" name="amount" inputMode="decimal" value={String(balance / 100)} readOnly aria-readonly className="bg-ivory-100 font-semibold tabular-nums" />
         </Field>
         <Field label="Method" htmlFor="method" error={err("method")}>
@@ -82,13 +82,13 @@ export function OfflinePaymentForm({
         {err("confirmReceived") ? <p className="mt-1 text-sm text-danger-700">{err("confirmReceived")}</p> : null}
       </div>
       <div className="flex justify-end">
-        <Button type="submit" className="w-full sm:w-auto">Record payment</Button>
+        <Button type="submit" className="w-full sm:w-auto">Take payment</Button>
       </div>
       </div>
       {review ? (
         <div role="alertdialog" aria-labelledby="pay-review-title" className="space-y-4 rounded-card border border-gold-300 bg-gold-50 p-5">
           <p id="pay-review-title" className="text-lg font-semibold text-ink-900">
-            Record {review.amount} {review.method.toLowerCase()} for {reservation.guestName}?
+            Take {review.amount} {review.method.toLowerCase()} from {reservation.guestName}?
           </p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-ink-500">Booking</dt><dd className="font-mono">{reservation.reference}</dd>
@@ -98,7 +98,7 @@ export function OfflinePaymentForm({
           <p className="text-sm text-ink-600">Payments can&apos;t be edited once saved. If something is wrong later, a manager records a correction.</p>
           <div className="grid grid-cols-2 gap-2.5 sm:flex sm:justify-end">
             <Button type="button" variant="secondary" size="lg" onClick={() => setReview(null)} disabled={pending}>Go back</Button>
-            <Button type="submit" size="lg" pending={pending}>Yes, record it</Button>
+            <Button type="submit" size="lg" pending={pending}>Yes, take payment</Button>
           </div>
         </div>
       ) : null}

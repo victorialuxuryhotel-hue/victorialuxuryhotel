@@ -24,7 +24,7 @@ export function CategoryTable({ rows, hrefFor }: { rows: CategoryRow[]; hrefFor:
       <div className="hidden md:block">
     <Table>
       <THead>
-        <tr><TH>Category</TH><TH className="text-right">Nightly rate</TH><TH>Sleeps</TH><TH>Rooms</TH><TH>Photos</TH><TH>Website</TH></tr>
+        <tr><TH>Room type</TH><TH className="text-right">Nightly rate</TH><TH>Sleeps</TH><TH>Rooms</TH><TH>Photos</TH><TH>Website</TH></tr>
       </THead>
       <TBody>
         {rows.map((c) => (

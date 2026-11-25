@@ -21,7 +21,7 @@ function describe(n: NeedsYou, links: TodayLinks) {
     case "unpaid":
       return {
         title: `${name} hasn't paid`,
-        reason: `Arrives today · ${formatNaira(n.dueKobo)} due before check-in`,
+        reason: `Arrives today · ${formatNaira(n.dueKobo)} owed before check-in`,
         action: "Take payment",
         href: links.pay(n.reservation.id),
       };

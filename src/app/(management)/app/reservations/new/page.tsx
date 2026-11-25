@@ -10,7 +10,7 @@ import { hotelToday } from "@/server/queries/reservations";
 import { listCategories } from "@/server/queries/rooms";
 import { getBookingRules } from "@/server/queries/settings";
 
-export const metadata: Metadata = { title: "New reservation" };
+export const metadata: Metadata = { title: "New booking" };
 
 async function Content() {
   const staff = await requireStaff();
@@ -22,7 +22,7 @@ async function Content() {
 export default function NewReservationPage() {
   return (
     <>
-      <PageHeader title="New reservation" description="Walk-in, phone or WhatsApp bookings." />
+      <PageHeader title="New booking" description="Walk-in, phone or WhatsApp bookings." />
       <Suspense fallback={<LoadingState />}><Content /></Suspense>
     </>
   );

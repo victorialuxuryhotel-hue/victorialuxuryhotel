@@ -9,7 +9,7 @@ export const managementNavGroups: readonly NavGroup[] = [
     label: "Daily work",
     items: [
       { href: "/app/today", label: "Today", icon: Sun, permission: ["reservations.manage"] },
-      { href: "/app/reservations", label: "Reservations", icon: CalendarCheck, permission: ["reservations.manage"] },
+      { href: "/app/reservations", label: "Bookings", icon: CalendarCheck, permission: ["reservations.manage"] },
       { href: "/app/rooms", label: "Rooms", icon: BedDouble, permission: ["rooms.status"] },
       { href: "/app/guests", label: "Guests", icon: Users, permission: ["guests.manage"] },
       { href: "/app/payments", label: "Payments", icon: CreditCard, permission: ["payments.record", "reports.view"] },

@@ -69,11 +69,11 @@ export function CategoryForm({ category, action = saveCategory }: { category?: C
         {!category?.id ? (
           <Card>
             <CardHeader title="Photos" />
-            <p className="p-5 text-sm text-ink-500">Save the category first, then add its photos.</p>
+            <p className="p-5 text-sm text-ink-500">Save the room type first, then add its photos.</p>
           </Card>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button type="submit" pending={pending}>Save category</Button>
+          <Button type="submit" pending={pending}>Save room type</Button>
         </div>
       </div>
     </form>

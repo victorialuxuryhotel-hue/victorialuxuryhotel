@@ -14,7 +14,7 @@ describe("finance", () => {
     expect(s.departments.map((d) => d.key)).toEqual(["rooms", "restaurant", "bar", "hall"]);
     expect(s.departments.reduce((t, d) => t + d.incomeKobo, 0)).toBe(s.incomeTotal);
     expect(s).not.toHaveProperty("expensesKobo");
-    await rejects(financeSummary(db, desk, "month"), /role does not allow/);
+    await rejects(financeSummary(db, desk, "month"), /role can't do this/);
   });
 
   it("only rooms money counts as rooms, and so on", async () => {

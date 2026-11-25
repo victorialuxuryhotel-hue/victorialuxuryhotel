@@ -40,7 +40,7 @@ export async function updateRoomStatus(_prev: ActionResult | null, formData: For
 
 const roomSchema = z.object({
   roomNumber: z.string().trim().min(1, "Enter a room number").max(10),
-  categoryId: z.uuid("Choose a category"),
+  categoryId: z.uuid("Choose a room type"),
   floor: z.string().trim().max(10).optional(),
 });
 

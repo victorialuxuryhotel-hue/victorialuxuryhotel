@@ -14,8 +14,8 @@ describe("repeated and concurrent actions", () => {
     });
     await setHallStatus(db, gm, id, "cancelled");
     const after = await logCount(id);
-    await rejects(setHallStatus(db, gm, id, "cancelled"), /can't change/);
-    await rejects(setHallStatus(db, gm, crypto.randomUUID(), "confirmed"), /can't change/);
+    await rejects(setHallStatus(db, gm, id, "cancelled"), /already cancelled, or already at that stage/);
+    await rejects(setHallStatus(db, gm, crypto.randomUUID(), "confirmed"), /already cancelled, or already at that stage/);
     expect(await logCount(id)).toBe(after);
   });
 

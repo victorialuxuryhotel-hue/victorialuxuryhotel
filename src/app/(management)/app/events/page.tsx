@@ -36,7 +36,7 @@ async function Content() {
 export default function EventsPage() {
   return (
     <>
-      <PageHeader title="Hall bookings" description="Conference hall enquiries, confirmed events and payments." />
+      <PageHeader title="Hall bookings" description="Conference hall enquiries, confirmed hall bookings and payments." />
       <Suspense fallback={<LoadingState />}><Content /></Suspense>
     </>
   );

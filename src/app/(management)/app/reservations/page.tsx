@@ -15,7 +15,7 @@ import { bookingSource, reservationStatus } from "@/domain/status";
 import { requireStaff } from "@/server/auth";
 import { listReservations, tabCounts, type ReservationTab } from "@/server/queries/reservations";
 
-export const metadata: Metadata = { title: "Reservations" };
+export const metadata: Metadata = { title: "Bookings" };
 
 const tabs: Array<{ key: ReservationTab; label: string }> = [
   { key: "upcoming", label: "Upcoming" },
@@ -62,7 +62,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
           <Pager basePath="/app/reservations" params={{ tab, q, status: one(sp.status), source: one(sp.source) }} page={page} hasMore={fetched.length > PAGE_SIZE} />
         </>
       ) : (
-        <div className="p-5"><EmptyState title={q ? "No reservations match your search" : "No reservations here"} description={q ? "Try a reference, a guest's name or phone number." : undefined} /></div>
+        <div className="p-5"><EmptyState title={q ? "No bookings match your search" : "No bookings here"} description={q ? "Try a reference, a guest's name or phone number." : undefined} /></div>
       )}
     </Card>
   );
@@ -71,14 +71,14 @@ async function Content({ searchParams }: { searchParams: SP }) {
 async function NewReservationButton() {
   const staff = await requireStaff();
   if (!can(staff.role, "reservations.manage")) return null;
-  return <Link href="/app/reservations/new" className={buttonStyles()}><CalendarPlus className="size-4" aria-hidden />New reservation</Link>;
+  return <Link href="/app/reservations/new" className={buttonStyles()}><CalendarPlus className="size-4" aria-hidden />New booking</Link>;
 }
 
 export default function ReservationsPage(props: PageProps<"/app/reservations">) {
   return (
     <>
       <PageHeader
-        title="Reservations"
+        title="Bookings"
         description="All bookings in one place."
         actions={<Suspense fallback={null}><NewReservationButton /></Suspense>}
       />

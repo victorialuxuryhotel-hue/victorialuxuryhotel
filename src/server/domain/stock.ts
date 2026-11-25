@@ -53,7 +53,7 @@ export async function addStockItem(
 export async function updateStockItem(db: Db, actor: Actor, id: string, v: { category: StockCategory; minQuantity: number; active: boolean }): Promise<void> {
   requireRole(actor, POS_MANAGERS);
   if (!(v.category in STOCK_CATEGORIES)) throw new AppError("VALIDATION", "Choose a category.");
-  if (!Number.isInteger(v.minQuantity) || v.minQuantity < 0 || v.minQuantity > 1_000_000) throw new AppError("VALIDATION", "Enter the reorder level as a whole number.");
+  if (!Number.isInteger(v.minQuantity) || v.minQuantity < 0 || v.minQuantity > 1_000_000) throw new AppError("VALIDATION", "Enter the low-stock level as a whole number.");
   const [r] = await writeBatch(db, actor, [
     db
       .prepare("UPDATE stock_items SET category = ?1, min_quantity = ?2, is_active = ?3 WHERE id = ?4 AND (category IS NOT ?1 OR min_quantity IS NOT ?2 OR is_active IS NOT ?3)")

@@ -97,7 +97,7 @@ describe("Paystack payments", () => {
     const b = await heldBooking();
     const p = await beginPaystackPayment(db, b.publicToken);
     expect(await applyPaystackResult(db, { reference: p.reference, status: "ongoing", amountKobo: 0, currency: "NGN", paidAt: null, channel: null, gatewayResponse: null })).toBe("still_pending");
-    await rejects(success("vl-nope00-00000000", 1), /Unknown payment reference/, "NOT_FOUND");
+    await rejects(success("vl-nope00-00000000", 1), /couldn't find that payment/, "NOT_FOUND");
   });
 
   it("a mismatched amount or currency is flagged once and never confirms", async () => {
@@ -148,7 +148,7 @@ describe("offline payments", () => {
 
   it("bookings are paid in full: a part payment is refused, the full amount confirms", async () => {
     const b = await heldBooking(1, 5_000_000);
-    await rejects(offline(b.id, 4_000_000), /paid in full\. Record the full ₦100,000 balance/);
+    await rejects(offline(b.id, 4_000_000), /paid in full\. Take the full ₦100,000 owed/);
     expect(await status(b.id)).toBe("pending_payment");
     const full = await offline(b.id, 10_000_000);
     expect(full.outcome).toBe("confirmed");
@@ -180,7 +180,7 @@ describe("offline payments", () => {
   it("refuses payments on cancelled reservations", async () => {
     const b = await heldBooking();
     await cancelReservation(db, desk, b.id, "Guest cancelled");
-    await rejects(offline(b.id, 100), /cancelled reservation/);
+    await rejects(offline(b.id, 100), /cancelled booking/);
   });
 });
 
@@ -225,7 +225,7 @@ describe("other booking workflows", () => {
   it("only managers resolve attention flags, with a note", async () => {
     const b = await heldBooking();
     await exec("UPDATE reservations SET attention_reason = 'Check this' WHERE id = ?", b.id);
-    await rejects(resolveAttention(db, desk, b.id, "Handled it"), /role does not allow/);
+    await rejects(resolveAttention(db, desk, b.id, "Handled it"), /role can't do this/);
     await rejects(resolveAttention(db, gm, b.id, "ok"), /Describe how/);
     await resolveAttention(db, gm, b.id, "Refunded via Paystack dashboard");
     expect((await q1<{ attention_reason: string | null }>("SELECT attention_reason FROM reservations WHERE id = ?", b.id)).attention_reason).toBeNull();
@@ -314,7 +314,7 @@ describe("payment corrections (payments are never edited)", () => {
   it("can't exceed the original payment, needs a reason, and is managers only", async () => {
     const b = await heldBooking(1, 5_000_000);
     const pay = await offline(b.id, 10_000_000);
-    await rejects(recordPaymentCorrection(db, desk, { paymentId: pay.paymentId, amountKobo: 100, reason: "Wrong amount" }), /role does not allow/);
+    await rejects(recordPaymentCorrection(db, desk, { paymentId: pay.paymentId, amountKobo: 100, reason: "Wrong amount" }), /role can't do this/);
     await rejects(recordPaymentCorrection(db, gm, { paymentId: pay.paymentId, amountKobo: 100, reason: "x" }), /Say what was wrong/);
     await recordPaymentCorrection(db, gm, { paymentId: pay.paymentId, amountKobo: 3_000_000, reason: "Partly wrong" });
     await rejects(recordPaymentCorrection(db, gm, { paymentId: pay.paymentId, amountKobo: 7_000_100, reason: "Wrong again" }), /At most .* can still be corrected/);

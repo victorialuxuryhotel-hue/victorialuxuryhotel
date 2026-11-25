@@ -87,7 +87,7 @@ async function Content() {
       ) : null}
 
       <Card>
-        <CardHeader title="Closings · last 14 days" description={viewer ? "Every attendant's cash count against the till." : "Your closings."} />
+        <CardHeader title="Closings · last 14 days" description={viewer ? "Every salesperson's cash count against the till." : "Your closings."} />
         {closings.length ? (
           <ul className="divide-y divide-hairline">
             {closings.map((c) => {

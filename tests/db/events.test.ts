@@ -14,7 +14,7 @@ describe("hall bookings", () => {
     await createHallBooking(db, gm, { ...base, title: "Afternoon", eventDate: date, startTime: "13:00", endTime: "17:00", status: "confirmed" });
 
     await recordHallPayment(db, desk, { bookingId: a, amountKobo: 10_000_000, method: "bank_transfer", paidOn: day(0), reference: null });
-    await rejects(recordHallPayment(db, desk, { bookingId: a, amountKobo: 25_000_000, method: "cash", paidOn: day(0), reference: null }), /still due/);
+    await rejects(recordHallPayment(db, desk, { bookingId: a, amountKobo: 25_000_000, method: "cash", paidOn: day(0), reference: null }), /owed/);
     expect((await listHallBookings(db, desk)).find((b) => b.id === a)!.paid_kobo).toBe(10_000_000);
     await setHallStatus(db, desk, a, "cancelled");
     await rejects(recordHallPayment(db, desk, { bookingId: a, amountKobo: 1_000, method: "cash", paidOn: day(0), reference: null }), /cancelled/);

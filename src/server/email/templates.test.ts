@@ -34,16 +34,16 @@ describe("guest emails (6f / 6g)", () => {
       { ...stay, totalKobo: 8_500_000, paidKobo: 8_500_000, category: "Suite", nights: 1, amountKobo: 8_500_000, receiptNumber: "RCT-2026-000418", method: "Cash", paidAt: "2026-12-01T08:14:00.000Z", receiptUrl: `${site}/book/receipt/token/RCT-2026-000418` },
       site,
     );
-    for (const s of ["Amount received", "₦85,000", "Cash · 1 Dec, 09:14", "Balance due", "₦0", "View or print receipt", "Keep this email as your receipt"]) {
+    for (const s of ["Amount received", "₦85,000", "Cash · 1 Dec, 09:14", "Owed", "Paid in full", "View or print receipt", "Keep this email as your receipt"]) {
       expect(e.html).toContain(s);
     }
     expect(e.text).toContain("View or print receipt: https://victorialuxuryhotel.com/book/receipt/token/RCT-2026-000418");
     if (process.env.EMAIL_OUT) writeFileSync(`${process.env.EMAIL_OUT}/email-6g-receipt.html`, e.html);
   });
 
-  it("partly paid booking says what's still due", () => {
+  it("partly paid booking says what's still owed", () => {
     const e = bookingConfirmedEmail({ ...stay, paidKobo: 5_000_000 }, site);
-    expect(e.html).toContain("Balance due");
+    expect(e.html).toContain("Owed");
     expect(e.html).toContain("₦60,000");
   });
 });

@@ -102,7 +102,7 @@ export function FrontDeskPayments({
       </Card>
 
       <p className="text-sm text-ink-500">
-        Older payments are in Reports, which managers can open. To find a guest&apos;s past payment, open their reservation.
+        Older payments are in Reports, which managers can open. To find a guest&apos;s past payment, open their booking.
       </p>
     </div>
   );

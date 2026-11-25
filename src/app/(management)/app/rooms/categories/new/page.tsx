@@ -7,7 +7,7 @@ import { LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
 import { requireStaff } from "@/server/auth";
 
-export const metadata: Metadata = { title: "New category" };
+export const metadata: Metadata = { title: "New room type" };
 
 async function Content() {
   const staff = await requireStaff();
