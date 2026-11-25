@@ -1,3 +1,4 @@
+import { stayTimesSentence } from "./stay-times";
 import { hotel } from "@/config/hotel";
 import { facilities } from "@/content/site";
 
@@ -61,7 +62,7 @@ export type Faq = { q: string; a: string };
 export function hotelFaqs(times: Times, cancellation: string): Faq[] {
   return [
     { q: "Where is Victoria Luxury Hotel and Apartment?", a: `${hotel.address.line1}, ${hotel.address.city}, ${hotel.address.state}, Nigeria.` },
-    { q: "What time are check-in and check-out?", a: `Check-in is from ${hhmm(times.checkInTime)}. Check-out is by ${hhmm(times.checkOutTime)}.` },
+    { q: "What time are check-in and check-out?", a: stayTimesSentence(times.checkInTime, times.checkOutTime) },
     { q: "What facilities does the hotel have?", a: `${facilities.map((f) => f.name).join(", ")}.` },
     { q: "How do I book?", a: `Book and pay online at ${SITE_URL}/book, or call or WhatsApp ${hotel.phoneDisplay}.` },
     { q: "How can I pay?", a: "Online by card or bank transfer (Paystack), or at the front desk by cash, transfer or POS." },

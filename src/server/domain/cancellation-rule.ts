@@ -8,7 +8,7 @@ export async function cancelRule(db: Db): Promise<CancelRule> {
     db,
     "SELECT check_in_time, free_cancel_hours, late_cancel_fee_pct FROM hotel_settings WHERE id = 1",
   );
-  return { checkInTime: s?.check_in_time ?? "14:00", freeHours: s?.free_cancel_hours ?? 24, feePct: s?.late_cancel_fee_pct ?? 50 };
+  return { checkInTime: s?.check_in_time ?? "00:00", freeHours: s?.free_cancel_hours ?? 24, feePct: s?.late_cancel_fee_pct ?? 50 };
 }
 
 /** The share of the room total kept when cancelling inside the late window (0 outside it). */

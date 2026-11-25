@@ -1,3 +1,4 @@
+import { stayTimesSentence } from "@/lib/stay-times";
 import { connection } from "next/server";
 import { hotel } from "@/config/hotel";
 import { facilities } from "@/content/site";
@@ -27,7 +28,7 @@ export async function GET() {
     ...facilities.map((f) => `- ${f.name}: ${f.text}`),
     "",
     "## Stay details",
-    ...(rules ? [`- Check-in from ${rules.checkInTime.slice(0, 5)}, check-out by ${rules.checkOutTime.slice(0, 5)}`] : []),
+    ...(rules ? [`- ${stayTimesSentence(rules.checkInTime, rules.checkOutTime)}`] : []),
     ...(rules?.cancellationPolicy ? [`- Cancellation: ${rules.cancellationPolicy}`] : []),
     "- Payment: online by card or bank transfer (Paystack), or at the front desk by cash, transfer or POS",
     "",

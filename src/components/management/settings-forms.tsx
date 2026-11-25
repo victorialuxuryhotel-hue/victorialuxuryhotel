@@ -28,7 +28,7 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
     <form action={action} onSubmit={keepValues(action)} className="grid gap-6 p-5 md:grid-cols-2">
       {state?.ok ? <div className="md:col-span-2"><FormMessage tone="success">Booking rules saved.</FormMessage></div> : null}
       {state && !state.ok ? <div className="md:col-span-2"><FormMessage>{state.message}</FormMessage></div> : null}
-      <Field label="Check-in from" htmlFor="cin" error={err("checkInTime")}><Input id="cin" name="checkInTime" type="time" defaultValue={rules.checkInTime.slice(0, 5)} /></Field>
+      <Field label="Check-in from" htmlFor="cin" hint="00:00 means any time on the arrival day. The free-cancellation window counts back from this time." error={err("checkInTime")}><Input id="cin" name="checkInTime" type="time" defaultValue={rules.checkInTime.slice(0, 5)} /></Field>
       <Field label="Check-out by" htmlFor="cout" error={err("checkOutTime")}><Input id="cout" name="checkOutTime" type="time" defaultValue={rules.checkOutTime.slice(0, 5)} /></Field>
       <Field label="Website payment window (minutes)" htmlFor="whold" hint="How long an unpaid online booking keeps the room." error={err("websiteHoldMinutes")}>
         <Input id="whold" name="websiteHoldMinutes" type="number" min={10} max={1440} defaultValue={rules.websiteHoldMinutes} />

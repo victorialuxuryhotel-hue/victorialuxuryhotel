@@ -5,7 +5,7 @@ const { bookingConfirmedEmail, paymentReceivedEmail } = await import("./template
 
 const stay = {
   guestName: "Adaeze Okafor", reference: "VL-7KQ3PM", category: "Deluxe", checkIn: "2026-12-01", checkOut: "2026-12-03",
-  nights: 2, guests: 2, totalKobo: 11_000_000, paidKobo: 11_000_000, checkInTime: "2:00 pm", checkOutTime: "12:00 noon",
+  nights: 2, guests: 2, totalKobo: 11_000_000, paidKobo: 11_000_000, checkInTime: "any time", checkOutTime: "by 12:00 noon",
 };
 const site = "https://victorialuxuryhotel.com";
 
@@ -13,7 +13,7 @@ describe("guest emails (6f / 6g)", () => {
   it("booking confirmed: reference box, times, directions and WhatsApp, matching plain text", () => {
     const e = bookingConfirmedEmail({ ...stay, receiptNumber: "RCT-2026-000412" }, site);
     expect(e.subject).toBe("Booking confirmed: VL-7KQ3PM");
-    for (const s of ["You&#39;re booked, Adaeze", "Booking reference", "Show this at the front desk", "from 2:00 pm", "by 12:00 noon", "Get directions", "Message us on WhatsApp", "RCT-2026-000412"]) {
+    for (const s of ["You&#39;re booked, Adaeze", "Booking reference", "Show this at the front desk", ", any time", "by 12:00 noon", "Get directions", "Message us on WhatsApp", "RCT-2026-000412"]) {
       expect(e.html).toContain(s);
     }
     expect(e.text).toContain("Booking reference: VL-7KQ3PM (Show this at the front desk)");

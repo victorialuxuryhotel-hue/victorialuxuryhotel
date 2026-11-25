@@ -1,4 +1,4 @@
-# Release review: security, roles and migrations 0012–0015
+# Release review: security, roles and migrations 0012–0016
 
 Nothing on this page has been run against production. Each step needs your review first. Run the steps in this order.
 
@@ -81,6 +81,13 @@ SELECT id, title FROM hall_bookings h WHERE status = 'confirmed'
 -- I13: anything in the retired sales table
 SELECT count(*) FROM sales;
 ```
+
+### What 0016 changes
+
+`migrations/0016_check_in_any_time.sql`: `UPDATE hotel_settings SET check_in_time = '00:00'`. One setting.
+00:00 means "check in any time on the arrival day" (decided 25 Nov). The free-cancellation window
+then counts back from midnight starting the arrival day, and the website, emails and calendar file
+say "any time". Check-out stays by 12:00. The hotel can change either time in Booking rules.
 
 ### Proof that data is kept
 
@@ -177,7 +184,7 @@ These are deliberately **not final** in the app:
 
 1. Rotate keys and set the Cloudflare secrets (section 2).
 2. Set up the Clerk production instance (section 3).
-3. Record the Time Travel bookmark, then apply 0012 to 0015 (section 1).
+3. Record the Time Travel bookmark, then apply 0012 to 0016 (section 1).
 4. Build (`pnpm cf:build`; it must report no secrets), upload, compare `wrangler versions view` secrets, remove `EMAIL_ALLOWLIST` if inherited, and deploy.
 5. In the app: deactivate the 3 demo staff (they're linked to development Clerk users). Create the first owner with `scripts/create-owner.mts`. Sign in and set up the authenticator app. Then invite the real staff.
 6. Remove the demo data from the live site: `npx wrangler d1 execute victoria-hotel-db --remote --file db/demo-live-undo.sql` (switches off the demo extras, the WELCOME10 promo code, demo menu and stock items, and clears the demo room descriptions). Check it first: it only switches things off, it deletes nothing.

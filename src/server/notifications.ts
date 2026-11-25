@@ -7,13 +7,9 @@ import { logger } from "@/lib/logger";
 import { paymentMethod } from "@/domain/status";
 import { all, first, getDb, type Db } from "./db";
 import { claimOutbox, finishOutbox, type OutboxRow } from "./domain/system";
+import { checkInWhen, checkOutWhen } from "@/lib/stay-times";
 import { sendEmail } from "./email/send";
 import { bookingConfirmedEmail, hotelNewBookingEmail, paymentReceivedEmail, reservationCancelledEmail, type StayInfo } from "./email/templates";
-
-const timeLabel = (t: string) => {
-  const [h = 0, m = 0] = t.split(":").map(Number);
-  return h === 12 && m === 0 ? "12:00 noon" : `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "pm" : "am"}`;
-};
 
 async function loadStay(db: Db, reservationId: string): Promise<(StayInfo & { email: string | null; source: string; receipt?: string; token: string }) | null> {
   const [r, settings, payments] = await Promise.all([
@@ -53,8 +49,8 @@ async function loadStay(db: Db, reservationId: string): Promise<(StayInfo & { em
     paidKobo: payments.reduce((s, p) => s + (p.kind === "refund" ? -p.amount_kobo : p.amount_kobo), 0),
     source: r.source,
     receipt: payments[0]?.receipt_number ?? undefined,
-    checkInTime: timeLabel(settings?.check_in_time ?? "14:00"),
-    checkOutTime: timeLabel(settings?.check_out_time ?? "12:00"),
+    checkInTime: checkInWhen(settings?.check_in_time ?? "00:00"),
+    checkOutTime: checkOutWhen(settings?.check_out_time ?? "12:00"),
   };
 }
 

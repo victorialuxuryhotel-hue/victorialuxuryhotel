@@ -183,7 +183,7 @@ export async function publicBookingRules() {
     "SELECT check_in_time, check_out_time, website_hold_minutes, cancellation_policy, free_cancel_hours, late_cancel_fee_pct FROM hotel_settings WHERE id = 1",
   );
   return {
-    checkInTime: data?.check_in_time ?? "14:00",
+    checkInTime: data?.check_in_time ?? "00:00",
     checkOutTime: data?.check_out_time ?? "12:00",
     holdMinutes: data?.website_hold_minutes ?? 30,
     cancellationPolicy: data?.cancellation_policy ?? (data ? cancellationRuleText(data.free_cancel_hours, data.late_cancel_fee_pct, data.check_in_time) : null),

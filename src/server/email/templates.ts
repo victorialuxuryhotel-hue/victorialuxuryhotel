@@ -84,8 +84,8 @@ const roomText = (s: { category: string; room?: string }) => (s.room ? `${s.room
 const stayRows = (s: StayInfo): Array<[string, string]> => [
   ["Booking reference", s.reference],
   ["Room", roomText(s)],
-  ["Check-in", `${formatDate(s.checkIn)}, from ${s.checkInTime}`],
-  ["Check-out", `${formatDate(s.checkOut)}, by ${s.checkOutTime}`],
+  ["Check-in", `${formatDate(s.checkIn)}, ${s.checkInTime}`],
+  ["Check-out", `${formatDate(s.checkOut)}, ${s.checkOutTime}`],
   ["Guests", String(s.guests)],
   ["Total", `${formatNaira(s.totalKobo)} (${plural(s.nights, "night")})`],
   ["Paid", formatNaira(s.paidKobo)],
@@ -102,8 +102,8 @@ export function bookingConfirmedEmail(s: StayInfo & { receiptNumber?: string }, 
       : `Your payment has been received and your ${s.category} room is confirmed. We look forward to welcoming you to Akure.`;
   const feature: Feature = { label: "Booking reference", value: s.reference, sub: "Show this at the front desk" };
   const rows: Array<[string, string]> = [
-    ["Check-in", `${formatDate(s.checkIn)}, from ${s.checkInTime}`],
-    ["Check-out", `${formatDate(s.checkOut)}, by ${s.checkOutTime}`],
+    ["Check-in", `${formatDate(s.checkIn)}, ${s.checkInTime}`],
+    ["Check-out", `${formatDate(s.checkOut)}, ${s.checkOutTime}`],
     ["Room", `${roomText(s)} · ${plural(s.guests, "guest")}`],
     [balance > 0 ? "Paid so far" : "Total paid", formatNaira(s.paidKobo)],
     ...(balance > 0 ? [["Owed", formatNaira(balance)] as [string, string]] : []),

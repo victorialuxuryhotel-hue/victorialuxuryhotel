@@ -41,6 +41,13 @@ describe("guest accounts", () => {
     expect(cancellationFee(11_000_000, "2026-12-02", rule, at)).toBe(5_500_000);
   });
 
+  it("with check-in any time (00:00), the window counts back from midnight starting the arrival day", () => {
+    const rule = { checkInTime: "00:00", freeHours: 24, feePct: 50 };
+    // Arrival 3 Dec: the window opens at midnight 2 Dec, Lagos time (23:00 UTC on 1 Dec).
+    expect(cancellationFee(10_000_000, "2026-12-03", rule, Date.parse("2026-12-01T22:59:00Z"))).toBe(0);
+    expect(cancellationFee(10_000_000, "2026-12-03", rule, Date.parse("2026-12-01T23:01:00Z"))).toBe(5_000_000);
+  });
+
   it("lists only the guest's bookings; cancelling a paid one keeps the fee and flags the refund", async () => {
     const e = mail();
     const far = await book(e, 30);
