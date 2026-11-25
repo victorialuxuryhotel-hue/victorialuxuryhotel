@@ -830,10 +830,11 @@ export async function validPromo(db: Db, code: string): Promise<{ code: string; 
     "SELECT code, percent_off, is_active, valid_until, max_uses, used_count FROM promo_codes WHERE code = ?",
     code.trim().toUpperCase(),
   );
-  const bad = new AppError("VALIDATION", "That promo code isn't valid.");
-  if (!p || !p.is_active) throw bad;
-  if (p.valid_until && p.valid_until < hotelToday()) throw new AppError("VALIDATION", "That promo code has expired.");
-  if (p.max_uses !== null && p.used_count >= p.max_uses) throw new AppError("VALIDATION", "That promo code has been fully used.");
+  // Attached to the promo field, so the guest sees it next to the code they typed.
+  const promoError = (message: string) => new AppError("VALIDATION", message, { fieldErrors: { promoCode: [message] } });
+  if (!p || !p.is_active) throw promoError("That promo code isn't valid. Check it, or leave the box empty.");
+  if (p.valid_until && p.valid_until < hotelToday()) throw promoError("That promo code has expired.");
+  if (p.max_uses !== null && p.used_count >= p.max_uses) throw promoError("That promo code has been fully used.");
   return { code: p.code, percent_off: p.percent_off };
 }
 

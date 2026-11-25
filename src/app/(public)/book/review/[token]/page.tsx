@@ -68,6 +68,11 @@ async function Review({ params }: { params: Promise<{ token: string }> }) {
               <span className="text-[15px] text-ink-900">Total to pay</span>
               <span className="font-display text-3xl text-navy-950">{formatNaira(b.due_kobo)}</span>
             </div>
+            {b.lateCancelNow ? (
+              <p role="note" className="mb-3 rounded-md border border-warning-600/30 bg-warning-50 px-4 py-3 text-sm text-warning-700">
+                Your arrival day is less than {rules.freeCancelHours} hours away, so this booking can&apos;t be cancelled for free: {rules.lateCancelFeePct}% of the room price is kept if you cancel.
+              </p>
+            ) : null}
             {rules.cancellationPolicy ? <p className="text-sm leading-relaxed text-ink-700">{rules.cancellationPolicy}</p> : null}
           </div>
 

@@ -1,5 +1,6 @@
 import "server-only";
 import { cancellationRuleText } from "@/lib/cancellation";
+import { cancellationFee, cancelRule } from "../domain/cancellation-rule";
 import type { PaymentMethod } from "@/domain/status";
 import { connection } from "next/server";
 import { z } from "zod";
@@ -97,6 +98,8 @@ export async function getBookingByToken(token: string) {
       r.id,
     );
     const holdActive = r.status === "pending_payment" && Boolean(r.hold_expires_at) && Date.parse(r.hold_expires_at!) > Date.now();
+    // Already inside the late-cancellation window (e.g. a same-day booking): the review page says so before payment.
+    const lateCancelNow = cancellationFee(r.total_amount_kobo, r.check_in, await cancelRule(db)) > 0;
     const paystack = payments.filter((p) => p.provider === "paystack");
     const paidKobo = payments.filter((p) => p.status === "successful").reduce((sum, p) => sum + (p.kind === "refund" ? -p.amount_kobo : p.amount_kobo), 0);
     const receipt = payments.find((p) => p.status === "successful" && p.receipt_number)?.receipt_number ?? undefined;
@@ -125,6 +128,7 @@ export async function getBookingByToken(token: string) {
       roomCategory: r.room_category ?? r.category_name,
       payments,
       holdActive,
+      lateCancelNow,
       latestAttempt: paystack[0],
       paidKobo,
       receipt,
@@ -187,6 +191,8 @@ export async function publicBookingRules() {
     checkInTime: data?.check_in_time ?? "00:00",
     checkOutTime: data?.check_out_time ?? "12:00",
     holdMinutes: data?.website_hold_minutes ?? 30,
+    freeCancelHours: data?.free_cancel_hours ?? 24,
+    lateCancelFeePct: data?.late_cancel_fee_pct ?? 50,
     cancellationPolicy: data?.cancellation_policy ?? (data ? cancellationRuleText(data.free_cancel_hours, data.late_cancel_fee_pct, data.check_in_time) : null),
   };
 }
