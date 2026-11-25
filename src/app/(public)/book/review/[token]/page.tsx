@@ -59,7 +59,8 @@ async function Review({ params }: { params: Promise<{ token: string }> }) {
               {rows.map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt className="border-b border-hairline py-2.5 pr-4 text-ink-500">{k}</dt>
-                  <dd className="border-b border-hairline py-2.5 text-right break-all text-ink-900 tabular-nums">{v}</dd>
+                  {/* Words wrap whole ("Thu 26 Nov", "₦10,000"); only an email address may break anywhere. */}
+                  <dd className={`border-b border-hairline py-2.5 text-right text-ink-900 tabular-nums ${k === "Confirmation to" ? "break-all" : "break-words"}`}>{v}</dd>
                 </div>
               ))}
             </dl>
