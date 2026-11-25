@@ -12,11 +12,11 @@ export async function getBookingRules(): Promise<BookingRules> {
   await authorizeRead(["reservations.manage", "payments.record", "reports.view", "settings.manage"]);
   const data = await first<{
     check_in_time: string; check_out_time: string; website_hold_minutes: number; staff_hold_hours: number; cancellation_policy: string | null;
-    free_cancel_hours: number; late_cancel_fee_pct: number; vat_rate_bp: number;
+    free_cancel_hours: number; late_cancel_fee_pct: number; vat_rate_bp: number; vat_on_receipts: number;
   }>(
     await getDb(),
     `SELECT check_in_time, check_out_time, website_hold_minutes, staff_hold_hours, cancellation_policy,
-            free_cancel_hours, late_cancel_fee_pct, vat_rate_bp FROM hotel_settings WHERE id = 1`,
+            free_cancel_hours, late_cancel_fee_pct, vat_rate_bp, vat_on_receipts FROM hotel_settings WHERE id = 1`,
   );
   if (!data) throw new Error("Could not load hotel settings");
   return {
@@ -28,6 +28,7 @@ export async function getBookingRules(): Promise<BookingRules> {
     freeCancelHours: data.free_cancel_hours,
     lateCancelFeePct: data.late_cancel_fee_pct,
     vatRateBp: data.vat_rate_bp,
+    vatOnReceipts: data.vat_on_receipts === 1,
   };
 }
 

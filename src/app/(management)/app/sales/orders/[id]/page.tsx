@@ -16,6 +16,7 @@ import { recordId } from "@/lib/ids";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { first, getDb } from "@/server/db";
 import { getOrder, ORDER_STATUS, OUTLETS, type OrderStatus } from "@/server/domain/pos";
+import { VAT_SHOWN_SQL } from "@/server/vat";
 
 export const metadata: Metadata = { title: "Order" };
 
@@ -28,7 +29,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
   if (!recordId().safeParse(id).success) notFound();
   const reader = await authorizeRead(["pos.sell", "pos.view"]);
   const db = await getDb();
-  const [o, settings] = await Promise.all([getOrder(db, actorOf(reader), id), first<{ vat_rate_bp: number }>(db, "SELECT vat_rate_bp FROM hotel_settings WHERE id = 1")]);
+  const [o, settings] = await Promise.all([getOrder(db, actorOf(reader), id), first<{ vat_rate_bp: number }>(db, `SELECT ${VAT_SHOWN_SQL} AS vat_rate_bp FROM hotel_settings WHERE id = 1`)]);
   if (!o) notFound();
   const receipt = o.receipt_number && o.paid_at && o.method;
   const row = "flex justify-between gap-4 py-2";
@@ -68,7 +69,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
             <PosReceipt
               r={{
                 outlet: o.outlet, receiptNumber: o.receipt_number!, orderNumber: o.number, paidAt: o.paid_at!, totalKobo: o.total_kobo, method: o.method!,
-                cashReceivedKobo: o.cash_received_kobo, attendant: o.taken_by ?? "staff", vatRateBp: settings?.vat_rate_bp ?? 750,
+                cashReceivedKobo: o.cash_received_kobo, attendant: o.taken_by ?? "staff", vatRateBp: settings?.vat_rate_bp ?? 0,
                 lines: o.lines.map((l) => ({ name: l.name, quantity: l.quantity, unitKobo: l.unit_price_kobo })),
                 voided: o.status === "void" ? { reason: o.close_reason ?? "", at: o.closed_at } : null,
               }}

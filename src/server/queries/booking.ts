@@ -12,6 +12,7 @@ import { logger } from "@/lib/logger";
 import { all, first, getDb } from "../db";
 import { freeNights, searchAvailability } from "../domain/inventory";
 import { coverPhotos } from "./catalogue";
+import { VAT_SHOWN_SQL } from "../vat";
 
 const SUGGEST_WITHIN_DAYS = 14;
 
@@ -160,7 +161,7 @@ export async function getGuestReceipt(token: string, receiptNumber: string) {
     ),
   ]);
   if (!p) return null;
-  const vat = await first<{ vat_rate_bp: number }>(db, "SELECT vat_rate_bp FROM hotel_settings WHERE id = 1");
+  const vat = await first<{ vat_rate_bp: number }>(db, `SELECT ${VAT_SHOWN_SQL} AS vat_rate_bp FROM hotel_settings WHERE id = 1`);
   return {
     vatRateBp: vat?.vat_rate_bp ?? 0,
     payment: {

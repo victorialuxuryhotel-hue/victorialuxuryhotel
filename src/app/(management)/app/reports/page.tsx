@@ -127,20 +127,20 @@ async function Money({ range, dept }: { range: ReportRange; dept: Department | n
         {mine ? (
           <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
             <div>{line("Received", mine.incomeKobo, true)}</div>
-            <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, mine.vatKobo)}</div>
+            {finance.vatRateBp ? <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, mine.vatKobo)}</div> : null}
           </dl>
         ) : (
           <>
             <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
               <div>{line("Total received", finance.incomeTotal, true)}</div>
-              <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, finance.vatKobo)}</div>
+              {finance.vatRateBp ? <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, finance.vatKobo)}</div> : null}
             </dl>
             <div className="overflow-x-auto border-t border-hairline">
               <table className="w-full min-w-[24rem] text-sm">
                 <thead className="text-xs text-ink-500">
                   <tr className="border-b border-hairline">
                     <th scope="col" className="px-5 py-2.5 text-left font-medium">Department</th>
-                    <th scope="col" className={cn(cell, "font-medium")}>VAT included</th>
+                    {finance.vatRateBp ? <th scope="col" className={cn(cell, "font-medium")}>VAT included</th> : null}
                     <th scope="col" className={cn(cell, "pr-5 font-medium")}>Received</th>
                   </tr>
                 </thead>
@@ -150,7 +150,7 @@ async function Money({ range, dept }: { range: ReportRange; dept: Department | n
                       <th scope="row" className="px-5 py-2.5 text-left font-medium text-ink-900">
                         <Link href={`/app/reports?tab=money&range=${range}&dept=${d.key}`} className="hover:underline">{d.label}</Link>
                       </th>
-                      <td className={cell}>{formatNaira(d.vatKobo)}</td>
+                      {finance.vatRateBp ? <td className={cell}>{formatNaira(d.vatKobo)}</td> : null}
                       <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(d.incomeKobo)}</td>
                     </tr>
                   ))}

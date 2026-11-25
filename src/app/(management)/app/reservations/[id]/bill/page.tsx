@@ -25,7 +25,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
     <GuestBill
       stay={{ ...r, room: r.roomNumber ? `Room ${r.roomNumber}` : undefined }}
       lines={lines}
-      vatRateBp={rules.vatRateBp}
+      vatRateBp={rules.vatOnReceipts ? rules.vatRateBp : 0}
       printedAt={new Date().toISOString()}
     />
   );

@@ -19,6 +19,7 @@ export type BookingRules = {
   freeCancelHours: number;
   lateCancelFeePct: number;
   vatRateBp: number;
+  vatOnReceipts: boolean;
 };
 
 export function BookingRulesForm({ rules }: { rules: BookingRules }) {
@@ -42,10 +43,16 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
       <Field label="Late cancellation fee (% of the room price)" htmlFor="lcf" error={err("lateCancelFeePct")}>
         <Input id="lcf" name="lateCancelFeePct" type="number" min={0} max={100} defaultValue={rules.lateCancelFeePct} />
       </Field>
-      <Field label="VAT rate (%)" htmlFor="vat" hint="Prices include VAT." error={err("vatRatePct")}>
+      <Field label="VAT rate (%)" htmlFor="vat" hint="Used only when VAT is shown on receipts." error={err("vatRatePct")}>
         <Input id="vat" name="vatRatePct" type="number" min={0} max={50} step={0.5} defaultValue={rules.vatRateBp / 100} />
       </Field>
-      <div className="hidden md:block" />
+      <label className="flex items-start gap-3 self-end pb-2 text-sm text-ink-700">
+        <input type="checkbox" name="vatOnReceipts" defaultChecked={rules.vatOnReceipts} className="mt-0.5 size-4 accent-navy-800" />
+        <span>
+          <span className="font-medium text-ink-900">Show VAT on receipts and reports</span>
+          <span className="block text-xs text-ink-500">Only if the hotel is VAT-registered. Prices don&apos;t change either way.</span>
+        </span>
+      </label>
       <Field label="Cancellation policy wording" optional htmlFor="cpol" hint="Leave empty to use the rule above." error={err("cancellationPolicy")} className="md:col-span-2">
         <Textarea id="cpol" name="cancellationPolicy" rows={3} maxLength={2000} defaultValue={rules.cancellationPolicy ?? ""} />
       </Field>

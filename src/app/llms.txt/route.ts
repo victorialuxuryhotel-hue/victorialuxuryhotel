@@ -21,7 +21,7 @@ export async function GET() {
     `- Email: ${hotel.email}`,
     `- Map: ${hotel.mapsUrl}`,
     "",
-    "## Rooms (price per night, Nigerian naira, VAT included)",
+    "## Rooms (price per night, Nigerian naira)",
     ...rooms.map((r) => `- [${r.name}](${SITE_URL}/rooms/${r.slug}): sleeps ${r.maxOccupancy}, ${formatNaira(r.fromRateKobo)}`),
     "",
     "## Facilities",

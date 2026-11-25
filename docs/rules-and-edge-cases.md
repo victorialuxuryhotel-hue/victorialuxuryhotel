@@ -240,7 +240,7 @@ Each row: expected behaviour + a test (unit, DB or e2e). "Today" means the busin
 6. Stock below zero at the bar — **decided: block** (25 Nov).
 7. Idle lock time on shared laptops (10 minutes).
 8. Groups / one payer for several rooms (not now; separate payments).
-9. VAT on receipts (off).
+9. VAT on receipts (off). **Built:** a Booking rules setting, off by default (migration 0018).
 
 ---
 

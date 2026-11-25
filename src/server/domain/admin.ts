@@ -160,7 +160,7 @@ export async function updateBookingRules(
   actor: Actor,
   v: {
     checkInTime: string; checkOutTime: string; websiteHoldMinutes: number; staffHoldHours: number; cancellationPolicy: string | null;
-    freeCancelHours: number; lateCancelFeePct: number; vatRatePct: number;
+    freeCancelHours: number; lateCancelFeePct: number; vatRatePct: number; vatOnReceipts?: boolean;
   },
 ): Promise<void> {
   requireRole(actor, MANAGERS);
@@ -169,10 +169,10 @@ export async function updateBookingRules(
     db
       .prepare(
         `UPDATE hotel_settings SET check_in_time = ?, check_out_time = ?, website_hold_minutes = ?, staff_hold_hours = ?, cancellation_policy = ?,
-           free_cancel_hours = ?, late_cancel_fee_pct = ?, vat_rate_bp = ?
+           free_cancel_hours = ?, late_cancel_fee_pct = ?, vat_rate_bp = ?, vat_on_receipts = ?
          WHERE id = 1`,
       )
-      .bind(hhmm(v.checkInTime), hhmm(v.checkOutTime), v.websiteHoldMinutes, v.staffHoldHours, v.cancellationPolicy, v.freeCancelHours, v.lateCancelFeePct, v.vatRatePct),
+      .bind(hhmm(v.checkInTime), hhmm(v.checkOutTime), v.websiteHoldMinutes, v.staffHoldHours, v.cancellationPolicy, v.freeCancelHours, v.lateCancelFeePct, v.vatRatePct, v.vatOnReceipts ? 1 : 0),
   ]);
 }
 

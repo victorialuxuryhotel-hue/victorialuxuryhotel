@@ -20,6 +20,7 @@ const schema = z.object({
   freeCancelHours: z.coerce.number().int().min(0).max(720, "At most 30 days"),
   lateCancelFeePct: z.coerce.number().int().min(0).max(100),
   vatRatePct: z.coerce.number().min(0).max(50).transform((v) => Math.round(v * 100)),
+  vatOnReceipts: z.literal("on").optional().transform((v) => v === "on"),
 });
 
 export async function updateBookingRules(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {

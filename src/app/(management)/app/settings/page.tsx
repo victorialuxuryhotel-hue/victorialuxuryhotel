@@ -32,7 +32,7 @@ async function SettingsContent() {
       <SettingsSection title="Booking rules" description="Changes apply to new bookings.">
         <BookingRulesForm rules={rules} />
       </SettingsSection>
-      <SettingsSection title="Extras" description="Guests can add these when they book online. Prices include VAT.">
+      <SettingsSection title="Extras" description="Guests can add these when they book online.">
         <ExtrasManager extras={catalogue.extras} />
       </SettingsSection>
       <SettingsSection title="Promo codes" description="Percent off the room price when a guest enters the code.">

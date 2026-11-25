@@ -28,7 +28,7 @@ async function Content() {
 export default function MenuPage() {
   return (
     <>
-      <PageHeader title="Menu" description="Items, prices and the stock each one uses. Prices include VAT." />
+      <PageHeader title="Menu" description="Items, prices and the stock each one uses." />
       <Suspense fallback={<LoadingState />}><Content /></Suspense>
     </>
   );

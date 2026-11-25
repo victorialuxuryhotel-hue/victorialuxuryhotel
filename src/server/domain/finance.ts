@@ -2,6 +2,7 @@ import { businessDaySql, hotelToday } from "@/lib/hotel-date";
 import { vatIncluded } from "@/lib/vat";
 import { all, first, HOTEL_REPORTERS, requireRole, type Actor, type Db } from "../db";
 import { rangeDates, type ReportRange } from "./reports";
+import { VAT_SHOWN_SQL } from "../vat";
 
 export { vatIncluded };
 
@@ -26,14 +27,14 @@ export async function financeSummary(db: Db, actor: Actor, range: ReportRange, t
       from, to,
     ),
     first<{ kobo: number }>(db, "SELECT coalesce(sum(amount_kobo), 0) AS kobo FROM hall_payments WHERE paid_on BETWEEN ? AND ?", from, to),
-    first<{ vat_rate_bp: number }>(db, "SELECT vat_rate_bp FROM hotel_settings WHERE id = 1"),
+    first<{ vat_rate_bp: number }>(db, `SELECT ${VAT_SHOWN_SQL} AS vat_rate_bp FROM hotel_settings WHERE id = 1`),
   ]);
   const outletKobo = (o: "restaurant" | "bar") => sales.find((x) => x.outlet === o)?.kobo ?? 0;
   const income = hotelOnly
     ? { rooms: rooms?.kobo ?? 0, restaurant: 0, bar: 0, hall: 0 }
     : { rooms: rooms?.kobo ?? 0, restaurant: outletKobo("restaurant"), bar: outletKobo("bar"), hall: halls?.kobo ?? 0 };
   const incomeTotal = income.rooms + income.restaurant + income.bar + income.hall;
-  const rate = settings?.vat_rate_bp ?? 750;
+  const rate = settings?.vat_rate_bp ?? 0;
   const departments = (Object.keys(DEPARTMENT_LABELS) as DepartmentKey[]).filter((k) => !hotelOnly || k === "rooms").map((key) => ({
     key, label: DEPARTMENT_LABELS[key], incomeKobo: income[key], vatKobo: vatIncluded(income[key], rate),
   }));
