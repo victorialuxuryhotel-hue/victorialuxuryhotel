@@ -1,3 +1,4 @@
+import { policy } from "@/config/policy";
 const HOTEL_TZ = "Africa/Lagos";
 
 export function hotelToday(at: Date = new Date()): string {
@@ -30,13 +31,20 @@ export function hotelInstant(date: string, time: string): string {
   return new Date(`${date}T${time}+01:00`).toISOString();
 }
 
-/** Restaurant & bar trading day: it starts at 05:00 Lagos time, so a sale at 1am belongs to the night before. */
-export const BUSINESS_DAY_START_HOUR = 5;
+/** Business day (closings, the till, sales reports): it starts at policy.businessDayStartHour Lagos time, so a sale at 1am belongs to the night before. */
+export const BUSINESS_DAY_START_HOUR: number = policy.businessDayStartHour;
 export function businessDate(at: Date = new Date()): string {
   return hotelToday(new Date(at.getTime() - BUSINESS_DAY_START_HOUR * 3_600_000));
 }
 export function businessDayStart(date: string): string {
   return hotelInstant(date, `${String(BUSINESS_DAY_START_HOUR).padStart(2, "0")}:00:00`);
 }
-/** SQL for the trading day of a UTC timestamp column (Lagos is UTC+1, minus the 5-hour start). */
+/** SQL for the business day of a UTC timestamp column (Lagos is UTC+1, minus the start hour). */
 export const businessDaySql = (col: string) => `date(${col}, '${1 - BUSINESS_DAY_START_HOUR} hours')`;
+
+/** "Business day Tue 24 Nov (ends 06:00)": a sale at 01:25 on the 25th belongs to the 24th. */
+export function businessDayLabel(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  const day = d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "");
+  return `Business day ${day} (ends ${String(BUSINESS_DAY_START_HOUR).padStart(2, "0")}:00)`;
+}

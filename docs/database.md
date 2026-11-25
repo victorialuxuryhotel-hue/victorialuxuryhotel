@@ -7,7 +7,7 @@ in the app. Words on screen follow [glossary.md](glossary.md); the names below a
 database's own (a *booking* is a row in `reservations`, a *room type* is a `room_categories` row).
 
 Money is integer **kobo** everywhere. Stay dates are hotel-local `YYYY-MM-DD` strings
-(Africa/Lagos). The restaurant & bar trading day runs 5am to 5am.
+(Africa/Lagos). The business day (closings, the till, sales reports) runs 06:00 to 06:00; see `src/config/policy.ts`.
 
 ## Tables
 

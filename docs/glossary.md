@@ -59,7 +59,7 @@ Test for any text on screen: would the hotel's best receptionist say these words
 | **sale** | transaction | A paid order. |
 | **void** | delete, reverse | Cancelling a paid sale; a manager does it, with a reason. |
 | **daily closing** | Z-report, end of day | Counting cash against cash sales at the end of the trading day. |
-| **trading day** | business day | 5am to 5am, so late-night sales count for the evening they belong to. |
+| **trading day** | business day | 06:00 to 06:00 (set in src/config/policy.ts), so late-night sales count for the evening they belong to. Screens say "Business day Tue 24 Nov (ends 06:00)". |
 | **received / used / damaged or wasted / count fix** | stock move kinds | What happened to stock. |
 | **low** | below reorder level | Stock at or under its "low at" level. |
 

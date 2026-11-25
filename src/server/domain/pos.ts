@@ -516,31 +516,51 @@ export async function closingSummary(db: Db, actor: Actor, staffId: string, date
   };
 }
 
-export async function closeDay(db: Db, actor: Actor, v: { countedCashKobo: number; explanation: string | null }): Promise<string> {
+export type CloseResult = { closed: true; id: string } | { closed: false; expectedKobo: number; countedKobo: number };
+
+/**
+ * Blind cash count (rules 2.6). The salesperson counts without seeing the expected cash. The first
+ * count of the business day is recorded at once and is final: seeing the expected figure afterwards
+ * can't change it. If it matches, the day is closed; if not, they give a reason and the day closes
+ * with that first count.
+ */
+export async function closeDay(db: Db, actor: Actor, v: { countedCashKobo: number; explanation: string | null }): Promise<CloseResult> {
   requireRole(actor, POS_SELLERS);
   const date = businessDate();
   const s = await closingSummary(db, actor, actor.id, date);
   if (s.openOrders) throw new AppError("VALIDATION", `${s.openOrders === 1 ? "1 order is" : `${s.openOrders} orders are`} still unpaid. Take payment or cancel ${s.openOrders === 1 ? "it" : "them"} first.`);
   if (!Number.isInteger(v.countedCashKobo) || v.countedCashKobo < 0 || v.countedCashKobo > 10_000_000_000) throw new AppError("VALIDATION", "Enter the cash you counted.");
+  if (await first(db, "SELECT 1 FROM pos_closings WHERE staff_id = ? AND business_date = ?", actor.id, date)) throw new AppError("CONFLICT", "You've already closed today's sales.");
   const expected = s.byMethod.cash;
+  const earlier = await first<{ counted: number }>(
+    db,
+    "SELECT json_extract(metadata, '$.counted_kobo') AS counted FROM activity_log WHERE action = 'pos.cash_counted' AND actor_id = ? AND entity_id = ? ORDER BY id LIMIT 1",
+    actor.id, date,
+  );
+  const counted = earlier ? earlier.counted : v.countedCashKobo;
+  const diff = counted - expected;
   const why = v.explanation?.trim() || null;
-  if (v.countedCashKobo !== expected && (!why || why.length < 3)) {
-    throw new AppError("VALIDATION", `The cash is ${naira(Math.abs(v.countedCashKobo - expected))} ${v.countedCashKobo < expected ? "short" : "over"}. Say why.`);
+  if (diff !== 0 && (!why || why.length < 3)) {
+    if (!earlier) {
+      await writeBatch(db, actor, [
+        activity(db, "pos.cash_counted", "pos_closing", date, `Cash counted for ${date}: ${naira(counted)} (blind count)`, { counted_kobo: counted, expected_kobo: expected }),
+      ]);
+    }
+    return { closed: false, expectedKobo: expected, countedKobo: counted };
   }
   const id = uuid();
-  const diff = v.countedCashKobo - expected;
   try {
     await writeBatch(db, actor, [
       db
         .prepare("INSERT INTO pos_closings (id, business_date, staff_id, summary, expected_cash_kobo, counted_cash_kobo, explanation) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(id, date, actor.id, JSON.stringify(s), expected, v.countedCashKobo, why),
-      activity(db, "pos.day_closed", "pos_closing", id, `Restaurant & bar sales closed for ${date}: ${naira(s.salesKobo)} sold, cash ${diff === 0 ? "matches" : `${naira(Math.abs(diff))} ${diff < 0 ? "short" : "over"}`}`),
+        .bind(id, date, actor.id, JSON.stringify(s), expected, counted, diff === 0 ? null : why),
+      activity(db, "pos.day_closed", "pos_closing", id, `Restaurant & bar sales closed for ${date}: ${naira(s.salesKobo)} sold, cash ${diff === 0 ? "matches" : `${naira(Math.abs(diff))} ${diff < 0 ? "short" : "over"}: ${why}`}`),
     ]);
   } catch (err) {
     if (err instanceof AppError && dbErrorToken(err.cause) === "unique") throw new AppError("CONFLICT", "You've already closed today's sales.");
     throw err;
   }
-  return id;
+  return { closed: true, id };
 }
 
 export async function verifyClosing(db: Db, actor: Actor, id: string, note: string | null): Promise<void> {

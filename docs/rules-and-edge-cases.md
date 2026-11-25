@@ -16,7 +16,7 @@ Legend: **[exists]** already enforced · **[new]** to build · **[decide]** need
 4. **Every move has an owner.** Each state change records who, when, and (for anything unusual) why.
 5. **Impossible states are impossible.** If a state must never exist, a DB constraint or trigger rejects it. The UI just explains the rejection in plain words.
 6. **The system checks itself.** A scheduled job looks for rule breaks and alerts; it never silently "fixes" money.
-7. **One business day per closing.** The hotel's business day runs 06:00 → 05:59 Africa/Lagos **[decide: cut-off 06:00]**. All "today", closings and reports use the business day, and screens say so.
+7. **One business day per closing.** The hotel's business day runs 06:00 → 05:59 Africa/Lagos **[default built: 06:00, in src/config/policy.ts]**. All "today", closings and reports use the business day, and screens say so.
 
 ---
 
@@ -80,7 +80,7 @@ Legacy: the old `sales` table from 0009 still allows `status = 'room_charge'` an
 
 ### 2.6 Closing (bar now; front desk **[new]**)
 
-`(none) → counted` (blind: expected amount not shown until submitted **[new]**; over/short ≠ 0 requires a reason **[new]**) → `verified` by manager **[exists: pos_closings_only_verify]**. Closings are never deleted or edited **[exists]**. One closing per person per business day per counter **[verify]**. Sales after a person's closing for that day go to a new closing, not the old one **[verify]**.
+`(none) → counted` (blind: expected amount not shown until submitted, and the first count is final **[exists]**; over/short ≠ 0 requires a reason **[exists]**) → `verified` by manager **[exists: pos_closings_only_verify]**. Closings are never deleted or edited **[exists]**. One closing per person per business day per counter **[verify]**. Sales after a person's closing for that day go to a new closing, not the old one **[verify]**.
 
 ### 2.7 Staff access
 

@@ -152,8 +152,12 @@ describe("daily closing", () => {
 
     const s = await closingSummary(db, att, att.id);
     expect(s).toMatchObject({ sales: 2, salesKobo: 500_000, byMethod: { cash: 300_000, bank_transfer: 0, pos_terminal: 200_000 }, openOrders: 0 });
-    await rejects(closeDay(db, att, { countedCashKobo: 250_000, explanation: null }), /₦500 short\. Say why/);
-    const id = await closeDay(db, att, { countedCashKobo: 250_000, explanation: "Gave wrong change" });
+    // Blind count: the first count is recorded and shown against the expected cash; it's final.
+    expect(await closeDay(db, att, { countedCashKobo: 250_000, explanation: null })).toEqual({ closed: false, expectedKobo: 300_000, countedKobo: 250_000 });
+    expect(await closeDay(db, att, { countedCashKobo: 300_000, explanation: null })).toEqual({ closed: false, expectedKobo: 300_000, countedKobo: 250_000 });
+    const closed = await closeDay(db, att, { countedCashKobo: 300_000, explanation: "Gave wrong change" });
+    if (!closed.closed) throw new Error("should have closed");
+    const id = closed.id;
     await rejects(closeDay(db, att, { countedCashKobo: 300_000, explanation: null }), /already closed/);
     await rejects(payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" }), /already closed today/);
 
@@ -165,8 +169,9 @@ describe("daily closing", () => {
 
     const mgrSale = await payOrder(db, mgr, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" });
     const own = await closeDay(db, mgr, { countedCashKobo: mgrSale.totalKobo, explanation: null });
-    await rejects(verifyClosing(db, mgr, own, null), /Another manager or the owner/);
-    await verifyClosing(db, owner, own, null);
+    if (!own.closed) throw new Error("a matching count closes at once");
+    await rejects(verifyClosing(db, mgr, own.id, null), /Another manager or the owner/);
+    await verifyClosing(db, owner, own.id, null);
   });
 });
 

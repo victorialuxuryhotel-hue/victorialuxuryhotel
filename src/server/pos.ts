@@ -123,15 +123,15 @@ export async function saveMenuStock(_prev: ActionResult | null, formData: FormDa
   }
 }
 
-export async function closeMyDay(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+export async function closeMyDay(_prev: ActionResult<pos.CloseResult> | null, formData: FormData): Promise<ActionResult<pos.CloseResult>> {
   try {
     const staff = await authorize("pos.sell");
-    await pos.closeDay(await getDb(), actorOf(staff), {
+    const r = await pos.closeDay(await getDb(), actorOf(staff), {
       countedCashKobo: naira.parse(formData.get("counted")),
       explanation: z.string().max(500).parse(String(formData.get("explanation") ?? "")) || null,
     });
-    refresh();
-    return ok(undefined);
+    if (r.closed) refresh();
+    return ok(r);
   } catch (err) {
     return fail(err, "pos.close_failed");
   }

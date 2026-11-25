@@ -21,6 +21,15 @@ const before = await val("SELECT count(*) FROM pos_orders WHERE transfer_referen
 await clickText(p, "button", "Confirm");
 await waitForText(p, /RB-\d{4}-\d{6}/);
 check("the sale is saved with its transfer reference", (await val("SELECT count(*) FROM pos_orders WHERE transfer_reference = '4821' AND status = 'paid' AND method = 'bank_transfer'")) === before + 1);
+
+// Fix 5: the cash count is blind. (Not submitted here: that would close this salesperson's day.)
+await go(p, "/app/sales/closing");
+await waitForText(p, /Your day/);
+const page = await text(p);
+const yourDay = page.slice(page.indexOf("Your day")).split(/Closings · last 14 days/i)[0];
+check("closing names the business day and when it ends", /Business day \w{3} \d{1,2} \w{3} \(ends 06:00\)/.test(yourDay), yourDay.slice(0, 120));
+check("no expected cash or money totals before the count", !/Cash expected|₦\s?[0-9]/.test(yourDay), JSON.stringify(yourDay.slice(0, 600)));
+check("the count comes first", /Submit my count/.test(yourDay));
 await ctx.close();
 
 {
