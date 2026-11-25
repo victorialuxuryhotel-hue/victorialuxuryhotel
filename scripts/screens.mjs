@@ -1,33 +1,56 @@
-// Screenshots of the main staff screens at laptop sizes, for review (docs/ux-brief-2026-11-25.md).
+// Screenshots of the main staff screens at the stations' sizes, for review (hardware brief H7, UX brief).
 // Run with the dev server up:  node --env-file=.env.local scripts/screens.mjs
 // Saves docs/screens/<screen>-<width>x<height>.png and prints whether each page scrolls.
+// Note: it makes one cash sale at the till (to show the payment step and the receipt).
 import { mkdirSync } from "node:fs";
-import { as, go, settle, val } from "../tests/e2e/lib.mjs";
+import { as, clickText, go, settle, text, until, val } from "../tests/e2e/lib.mjs";
 
 const OUT = "docs/screens";
 mkdirSync(OUT, { recursive: true });
-// Usable size of a 1366×768 / 1280×720 laptop with browser toolbars (~100px), and the 15" bar POS
-// (1024×768) in Chrome kiosk mode (no toolbars).
-const SIZES = [[1366, 668], [1280, 620], [1024, 768]];
-const booking = await val("SELECT id FROM reservations WHERE status = 'checked_in' ORDER BY check_out LIMIT 1");
-const screens = [
-  ["front_desk", "today", "/app/today"],
-  ["front_desk", "booking", `/app/reservations/${booking}`],
-  ["front_desk", "room-board", "/app/rooms"],
-  ["restaurant_bar", "till", "/app/sales"],
-  ["restaurant_bar", "closing", "/app/sales/closing"],
-];
 
-for (const [width, height] of SIZES) {
-  for (const [role, name, path] of screens) {
-    const { ctx, p } = await as(role);
+// Bar terminal: Chrome kiosk, no toolbars. Front desk: a normal Chrome window (~100px of toolbars).
+const BAR = [[1280, 720]];
+const DESK = [[1366, 668], [1920, 980]];
+const booking = await val("SELECT id FROM reservations WHERE status = 'checked_in' ORDER BY check_out LIMIT 1");
+
+const shot = async (p, name, width, height) => {
+  const scroll = await p.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+  await p.screenshot({ path: `${OUT}/${name}-${width}x${height}.png` });
+  console.log(`${name} ${width}x${height}: ${scroll > 0 ? `page scrolls ${scroll}px` : "fits, no page scroll"}`);
+};
+
+for (const [width, height] of DESK) {
+  for (const [name, path] of [["today", "/app/today"], ["booking", `/app/reservations/${booking}`], ["room-board", "/app/rooms"]]) {
+    const { ctx, p } = await as("front_desk");
     await p.setViewport({ width, height });
     await go(p, path);
     await settle(p);
-    const scroll = await p.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
-    await p.screenshot({ path: `${OUT}/${name}-${width}x${height}.png` });
-    console.log(`${name} ${width}x${height}: ${scroll > 0 ? `page scrolls ${scroll}px` : "fits, no page scroll"}`);
+    await shot(p, name, width, height);
     await ctx.close();
   }
+}
+
+for (const [width, height] of BAR) {
+  const { ctx, p } = await as("restaurant_bar");
+  await p.setViewport({ width, height });
+  await p.evaluateOnNewDocument(() => { window.print = () => {}; });
+  await go(p, "/app/sales");
+  await settle(p);
+  await shot(p, "till", width, height);
+  await until(async () => {
+    if (/Total · 1 item/.test(await text(p))) return true;
+    await p.click("section[aria-label=Menu] li button:not([disabled])").catch(() => {});
+    return false;
+  }, "item added", 10000);
+  await clickText(p, "button", "Take payment");
+  await clickText(p, "button", "Exact");
+  await shot(p, "till-payment", width, height);
+  await clickText(p, "button", "Confirm");
+  await until(async () => /Give change/.test(await text(p)), "receipt", 20000);
+  await shot(p, "till-receipt", width, height);
+  await go(p, "/app/sales/closing");
+  await settle(p);
+  await shot(p, "closing", width, height);
+  await ctx.close();
 }
 process.exit(0);

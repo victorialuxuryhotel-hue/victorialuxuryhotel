@@ -222,7 +222,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
     // column and the order panel stays pinned, so the page itself never scrolls (UX brief: 1280×720).
     <div className="space-y-8 pb-24 lg:h-full lg:pb-0">
       {receipt ? <div className="hidden print:block"><PosReceipt r={receipt} printable={!stationConfigured || station.printLayout !== "a4"} /></div> : null}
-      {/* 1280px and wider: unpaid · menu · order. Narrower laptops and the 15" bar POS (1024×768): menu · order, unpaid orders under the menu. */}
+      {/* The bar terminal (1280×720, kiosk) and wider: unpaid · menu · order. Smaller screens: menu · order, unpaid orders under the menu. */}
       <div className="grid gap-6 lg:h-full lg:grid-cols-[1fr_21rem] print:hidden xl:grid-cols-[15rem_1fr_22rem]">
         {/* Left: unpaid orders, searchable, with a New order button on top. */}
         <aside aria-labelledby="unpaid" className="hidden min-w-0 flex-col rounded-card border border-hairline bg-ivory-50 xl:col-start-1 xl:row-start-1 xl:flex xl:min-h-0">
@@ -428,7 +428,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
             <p className="rounded-md border border-dashed border-hairline p-6 text-sm text-ink-500">No {OUTLETS[outlet].toLowerCase()} items on the menu yet. A manager adds them under Menu.</p>
           )}
           {open.length ? (
-            // Below 1280px (including the 15" bar POS) the unpaid orders sit under the menu, so the menu comes first.
+            // Below 1280px the unpaid orders sit under the menu, so the menu comes first.
             <section aria-label="Unpaid orders" className="rounded-card border border-hairline bg-ivory-50 xl:hidden">
               <h2 className="border-b border-hairline px-5 py-3 font-display text-lg text-navy-950">Unpaid orders · {open.length}</h2>
               <ul className="divide-y divide-hairline">
