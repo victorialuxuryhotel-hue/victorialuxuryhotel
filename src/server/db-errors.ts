@@ -32,6 +32,7 @@ const tokens: Record<string, [ErrorCode, string]> = {
   hall_not_paid: ["VALIDATION", "A hall booking is confirmed once it has a price and is paid in full. Record the payment first."],
   transfer_needs_reference: ["VALIDATION", "For a transfer, enter the last 4 characters of the transfer reference or the sender's name."],
   sales_retired: ["FORBIDDEN", "Charging to a room isn't available. Customers pay at the counter."],
+  vat_needs_tax_id: ["VALIDATION", "VAT can't be shown on receipts without the hotel's Tax ID (TIN). Enter the TIN first."],
   room_before_payment: ["VALIDATION", "This booking isn't paid yet. Take the payment first: a room is given automatically once it's paid."],
   change_immutable: ["CONFLICT", "That change has already been paid for or cancelled. Reload to see where it is now."],
   change_needs_approval: ["FORBIDDEN", "Only the General Manager or the Owner can apply a change before it's paid, and they must give a reason."],

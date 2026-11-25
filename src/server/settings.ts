@@ -21,6 +21,7 @@ const schema = z.object({
   lateCancelFeePct: z.coerce.number().int().min(0).max(100),
   vatRatePct: z.coerce.number().min(0).max(50).transform((v) => Math.round(v * 100)),
   vatOnReceipts: z.literal("on").optional().transform((v) => v === "on"),
+  taxId: z.string().trim().max(30).optional().transform((v) => v || null).refine((v) => v === null || v.length >= 5, "Enter the full Tax ID (TIN)"),
 });
 
 export async function updateBookingRules(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {

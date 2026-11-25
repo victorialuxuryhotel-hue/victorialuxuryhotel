@@ -26,6 +26,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
       stay={{ ...r, room: r.roomNumber ? `Room ${r.roomNumber}` : undefined }}
       lines={lines}
       vatRateBp={rules.vatOnReceipts ? rules.vatRateBp : 0}
+      taxId={rules.taxId}
       printedAt={new Date().toISOString()}
     />
   );

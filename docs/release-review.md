@@ -1,4 +1,4 @@
-# Release review: security, roles and migrations 0012–0018
+# Release review: security, roles and migrations 0012–0019
 
 Nothing on this page has been run against production. Each step needs your review first. Run the steps in this order.
 
@@ -98,9 +98,13 @@ or cancelled); applying one before payment needs the General Manager or Owner an
 
 ### What 0018 changes
 
-`migrations/0018_vat_on_receipts.sql`: adds `hotel_settings.vat_on_receipts` and switches it on, because
-the hotel is VAT-registered (confirmed 25 Nov). The rate is kept (7.5%). Receipts, bills, the till, reports and
-the income download show "Includes VAT (7.5%)". It can be switched off in Booking rules if that ever changes.
+`migrations/0018_vat_on_receipts.sql`: adds `hotel_settings.vat_on_receipts` (default 0, off). The rate is kept (7.5%).
+
+### What 0019 changes
+
+`migrations/0019_tax_id.sql`: adds `hotel_settings.tax_id` (empty) and a rule that VAT can't be switched on without it.
+Receipts and bills print "TIN …" with the VAT line. **VAT stays off until Tobi confirms the hotel's TIN:**
+then enter it in Booking rules and tick "Show VAT on receipts and reports".
 
 ### Proof that data is kept
 
@@ -199,7 +203,7 @@ These are deliberately **not final** in the app:
 
 1. Rotate keys and set the Cloudflare secrets (section 2).
 2. Set up the Clerk production instance (section 3). Two-step sign-in stays on hold until you set `TWO_STEP_ENFORCED=1` (section 4); do that before go-live.
-3. Record the Time Travel bookmark, then apply 0012 to 0018 (section 1).
+3. Record the Time Travel bookmark, then apply 0012 to 0019 (section 1).
 4. Build (`pnpm cf:build`; it must report no secrets), upload, compare `wrangler versions view` secrets, remove `EMAIL_ALLOWLIST` if inherited, and deploy.
 5. In the app: deactivate the 3 demo staff (they're linked to development Clerk users). Create the first owner with `scripts/create-owner.mts`. Sign in and set up the authenticator app. Then invite the real staff.
 6. Remove the demo data from the live site: `npx wrangler d1 execute victoria-hotel-db --remote --file db/demo-live-undo.sql` (switches off the demo extras, the WELCOME10 promo code, demo menu and stock items, and clears the demo room descriptions). Check it first: it only switches things off, it deletes nothing.

@@ -28,7 +28,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     listMenu(db, actor),
     openOrders(db, actor),
     closingSummary(db, actor, staff.id),
-    first<{ vat_rate_bp: number }>(db, `SELECT ${VAT_SHOWN_SQL} AS vat_rate_bp FROM hotel_settings WHERE id = 1`),
+    first<{ vat_rate_bp: number; tax_id: string | null }>(db, `SELECT ${VAT_SHOWN_SQL} AS vat_rate_bp, tax_id FROM hotel_settings WHERE id = 1`),
     first(db, "SELECT 1 FROM pos_closings WHERE staff_id = ? AND business_date = ?", staff.id, businessDate()),
     topSellers(db, actor),
   ]);
@@ -53,7 +53,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         </p>
       ) : (
         <div className="lg:min-h-0 lg:flex-1">
-          <Till menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} resume={resume} favourites={favourites} />
+          <Till menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} taxId={settings?.tax_id ?? null} resume={resume} favourites={favourites} />
         </div>
       )}
     </div>

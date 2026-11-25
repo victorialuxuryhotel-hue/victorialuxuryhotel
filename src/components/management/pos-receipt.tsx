@@ -14,6 +14,8 @@ export type PosReceiptData = {
   cashReceivedKobo: number | null;
   attendant: string;
   vatRateBp: number;
+  /** Printed with the VAT line: a VAT receipt carries the hotel's Tax ID. */
+  taxId?: string | null;
   voided?: { reason: string; at: string | null } | null;
 };
 
@@ -57,6 +59,7 @@ export function PosReceipt({ r, className, printable = true }: { r: PosReceiptDa
           </>
         ) : null}
         {r.vatRateBp ? <div className={cn(row, "text-xs text-ink-600")}><dt>Includes VAT ({r.vatRateBp / 100}%)</dt><dd className="tabular-nums">{formatNaira(vatIncluded(r.totalKobo, r.vatRateBp))}</dd></div> : null}
+        {r.vatRateBp && r.taxId ? <div className={cn(row, "text-xs text-ink-600")}><dt>TIN</dt><dd className="tabular-nums">{r.taxId}</dd></div> : null}
       </dl>
       {r.voided ? (
         <p className="rounded border-2 border-danger-600 p-2 text-center text-sm font-bold text-danger-700">VOIDED{r.voided.at ? ` ${formatDateTime(r.voided.at)}` : ""}: {r.voided.reason}</p>

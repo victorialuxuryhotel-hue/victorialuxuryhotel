@@ -74,7 +74,7 @@ export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: Pay
 export type ReceiptPayment = Pick<PaymentRow, "receiptNumber" | "paidAt" | "method" | "providerReference" | "amountKobo" | "provider" | "recordedBy">;
 export type ReceiptStay = Pick<ReservationDetail, "guestName" | "reference" | "category" | "nights" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo"> & { room?: string };
 
-export function Receipt({ payment, reservation, forGuest = false, vatRateBp }: { payment: ReceiptPayment; reservation: ReceiptStay; forGuest?: boolean; vatRateBp?: number }) {
+export function Receipt({ payment, reservation, forGuest = false, vatRateBp, taxId }: { payment: ReceiptPayment; reservation: ReceiptStay; forGuest?: boolean; vatRateBp?: number; taxId?: string | null }) {
   return (
     <article className="mx-auto max-w-2xl rounded-card border border-hairline bg-ivory-50 p-5 sm:p-12 print:border-0">
       <header className="flex flex-col-reverse gap-4 border-b border-hairline pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:pb-8">
@@ -115,7 +115,10 @@ export function Receipt({ payment, reservation, forGuest = false, vatRateBp }: {
         <tfoot>
           <tr><td className="pt-4 text-ink-500">This payment</td><td className="pt-4 text-right text-lg font-semibold tabular-nums">{formatNaira(payment.amountKobo)}</td></tr>
           {vatRateBp ? (
-            <tr><td className="pt-1 text-ink-500">Includes VAT ({vatRateBp / 100}%)</td><td className="pt-1 text-right tabular-nums">{formatNaira(vatIncluded(payment.amountKobo, vatRateBp))}</td></tr>
+            <>
+              <tr><td className="pt-1 text-ink-500">Includes VAT ({vatRateBp / 100}%)</td><td className="pt-1 text-right tabular-nums">{formatNaira(vatIncluded(payment.amountKobo, vatRateBp))}</td></tr>
+              {taxId ? <tr><td className="pt-1 text-ink-500">TIN</td><td className="pt-1 text-right tabular-nums">{taxId}</td></tr> : null}
+            </>
           ) : null}
           <tr><td className="pt-1 text-ink-500">Still owed</td><td className="pt-1 text-right tabular-nums">{formatNaira(reservation.totalKobo - reservation.paidKobo)}</td></tr>
         </tfoot>
@@ -135,7 +138,7 @@ export type BillLines = {
   extras: { name: string; unitKobo: number; perNight: boolean; amountKobo: number }[];
 };
 
-export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillStay; lines: BillLines; vatRateBp: number; printedAt: string }) {
+export function GuestBill({ stay, lines, vatRateBp, printedAt, taxId }: { stay: BillStay; lines: BillLines; vatRateBp: number; printedAt: string; taxId?: string | null }) {
   const extrasListed = lines.extras.reduce((s, e) => s + e.amountKobo, 0);
   const adjustment = lines.extrasKobo - extrasListed;
   const paid = stay.payments.filter((p) => p.status === "successful");
@@ -196,6 +199,7 @@ export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillSta
         <tfoot>
           <tr><td className="pt-3 font-semibold text-ink-900">Total charges</td><td className="pt-3 text-right font-semibold tabular-nums">{formatNaira(stay.totalKobo)}</td></tr>
           {vatRateBp ? <tr><td className="pt-1 text-xs text-ink-500">Includes VAT ({vatRateBp / 100}%)</td><td className="pt-1 text-right text-xs tabular-nums text-ink-500">{formatNaira(vatIncluded(stay.totalKobo, vatRateBp))}</td></tr> : null}
+          {vatRateBp && taxId ? <tr><td className="pt-1 text-xs text-ink-500">TIN</td><td className="pt-1 text-right text-xs tabular-nums text-ink-500">{taxId}</td></tr> : null}
         </tfoot>
       </table>
 

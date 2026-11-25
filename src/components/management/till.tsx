@@ -70,8 +70,8 @@ function parseDraft(raw: string | null, menu: MenuItem[]) {
   }
 }
 
-export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] } }: {
-  menu: MenuItem[]; open: OpenOrder[]; attendant: string; vatRateBp: number; startOutlet?: Outlet; resume?: string;
+export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] } }: {
+  menu: MenuItem[]; open: OpenOrder[]; attendant: string; vatRateBp: number; taxId?: string | null; startOutlet?: Outlet; resume?: string;
   /** Each counter's best sellers, shown as a quick row above the menu. */
   favourites?: Record<Outlet, string[]>;
 }) {
@@ -402,7 +402,7 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
               onSubmit={(e) => {
                 stampId(e);
                 snapshot.current = {
-                  outlet, receiptNumber: "", orderNumber: 0, paidAt: "", attendant, vatRateBp,
+                  outlet, receiptNumber: "", orderNumber: 0, paidAt: "", attendant, vatRateBp, taxId,
                   lines: lines.map((l) => ({ name: l.item.name, quantity: l.q, unitKobo: l.item.price_kobo })),
                   totalKobo: total, method, cashReceivedKobo: method === "cash" ? givenKobo : null,
                 };

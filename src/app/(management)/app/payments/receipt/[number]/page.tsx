@@ -24,7 +24,7 @@ async function Content({ params }: { params: Promise<{ number: string }> }) {
   const payment = r?.payments.find((x) => x.receiptNumber === number);
   if (!r || !payment) notFound();
   const rules = await getBookingRules();
-  return <Receipt payment={payment} reservation={{ ...r, room: r.roomNumber ? `Room ${r.roomNumber}` : undefined }} vatRateBp={rules.vatOnReceipts ? rules.vatRateBp : 0} />;
+  return <Receipt payment={payment} reservation={{ ...r, room: r.roomNumber ? `Room ${r.roomNumber}` : undefined }} vatRateBp={rules.vatOnReceipts ? rules.vatRateBp : 0} taxId={rules.taxId} />;
 }
 
 export default function ReceiptPage(props: PageProps<"/app/payments/receipt/[number]">) {

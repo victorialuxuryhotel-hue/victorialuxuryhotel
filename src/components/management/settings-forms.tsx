@@ -20,6 +20,7 @@ export type BookingRules = {
   lateCancelFeePct: number;
   vatRateBp: number;
   vatOnReceipts: boolean;
+  taxId: string | null;
 };
 
 export function BookingRulesForm({ rules }: { rules: BookingRules }) {
@@ -45,6 +46,9 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
       </Field>
       <Field label="VAT rate (%)" htmlFor="vat" hint="Used only when VAT is shown on receipts." error={err("vatRatePct")}>
         <Input id="vat" name="vatRatePct" type="number" min={0} max={50} step={0.5} defaultValue={rules.vatRateBp / 100} />
+      </Field>
+      <Field label="Tax ID (TIN)" optional htmlFor="tin" hint="Printed on receipts and bills when VAT is shown. Needed before VAT can be switched on." error={err("taxId")}>
+        <Input id="tin" name="taxId" defaultValue={rules.taxId ?? ""} maxLength={30} autoComplete="off" />
       </Field>
       <label className="flex items-start gap-3 self-end pb-2 text-sm text-ink-700">
         <input type="checkbox" name="vatOnReceipts" defaultChecked={rules.vatOnReceipts} className="mt-0.5 size-4 accent-navy-800" />
