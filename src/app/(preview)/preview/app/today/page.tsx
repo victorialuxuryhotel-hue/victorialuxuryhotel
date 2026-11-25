@@ -26,6 +26,7 @@ export default function Page() {
       departures={departures}
       inHouse={reservations.filter((r) => r.status === "checked_in")}
       counts={roomCounts(board)}
+      progress={{ arrived: 13, left: 35 }}
       tonight={tonightView([
         { categoryId: "standard", name: "Standard", rateKobo: 4_000_000, rooms: 28, free: 16, held: 2 },
         { categoryId: "deluxe", name: "Deluxe", rateKobo: 5_500_000, rooms: 12, free: 3, held: 0 },

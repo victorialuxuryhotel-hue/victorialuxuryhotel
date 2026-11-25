@@ -154,6 +154,12 @@ for (const id of pagingIds) {
   const { ctx, p } = await as("front_desk");
   await go(p, "/app/today");
   await waitForText(p, /Available tonight/i);
+  // I3: "Arriving today · 1 of 3 arrived": the still-to-come part is the list on screen.
+  const progress = await p.$$eval("[role=progressbar]", (bars) =>
+    bars.map((b) => ({ done: Number(b.getAttribute("aria-valuenow")), total: Number(b.getAttribute("aria-valuemax")), rows: b.closest(".rounded-card")?.querySelectorAll("ul > li").length ?? 0 })),
+  );
+  check("Today's headings count arrivals and departures done, with a progress bar", progress.length >= 1, JSON.stringify(progress));
+  check("and the count still to go is the list on screen", progress.every((x) => x.total - x.done === x.rows), JSON.stringify(progress));
   const card = await p.$("[data-tonight]:has(a[href*='/app/reservations/new?type='])");
   check("Today shows the room types free tonight with New booking", Boolean(card) || /Fully booked tonight/.test(await text(p)));
   if (card) {

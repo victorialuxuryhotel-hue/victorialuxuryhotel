@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReservationRow } from "./views";
-import { greeting, needsYouNow, roomCounts, tonightView, type TodayInput, type TonightType } from "./today";
+import { greeting, movementProgress, needsYouNow, roomCounts, tonightView, type TodayInput, type TonightType } from "./today";
 
 const today = "2026-11-25";
 const base: ReservationRow = {
@@ -131,5 +131,24 @@ describe("available tonight (I2)", () => {
   it("a type with no rooms in service is full, and no types shows nothing", () => {
     expect(tonightView([t("Apartment", 0, 0)]).cards[0]).toMatchObject({ shown: 0, full: true });
     expect(tonightView([])).toEqual({ cards: [], fullyBooked: false, overbooked: [] });
+  });
+});
+
+describe("progress counts (I3)", () => {
+  it("total is the list plus those done", () => {
+    expect(movementProgress("arrivals", 5, 13)).toEqual({ done: 13, total: 18, pct: 72, label: "13 of 18 arrived" });
+    expect(movementProgress("departures", 3, 35)).toMatchObject({ total: 38, label: "35 of 38 left" });
+  });
+
+  it("checking a guest in moves them from the list to done; the total doesn't change", () => {
+    const before = movementProgress("arrivals", 5, 13);
+    const after = movementProgress("arrivals", 4, 14);
+    expect(after.total).toBe(before.total);
+    expect(after.done).toBe(before.done + 1);
+  });
+
+  it("nobody due: 0 of 0, no division by zero; everyone done: 100%", () => {
+    expect(movementProgress("arrivals", 0, 0)).toMatchObject({ total: 0, pct: 0, label: "0 of 0 arrived" });
+    expect(movementProgress("departures", 0, 4).pct).toBe(100);
   });
 });

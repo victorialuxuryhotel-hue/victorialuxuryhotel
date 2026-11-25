@@ -29,6 +29,7 @@ async function Content() {
       inHouse={m.inHouse}
       counts={roomCounts(rooms)}
       tonight={tonightView(tonight)}
+      progress={m.progress}
       signedIn={<SignedInStrip name={staff.fullName} roleLabel={staffRole[staff.role]} />}
       links={{
         reservation: (id) => `/app/reservations/${id}`,

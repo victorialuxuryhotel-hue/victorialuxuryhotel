@@ -92,3 +92,15 @@ export function tonightView(types: TonightType[]): { cards: TonightCard[]; fully
     overbooked: types.filter((t) => t.free < 0),
   };
 }
+
+export type Progress = { done: number; total: number; pct: number; label: string };
+
+/**
+ * "13 of 18 arrived" (interface brief I3). `due` is the list's own rows and `done` the guests who
+ * have already arrived or left, counted with the same conditions (server/domain/movements.ts), so
+ * checking a guest in moves them from due to done and the total stays put.
+ */
+export function movementProgress(kind: "arrivals" | "departures", due: number, done: number): Progress {
+  const total = due + done;
+  return { done, total, pct: total ? Math.round((done / total) * 100) : 0, label: `${done} of ${total} ${kind === "arrivals" ? "arrived" : "left"}` };
+}

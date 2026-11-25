@@ -6,6 +6,7 @@ import type { ReservationRow } from "@/domain/views";
 import { formatDate, formatNaira, nightsBetween, plural } from "@/lib/format";
 import { ReservationBadge } from "./badges";
 import { nextStep, owedOf } from "@/domain/next-step";
+import { movementProgress } from "@/domain/today";
 import { cn } from "@/lib/utils/cn";
 import { CheckInButton, CheckOutButton, TakePaymentLink } from "./reservation-actions";
 
@@ -15,6 +16,7 @@ export function MovementList({
   hrefFor,
   title,
   today,
+  done,
 }: {
   kind: "arrivals" | "departures";
   title?: string;
@@ -22,18 +24,40 @@ export function MovementList({
   hrefFor: (r: ReservationRow) => string;
   /** Hotel date, worked out by the page on the server (reading the clock while rendering breaks prerendering). */
   today: string;
+  /** Guests who have already arrived / left today (I3). Shows "13 of 18 arrived" and a progress bar. */
+  done?: number;
 }) {
   const arrivals = kind === "arrivals";
+  const progress = done === undefined ? null : movementProgress(kind, rows.length, done);
+  const heading = title ?? (arrivals ? "Arrivals" : "Departures");
   return (
     <Card>
       <CardHeader
-        title={title ?? (arrivals ? "Arrivals" : "Departures")}
+        title={progress && progress.total ? `${heading} · ${progress.label}` : heading}
         description={arrivals ? "Payment first, then a clean room, then the key." : "Take any payment owed, then check the guest out."}
-        action={<span className="rounded-full bg-ivory-200 px-2.5 py-0.5 text-sm font-semibold tabular-nums">{rows.length}</span>}
+        action={progress ? undefined : <span className="rounded-full bg-ivory-200 px-2.5 py-0.5 text-sm font-semibold tabular-nums">{rows.length}</span>}
       />
+      {progress && progress.total ? (
+        <div
+          role="progressbar"
+          aria-label={`${heading}: ${progress.label}`}
+          aria-valuemin={0}
+          aria-valuemax={progress.total}
+          aria-valuenow={progress.done}
+          className="h-1 bg-ivory-200"
+        >
+          <div className="h-full bg-success-600 transition-[width]" style={{ width: `${progress.pct}%` }} />
+        </div>
+      ) : null}
       {rows.length === 0 ? (
         <div className="p-5">
-          <EmptyState title={arrivals ? "No arrivals today" : "No departures today"} />
+          <EmptyState
+            title={
+              progress && progress.total
+                ? arrivals ? "Everyone due today has arrived" : "Everyone due out has left"
+                : arrivals ? "No arrivals today" : "No departures today"
+            }
+          />
         </div>
       ) : (
         <ul className="divide-y divide-hairline">

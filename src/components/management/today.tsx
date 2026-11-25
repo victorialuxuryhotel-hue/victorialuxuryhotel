@@ -98,6 +98,7 @@ export function TodayView({
   inHouse,
   counts,
   tonight,
+  progress,
   links,
   signedIn,
 }: {
@@ -110,6 +111,8 @@ export function TodayView({
   inHouse: ReservationRow[];
   counts: RoomCounts;
   tonight: ReturnType<typeof tonightView>;
+  /** Already arrived / left today, counted like the lists (I3). */
+  progress: { arrived: number; left: number };
   links: TodayLinks;
   /** "Signed in as … · Switch user" for the shared front desk computer. */
   signedIn?: ReactNode;
@@ -191,8 +194,8 @@ export function TodayView({
         <TonightSection tonight={tonight} newBooking={links.newBooking} />
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <MovementList kind="departures" title="Leaving today" rows={departures} hrefFor={href} today={today} />
-          <MovementList kind="arrivals" title="Coming in today" rows={arrivals} hrefFor={href} today={today} />
+          <MovementList kind="departures" title="Leaving today" rows={departures} hrefFor={href} today={today} done={progress.left} />
+          <MovementList kind="arrivals" title="Arriving today" rows={arrivals} hrefFor={href} today={today} done={progress.arrived} />
         </div>
 
         <Card>
