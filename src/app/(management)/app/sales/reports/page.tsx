@@ -147,6 +147,15 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
       </Card>
 
       <Card>
+        <CardHeader title="Unpaid orders cancelled" description={`Who cancelled what, and why · ${rangeName.toLowerCase()}`} />
+        <Table
+          head={["Cancelled by", "Time", "Order", "Counter", "Amount", "Reason"]}
+          rows={r.cancelled.map((c) => [c.who, formatDateTime(c.closed_at), `#${c.number}`, OUTLETS[c.outlet], formatNaira(c.kobo), c.reason ?? "None given (before reasons were required)"])}
+          empty="No orders cancelled."
+        />
+      </Card>
+
+      <Card>
         <CardHeader title="By menu item" description="Best sellers first." />
         <Table head={["Item", "Counter", "Qty", "Amount"]} rows={r.byItem.map((i) => [i.name, OUTLETS[i.outlet], i.qty, formatNaira(i.kobo)])} empty="No sales." />
       </Card>

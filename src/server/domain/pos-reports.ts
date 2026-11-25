@@ -17,7 +17,7 @@ export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: O
   const out = outlet ? "AND o.outlet = ?" : "";
   const args = (...a: unknown[]) => [...a, ...(outlet ? [outlet] : [])];
   const PAID = `o.status = 'paid' AND o.paid_at >= ? AND o.paid_at < ? ${out}`;
-  const [byDay, byItem, byCategory, byStaff, byMethod, voids, closings, stock, moves, transfers] = await Promise.all([
+  const [byDay, byItem, byCategory, byStaff, byMethod, voids, closings, stock, moves, transfers, cancelled] = await Promise.all([
     all<{ day: string; kobo: number; n: number }>(db, `SELECT ${DAY} AS day, sum(o.total_kobo) AS kobo, count(*) AS n FROM pos_orders o WHERE ${PAID} GROUP BY day`, ...args(start, end)),
     all<{ name: string; outlet: Outlet; qty: number; kobo: number }>(
       db,
@@ -67,6 +67,14 @@ export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: O
        WHERE ${PAID} AND o.method = 'bank_transfer' ORDER BY s.full_name, o.paid_at`,
       ...args(start, end),
     ),
+    // Unpaid orders cancelled, with who and why (rules 2.5: visible to the manager).
+    all<{ number: number; who: string; closed_at: string; outlet: Outlet; kobo: number; reason: string | null }>(
+      db,
+      `SELECT o.number, s.full_name AS who, o.closed_at, o.outlet, o.total_kobo AS kobo, o.close_reason AS reason
+       FROM pos_orders o JOIN staff_profiles s ON s.id = o.closed_by
+       WHERE o.status = 'cancelled' AND o.closed_at >= ? AND o.closed_at < ? ${out} ORDER BY o.closed_at DESC`,
+      ...args(start, end),
+    ),
   ]);
   const salesKobo = byDay.reduce((s, d) => s + d.kobo, 0);
   const sales = byDay.reduce((s, d) => s + d.n, 0);
@@ -81,7 +89,7 @@ export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: O
   }
   return {
     from, to, outlet, sales, salesKobo, daily, byItem, byCategory, byStaff, byMethod: method,
-    voids: voids?.n ?? 0, voidsKobo: voids?.kobo ?? 0, transfers,
+    voids: voids?.n ?? 0, voidsKobo: voids?.kobo ?? 0, transfers, cancelled,
     closings: closings[0] ?? { n: 0, diff: 0, unverified: 0 },
     stock, lowStock: stock.filter((s) => s.quantity <= s.min_quantity), stockMoves: [...stockMoves.values()].sort((a, b) => a.name.localeCompare(b.name)),
   };

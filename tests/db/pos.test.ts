@@ -97,11 +97,15 @@ describe("selling", () => {
     expect(await onHand(stockId)).toBe(6);
     expect((await posReport(db, mgr, "today", "bar")).salesKobo - before.salesKobo).toBe(400_000);
     await rejects(saveOrder(db, att, { id: order.id, outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }] }), /already paid/);
-    await rejects(cancelOrder(db, att, order.id, null), /Only unpaid/);
+    await rejects(cancelOrder(db, att, order.id, "Changed mind"), /Only unpaid/);
 
     const dropped = await saveOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }] });
+    await rejects(cancelOrder(db, att, dropped.id, null), /Say why the order is cancelled/);
+    await rejects(cancelOrder(db, att, dropped.id, "  "), /Say why the order is cancelled/);
     await cancelOrder(db, att, dropped.id, "Customer left");
     expect((await getOrder(db, mgr, dropped.id))!.status).toBe("cancelled");
+    const listed = (await posReport(db, mgr, "today", "bar")).cancelled.find((c) => c.number === dropped.number);
+    expect(listed).toMatchObject({ reason: "Customer left", kobo: 100_000 });
     await rejects(payOrder(db, att, { id: dropped.id, method: "cash" }), /cancelled/);
   });
 
@@ -148,7 +152,7 @@ describe("daily closing", () => {
     await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 2 }], method: "pos_terminal" });
     const open = await saveOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }] });
     await rejects(closeDay(db, att, { countedCashKobo: 300_000, explanation: null }), /still unpaid/);
-    await cancelOrder(db, att, open.id, null);
+    await cancelOrder(db, att, open.id, "Customer walked out");
 
     const s = await closingSummary(db, att, att.id);
     expect(s).toMatchObject({ sales: 2, salesKobo: 500_000, byMethod: { cash: 300_000, bank_transfer: 0, pos_terminal: 200_000 }, openOrders: 0 });

@@ -74,7 +74,7 @@ Refund: a `kind = refund` entry created only after GM/Owner approval of a refund
 
 ### 2.5 Bar/restaurant order (`pos_orders`)
 
-`open → paid` (method + for transfer a reference and confirmed tick **[exists — 0015]**) · `open → cancelled` (reason required **[new]**, visible to manager) · `paid → void` (manager only, reason ≥ 3 chars **[exists]**, stock returned **[verify]**). Items editable only while open **[exists]**. Prices are captured on the line at the time of adding **[verify]**; later menu price changes don't alter open orders' existing lines.
+`open → paid` (method + for transfer a reference and confirmed tick **[exists — 0015]**) · `open → cancelled` (reason required, visible to the manager in Sales reports **[exists]**) · `paid → void` (manager only, reason ≥ 3 chars **[exists]**, stock returned **[verify]**). Items editable only while open **[exists]**. Prices are captured on the line at the time of adding **[verify]**; later menu price changes don't alter open orders' existing lines.
 
 Legacy: the old `sales` table from 0009 still allows `status = 'room_charge'` and has a `sales_room_charge_in_house` trigger. **Charge-to-room is out of scope.** Nothing writes to `sales` any more; inserts are blocked by a trigger and the leftover error mappings are removed **[exists — 0015]**.
 

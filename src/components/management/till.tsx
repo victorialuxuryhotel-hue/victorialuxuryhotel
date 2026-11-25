@@ -359,7 +359,7 @@ function OpenOrderRow({ o, onOpen, active }: { o: OpenOrder; onOpen: () => void;
       {confirm ? (
         <form action={action} className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <input type="hidden" name="id" value={o.id} />
-          <Input name="reason" placeholder="Why? (optional)" className="h-10 min-w-0 flex-1 text-sm sm:w-44" />
+          <Input name="reason" placeholder="Why? (the manager sees this)" required minLength={3} aria-label="Why is this order cancelled?" className="h-10 min-w-0 flex-1 text-sm sm:w-52" />
           <Button type="submit" size="sm" variant="danger" pending={pending}>Cancel order</Button>
           <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Keep</Button>
           {state && !state.ok ? <p className="w-full text-xs text-danger-700">{state.message}</p> : null}

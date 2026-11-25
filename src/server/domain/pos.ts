@@ -369,13 +369,16 @@ export async function payOrder(
 }
 
 /** Drop an unpaid order. It stays on record as cancelled. */
+/** Cancel an unpaid order. A reason is required (rules 2.5); the manager sees it in Sales reports. */
 export async function cancelOrder(db: Db, actor: Actor, id: string, reason: string | null): Promise<void> {
   requireRole(actor, POS_SELLERS);
+  const why = reason?.trim() ?? "";
+  if (why.length < 3) throw new AppError("VALIDATION", "Say why the order is cancelled. The manager sees this.");
   const [r] = await writeBatch(db, actor, [
     db
       .prepare("UPDATE pos_orders SET status = 'cancelled', closed_by = ?, closed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), close_reason = ? WHERE id = ? AND status = 'open'")
-      .bind(actor.id, reason?.trim().slice(0, 200) || null, id),
-    activityIfChanged(db, "pos.order_cancelled", "pos_order", id, `Unpaid order cancelled${reason?.trim() ? `: ${reason.trim()}` : ""}`),
+      .bind(actor.id, why.slice(0, 200), id),
+    activityIfChanged(db, "pos.order_cancelled", "pos_order", id, `Unpaid order cancelled: ${why}`),
   ]);
   if (!r?.meta.changes) throw new AppError("INVALID_TRANSITION", "Only unpaid orders can be cancelled.");
 }
