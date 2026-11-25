@@ -1,3 +1,4 @@
+import { hotelToday } from "@/lib/hotel-date";
 import { canAny } from "@/lib/auth/permissions";
 import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
@@ -18,7 +19,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
   if (!z.uuid().safeParse(id).success) notFound();
   const result = await getGuest(id);
   if (!result) notFound();
-  return <GuestProfile guest={result.guest} stays={result.stays} stayHref={(r) => `/app/reservations/${r.id}`} />;
+  return <GuestProfile guest={result.guest} stays={result.stays} stayHref={(r) => `/app/reservations/${r.id}`} today={hotelToday()} />;
 }
 
 export default function GuestPage(props: PageProps<"/app/guests/[id]">) {

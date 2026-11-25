@@ -1,3 +1,4 @@
+import { hotelToday } from "@/lib/hotel-date";
 import { can, canAny } from "@/lib/auth/permissions";
 import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
@@ -58,7 +59,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
       />
       {rows.length ? (
         <>
-          <ReservationTable rows={rows} hrefFor={(r) => `/app/reservations/${r.id}`} />
+          <ReservationTable rows={rows} hrefFor={(r) => `/app/reservations/${r.id}`} today={hotelToday()} />
           <Pager basePath="/app/reservations" params={{ tab, q, status: one(sp.status), source: one(sp.source) }} page={page} hasMore={fetched.length > PAGE_SIZE} />
         </>
       ) : (

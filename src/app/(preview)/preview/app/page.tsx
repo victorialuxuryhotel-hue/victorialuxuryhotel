@@ -67,7 +67,7 @@ export default function Page() {
 
         <Card>
           <CardHeader title="Recent bookings" action={<Link href="/preview/app/reservations" className="text-sm font-medium text-navy-800">All reservations</Link>} />
-          <ReservationTable rows={reservations.slice(0, 5)} hrefFor={href} />
+          <ReservationTable rows={reservations.slice(0, 5)} hrefFor={href} today={today} />
         </Card>
       </div>
     </>

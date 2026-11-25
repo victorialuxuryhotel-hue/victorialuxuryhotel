@@ -6,7 +6,7 @@ import { FilterSelect, ListToolbar, Tabs } from "@/components/management/toolbar
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { bookingSource, reservationStatus } from "@/domain/status";
-import { reservations } from "../../_sample";
+import { reservations, today } from "../../_sample";
 
 export default function Page() {
   return (
@@ -28,7 +28,7 @@ export default function Page() {
               </>
             }
           />
-          <ReservationTable rows={reservations} hrefFor={() => "/preview/app/reservations/vl-7kq3pm"} />
+          <ReservationTable rows={reservations} hrefFor={() => "/preview/app/reservations/vl-7kq3pm"} today={today} />
         </Card>
       </div>
     </>

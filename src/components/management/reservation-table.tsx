@@ -6,7 +6,9 @@ import type { ReservationRow } from "@/domain/views";
 import { formatDate, formatNaira, nightsBetween, plural } from "@/lib/format";
 import { PaidProgress, ReservationBadge } from "./badges";
 
-export function ReservationTable({ rows, hrefFor }: { rows: ReservationRow[]; hrefFor: (r: ReservationRow) => string }) {
+/** today: the hotel date from the page, so dates in another year show their year. */
+export function ReservationTable({ rows, hrefFor, today }: { rows: ReservationRow[]; hrefFor: (r: ReservationRow) => string; today: string }) {
+  const year = today.slice(0, 4);
   return (
     <>
       <ul className="divide-y divide-hairline md:hidden">
@@ -22,7 +24,7 @@ export function ReservationTable({ rows, hrefFor }: { rows: ReservationRow[]; hr
               </div>
               <p className="mt-2 text-sm text-ink-600">
                 {r.category}
-                {r.roomNumber ? ` · Room ${r.roomNumber}` : ""} · {formatDate(r.checkIn, { year: false })} → {formatDate(r.checkOut, { year: false })}
+                {r.roomNumber ? ` · Room ${r.roomNumber}` : ""} · {formatDate(r.checkIn, { year })} → {formatDate(r.checkOut, { year })}
               </p>
               {r.attention ? (
                 <p className="mt-2 flex items-center gap-1.5 text-xs text-warning-700">
@@ -55,7 +57,7 @@ export function ReservationTable({ rows, hrefFor }: { rows: ReservationRow[]; hr
                 </TD>
                 <TD>
                   <p className="whitespace-nowrap text-ink-900">
-                    {formatDate(r.checkIn, { year: false })} → {formatDate(r.checkOut, { year: false })}
+                    {formatDate(r.checkIn, { year })} → {formatDate(r.checkOut, { year })}
                   </p>
                   <p className="text-xs text-ink-500">
                     {plural(nightsBetween(r.checkIn, r.checkOut), "night")} · {plural(r.guests, "guest")}

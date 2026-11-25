@@ -122,7 +122,7 @@ async function Content() {
 
       <Card>
         <CardHeader title="Recent bookings" action={<Link href="/app/reservations?tab=all" className="text-sm font-medium text-navy-800">All bookings</Link>} />
-        {recent.length ? <ReservationTable rows={recent.slice(0, 8)} hrefFor={href} /> : <div className="p-5"><EmptyState title="No bookings yet" /></div>}
+        {recent.length ? <ReservationTable rows={recent.slice(0, 8)} hrefFor={href} today={m.today} /> : <div className="p-5"><EmptyState title="No bookings yet" /></div>}
       </Card>
     </div>
   );

@@ -24,6 +24,12 @@ describe("format", () => {
     expect(formatDate("2026-12-01")).toMatch(/^Tue,? 1 Dec 2026$/);
   });
 
+  it("shows the year only for dates outside the current year when given it", () => {
+    expect(formatDate("2026-12-01", { year: "2026" })).toMatch(/^Tue,? 1 Dec$/);
+    expect(formatDate("2027-01-28", { year: "2026" })).toMatch(/^Thu,? 28 Jan 2027$/);
+    expect(formatDate("2027-01-28", { year: false })).toMatch(/^Thu,? 28 Jan$/);
+  });
+
   it("counts nights, including across a month end", () => {
     expect(nightsBetween("2026-11-29", "2026-12-02")).toBe(3);
   });

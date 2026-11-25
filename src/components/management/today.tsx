@@ -160,7 +160,7 @@ export function TodayView({
             description="Guests checked in now."
             action={<span className="rounded-full bg-ivory-200 px-2.5 py-0.5 text-sm font-semibold tabular-nums">{inHouse.length}</span>}
           />
-          {inHouse.length ? <ReservationTable rows={inHouse} hrefFor={href} /> : <div className="p-5"><EmptyState title="No guests checked in" /></div>}
+          {inHouse.length ? <ReservationTable rows={inHouse} hrefFor={href} today={today} /> : <div className="p-5"><EmptyState title="No guests checked in" /></div>}
         </Card>
 
         <section aria-label="Rooms">
