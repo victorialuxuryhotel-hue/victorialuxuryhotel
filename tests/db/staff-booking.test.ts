@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { availabilityForStay, findGuestsByPhone } from "@/server/domain/staff-booking";
 import { recordOfflinePayment } from "@/server/domain/payments";
 import { createStaffReservation } from "@/server/domain/reservations";
-import { day, db, desk, exec, makeCategory, q1 } from "./helpers";
+import { day, db, desk, exec, insertReservation, makeCategory, q1 } from "./helpers";
 
 describe("new reservation helpers (6d)", () => {
   it("finds a returning guest by phone typed in another format, from 7 digits", async () => {
@@ -21,6 +21,15 @@ describe("new reservation helpers (6d)", () => {
     await createStaffReservation(db, desk, { categoryId: c.id, checkIn: day(70), checkOut: day(71), guests: 1, source: "walk_in", fullName: "Full Tonight", phone: "+2348000000011" });
     const after = (await availabilityForStay(db, desk, day(70), day(71))).find((a) => a.categoryId === c.id);
     expect(after?.free).toBe(0);
+  });
+
+  it("doesn't offer an overstaying guest's room, and the list agrees with the count", async () => {
+    const c = await makeCategory(2);
+    const stay = await insertReservation({ categoryId: c.id, checkIn: day(-4), checkOut: day(-2), roomId: c.roomIds[0], status: "confirmed" });
+    await exec("UPDATE reservations SET status = 'checked_in' WHERE id = ?", stay);
+    const tonight = (await availabilityForStay(db, desk, day(0), day(1))).find((a) => a.categoryId === c.id)!;
+    expect(tonight.free).toBe(1);
+    expect(tonight.rooms.map((r) => r.id)).toEqual([c.roomIds[1]]);
   });
 
   it("a new staff booking has no room until it's paid; payment assigns a ready one", async () => {
