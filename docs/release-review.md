@@ -131,4 +131,5 @@ These are deliberately **not final** in the app:
 3. Record the Time Travel bookmark, then apply 0012 and 0013 (section 1).
 4. Build (`pnpm cf:build`; it must report no secrets), upload, compare `wrangler versions view` secrets, remove `EMAIL_ALLOWLIST` if inherited, and deploy.
 5. In the app: deactivate the 3 demo staff (they're linked to development Clerk users). Create the first owner with `scripts/create-owner.mts`. Sign in and set up the authenticator app. Then invite the real staff.
-6. Run the checks in `docs/deployment-cloudflare.md` → "Checks after each deploy".
+6. Remove the demo data from the live site: `npx wrangler d1 execute victoria-hotel-db --remote --file db/demo-live-undo.sql` (switches off the demo extras, the WELCOME10 promo code, demo menu and stock items, and clears the demo room descriptions). Check it first: it only switches things off, it deletes nothing.
+7. Run the checks in `docs/deployment-cloudflare.md` → "Checks after each deploy".
