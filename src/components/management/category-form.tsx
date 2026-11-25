@@ -7,7 +7,6 @@ import { Field, FormMessage, Input, Textarea } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/errors";
 import { saveCategory } from "@/server/rooms";
 import { keepValues } from "@/lib/forms";
-import { MIN_NIGHTLY_RATE_KOBO } from "@/domain/pricing";
 
 export type CategoryFormValues = {
   id?: string;
@@ -52,7 +51,7 @@ export function CategoryForm({ category, action = saveCategory }: { category?: C
           <CardHeader title="Pricing & capacity" />
           <div className="space-y-5 p-5">
             <Field label="Nightly rate (₦)" htmlFor="crate" error={err("nightlyRate")}>
-              <Input id="crate" name="nightlyRate" inputMode="decimal" min={MIN_NIGHTLY_RATE_KOBO / 100} defaultValue={category?.nightlyRateKobo ? String(category.nightlyRateKobo / 100) : ""} required />
+              <Input id="crate" name="nightlyRate" inputMode="decimal" min={1} defaultValue={category?.nightlyRateKobo ? String(category.nightlyRateKobo / 100) : ""} required />
             </Field>
             <Field label="Maximum guests" htmlFor="cocc" error={err("maxOccupancy")}>
               <Input id="cocc" name="maxOccupancy" type="number" min={1} max={20} defaultValue={category?.maxOccupancy ?? 2} required />

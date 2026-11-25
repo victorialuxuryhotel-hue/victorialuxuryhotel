@@ -15,7 +15,7 @@ Money is integer **kobo** everywhere. Stay dates are hotel-local `YYYY-MM-DD` st
 | --- | --- | --- |
 | Settings | `hotel_settings` | One row: check-in/out times, hold lengths, free-cancellation hours, late-cancellation fee %, VAT rate |
 | Staff | `staff_profiles` | Linked to a Clerk user on first sign-in. Role is stored as role + department + manager flag (seven roles). Deactivate, never delete; at least one active owner |
-| Rooms | `room_categories`, `rooms`, `room_category_images`, `site_photos` | Rate ≥ ₦40,000 a night; no deletes (deactivate); photo files live in R2 |
+| Rooms | `room_categories`, `rooms`, `room_category_images`, `site_photos` | Rate above ₦0, no minimum (0023); no deletes (deactivate); photo files live in R2 |
 | Guests | `guests`, `guest_login_codes` | Email optional (walk-ins); one-time codes for guest sign-in |
 | Bookings | `reservations`, `reservation_status_history`, `reservation_extras`, `extras`, `promo_codes`, `calendar` | See below |
 | Payments | `payments`, `payment_events`, `receipt_counters`, `email_outbox` | Immutable once successful; corrections are separate linked rows |

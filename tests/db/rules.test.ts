@@ -280,11 +280,11 @@ describe("activity log and staff", () => {
   });
 });
 
-describe("minimum room rate", () => {
-  it("refuses a room type priced below ₦40,000 a night, on insert and on update", async () => {
-    await rejects(makeCategory(0, { rateKobo: 3_999_999 }), /rate_below_minimum/);
-    const c = await makeCategory(0, { rateKobo: 4_000_000 });
-    await rejects(exec("UPDATE room_categories SET nightly_rate_kobo = 3500000 WHERE id = ?", c.id), /rate_below_minimum/);
-    await exec("UPDATE room_categories SET nightly_rate_kobo = 4500000 WHERE id = ?", c.id);
+describe("room rates", () => {
+  it("has no minimum: any rate the hotel sets is kept exactly, but never zero (0023)", async () => {
+    const c = await makeCategory(0, { rateKobo: 2_500_000 });
+    await exec("UPDATE room_categories SET nightly_rate_kobo = 10800000 WHERE id = ?", c.id);
+    expect((await q1<{ r: number }>("SELECT nightly_rate_kobo AS r FROM room_categories WHERE id = ?", c.id)).r).toBe(10_800_000);
+    await rejects(exec("UPDATE room_categories SET nightly_rate_kobo = 0 WHERE id = ?", c.id), /CHECK constraint failed/);
   });
 });

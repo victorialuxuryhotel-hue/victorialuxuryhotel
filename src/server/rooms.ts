@@ -3,9 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { MIN_NIGHTLY_RATE_KOBO } from "@/domain/pricing";
 import { recordId } from "@/lib/ids";
-import { formatNaira } from "@/lib/format";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize } from "./auth";
@@ -64,7 +62,8 @@ const categorySchema = z.object({
   amenities: z.string().max(2000),
   nightlyRate: z.coerce
     .number({ error: "Enter the nightly rate" })
-    .min(MIN_NIGHTLY_RATE_KOBO / 100, `The minimum rate is ${formatNaira(MIN_NIGHTLY_RATE_KOBO)} a night`)
+    // No minimum: the rate is exactly what the hotel sets (migration 0023). It must be above zero.
+    .positive("Enter the nightly rate")
     .max(100_000_000),
   maxOccupancy: z.coerce.number().int().min(1).max(20),
   sortOrder: z.coerce.number().int().min(0).max(1000).default(0),

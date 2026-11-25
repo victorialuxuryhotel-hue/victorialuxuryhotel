@@ -1,5 +1,3 @@
-export const MIN_NIGHTLY_RATE_KOBO = 4_000_000;
-
 export type PricedExtra = { priceKobo: number; perNight: boolean };
 
 /** An extra for this many nights: per-night extras are charged every night, the rest once. */

@@ -10,7 +10,6 @@ const tokens: Record<string, [ErrorCode, string]> = {
   in_house_frozen: ["VALIDATION", "The guest is in house: only the check-out date can change."],
   payment_immutable: ["CONFLICT", "Payments can't be edited once saved. A manager can record a correction instead."],
   payment_closed: ["CONFLICT", "That online payment attempt has ended. Start a new payment."],
-  rate_below_minimum: ["VALIDATION", "The minimum rate is ₦40,000 a night."],
   invalid_correction: ["VALIDATION", "A correction can't be more than what was paid with that payment."],
   activity_log_immutable: ["FORBIDDEN", "Activity records can't be changed or deleted."],
   last_owner: ["CONFLICT", "At least one active owner is required."],
