@@ -2,7 +2,9 @@ import { canAny } from "@/lib/auth/permissions";
 import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { SignedInStrip } from "@/components/management/idle-lock";
 import { TodayView } from "@/components/management/today";
+import { staffRole } from "@/domain/status";
 import { LoadingState } from "@/components/ui/feedback";
 import { greeting, needsYouNow, roomCounts } from "@/domain/today";
 import { hotelTimeNow } from "@/lib/hotel-date";
@@ -26,6 +28,7 @@ async function Content() {
       departures={m.departures}
       inHouse={m.inHouse}
       counts={roomCounts(rooms)}
+      signedIn={<SignedInStrip name={staff.fullName} roleLabel={staffRole[staff.role]} />}
       links={{
         reservation: (id) => `/app/reservations/${id}`,
         pay: (id) => `/app/payments/record?reservation=${id}`,

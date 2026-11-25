@@ -93,6 +93,7 @@ export function TodayView({
   inHouse,
   counts,
   links,
+  signedIn,
 }: {
   firstName: string;
   greeting: string;
@@ -103,14 +104,19 @@ export function TodayView({
   inHouse: ReservationRow[];
   counts: RoomCounts;
   links: TodayLinks;
+  /** "Signed in as … · Switch user" for the shared front desk computer. */
+  signedIn?: ReactNode;
 }) {
   const href = (r: { id: string }) => links.reservation(r.id);
   return (
     <ActionFeedbackProvider>
       <div className="space-y-6 px-4 py-6 lg:px-8">
-        <header>
-          <h1 className="text-[1.75rem] leading-tight font-semibold text-ink-900">{greeting}, {firstName}</h1>
-          <p className="mt-1 text-sm text-ink-500">{formatDate(today)}</p>
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[1.75rem] leading-tight font-semibold text-ink-900">{greeting}, {firstName}</h1>
+            <p className="mt-1 text-sm text-ink-500">{formatDate(today)}</p>
+          </div>
+          {signedIn}
         </header>
 
         <section aria-labelledby="needs">

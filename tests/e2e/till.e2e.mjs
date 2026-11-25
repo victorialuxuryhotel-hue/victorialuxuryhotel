@@ -1,5 +1,5 @@
 // Fix 4 / rule I10: a transfer at the till can't be confirmed without the reference and the bank-app tick.
-import { as, check, clickText, finish, go, settle, text, val, waitForText } from "./lib.mjs";
+import { as, check, clickText, finish, go, settle, text, until, val, waitForText } from "./lib.mjs";
 
 const { ctx, p } = await as("restaurant_bar");
 // A 1280×720 laptop with browser toolbars: the till must work without scrolling the page.
@@ -47,6 +47,30 @@ check("closing names the business day and when it ends", /Business day \w{3} \d{
 check("no expected cash or money totals before the count", !/Cash expected|₦\s?[0-9]/.test(yourDay), JSON.stringify(yourDay.slice(0, 600)));
 check("the count comes first", /Submit my count/.test(yourDay));
 await ctx.close();
+
+{
+  // H3: the idle lock covers the screen; Continue brings back the same order. (Idle time shortened for the test.)
+  const { ctx, p } = await as("restaurant_bar");
+  await go(p, "/app/sales");
+  check("the till shows who is signed in, with Switch user", /Signed in as .+ \(.+\)\s*Switch user/.test(await text(p)));
+  await p.evaluate(() => localStorage.setItem("victoria-idle-lock-ms", "4000"));
+  await p.reload({ waitUntil: "load" });
+  await settle(p);
+  // Tap until the item is in the order (a tap before the page has finished loading does nothing).
+  await until(async () => {
+    if (/Total · 1 item/.test(await text(p))) return true;
+    await p.click("section[aria-label=Menu] li button:not([disabled])").catch(() => {});
+    return false;
+  }, "item added", 10000);
+  await waitForText(p, /Locked/, 15000);
+  check("after the idle time the screen locks", Boolean(await p.$("[role=dialog][aria-modal=true]")));
+  // Back to the normal idle time before continuing, so the lock doesn't come straight back.
+  await p.evaluate(() => localStorage.removeItem("victoria-idle-lock-ms"));
+  await clickText(p, "button", "Continue as");
+  check("Continue brings back the order being taken", /Total · 1 item/.test(await text(p)));
+  await clickText(p, "button", "Clear");
+  await ctx.close();
+}
 
 {
   // A reload (or power cut) mid-order: the till offers to bring the order back.

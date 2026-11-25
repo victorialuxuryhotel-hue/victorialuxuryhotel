@@ -1,3 +1,5 @@
+import { SignedInStrip } from "@/components/management/idle-lock";
+import { staffRole } from "@/domain/status";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -41,6 +43,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         <span>Cash to hand in: <b className="tabular-nums text-ink-900">{formatNaira(mine.byMethod.cash)}</b></span>
         <Link href="/app/sales/orders" className="font-medium text-navy-800 hover:underline">Orders & receipts</Link>
         <Link href="/app/sales/closing" className="font-medium text-navy-800 hover:underline">Close my day</Link>
+        <div className="ml-auto"><SignedInStrip name={staff.fullName} roleLabel={staffRole[staff.role]} /></div>
       </div>
       {low.length ? (
         <p role="status" className="rounded-md border border-warning-600/30 bg-warning-50 px-4 py-3 text-sm text-warning-700">
@@ -53,7 +56,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         </p>
       ) : (
         <div className="lg:min-h-0 lg:flex-1">
-          <Till menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} taxId={settings?.tax_id ?? null} resume={resume} favourites={favourites} />
+          <Till menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} taxId={settings?.tax_id ?? null} resume={resume} favourites={favourites} staffId={staff.id} />
         </div>
       )}
     </div>

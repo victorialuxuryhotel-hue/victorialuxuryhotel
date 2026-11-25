@@ -26,7 +26,7 @@ const paySafe = safeAction(takePayment, OFFLINE);
 const cancelSafe = safeAction(cancelOpenOrder, OFFLINE);
 
 // ---- The order being taken, kept in this browser so a reload doesn't lose it ----
-const DRAFT_KEY = "victoria-till-draft";
+const draftKey = (staffId: string) => `victoria-till-draft:${staffId}`;
 type Draft = { outlet: Outlet; cart: Record<string, number>; note: string; orderId: string; editing: { id: string; number: number } | null; at: number };
 const draftListeners = new Set<() => void>();
 function subscribeStorage(listener: () => void) {
@@ -37,17 +37,17 @@ function subscribeStorage(listener: () => void) {
     window.removeEventListener("storage", listener);
   };
 }
-function readDraft(): string | null {
+function readDraft(staffId: string): string | null {
   try {
-    return window.localStorage.getItem(DRAFT_KEY);
+    return window.localStorage.getItem(draftKey(staffId));
   } catch {
     return null; // storage blocked
   }
 }
-function writeDraft(d: Omit<Draft, "at"> | null) {
+function writeDraft(staffId: string, d: Omit<Draft, "at"> | null) {
   try {
-    if (d) window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, at: Date.now() }));
-    else window.localStorage.removeItem(DRAFT_KEY);
+    if (d) window.localStorage.setItem(draftKey(staffId), JSON.stringify({ ...d, at: Date.now() }));
+    else window.localStorage.removeItem(draftKey(staffId));
   } catch {
     /* storage blocked: nothing to keep */
   }
@@ -70,10 +70,12 @@ function parseDraft(raw: string | null, menu: MenuItem[]) {
   }
 }
 
-export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] } }: {
+export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] }, staffId = "" }: {
   menu: MenuItem[]; open: OpenOrder[]; attendant: string; vatRateBp: number; taxId?: string | null; startOutlet?: Outlet; resume?: string;
   /** Each counter's best sellers, shown as a quick row above the menu. */
   favourites?: Record<Outlet, string[]>;
+  /** Drafts are kept per staff member: the next person to sign in doesn't see someone else's order. */
+  staffId?: string;
 }) {
   const resumeOrder = open.find((o) => o.id === resume);
   const [outlet, setOutlet] = useState<Outlet>(resumeOrder?.outlet ?? startOutlet);
@@ -139,19 +141,19 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
 
   // A refresh, a UPS changeover or a power cut mustn't lose the order being taken: a copy of the
   // current order is kept in this browser, and after a reload the till offers to bring it back.
-  const draftRaw = useSyncExternalStore(subscribeStorage, readDraft, () => null);
+  const draftRaw = useSyncExternalStore(subscribeStorage, () => readDraft(staffId), () => null);
   const draft = useMemo(() => parseDraft(draftRaw, menu), [draftRaw, menu]);
   const hadLines = useRef(false);
   useEffect(() => {
     if (lines.length && step !== "done") {
       hadLines.current = true;
-      writeDraft({ outlet, cart, note, orderId: orderId.current, editing });
+      writeDraft(staffId, { outlet, cart, note, orderId: orderId.current, editing });
     } else if (hadLines.current) {
       // The order was paid, saved or cleared. (An empty till after a reload keeps the saved copy for the offer to restore.)
       hadLines.current = false;
-      writeDraft(null);
+      writeDraft(staffId, null);
     }
-  }, [outlet, cart, note, editing, lines.length, step]);
+  }, [outlet, cart, note, editing, lines.length, step, staffId]);
   const restoreDraft = () => {
     if (!draft) return;
     setReceipt(null);
@@ -345,7 +347,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               </p>
               <div className="mt-2 flex gap-2">
                 <Button size="sm" onClick={restoreDraft}>Bring it back</Button>
-                <Button size="sm" variant="ghost" onClick={() => writeDraft(null)}>Discard</Button>
+                <Button size="sm" variant="ghost" onClick={() => writeDraft(staffId, null)}>Discard</Button>
               </div>
             </div>
           ) : null}
