@@ -2,11 +2,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   paymentStatus,
   reservationStatus,
-  roomBoardState,
   roomReadiness,
   type PaymentStatus,
   type ReservationStatus,
-  type RoomBoardState,
   type RoomReadiness,
 } from "@/domain/status";
 
@@ -22,10 +20,6 @@ export const ReadinessBadge = ({ readiness }: { readiness: RoomReadiness }) => (
   <Badge tone={roomReadiness[readiness].tone}>{roomReadiness[readiness].label}</Badge>
 );
 
-export const RoomStateBadge = ({ state }: { state: RoomBoardState }) => (
-  <Badge tone={roomBoardState[state].tone}>{roomBoardState[state].label}</Badge>
-);
-
 export function PaidProgress({ paidKobo, totalKobo, format }: { paidKobo: number; totalKobo: number; format: (k: number) => string }) {
   const pct = Math.min(100, Math.round((paidKobo / totalKobo) * 100));
   const balance = totalKobo - paidKobo;
@@ -34,7 +28,7 @@ export function PaidProgress({ paidKobo, totalKobo, format }: { paidKobo: number
       <div className="h-1.5 overflow-hidden rounded-full bg-ivory-200">
         <div className={pct === 100 ? "h-full bg-success-600" : "h-full bg-gold-500"} style={{ width: `${pct}%` }} />
       </div>
-      <p className="mt-1 text-xs text-ink-500">{balance > 0 ? `${format(balance)} due` : "Paid in full"}</p>
+      <p className="mt-1 text-xs text-ink-500">{balance > 0 ? `${format(balance)} owed` : "Paid in full"}</p>
     </div>
   );
 }
