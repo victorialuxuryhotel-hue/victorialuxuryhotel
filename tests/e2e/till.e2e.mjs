@@ -57,6 +57,29 @@ check("the count comes first", /Submit my count/.test(yourDay));
 await ctx.close();
 
 {
+  // H9: losing the connection shows the banner and turns Pay off until it's back.
+  const { ctx, p } = await as("restaurant_bar");
+  await p.setViewport({ width: 1280, height: 720 });
+  await go(p, "/app/sales");
+  await settle(p);
+  await until(async () => {
+    if (/Total · 1 item/.test(await text(p))) return true;
+    await p.click("section[aria-label=Menu] li button:not([disabled])").catch(() => {});
+    return false;
+  }, "item added", 10000);
+  const payDisabled = () => p.$$eval("button", (bs) => bs.find((b) => b.innerText.trim() === "Take payment")?.disabled);
+  await p.setOfflineMode(true);
+  await waitForText(p, /No internet connection\. Your last action may not have saved/);
+  check("offline: the banner says don't take payment", /Don't take payment until this clears/.test(await text(p)));
+  check("offline: Take payment is off", (await payDisabled()) === true);
+  await p.setOfflineMode(false);
+  await until(async () => !/No internet connection/.test(await text(p)), "back online", 10000);
+  check("back online: the banner goes and Take payment is on again", (await payDisabled()) === false);
+  await clickText(p, "button", "Clear");
+  await ctx.close();
+}
+
+{
   // H5: this station prints 80mm receipts automatically, once per receipt.
   const { ctx, p } = await as("restaurant_bar");
   await p.setViewport({ width: 1280, height: 720 });

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { paymentMethod } from "@/domain/status";
 import { owedOf } from "@/domain/next-step";
+import { OFFLINE_REASON, useOnline } from "./connection";
 import { formatNaira } from "@/lib/format";
 import { recordOfflinePayment } from "@/server/payments";
 
@@ -19,6 +20,7 @@ export function OfflinePaymentForm({
   const [paymentId] = useState(() => crypto.randomUUID());
   const [review, setReview] = useState<null | { amount: string; method: string; paidOn: string; reference: string }>(null);
   const [method, setMethod] = useState("cash");
+  const online = useOnline();
   const transfer = method === "bank_transfer";
   const pos = method === "pos_terminal";
   const [seen, setSeen] = useState(state);
@@ -111,7 +113,7 @@ export function OfflinePaymentForm({
         {err("confirmReceived") ? <p className="mt-1 text-sm text-danger-700">{err("confirmReceived")}</p> : null}
       </div>
       <div className="flex justify-end">
-        <Button type="submit" className="w-full sm:w-auto">Take payment</Button>
+        <Button type="submit" className="w-full sm:w-auto" disabled={!online} title={online ? undefined : OFFLINE_REASON}>Take payment</Button>
       </div>
       </div>
       {review ? (
@@ -127,7 +129,7 @@ export function OfflinePaymentForm({
           <p className="text-sm text-ink-600">Payments can&apos;t be edited once saved. If something is wrong later, a manager records a correction.</p>
           <div className="grid grid-cols-2 gap-2.5 sm:flex sm:justify-end">
             <Button type="button" variant="secondary" size="lg" onClick={() => setReview(null)} disabled={pending}>Go back</Button>
-            <Button type="submit" size="lg" pending={pending}>Yes, take payment</Button>
+            <Button type="submit" size="lg" pending={pending} disabled={!online} title={online ? undefined : OFFLINE_REASON}>Yes, take payment</Button>
           </div>
         </div>
       ) : null}

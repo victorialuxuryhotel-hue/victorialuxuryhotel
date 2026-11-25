@@ -11,6 +11,7 @@ import { applyChangeUnpaid, assignRoom, cancelPendingChange, cancelReservation, 
 import { ActionButton } from "./action-form";
 import { useActionFeedback, withFeedback } from "./action-feedback";
 import { keepValues } from "@/lib/forms";
+import { OFFLINE_REASON, useOnline } from "./connection";
 
 /** blocked: why this room can't be chosen now ("Occupied · Adeyemi", "To clean", "Out of order"). */
 export type RoomOption = { id: string; number: string; category: string; ready: boolean; blocked?: string };
@@ -19,6 +20,15 @@ type Size = "sm" | "md" | "lg";
 
 /** Shown instead of check-in or check-out while money is owed: the server refuses both until the balance is paid. */
 export function TakePaymentLink({ reservationId, balanceKobo, size = "md" }: { reservationId: string; balanceKobo: number; size?: Size }) {
+  const online = useOnline();
+  const style = buttonStyles({ size, variant: size === "sm" ? "secondary" : "primary", className: size === "lg" ? "w-full" : "whitespace-nowrap" });
+  if (!online) {
+    return (
+      <span role="link" aria-disabled="true" title={OFFLINE_REASON} className={`${style} cursor-not-allowed opacity-45`}>
+        <Wallet className="size-4" aria-hidden /> Take payment · {formatNaira(balanceKobo)}
+      </span>
+    );
+  }
   return (
     <Link
       href={`/app/payments/record?reservation=${reservationId}`}
@@ -31,7 +41,9 @@ export function TakePaymentLink({ reservationId, balanceKobo, size = "md" }: { r
 
 export function CheckInButton({ reservationId, roomNumber, disabledReason, balanceKobo = 0, size }: { reservationId: string; roomNumber?: string; disabledReason?: string; balanceKobo?: number; size?: Size }) {
   const feedback = useActionFeedback();
+  const online = useOnline();
   if (balanceKobo > 0) return <TakePaymentLink reservationId={reservationId} balanceKobo={balanceKobo} size={size} />;
+  if (!online) disabledReason = OFFLINE_REASON;
   if (disabledReason) {
     return (
       <Button disabled title={disabledReason}>
@@ -55,7 +67,15 @@ export function CheckInButton({ reservationId, roomNumber, disabledReason, balan
 
 export function CheckOutButton({ reservationId, balanceKobo, size }: { reservationId: string; balanceKobo: number; size?: Size }) {
   const feedback = useActionFeedback();
+  const online = useOnline();
   if (balanceKobo > 0) return <TakePaymentLink reservationId={reservationId} balanceKobo={balanceKobo} size={size} />;
+  if (!online) {
+    return (
+      <Button disabled title={OFFLINE_REASON} size={size === "lg" ? "md" : size} variant={size === "sm" ? "secondary" : "primary"}>
+        <LogOut className="size-4" aria-hidden /> Check out
+      </Button>
+    );
+  }
   return (
     <ActionButton
       action={checkOut}

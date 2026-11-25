@@ -12,6 +12,7 @@ import type { MenuCategory, MenuItem, OpenOrder, Outlet, PayMethod } from "@/ser
 import { NumPad } from "@/components/ui/num-pad";
 import { shouldAutoPrint } from "@/lib/station";
 import { useStationConfigured } from "./thermal";
+import { OFFLINE_REASON, useOnline } from "./connection";
 import { useStation } from "./use-station";
 import { PosReceipt, type PosReceiptData } from "./pos-receipt";
 
@@ -88,6 +89,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   const resumeOrder = open.find((o) => o.id === resume);
   // Which counter: the order being resumed, else what the salesperson picked, else this station's default (H5).
   const station = useStation();
+  const online = useOnline();
   const stationConfigured = useStationConfigured();
   const [outletChoice, setOutlet] = useState<Outlet | null>(resumeOrder?.outlet ?? null);
   const outlet: Outlet = outletChoice ?? station.counter ?? startOutlet;
@@ -525,7 +527,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
                 <Input value={note} onChange={(e) => setNote(e.target.value.slice(0, 120))} placeholder="Or a name" aria-label="Table or customer" />
               </div>
               <div className="grid gap-2">
-                <Button size="lg" disabled={!lines.length} onClick={() => setStep("pay")}>Take payment</Button>
+                <Button size="lg" disabled={!lines.length || !online} title={online ? undefined : OFFLINE_REASON} onClick={() => setStep("pay")}>Take payment</Button>
                 <form action={saveAction} onSubmit={stampId}>
                   <input type="hidden" name="id" defaultValue="" />
                   <input type="hidden" name="outlet" value={outlet} />
@@ -541,7 +543,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               <div className="grid grid-cols-[auto_1fr] gap-2">
                 {/* Back and Confirm stay with the order; the payment details are in the wide column (form="till-pay"). */}
                 <Button type="button" variant="secondary" size="lg" onClick={() => setStep("order")}>Back</Button>
-                <Button type="submit" form="till-pay" size="lg" pending={paying} disabled={!lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && (transferRef.trim().length < 3 || !transferChecked)) || (method === "pos_terminal" && !/^\d{4}$/.test(transferRef))}>
+                <Button type="submit" form="till-pay" size="lg" pending={paying} title={online ? undefined : OFFLINE_REASON} disabled={!online || !lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && (transferRef.trim().length < 3 || !transferChecked)) || (method === "pos_terminal" && !/^\d{4}$/.test(transferRef))}>
                   Confirm {formatNaira(total)} paid
                 </Button>
               </div>
