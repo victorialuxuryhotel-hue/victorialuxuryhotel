@@ -107,6 +107,7 @@ Invite → active → removed. Removing access ends sessions immediately **[veri
 | I13 | Insert into legacy `sales` (charge-to-room) | **[exists — 0015]** |
 | I14 | Zero owners | **[exists]** |
 | I15 | Bar order `paid` by POS/card without the last 4 digits of the terminal slip | **[exists — 0020]** (hardware brief H1) |
+| I17 | A payment check (Matches / Not found against the statement or terminal) changed, deleted, made twice for one payment, made by anyone but the GM/Owner, or "Not found" without a note | **[exists — 0021]** (interface brief I1) |
 | I16 | Desk payment by POS/card without the last 4 digits of the slip (from 0020 on; slips may repeat, transfers may not) | **[exists — 0020]** (H2) |
 
 Each invariant gets a DB test in `tests/db` that tries to break it and expects the specific error.

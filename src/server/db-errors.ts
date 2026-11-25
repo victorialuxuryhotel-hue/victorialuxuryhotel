@@ -33,6 +33,8 @@ const tokens: Record<string, [ErrorCode, string]> = {
   payment_needs_reference: ["VALIDATION", "This payment needs its reference: the last 4 digits of the POS slip, or for a transfer the reference or sender's name."],
   sales_retired: ["FORBIDDEN", "Charging to a room isn't available. Customers pay at the counter."],
   vat_needs_tax_id: ["VALIDATION", "VAT can't be shown on receipts without the hotel's Tax ID (TIN). Enter the TIN first."],
+  payment_check_immutable: ["CONFLICT", "A payment check can't be changed or deleted. If it was wrong, tell the owner."],
+  payment_check_forbidden: ["FORBIDDEN", "Only the General Manager or the Owner can confirm payments."],
   room_before_payment: ["VALIDATION", "This booking isn't paid yet. Take the payment first: a room is given automatically once it's paid."],
   change_immutable: ["CONFLICT", "That change has already been paid for or cancelled. Reload to see where it is now."],
   change_needs_approval: ["FORBIDDEN", "Only the General Manager or the Owner can apply a change before it's paid, and they must give a reason."],

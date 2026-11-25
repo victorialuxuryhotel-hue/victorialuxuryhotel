@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { as, BASE, check, clickText, fill, finish, go, run, session, text, val, waitForText } from "./lib.mjs";
+import { as, BASE, check, clickText, fill, finish, go, run, session, text, until, val, waitForText } from "./lib.mjs";
 
 const MOCK = "http://127.0.0.1:4010";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -171,6 +171,32 @@ for (const id of pagingIds) {
     await p.keyboard.press("Escape");
     check("Esc closes the Cancel popover", !(await p.$eval("details[data-popover]", (d) => d.open)));
   }
+  await ctx.close();
+}
+
+{
+  // I1: payments to confirm. The general manager ticks a transfer off; "Not found" raises an alert.
+  const { ctx, p } = await as("general_manager");
+  await go(p, "/app");
+  const dash = await text(p);
+  check("the dashboard says how many payments are waiting to be confirmed", /Needs attention · \d+ payments? \(₦[\d,]+\) to confirm/.test(dash), dash.slice(0, 200));
+  await go(p, "/app/payments/confirm");
+  const count = async () => p.$$eval("li", (ls) => ls.filter((l) => l.querySelector("button")?.innerText.includes("Matches")).length);
+  const before = await count();
+  check("payments to confirm lists transfers and POS payments", before >= 2, String(before));
+  await clickText(p, "button", "Matches");
+  await until(async () => (await count()) === before - 1, "one confirmed", 15000);
+  check("Matches takes it off the list", true);
+  await fetch(`${MOCK}/__alerts`, { method: "DELETE" });
+  await clickText(p, "button", "Not found");
+  await fill(p, "input[name=note]", "Not on the GTB statement (browser test)");
+  await p.$$eval("button[type=submit]", (bs) => bs.find((b) => b.innerText.trim() === "Not found")?.click());
+  await until(async () => (await count()) === before - 2, "one not found", 15000);
+  const alerts = await until(async () => {
+    const a = (await (await fetch(`${MOCK}/__alerts`)).json()).filter((x) => /wasn't found on the statement/.test(x.text ?? ""));
+    return a.length ? a : null;
+  }, "alert", 15000).catch(() => []);
+  check("Not found raises an alert", alerts.length === 1, JSON.stringify(alerts).slice(0, 200));
   await ctx.close();
 }
 

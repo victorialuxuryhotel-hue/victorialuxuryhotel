@@ -1,3 +1,6 @@
+import { toConfirmSummary } from "@/server/domain/payment-checks";
+import { actorOf, authorizeRead } from "@/server/auth";
+import { getDb } from "@/server/db";
 import type { Metadata } from "next";
 import { owedOf } from "@/domain/next-step";
 import Link from "next/link";
@@ -83,7 +86,13 @@ async function Content() {
   const staff = await requireStaff();
   if (staff.role === "front_desk" || staff.role === "hotel_manager") redirect("/app/today");
   if (staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager") redirect("/app/sales");
-  const [m, rooms, awaiting, recent] = await Promise.all([movements(), roomBoard(), awaitingPaymentCount(), listReservations({ tab: "all" })]);
+  const [m, rooms, awaiting, recent, toConfirm] = await Promise.all([
+    movements(),
+    roomBoard(),
+    awaitingPaymentCount(),
+    listReservations({ tab: "all" }),
+    can(staff.role, "reports.view") ? authorizeRead("reports.view").then(async (r) => toConfirmSummary(await getDb(), actorOf(r))) : Promise.resolve({ count: 0, kobo: 0 }),
+  ]);
   const noRoom = m.arrivals.filter((a) => !a.roomNumber).length;
   const owing = m.departures.filter((d) => owedOf(d) > 0).length;
   // Two-step sign-in is on hold for testing; the owner and GM see this until it's enforced before go-live.
@@ -97,6 +106,12 @@ async function Content() {
         </p>
       ) : null}
       <p className="-mt-2 text-sm text-ink-500">{formatDate(m.today)}</p>
+      {toConfirm.count ? (
+        <Link href="/app/payments/confirm" className="flex items-center justify-between gap-3 rounded-card border border-warning-600/30 bg-warning-50 px-5 py-3 text-sm text-warning-700 hover:bg-warning-50/70">
+          <span><b>Needs attention</b> · {toConfirm.count} payment{toConfirm.count === 1 ? "" : "s"} ({formatNaira(toConfirm.kobo)}) to confirm against the bank or the terminal</span>
+          <ArrowRight className="size-4 shrink-0" aria-hidden />
+        </Link>
+      ) : null}
       <StatGrid>
         <Stat label="Arrivals today" value={m.arrivals.length} caption={noRoom ? `${noRoom} still need a room` : "All have rooms assigned"} />
         <Stat label="Departures due" value={m.departures.length} caption={owing ? `${owing} with money owed` : "Nothing owed"} />

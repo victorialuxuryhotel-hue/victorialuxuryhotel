@@ -1,4 +1,4 @@
-# Release review: security, roles and migrations 0012–0020
+# Release review: security, roles and migrations 0012–0021
 
 Nothing on this page has been run against production. Each step needs your review first. Run the steps in this order.
 
@@ -117,6 +117,13 @@ then enter it in Booking rules and tick "Show VAT on receipts and reports".
 | `payments_pos_slip` | I16: a desk payment by POS/card needs the slip's last 4 digits (new payments only). |
 | Recreate `payments_provider_reference_key` without POS slips | A repeated transfer reference is still refused; POS slips (4 digits) may repeat between genuine payments. Paystack references stay unique. |
 
+### What 0021 changes
+
+`migrations/0021_payment_checks.sql`: a new append-only table, `payment_checks` (interface brief I1). The General
+Manager or Owner marks each transfer and POS payment Matches or Not found against the bank statement or terminal
+report; one check per payment, never changed or deleted, "Not found" needs a note. Payments are not changed.
+No existing rows change. Every existing transfer and POS payment starts in the "to confirm" list.
+
 ### Proof that data is kept
 
 On 24 Nov 2026 a read-only export of the live database was loaded into a local SQLite copy. Both migrations were applied to it with foreign keys on, matching D1. Before and after:
@@ -214,7 +221,7 @@ These are deliberately **not final** in the app:
 
 1. Rotate keys and set the Cloudflare secrets (section 2).
 2. Set up the Clerk production instance (section 3). Two-step sign-in stays on hold until you set `TWO_STEP_ENFORCED=1` (section 4); do that before go-live.
-3. Record the Time Travel bookmark, then apply 0012 to 0020 (section 1).
+3. Record the Time Travel bookmark, then apply 0012 to 0021 (section 1).
 4. Build (`pnpm cf:build`; it must report no secrets), upload, compare `wrangler versions view` secrets, remove `EMAIL_ALLOWLIST` if inherited, and deploy.
 5. In the app: deactivate the 3 demo staff (they're linked to development Clerk users). Create the first owner with `scripts/create-owner.mts`. Sign in and set up the authenticator app. Then invite the real staff.
 6. Remove the demo data from the live site: `npx wrangler d1 execute victoria-hotel-db --remote --file db/demo-live-undo.sql` (switches off the demo extras, the WELCOME10 promo code, demo menu and stock items, and clears the demo room descriptions). Check it first: it only switches things off, it deletes nothing.
