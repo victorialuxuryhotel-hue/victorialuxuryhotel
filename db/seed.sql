@@ -8,10 +8,10 @@
 -- =============================================================================
 
 INSERT INTO room_categories (id, slug, name, short_description, nightly_rate_kobo, max_occupancy, sort_order) VALUES
-  ('00000000-0000-4000-8000-000000000001', 'standard',  'Standard',  '[Placeholder] Awaiting description from the hotel.', 4000000, 2, 1),
-  ('00000000-0000-4000-8000-000000000002', 'deluxe',    'Deluxe',    '[Placeholder] Awaiting description from the hotel.', 5500000, 2, 2),
-  ('00000000-0000-4000-8000-000000000003', 'suite',     'Suite',     '[Placeholder] Awaiting description from the hotel.', 8500000, 3, 3),
-  ('00000000-0000-4000-8000-000000000004', 'apartment', 'Apartment', '[Placeholder] Awaiting description from the hotel.', 12000000, 4, 4);
+  ('00000000-0000-4000-8000-000000000001', 'standard',  'Standard',  '[Placeholder] Awaiting description from the hotel.', 5500000, 2, 1),
+  ('00000000-0000-4000-8000-000000000002', 'deluxe',    'Deluxe',    '[Placeholder] Awaiting description from the hotel.', 7500000, 2, 2),
+  ('00000000-0000-4000-8000-000000000003', 'suite',     'Suite',     '[Placeholder] Awaiting description from the hotel.', 10800000, 3, 3),
+  ('00000000-0000-4000-8000-000000000004', 'apartment', 'Apartment', '[Placeholder] Awaiting description from the hotel.', 23000000, 4, 4);
 
 -- 29 rooms. Placeholder split: Standard 12, Deluxe 9, Suite 5, Apartment 3.
 WITH RECURSIVE n(x) AS (SELECT 101 UNION ALL SELECT x + 1 FROM n WHERE x < 403),

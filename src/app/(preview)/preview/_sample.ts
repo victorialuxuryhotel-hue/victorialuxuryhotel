@@ -66,10 +66,10 @@ export const rooms: RoomTile[] = [
 ].map(({ n, c }, i) => ({ id: `room-${n}`, number: String(n), category: c, floor: String(n)[0], ...roomStates[(i * 5) % roomStates.length]! }));
 
 export const categories: CategoryRow[] = [
-  { id: "c1", name: "Standard", slug: "standard", nightlyRateKobo: 4_000_000, maxOccupancy: 2, rooms: 12, images: 0, isActive: true },
-  { id: "c2", name: "Deluxe", slug: "deluxe", nightlyRateKobo: 5_500_000, maxOccupancy: 2, rooms: 9, images: 0, isActive: true },
-  { id: "c3", name: "Suite", slug: "suite", nightlyRateKobo: 8_500_000, maxOccupancy: 3, rooms: 5, images: 0, isActive: true },
-  { id: "c4", name: "Apartment", slug: "apartment", nightlyRateKobo: 12_000_000, maxOccupancy: 4, rooms: 3, images: 0, isActive: true },
+  { id: "c1", name: "Standard", slug: "standard", nightlyRateKobo: 5_500_000, maxOccupancy: 2, rooms: 12, images: 0, isActive: true },
+  { id: "c2", name: "Deluxe", slug: "deluxe", nightlyRateKobo: 7_500_000, maxOccupancy: 2, rooms: 9, images: 0, isActive: true },
+  { id: "c3", name: "Suite", slug: "suite", nightlyRateKobo: 10_800_000, maxOccupancy: 3, rooms: 5, images: 0, isActive: true },
+  { id: "c4", name: "Apartment", slug: "apartment", nightlyRateKobo: 23_000_000, maxOccupancy: 4, rooms: 3, images: 0, isActive: true },
 ];
 
 export const guests: GuestRow[] = [
@@ -96,8 +96,8 @@ export const activity: ActivityRow[] = [
 ];
 
 export const availability: AvailabilityOption[] = [
-  { slug: "standard", name: "Standard", summary: "Comfortable, well-appointed rooms for a restful stay.", maxOccupancy: 2, isAvailable: true, nightlyRateKobo: 4_000_000, totalKobo: 8_000_000, nights: 2 },
-  { slug: "deluxe", name: "Deluxe", summary: "More room to relax, for guests who want a little extra.", maxOccupancy: 2, isAvailable: true, nightlyRateKobo: 5_500_000, totalKobo: 11_000_000, nights: 2 },
-  { slug: "suite", name: "Suite", summary: "Generous space for a stay that feels truly special.", maxOccupancy: 3, isAvailable: true, nightlyRateKobo: 8_500_000, totalKobo: 17_000_000, nights: 2 },
-  { slug: "apartment", name: "Apartment", summary: "Self-contained living for families and long stays.", maxOccupancy: 4, isAvailable: false, nightlyRateKobo: 12_000_000, totalKobo: 24_000_000, nights: 2 },
+  { slug: "standard", name: "Standard", summary: "Comfortable, well-appointed rooms for a restful stay.", maxOccupancy: 2, isAvailable: true, nightlyRateKobo: 5_500_000, totalKobo: 11_000_000, nights: 2 },
+  { slug: "deluxe", name: "Deluxe", summary: "More room to relax, for guests who want a little extra.", maxOccupancy: 2, isAvailable: true, nightlyRateKobo: 7_500_000, totalKobo: 15_000_000, nights: 2 },
+  { slug: "suite", name: "Suite", summary: "Generous space for a stay that feels truly special.", maxOccupancy: 3, isAvailable: true, nightlyRateKobo: 10_800_000, totalKobo: 21_600_000, nights: 2 },
+  { slug: "apartment", name: "Apartment", summary: "Self-contained living for families and long stays.", maxOccupancy: 4, isAvailable: false, nightlyRateKobo: 23_000_000, totalKobo: 46_000_000, nights: 2 },
 ];
