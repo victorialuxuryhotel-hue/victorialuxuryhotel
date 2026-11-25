@@ -43,10 +43,6 @@ next-env.d.ts
 # local env (keep .env.example committed)
 !.env.example
 
-# supabase
-supabase/.branches
-supabase/.temp
-
 # cloudflare / opennext
 /.open-next/
 /.wrangler/
@@ -57,3 +53,4 @@ supabase/.temp
 
 # Production database exports (contain guest data)
 backups/
+/tests/e2e/.state/
