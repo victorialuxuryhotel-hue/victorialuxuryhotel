@@ -26,6 +26,8 @@ const chip = (on: boolean) =>
 
 export function ReservationForm({ categories, today, holdHours, aboveTabs = false }: { categories: CategoryRow[]; today: string; holdHours: number; aboveTabs?: boolean }) {
   const [state, action, pending] = useActionState(createReservation, null);
+  // One id per form: a double tap or a retry after a timeout returns the same booking, not a second hold.
+  const [requestId] = useState(() => crypto.randomUUID());
   const err = (n: string) => (state && !state.ok ? state.fieldErrors?.[n]?.[0] : undefined);
   const active = categories.filter((c) => c.isActive);
 
@@ -160,6 +162,7 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
           <fieldset className="border-t border-hairline p-5">
             <legend className="mb-3 text-sm text-ink-700">Booked by</legend>
             <input type="hidden" name="source" value={source} />
+            <input type="hidden" name="requestId" value={requestId} />
             <div className="flex flex-wrap gap-2">
               {(["walk_in", "phone", "whatsapp"] as const).map((s) => (
                 <button key={s} type="button" aria-pressed={source === s} onClick={() => setSource(s)} className={chip(source === s)}>

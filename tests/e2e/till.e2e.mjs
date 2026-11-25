@@ -36,6 +36,23 @@ check("the count comes first", /Submit my count/.test(yourDay));
 await ctx.close();
 
 {
+  // A reload (or power cut) mid-order: the till offers to bring the order back.
+  const { ctx, p } = await as("restaurant_bar");
+  await go(p, "/app/sales");
+  const tiles = await p.$$("section[aria-label=Menu] li button:not([disabled])");
+  await tiles[0].click();
+  await tiles[1].click();
+  await new Promise((r) => setTimeout(r, 300));
+  await p.reload({ waitUntil: "load" });
+  await waitForText(p, /Unfinished order from before the page reloaded: 2 items/);
+  check("after a reload the till offers the unfinished order", true);
+  await clickText(p, "button", "Bring it back");
+  check("and brings it back", /Total · 2 items/.test(await text(p)));
+  await clickText(p, "button", "Clear");
+  await ctx.close();
+}
+
+{
   const { ctx, p } = await as("restaurant_bar_manager");
   await go(p, "/app/sales/reports?range=today");
   check("the manager sees it under Transfers to check, with the reference", /Transfers to check[\s\S]*4821/.test(await text(p)));

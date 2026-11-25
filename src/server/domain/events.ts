@@ -1,4 +1,5 @@
 import { AppError } from "@/lib/errors";
+import { dbErrorToken } from "../db-errors";
 import { formatNaira } from "@/lib/format";
 import { addDays, hotelToday } from "@/lib/hotel-date";
 import { activity, activityIfChanged, all, EVENTS_STAFF, first, requireRole, uuid, writeBatch, type Actor, type Db } from "../db";
@@ -62,9 +63,17 @@ export async function setHallStatus(db: Db, actor: Actor, id: string, status: Ex
 export async function recordHallPayment(
   db: Db,
   actor: Actor,
-  v: { bookingId: string; amountKobo: number; method: HallMethod; paidOn: string; reference: string | null },
+  v: { bookingId: string; amountKobo: number; method: HallMethod; paidOn: string; reference: string | null; paymentId?: string },
 ): Promise<void> {
   requireRole(actor, EVENTS_STAFF);
+  // Same form sent twice (double tap, or a retry on slow Wi-Fi): the payment is already recorded.
+  if (v.paymentId) {
+    const done = await first<{ booking_id: string }>(db, "SELECT booking_id FROM hall_payments WHERE id = ?", v.paymentId);
+    if (done) {
+      if (done.booking_id !== v.bookingId) throw new AppError("CONFLICT", "This form was already used. Reload and try again.");
+      return;
+    }
+  }
   const b = await first<{ title: string; price_kobo: number; status: HallStatus; paid: number }>(
     db,
     "SELECT title, price_kobo, status, (SELECT coalesce(sum(amount_kobo), 0) FROM hall_payments WHERE booking_id = h.id) AS paid FROM hall_bookings h WHERE id = ?",
@@ -78,8 +87,10 @@ export async function recordHallPayment(
   }
   if (b.paid + v.amountKobo > b.price_kobo) throw new AppError("VALIDATION", `That's more than the ${formatNaira(b.price_kobo - b.paid)} owed.`);
   if (v.paidOn > hotelToday()) throw new AppError("VALIDATION", "The date can't be in the future.");
-  const id = uuid();
-  const [r] = await writeBatch(db, actor, [
+  const id = v.paymentId ?? uuid();
+  let r;
+  try {
+    [r] = await writeBatch(db, actor, [
     db
       .prepare(
         `INSERT INTO hall_payments (id, booking_id, amount_kobo, method, paid_on, reference, recorded_by)
@@ -97,6 +108,11 @@ export async function recordHallPayment(
       )
       .bind(v.bookingId),
     activityIfChanged(db, "hall.confirmed", "hall_booking", v.bookingId, `Hall booking confirmed: paid in full`),
-  ]);
+    ]);
+  } catch (err) {
+    // The same payment arriving twice at once: the first one recorded it.
+    if (v.paymentId && err instanceof AppError && dbErrorToken(err.cause) === "unique" && (await first(db, "SELECT 1 FROM hall_payments WHERE id = ?", v.paymentId))) return;
+    throw err;
+  }
   if (!r?.meta.changes) throw new AppError("CONFLICT", "Someone just recorded a payment or changed this booking. Reload and try again.");
 }

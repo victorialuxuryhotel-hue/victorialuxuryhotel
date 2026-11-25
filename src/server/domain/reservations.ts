@@ -100,6 +100,11 @@ type CreateInput = {
   source: ReservationRow["source"];
   createdBy: string | null;
   holdMinutes: number;
+  /**
+   * The form's own id for this booking (made when the form opened). Sending it again, after a
+   * double tap or a retry on slow Wi-Fi, returns the booking already made instead of a second hold.
+   */
+  requestId?: string;
 };
 
 export type CreatedReservation = { id: string; reference: string; publicToken: string; totalAmountKobo: number; holdExpiresAt: string };
@@ -147,8 +152,22 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
   const discountKobo = price.discountKobo;
   const holdExpiresAt = new Date(Date.now() + input.holdMinutes * 60_000).toISOString();
 
+  const already = async () => {
+    if (!input.requestId) return null;
+    const r = await first<{ reference: string; public_token: string; due: number; hold_expires_at: string; created_by: string | null }>(
+      db,
+      "SELECT reference, public_token, total_amount_kobo + extras_kobo - discount_kobo AS due, hold_expires_at, created_by FROM reservations WHERE id = ?",
+      input.requestId,
+    );
+    if (!r) return null;
+    if (r.created_by !== input.createdBy) throw new AppError("CONFLICT", "This form was already used. Reload and try again.");
+    return { id: input.requestId, reference: r.reference, publicToken: r.public_token, totalAmountKobo: r.due, holdExpiresAt: r.hold_expires_at };
+  };
+  const earlier = await already();
+  if (earlier) return earlier;
+
   for (let attempt = 1; ; attempt++) {
-    const id = uuid();
+    const id = input.requestId ?? uuid();
     const reference = generateReference();
     const publicToken = uuid();
     const stmts: Stmt[] = [];
@@ -202,6 +221,10 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
     } catch (err) {
       const collided = err instanceof AppError && dbErrorToken(err.cause) === "unique" && /reservations\.(reference|public_token)/.test(String((err.cause as Error)?.message));
       if (collided && attempt < 3) continue;
+      if (err instanceof AppError && dbErrorToken(err.cause) === "unique") {
+        const same = await already();
+        if (same) return same;
+      }
       rethrow(err, { no_capacity: unavailable, promo_invalid: new AppError("VALIDATION", "That promo code can no longer be used."), room_overlap: new AppError("CONFLICT", "That room was just booked for some of these nights. Choose another.") });
     }
   }

@@ -57,6 +57,7 @@ export async function addHallPayment(_prev: ActionResult | null, formData: FormD
         method: z.enum(["cash", "bank_transfer", "pos_terminal", "card"]),
         paidOn: z.iso.date(),
         reference: opt(80),
+        paymentId: z.uuid().optional(),
       })
       .safeParse(Object.fromEntries(formData));
     if (!v.success) throw new AppError("VALIDATION", v.error.issues[0]?.message ?? "Check the payment");

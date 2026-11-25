@@ -53,6 +53,7 @@ function StatusButton({ id, status, label, variant }: { id: string; status: "can
 
 function PaymentForm({ b, today, onDone }: { b: HallBooking; today: string; onDone: () => void }) {
   const [state, action, pending] = useActionState(addHallPayment, null);
+  const [paymentId] = useState(() => crypto.randomUUID());
   const [method, setMethod] = useState("bank_transfer");
   const transfer = method === "bank_transfer";
   useEffect(() => {
@@ -61,6 +62,7 @@ function PaymentForm({ b, today, onDone }: { b: HallBooking; today: string; onDo
   return (
     <form action={action} onSubmit={keepValues(action)} className="mt-3 flex flex-wrap items-end gap-2 rounded-md border border-hairline p-3">
       <input type="hidden" name="bookingId" value={b.id} />
+      <input type="hidden" name="paymentId" value={paymentId} />
       <Field label="Amount (₦)" htmlFor={`pa-${b.id}`}><Input id={`pa-${b.id}`} name="amount" type="number" min={1} step="any" defaultValue={b.price_kobo > b.paid_kobo ? (b.price_kobo - b.paid_kobo) / 100 : undefined} className="h-11 w-32" required /></Field>
       <Field label="Method" htmlFor={`pm-${b.id}`}>
         <Select id={`pm-${b.id}`} name="method" value={method} onChange={(e) => setMethod(e.target.value)} className="h-11">

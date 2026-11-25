@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { CheckCircle2, Minus, Plus, Printer, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormMessage, Input } from "@/components/ui/form";
@@ -24,6 +24,51 @@ const OFFLINE = `${OFFLINE_MESSAGE} If the internet stays down, use a numbered p
 const saveSafe = safeAction(saveOpenOrder, OFFLINE);
 const paySafe = safeAction(takePayment, OFFLINE);
 const cancelSafe = safeAction(cancelOpenOrder, OFFLINE);
+
+// ---- The order being taken, kept in this browser so a reload doesn't lose it ----
+const DRAFT_KEY = "victoria-till-draft";
+type Draft = { outlet: Outlet; cart: Record<string, number>; note: string; orderId: string; editing: { id: string; number: number } | null; at: number };
+const draftListeners = new Set<() => void>();
+function subscribeStorage(listener: () => void) {
+  draftListeners.add(listener);
+  window.addEventListener("storage", listener);
+  return () => {
+    draftListeners.delete(listener);
+    window.removeEventListener("storage", listener);
+  };
+}
+function readDraft(): string | null {
+  try {
+    return window.localStorage.getItem(DRAFT_KEY);
+  } catch {
+    return null; // storage blocked
+  }
+}
+function writeDraft(d: Omit<Draft, "at"> | null) {
+  try {
+    if (d) window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, at: Date.now() }));
+    else window.localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* storage blocked: nothing to keep */
+  }
+  draftListeners.forEach((l) => l());
+}
+/** Only today's work (12 hours), and only items still on the menu. */
+function parseDraft(raw: string | null, menu: MenuItem[]) {
+  if (!raw) return null;
+  try {
+    const d = JSON.parse(raw) as Draft;
+    if (Date.now() - d.at > 12 * 3_600_000) return null;
+    const cart = Object.fromEntries(Object.entries(d.cart).filter(([id, q]) => q > 0 && menu.some((m) => m.id === id)));
+    const ids = Object.keys(cart);
+    if (!ids.length) return null;
+    const count = ids.reduce((n, id) => n + cart[id]!, 0);
+    const totalKobo = ids.reduce((t, id) => t + cart[id]! * (menu.find((m) => m.id === id)?.price_kobo ?? 0), 0);
+    return { ...d, cart, count, totalKobo };
+  } catch {
+    return null;
+  }
+}
 
 export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] } }: {
   menu: MenuItem[]; open: OpenOrder[]; attendant: string; vatRateBp: number; startOutlet?: Outlet; resume?: string;
@@ -92,6 +137,32 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
   const openShown = q ? open.filter((o) => `#${o.number} ${o.note ?? ""} ${o.items}`.toLowerCase().includes(q)) : open;
   const linesJson = JSON.stringify(lines.map((l) => ({ menuItemId: l.item.id, quantity: l.q })));
 
+  // A refresh, a UPS changeover or a power cut mustn't lose the order being taken: a copy of the
+  // current order is kept in this browser, and after a reload the till offers to bring it back.
+  const draftRaw = useSyncExternalStore(subscribeStorage, readDraft, () => null);
+  const draft = useMemo(() => parseDraft(draftRaw, menu), [draftRaw, menu]);
+  const hadLines = useRef(false);
+  useEffect(() => {
+    if (lines.length && step !== "done") {
+      hadLines.current = true;
+      writeDraft({ outlet, cart, note, orderId: orderId.current, editing });
+    } else if (hadLines.current) {
+      // The order was paid, saved or cleared. (An empty till after a reload keeps the saved copy for the offer to restore.)
+      hadLines.current = false;
+      writeDraft(null);
+    }
+  }, [outlet, cart, note, editing, lines.length, step]);
+  const restoreDraft = () => {
+    if (!draft) return;
+    setReceipt(null);
+    setStep("order");
+    setOutlet(draft.outlet);
+    setCart(draft.cart);
+    setNote(draft.note);
+    setEditing(draft.editing && open.some((o) => o.id === draft.editing!.id) ? draft.editing : null);
+    orderId.current = draft.orderId;
+  };
+
   const handledSave = useRef<unknown>(null);
   useEffect(() => {
     if (saveState?.ok && handledSave.current !== saveState) {
@@ -136,7 +207,7 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
               <Button size="sm" variant="secondary" onClick={() => { setReceipt(null); reset(); }}><Plus className="size-4" aria-hidden /> New</Button>
             </div>
             {open.length > 3 ? (
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Table, name or #" aria-label="Find an unpaid order" className="h-10 text-sm" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Table, name or #" aria-label="Find an unpaid order" className="h-10 text-sm pointer-coarse:h-11" />
             ) : null}
           </div>
           {openShown.length ? (
@@ -263,6 +334,18 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
             <h2 className="font-display text-2xl text-navy-950">{editing ? `Order #${editing.number}` : "New order"}</h2>
             {lines.length ? <button type="button" onClick={reset} className="text-sm text-ink-500 underline-offset-2 hover:underline">Clear</button> : null}
           </div>
+          {draft && !lines.length && step === "order" ? (
+            <div className="rounded-md border border-gold-300 bg-gold-50 p-3 text-sm" role="status">
+              <p className="text-ink-900">
+                Unfinished order from before the page reloaded: {draft.count} item{draft.count === 1 ? "" : "s"} · {formatNaira(draft.totalKobo)}
+                {draft.note ? ` · ${draft.note}` : ""}
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" onClick={restoreDraft}>Bring it back</Button>
+                <Button size="sm" variant="ghost" onClick={() => writeDraft(null)}>Discard</Button>
+              </div>
+            </div>
+          ) : null}
           {saveState && !saveState.ok ? <FormMessage>{saveState.message}</FormMessage> : null}
           {payState && !payState.ok ? <FormMessage>{payState.message}</FormMessage> : null}
           {saveState?.ok && !lines.length ? <FormMessage tone="success">Order #{saveState.data.number} saved as unpaid.</FormMessage> : null}
@@ -277,10 +360,10 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
                   </div>
                   <div className="mt-1 flex items-center gap-1">
                     <span className="mr-auto text-xs tabular-nums text-ink-500">{formatNaira(l.item.price_kobo)} each</span>
-                    <button type="button" aria-label={`Remove ${l.item.name}`} onClick={() => add(l.item, -l.q)} className="flex size-10 items-center justify-center rounded text-ink-500 hover:bg-ink-900/5"><Trash2 className="size-4" /></button>
-                    <button type="button" aria-label={`One less ${l.item.name}`} onClick={() => add(l.item, -1)} className="flex size-10 items-center justify-center rounded border border-hairline text-navy-700"><Minus className="size-4" /></button>
+                    <button type="button" aria-label={`Remove ${l.item.name}`} onClick={() => add(l.item, -l.q)} className="flex size-10 items-center justify-center rounded pointer-coarse:size-12 text-ink-500 hover:bg-ink-900/5"><Trash2 className="size-4" /></button>
+                    <button type="button" aria-label={`One less ${l.item.name}`} onClick={() => add(l.item, -1)} className="flex size-10 items-center justify-center rounded pointer-coarse:size-12 border border-hairline text-navy-700"><Minus className="size-4" /></button>
                     <span className="w-8 text-center text-base font-semibold tabular-nums" aria-live="polite">{l.q}</span>
-                    <button type="button" aria-label={`One more ${l.item.name}`} disabled={l.q >= maxFor(l.item)} onClick={() => add(l.item, 1)} className="flex size-10 items-center justify-center rounded border border-hairline text-navy-700 disabled:opacity-40"><Plus className="size-4" /></button>
+                    <button type="button" aria-label={`One more ${l.item.name}`} disabled={l.q >= maxFor(l.item)} onClick={() => add(l.item, 1)} className="flex size-10 items-center justify-center rounded pointer-coarse:size-12 border border-hairline text-navy-700 disabled:opacity-40"><Plus className="size-4" /></button>
                   </div>
                 </li>
               ))}
