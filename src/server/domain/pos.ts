@@ -422,6 +422,26 @@ const ORDER_SELECT = `SELECT o.id, o.number, o.outlet, o.status, o.total_kobo, o
 
 const sees = (actor: NonNullable<Actor>) => (POS_VIEWERS as readonly StaffRole[]).includes(actor.role);
 
+/** The till's favourites row: each counter's 8 best sellers by quantity over the last 30 days. */
+export async function topSellers(db: Db, actor: Actor, days = 30, limit = 8): Promise<Record<Outlet, string[]>> {
+  requireRole(actor, ALL_POS);
+  const rows = await all<{ outlet: Outlet; menu_item_id: string }>(
+    db,
+    `SELECT outlet, menu_item_id FROM (
+       SELECT o.outlet, i.menu_item_id, sum(i.quantity) AS qty,
+              row_number() OVER (PARTITION BY o.outlet ORDER BY sum(i.quantity) DESC, i.menu_item_id) AS rank
+       FROM pos_order_items i JOIN pos_orders o ON o.id = i.order_id
+       WHERE o.status = 'paid' AND o.paid_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?)
+       GROUP BY o.outlet, i.menu_item_id)
+     WHERE rank <= ? ORDER BY outlet, rank`,
+    `-${days} days`,
+    limit,
+  );
+  const out: Record<Outlet, string[]> = { restaurant: [], bar: [] };
+  for (const r of rows) out[r.outlet].push(r.menu_item_id);
+  return out;
+}
+
 export type OpenOrder = OrderRow & { lines: OrderLine[] };
 
 export async function openOrders(db: Db, actor: Actor): Promise<OpenOrder[]> {

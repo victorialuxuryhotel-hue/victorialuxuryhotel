@@ -25,8 +25,10 @@ const saveSafe = safeAction(saveOpenOrder, OFFLINE);
 const paySafe = safeAction(takePayment, OFFLINE);
 const cancelSafe = safeAction(cancelOpenOrder, OFFLINE);
 
-export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", resume }: {
+export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] } }: {
   menu: MenuItem[]; open: OpenOrder[]; attendant: string; vatRateBp: number; startOutlet?: Outlet; resume?: string;
+  /** Each counter's best sellers, shown as a quick row above the menu. */
+  favourites?: Record<Outlet, string[]>;
 }) {
   const resumeOrder = open.find((o) => o.id === resume);
   const [outlet, setOutlet] = useState<Outlet>(resumeOrder?.outlet ?? startOutlet);
@@ -41,6 +43,7 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
   const [given, setGiven] = useState("");
   const [receipt, setReceipt] = useState<PosReceiptData | null>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
+  const [search, setSearch] = useState("");
   const [saveState, saveAction, saving] = useActionState(saveSafe, null);
   const [payState, payAction, paying] = useActionState(paySafe, null);
   const orderId = useRef<string>(resumeOrder?.id ?? "");
@@ -74,7 +77,19 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
     setTransferChecked(false);
     setStep("order");
   };
-  const add = (m: MenuItem, d: number) => setCart((c) => ({ ...c, [m.id]: Math.max(0, Math.min(maxFor(m), (c[m.id] ?? 0) + d)) }));
+  const add = (m: MenuItem, d: number) => {
+    // After a payment the receipt panel stays up; tapping the menu starts the next order.
+    if (step === "done") {
+      setReceipt(null);
+      reset();
+      setCart({ [m.id]: Math.max(0, Math.min(maxFor(m), d)) });
+      return;
+    }
+    setCart((c) => ({ ...c, [m.id]: Math.max(0, Math.min(maxFor(m), (c[m.id] ?? 0) + d)) }));
+  };
+  const favs = (favourites[outlet] ?? []).map((id) => items.find((m) => m.id === id)).filter((m): m is MenuItem => Boolean(m));
+  const q = search.trim().toLowerCase();
+  const openShown = q ? open.filter((o) => `#${o.number} ${o.note ?? ""} ${o.items}`.toLowerCase().includes(q)) : open;
   const linesJson = JSON.stringify(lines.map((l) => ({ menuItemId: l.item.id, quantity: l.q })));
 
   const handledSave = useRef<unknown>(null);
@@ -106,35 +121,34 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  if (step === "done" && receipt) {
-    return (
-      <div className="mx-auto max-w-md space-y-5 py-2">
-        <div className="flex items-center gap-3 rounded-card border border-success-600/30 bg-success-50 p-4 print:hidden" role="status">
-          <CheckCircle2 className="size-6 shrink-0 text-success-700" aria-hidden />
-          <div>
-            <p className="font-semibold text-ink-900">{alreadyPaid ? "This order was already paid." : "Paid"}: {formatNaira(receipt.totalKobo)}</p>
-            {receipt.method === "cash" && receipt.cashReceivedKobo != null ? (
-              <p className="text-lg font-semibold text-success-700">Give change: {formatNaira(receipt.cashReceivedKobo - receipt.totalKobo)}</p>
-            ) : (
-              <p className="text-sm text-ink-600">{METHODS[receipt.method]}</p>
-            )}
-          </div>
-        </div>
-        <PosReceipt r={receipt} />
-        <div className="grid grid-cols-2 gap-3 print:hidden">
-          <Button variant="secondary" size="lg" onClick={() => window.print()}><Printer className="size-4" aria-hidden /> Print receipt</Button>
-          <Button size="lg" onClick={() => { setReceipt(null); reset(); }}>New order</Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     // Laptops: the till fills the window. The menu (and unpaid orders under it) scrolls in its own
     // column and the order panel stays pinned, so the page itself never scrolls (UX brief: 1280×720).
     <div className="space-y-8 pb-24 lg:h-full lg:pb-0">
-      <div className="grid gap-6 lg:h-full lg:grid-cols-[1fr_24rem]">
-        <section aria-label="Menu" className="min-w-0 space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2 lg:pb-4">
+      {receipt ? <div className="hidden print:block"><PosReceipt r={receipt} /></div> : null}
+      {/* 1280px and wider: unpaid · menu · order. Narrower laptops and the 15" bar POS (1024×768): menu · order, unpaid orders under the menu. */}
+      <div className="grid gap-6 lg:h-full lg:grid-cols-[1fr_21rem] print:hidden xl:grid-cols-[15rem_1fr_22rem]">
+        {/* Left: unpaid orders, searchable, with a New order button on top. */}
+        <aside aria-labelledby="unpaid" className="hidden min-w-0 flex-col rounded-card border border-hairline bg-ivory-50 xl:col-start-1 xl:row-start-1 xl:flex xl:min-h-0">
+          <div className="space-y-2 border-b border-hairline p-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 id="unpaid" className="font-display text-lg text-navy-950">Unpaid · {open.length}</h2>
+              <Button size="sm" variant="secondary" onClick={() => { setReceipt(null); reset(); }}><Plus className="size-4" aria-hidden /> New</Button>
+            </div>
+            {open.length > 3 ? (
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Table, name or #" aria-label="Find an unpaid order" className="h-10 text-sm" />
+            ) : null}
+          </div>
+          {openShown.length ? (
+            <ul className="divide-y divide-hairline lg:min-h-0 lg:overflow-y-auto">
+              {openShown.map((o) => <OpenOrderRow key={o.id} o={o} onOpen={() => { setReceipt(null); resumeOpen(o); }} active={editing?.id === o.id} />)}
+            </ul>
+          ) : (
+            <p className="p-3 text-sm text-ink-500">{open.length ? "No unpaid order matches." : "No unpaid orders. Save one as unpaid to keep a tab open."}</p>
+          )}
+        </aside>
+
+        <section aria-label="Menu" className="min-w-0 space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2 lg:pb-4 xl:col-start-2 xl:row-start-1">
           <div className="flex gap-2" role="tablist" aria-label="Counter">
             {(Object.keys(OUTLETS) as Outlet[]).map((o) => (
               <button
@@ -150,6 +164,21 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
               </button>
             ))}
           </div>
+          {favs.length && category === "all" ? (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-ink-500">Best sellers</p>
+              <div className="flex flex-wrap gap-2">
+                {favs.map((m) => {
+                  const off = !m.is_available || m.stock_left === 0 || (cart[m.id] ?? 0) >= maxFor(m);
+                  return (
+                    <button key={m.id} type="button" disabled={off} onClick={() => add(m, 1)} className={cn(chip(false), "gap-2 rounded-md px-3 disabled:opacity-40")}>
+                      {m.name} <span className="tabular-nums text-ink-500">{formatNaira(m.price_kobo)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           {categories.length > 1 ? (
             <nav aria-label="Category" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
               <button type="button" aria-pressed={category === "all"} onClick={() => setCategory("all")} className={chip(category === "all")}>All</button>
@@ -159,7 +188,7 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
             </nav>
           ) : null}
           {shown.length ? (
-            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
               {shown.map((m) => {
                 const out = m.stock_left === 0;
                 const off = !m.is_available || out;
@@ -198,16 +227,38 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
             <p className="rounded-md border border-dashed border-hairline p-6 text-sm text-ink-500">No {OUTLETS[outlet].toLowerCase()} items on the menu yet. A manager adds them under Menu.</p>
           )}
           {open.length ? (
-            <section aria-labelledby="unpaid" className="rounded-card border border-hairline bg-ivory-50">
-              <h2 id="unpaid" className="border-b border-hairline px-5 py-4 font-display text-xl text-navy-950">Unpaid orders · {open.length}</h2>
+            // Below 1280px (including the 15" bar POS) the unpaid orders sit under the menu, so the menu comes first.
+            <section aria-label="Unpaid orders" className="rounded-card border border-hairline bg-ivory-50 xl:hidden">
+              <h2 className="border-b border-hairline px-5 py-3 font-display text-lg text-navy-950">Unpaid orders · {open.length}</h2>
               <ul className="divide-y divide-hairline">
-                {open.map((o) => <OpenOrderRow key={o.id} o={o} onOpen={() => resumeOpen(o)} active={editing?.id === o.id} />)}
+                {open.map((o) => <OpenOrderRow key={o.id} o={o} onOpen={() => { setReceipt(null); resumeOpen(o); }} active={editing?.id === o.id} />)}
               </ul>
             </section>
           ) : null}
         </section>
 
-        <section id="order" aria-label="This order" className="h-fit space-y-4 rounded-card border border-hairline bg-ivory-50 p-5 lg:max-h-full lg:overflow-y-auto">
+        <section id="order" aria-label="This order" className="h-fit space-y-4 rounded-card border border-hairline bg-ivory-50 p-5 lg:max-h-full lg:overflow-y-auto xl:col-start-3 xl:row-start-1">
+          {step === "done" && receipt ? (
+            // Slim receipt: the essentials, Print and New order. The full receipt is only for printing.
+            <div className="space-y-4" role="status">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 size-6 shrink-0 text-success-700" aria-hidden />
+                <div>
+                  <p className="font-semibold text-ink-900">{alreadyPaid ? "Already paid" : "Paid"} · {formatNaira(receipt.totalKobo)}</p>
+                  <p className="text-sm text-ink-600">{METHODS[receipt.method]} · {receipt.receiptNumber}</p>
+                </div>
+              </div>
+              {receipt.method === "cash" && receipt.cashReceivedKobo != null ? (
+                <p className="rounded-md bg-success-50 px-3 py-2 text-lg font-semibold tabular-nums text-success-700">Give change: {formatNaira(receipt.cashReceivedKobo - receipt.totalKobo)}</p>
+              ) : null}
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="secondary" onClick={() => window.print()}><Printer className="size-4" aria-hidden /> Print</Button>
+                <Button autoFocus onClick={() => { setReceipt(null); reset(); }}>New order</Button>
+              </div>
+              <p className="text-xs text-ink-500">Or tap an item on the menu to start the next order.</p>
+            </div>
+          ) : (
+          <>
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="font-display text-2xl text-navy-950">{editing ? `Order #${editing.number}` : "New order"}</h2>
             {lines.length ? <button type="button" onClick={reset} className="text-sm text-ink-500 underline-offset-2 hover:underline">Clear</button> : null}
@@ -331,6 +382,8 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
                 </Button>
               </div>
             </form>
+          )}
+          </>
           )}
         </section>
       </div>

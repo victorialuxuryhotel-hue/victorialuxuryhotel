@@ -6,8 +6,9 @@ import { as, go, settle, val } from "../tests/e2e/lib.mjs";
 
 const OUT = "docs/screens";
 mkdirSync(OUT, { recursive: true });
-// The usable height of a 1366×768 / 1280×720 laptop with browser toolbars (~100px).
-const SIZES = [[1366, 668], [1280, 620]];
+// Usable size of a 1366×768 / 1280×720 laptop with browser toolbars (~100px), and the 15" bar POS
+// (1024×768) in Chrome kiosk mode (no toolbars).
+const SIZES = [[1366, 668], [1280, 620], [1024, 768]];
 const booking = await val("SELECT id FROM reservations WHERE status = 'checked_in' ORDER BY check_out LIMIT 1");
 const screens = [
   ["front_desk", "today", "/app/today"],

@@ -11,6 +11,7 @@ import {
   payOrder,
   saveMenuItem,
   saveOrder,
+  topSellers,
   setMenuItemStock,
   verifyClosing,
   voidOrder,
@@ -213,6 +214,20 @@ describe("restaurant & bar reports and the hotel's books", () => {
     const kitchen = await posReport(db, mgr, "today", "restaurant");
     expect(kitchen.transfers.find((t) => t.receipt_number === food.receiptNumber)).toMatchObject({ reference: "ADA OKAFOR", kobo: 850_000, outlet: "restaurant" });
     expect(kitchen.transfers.every((t) => t.outlet === "restaurant")).toBe(true);
+  });
+
+  it("the till's favourites are each counter's best sellers, most sold first", async () => {
+    const mgr = await staff("restaurant_bar_manager");
+    const att = await staff("restaurant_bar");
+    const a = await drink(mgr, 900);
+    const b = await drink(mgr, 900);
+    const sell = (itemId: string, quantity: number) => payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity }], method: "cash" });
+    await sell(a.itemId, 90); // the till caps a line at 99
+    await sell(b.itemId, 95);
+    const fav = await topSellers(db, att);
+    expect(fav.bar.indexOf(b.itemId)).toBeLessThan(fav.bar.indexOf(a.itemId));
+    expect(fav.bar.length).toBeLessThanOrEqual(8);
+    expect(fav.restaurant).not.toContain(a.itemId);
   });
 
   it("a transfer at the till needs the reference and the bank-app tick", async () => {
