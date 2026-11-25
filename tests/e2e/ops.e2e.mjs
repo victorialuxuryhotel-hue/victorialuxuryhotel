@@ -114,4 +114,14 @@ for (const id of pagingIds) {
   await run("UPDATE reservations SET status = 'cancelled', cancellation_reason = 'Browser test paging data' WHERE id = ?", id).catch(() => {});
 }
 
+{
+  // Links that can't exist get a real 404 from the Proxy; unknown-but-plausible ones are kept out of search.
+  const status = async (path) => (await fetch(`${BASE}${path}`, { redirect: "manual" })).status;
+  check("a malformed booking link is a 404", (await status("/book/review/not-a-token")) === 404);
+  check("a malformed room link is a 404", (await status("/rooms/nope%20room!")) === 404);
+  const unknown = await (await fetch(`${BASE}/rooms/nope-room`)).text();
+  check("an unknown room says Page not found and isn't indexed", /<title>Page not found/.test(unknown) && /noindex/.test(unknown));
+  check("a real room page is fine", (await status("/rooms/deluxe")) === 200);
+}
+
 await finish();
