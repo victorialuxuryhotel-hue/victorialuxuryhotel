@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { formatDate, formatNaira } from "@/lib/format";
+import { keepValues } from "@/lib/forms";
 import { cn } from "@/lib/utils/cn";
 import { addHallBooking, addHallPayment, changeHallStatus } from "@/server/events";
 import type { HallBooking } from "@/server/domain/events";
@@ -16,7 +17,8 @@ export function HallBookingForm({ today }: { today: string }) {
   }, [state]);
   const err = (n: string) => (state && !state.ok ? state.fieldErrors?.[n]?.[0] : undefined);
   return (
-    <form ref={form} action={action} className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
+    // keepValues: an error (e.g. "The hall is already booked at that time.") keeps what was typed; success clears the form.
+    <form ref={form} action={action} onSubmit={keepValues(action)} className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
       {state?.ok ? <div className="sm:col-span-2 lg:col-span-4"><FormMessage tone="success">Saved.</FormMessage></div> : null}
       {state && !state.ok && !state.fieldErrors ? <div className="sm:col-span-2 lg:col-span-4"><FormMessage>{state.message}</FormMessage></div> : null}
       <Field label="Event" htmlFor="htitle" error={err("title")} className="sm:col-span-2"><Input id="htitle" name="title" placeholder="Staff training" required /></Field>
@@ -57,7 +59,7 @@ function PaymentForm({ b, today, onDone }: { b: HallBooking; today: string; onDo
     if (state?.ok) onDone();
   }, [state, onDone]);
   return (
-    <form action={action} className="mt-3 flex flex-wrap items-end gap-2 rounded-md border border-hairline p-3">
+    <form action={action} onSubmit={keepValues(action)} className="mt-3 flex flex-wrap items-end gap-2 rounded-md border border-hairline p-3">
       <input type="hidden" name="bookingId" value={b.id} />
       <Field label="Amount (₦)" htmlFor={`pa-${b.id}`}><Input id={`pa-${b.id}`} name="amount" type="number" min={1} step="any" defaultValue={b.price_kobo > b.paid_kobo ? (b.price_kobo - b.paid_kobo) / 100 : undefined} className="h-11 w-32" required /></Field>
       <Field label="Method" htmlFor={`pm-${b.id}`}>

@@ -26,7 +26,7 @@ if ! curl -sf -o /dev/null http://127.0.0.1:4010/__health; then
 fi
 
 files=("$@")
-[ ${#files[@]} -eq 0 ] && files=(tests/e2e/twostep.e2e.mjs tests/e2e/auth.e2e.mjs tests/e2e/invite.e2e.mjs tests/e2e/workflows.e2e.mjs tests/e2e/payments.e2e.mjs tests/e2e/changes.e2e.mjs tests/e2e/till.e2e.mjs tests/e2e/photos.e2e.mjs tests/e2e/ops.e2e.mjs)
+[ ${#files[@]} -eq 0 ] && files=(tests/e2e/twostep.e2e.mjs tests/e2e/auth.e2e.mjs tests/e2e/invite.e2e.mjs tests/e2e/workflows.e2e.mjs tests/e2e/payments.e2e.mjs tests/e2e/changes.e2e.mjs tests/e2e/till.e2e.mjs tests/e2e/hall.e2e.mjs tests/e2e/photos.e2e.mjs tests/e2e/ops.e2e.mjs)
 status=0
 for t in "${files[@]}"; do echo "== $t"; node --env-file=.env.local "$t" || status=1; done
 exit $status
