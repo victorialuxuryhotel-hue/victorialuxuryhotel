@@ -30,7 +30,7 @@ const tokens: Record<string, [ErrorCode, string]> = {
   not_paid: ["VALIDATION", "This booking isn't fully paid. Take the payment first, then check the guest in or out."],
   payment_incomplete: ["VALIDATION", "A payment needs how it was paid and who took it. For a bank transfer, enter the transfer reference or the sender's name."],
   hall_not_paid: ["VALIDATION", "A hall booking is confirmed once it has a price and is paid in full. Record the payment first."],
-  transfer_needs_reference: ["VALIDATION", "For a transfer, enter the last 4 characters of the transfer reference or the sender's name."],
+  payment_needs_reference: ["VALIDATION", "This payment needs its reference: the last 4 digits of the POS slip, or for a transfer the reference or sender's name."],
   sales_retired: ["FORBIDDEN", "Charging to a room isn't available. Customers pay at the counter."],
   vat_needs_tax_id: ["VALIDATION", "VAT can't be shown on receipts without the hotel's Tax ID (TIN). Enter the TIN first."],
   room_before_payment: ["VALIDATION", "This booking isn't paid yet. Take the payment first: a room is given automatically once it's paid."],

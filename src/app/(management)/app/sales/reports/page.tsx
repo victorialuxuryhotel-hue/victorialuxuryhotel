@@ -106,7 +106,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           ["Orders", `/app/sales/orders/csv?from=${r.from}&to=${r.to}${outlet ? `&outlet=${outlet}` : ""}`],
           ["Sales by item", `/app/sales/reports/items-csv?range=${range}${outlet ? `&outlet=${outlet}` : ""}`],
           ["Stock", `/app/sales/reports/stock-csv?range=${range}`],
-          ["Transfers", `/app/sales/reports/transfers-csv?range=${range}${outlet ? `&outlet=${outlet}` : ""}`],
+          ["Transfers and POS", `/app/sales/reports/transfers-csv?range=${range}${outlet ? `&outlet=${outlet}` : ""}`],
         ].map(([label, href]) => (
           <span key={label} className="inline-flex">
             <a href={`${href}&format=xlsx`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> {label} (Excel)</a>
@@ -136,13 +136,16 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
 
       <Card>
         <CardHeader
-          title="Transfers to check"
-          description={`Every transfer sale, by salesperson, with the reference they entered. Tick each one off against the hotel's bank statement · ${rangeName.toLowerCase()}`}
+          title="Transfers and POS payments to check"
+          description={`Every transfer and POS/card sale, by salesperson, with the reference they entered. Tick transfers off against the bank statement and POS slips against the terminal's report · ${rangeName.toLowerCase()}`}
         />
         <Table
-          head={["Sold by", "Time", "Receipt", "Counter", "Amount", "Reference"]}
-          rows={r.transfers.map((t) => [t.who, formatDateTime(t.paid_at), t.receipt_number, OUTLETS[t.outlet], formatNaira(t.kobo), t.reference ?? "None (before references were required)"])}
-          empty="No transfer sales."
+          head={["Sold by", "Time", "Receipt", "Counter", "Method", "Amount", "Reference"]}
+          rows={r.transfers.map((t) => [
+            t.who, formatDateTime(t.paid_at), t.receipt_number, OUTLETS[t.outlet], PAY_METHODS[t.method], formatNaira(t.kobo),
+            t.reference ? (t.method === "pos_terminal" ? `Slip …${t.reference}` : t.reference) : "None (before references were required)",
+          ])}
+          empty="No transfer or POS sales."
         />
       </Card>
 

@@ -14,16 +14,29 @@ await clickText(p, "button", "Take payment");
 await clickText(p, "button", "Transfer");
 const confirm = async () => p.$$eval("button[type=submit]", (bs) => bs.find((b) => /^Confirm .* paid$/.test(b.innerText.trim()))?.disabled);
 check("Confirm is off until there's a reference and the tick", (await confirm()) === true);
-await p.type("input[name=transferReference]", "4821");
+await p.type("input[name=paymentReference]", "4821");
 check("a reference alone isn't enough", (await confirm()) === true);
 await p.click("input[name=transferChecked]");
 check("reference and tick: Confirm is on", (await confirm()) === false);
 check("at 1280×720 the till, with the Transfer fields open, fits without scrolling the page", (await p.evaluate(() => document.documentElement.scrollHeight - innerHeight)) <= 0);
 check("the tick says a screenshot or SMS alert is not enough", /screenshot or SMS alert is not enough/.test(await text(p)));
-const before = await val("SELECT count(*) FROM pos_orders WHERE transfer_reference = '4821'");
+const before = await val("SELECT count(*) FROM pos_orders WHERE payment_reference = '4821'");
 await clickText(p, "button", "Confirm");
 await waitForText(p, /RB-\d{4}-\d{6}/);
-check("the sale is saved with its transfer reference", (await val("SELECT count(*) FROM pos_orders WHERE transfer_reference = '4821' AND status = 'paid' AND method = 'bank_transfer'")) === before + 1);
+check("the sale is saved with its transfer reference", (await val("SELECT count(*) FROM pos_orders WHERE payment_reference = '4821' AND status = 'paid' AND method = 'bank_transfer'")) === before + 1);
+
+// H1: a POS/card sale needs the last 4 digits of the slip.
+await clickText(p, "button", "New order");
+const tile2 = await p.$("section[aria-label=Menu] li button:not([disabled])");
+await tile2.click();
+await clickText(p, "button", "Take payment");
+await clickText(p, "button", "POS / card");
+check("POS: Confirm is off until the slip's 4 digits are in", (await confirm()) === true);
+await p.type("input[name=paymentReference]", "77x31");
+check("only digits, at most 4", (await p.$eval("input[name=paymentReference]", (e) => e.value)) === "7731" && (await confirm()) === false);
+await clickText(p, "button", "Confirm");
+await waitForText(p, /slip …7731/);
+check("the receipt shows the POS slip", /POS \/ card · slip …7731/.test(await text(p)));
 
 // Fix 5: the cash count is blind. (Not submitted here: that would close this salesperson's day.)
 await go(p, "/app/sales/closing");
@@ -55,7 +68,7 @@ await ctx.close();
 {
   const { ctx, p } = await as("restaurant_bar_manager");
   await go(p, "/app/sales/reports?range=today");
-  check("the manager sees it under Transfers to check, with the reference", /Transfers to check[\s\S]*4821/.test(await text(p)));
+  check("the manager sees it under Transfers to check, with the reference", /Transfers and POS payments to check[\s\S]*4821/.test(await text(p)));
   await ctx.close();
 }
 await finish();

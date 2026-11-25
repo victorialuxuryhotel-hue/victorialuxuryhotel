@@ -20,6 +20,7 @@ export function OfflinePaymentForm({
   const [review, setReview] = useState<null | { amount: string; method: string; paidOn: string; reference: string }>(null);
   const [method, setMethod] = useState("cash");
   const transfer = method === "bank_transfer";
+  const pos = method === "pos_terminal";
   const [seen, setSeen] = useState(state);
   if (state !== seen) {
     setSeen(state);
@@ -75,13 +76,27 @@ export function OfflinePaymentForm({
           <Input id="paidOn" name="paidOn" type="date" defaultValue={today} max={today} required />
         </Field>
         <Field
-          label={transfer ? "Transfer reference or sender's name" : "Reference"}
-          optional={!transfer}
+          label={transfer ? "Transfer reference or sender's name" : pos ? "Last 4 digits of the POS slip" : "Reference"}
+          optional={!transfer && !pos}
           htmlFor="ref"
-          hint={transfer ? "As it appears in the hotel's bank app, so it can be matched to the statement." : "POS slip number, if any."}
+          hint={
+            transfer
+              ? "As it appears in the hotel's bank app, so it can be matched to the statement."
+              : pos
+                ? "Once the terminal says Approved. The manager matches it to the terminal's report."
+                : "Not needed for cash."
+          }
           error={err("reference")}
         >
-          <Input id="ref" name="reference" maxLength={100} required={transfer} minLength={transfer ? 3 : undefined} />
+          <Input
+            id="ref"
+            name="reference"
+            maxLength={pos ? 4 : 100}
+            required={transfer || pos}
+            minLength={transfer ? 3 : pos ? 4 : undefined}
+            pattern={pos ? "[0-9]{4}" : undefined}
+            inputMode={pos ? "numeric" : undefined}
+          />
         </Field>
       </div>
       <Field label="Note" optional htmlFor="note"><Textarea id="note" name="notes" rows={2} maxLength={1000} /></Field>

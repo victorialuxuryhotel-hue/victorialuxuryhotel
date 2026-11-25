@@ -135,12 +135,51 @@ describe("section 3 invariants", () => {
     const order = await saveOrder(db, seller, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: item, quantity: 1 }] });
     const pay = (ref: string | null) =>
       exec(
-        `UPDATE pos_orders SET status = 'paid', method = 'bank_transfer', transfer_reference = ?, paid_by = ?, paid_at = ?, receipt_number = ? WHERE id = ?`,
+        `UPDATE pos_orders SET status = 'paid', method = 'bank_transfer', payment_reference = ?, paid_by = ?, paid_at = ?, receipt_number = ? WHERE id = ?`,
         ref, seller!.id, iso(0), `RB-T-${rand()}`, order.id,
       );
-    await rejects(pay(null), /transfer_needs_reference/);
-    await rejects(pay("  "), /transfer_needs_reference/);
+    await rejects(pay(null), /payment_needs_reference/);
+    await rejects(pay("  "), /payment_needs_reference/);
     await pay("4821");
+  });
+
+  it("I15 a bar order paid by POS/card without the slip's last 4 digits is rejected", async () => {
+    const seller: Actor = { id: crypto.randomUUID(), role: "restaurant_bar_manager" };
+    await exec(
+      "INSERT INTO staff_profiles (id, full_name, email, role, department, department_lead) VALUES (?, 'Bar Lead', ?, 'front_desk', 'restaurant_bar', 1)",
+      seller!.id, `bar-${rand()}@example.com`,
+    );
+    const item = await saveMenuItem(db, seller, { name: `Malt ${rand()}`, outlet: "bar", category: "soft_drinks", priceKobo: 100_000, available: true, active: true });
+    const order = await saveOrder(db, seller, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: item, quantity: 1 }] });
+    const pay = (ref: string | null) =>
+      exec(
+        `UPDATE pos_orders SET status = 'paid', method = 'pos_terminal', payment_reference = ?, paid_by = ?, paid_at = ?, receipt_number = ? WHERE id = ?`,
+        ref, seller!.id, iso(0), `RB-T-${rand()}`, order.id,
+      );
+    await rejects(pay(null), /payment_needs_reference/);
+    await rejects(pay("12a4"), /payment_needs_reference/);
+    await pay("1234");
+  });
+
+  it("I16 a desk payment by POS/card without the slip's last 4 digits is rejected; slips may repeat", async () => {
+    const c = await makeCategory(2);
+    const r = await insertReservation({ categoryId: c.id, checkIn: day(5), checkOut: day(6) });
+    const r2 = await insertReservation({ categoryId: c.id, checkIn: day(5), checkOut: day(6) });
+    const insert = (reservationId: string, reference: string | null) =>
+      exec(
+        `INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, provider_reference, status, paid_at, verified_at, recorded_by)
+         VALUES (?, ?, 100, 'offline', 'pos_terminal', ?, 'successful', ?, ?, ?)`,
+        crypto.randomUUID(), reservationId, reference, iso(0), iso(0), desk!.id,
+      );
+    await rejects(insert(r, null), /payment_needs_reference/);
+    await rejects(insert(r, "slip"), /payment_needs_reference/);
+    await insert(r, "7731");
+    await insert(r2, "7731"); // two genuine slips can end in the same 4 digits
+    await rejects(
+      recordOfflinePayment(db, desk, { reservationId: r, amountKobo: 5_000_000, method: "pos_terminal", reference: "", paidOn: day(0), confirmReceived: true }),
+      /last 4 digits of the slip/,
+      "VALIDATION",
+    );
   });
 
   it("I11 a closing can't be edited, deleted or made twice for one person and business day", async () => {

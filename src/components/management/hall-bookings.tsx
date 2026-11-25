@@ -56,6 +56,7 @@ function PaymentForm({ b, today, onDone }: { b: HallBooking; today: string; onDo
   const [paymentId] = useState(() => crypto.randomUUID());
   const [method, setMethod] = useState("bank_transfer");
   const transfer = method === "bank_transfer";
+  const pos = method === "pos_terminal";
   useEffect(() => {
     if (state?.ok) onDone();
   }, [state, onDone]);
@@ -70,8 +71,8 @@ function PaymentForm({ b, today, onDone }: { b: HallBooking; today: string; onDo
         </Select>
       </Field>
       <Field label="Date" htmlFor={`pd-${b.id}`}><Input id={`pd-${b.id}`} name="paidOn" type="date" max={today} defaultValue={today} className="h-11" /></Field>
-      <Field label={transfer ? "Transfer reference or sender" : "Reference"} optional={!transfer} htmlFor={`pr-${b.id}`}>
-        <Input id={`pr-${b.id}`} name="reference" className="h-11 w-44" required={transfer} minLength={transfer ? 3 : undefined} />
+      <Field label={transfer ? "Transfer reference or sender" : pos ? "POS slip, last 4" : "Reference"} optional={!transfer && !pos} htmlFor={`pr-${b.id}`}>
+        <Input id={`pr-${b.id}`} name="reference" className="h-11 w-44" required={transfer || pos} minLength={transfer ? 3 : pos ? 4 : undefined} maxLength={pos ? 4 : undefined} inputMode={pos ? "numeric" : undefined} pattern={pos ? "[0-9]{4}" : undefined} />
       </Field>
       <Button type="submit" size="sm" className="h-11" pending={pending}>Take payment</Button>
       {state && !state.ok ? <p className="w-full text-xs text-danger-700">{state.message}</p> : null}

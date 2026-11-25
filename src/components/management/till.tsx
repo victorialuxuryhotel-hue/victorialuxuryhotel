@@ -316,7 +316,10 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
                 <CheckCircle2 className="mt-0.5 size-6 shrink-0 text-success-700" aria-hidden />
                 <div>
                   <p className="font-semibold text-ink-900">{alreadyPaid ? "Already paid" : "Paid"} · {formatNaira(receipt.totalKobo)}</p>
-                  <p className="text-sm text-ink-600">{METHODS[receipt.method]} · {receipt.receiptNumber}</p>
+                  <p className="text-sm text-ink-600">
+                    {METHODS[receipt.method]}
+                    {receipt.reference ? (receipt.method === "pos_terminal" ? ` · slip …${receipt.reference}` : ` · ref ${receipt.reference}`) : ""} · {receipt.receiptNumber}
+                  </p>
                 </div>
               </div>
               {receipt.method === "cash" && receipt.cashReceivedKobo != null ? (
@@ -404,7 +407,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
                 snapshot.current = {
                   outlet, receiptNumber: "", orderNumber: 0, paidAt: "", attendant, vatRateBp, taxId,
                   lines: lines.map((l) => ({ name: l.item.name, quantity: l.q, unitKobo: l.item.price_kobo })),
-                  totalKobo: total, method, cashReceivedKobo: method === "cash" ? givenKobo : null,
+                  totalKobo: total, method, cashReceivedKobo: method === "cash" ? givenKobo : null, reference: method === "cash" ? null : transferRef.trim() || null,
                 };
               }}
               className="space-y-4"
@@ -418,7 +421,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
                 <legend className="mb-2 text-[13px] text-ink-700">How is the customer paying?</legend>
                 <div className="grid grid-cols-3 gap-2">
                   {(Object.keys(METHODS) as PayMethod[]).map((k) => (
-                    <button key={k} type="button" aria-pressed={method === k} onClick={() => setMethod(k)} className={cn(chip(method === k), "rounded-md px-2")}>{METHODS[k]}</button>
+                    <button key={k} type="button" aria-pressed={method === k} onClick={() => { setMethod(k); setTransferRef(""); }} className={cn(chip(method === k), "rounded-md px-2")}>{METHODS[k]}</button>
                   ))}
                 </div>
               </fieldset>
@@ -448,7 +451,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
                 <div className="space-y-3 rounded-md bg-white p-3">
                   <label className="block">
                     <span className="mb-1 block text-[13px] text-ink-700">Last 4 characters of the transfer reference, or the sender&apos;s name</span>
-                    <Input name="transferReference" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} maxLength={80} autoComplete="off" required minLength={3} />
+                    <Input name="paymentReference" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} maxLength={80} autoComplete="off" required minLength={3} />
                   </label>
                   <label className="flex gap-3 rounded-md border border-gold-300 bg-gold-50 p-3 text-sm text-ink-800">
                     <input type="checkbox" name="transferChecked" checked={transferChecked} onChange={(e) => setTransferChecked(e.target.checked)} required className="mt-0.5 size-4 shrink-0 accent-navy-800" />
@@ -458,9 +461,28 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
                   </label>
                 </div>
               ) : null}
+              {method === "pos_terminal" ? (
+                <div className="space-y-2 rounded-md bg-white p-3">
+                  <label className="block">
+                    <span className="mb-1 block text-[13px] text-ink-700">Last 4 digits of the POS slip, once the terminal says Approved</span>
+                    <Input
+                      name="paymentReference"
+                      value={transferRef}
+                      onChange={(e) => setTransferRef(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                      inputMode="numeric"
+                      pattern="[0-9]{4}"
+                      maxLength={4}
+                      autoComplete="off"
+                      required
+                      className="text-lg tracking-[0.3em] tabular-nums"
+                    />
+                  </label>
+                  <p className="text-xs text-ink-500">The manager matches these against the terminal&apos;s own report.</p>
+                </div>
+              ) : null}
               <div className="grid grid-cols-[auto_1fr] gap-2">
                 <Button type="button" variant="secondary" size="lg" onClick={() => setStep("order")}>Back</Button>
-                <Button type="submit" size="lg" pending={paying} disabled={!lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && (transferRef.trim().length < 3 || !transferChecked))}>
+                <Button type="submit" size="lg" pending={paying} disabled={!lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && (transferRef.trim().length < 3 || !transferChecked)) || (method === "pos_terminal" && !/^\d{4}$/.test(transferRef))}>
                   Confirm {formatNaira(total)} paid
                 </Button>
               </div>

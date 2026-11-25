@@ -60,7 +60,7 @@ describe("income by day, by staff and method, and the accountant's download", ()
       crypto.randomUUID(), b.id, hotelInstant(today, "00:30:00"), hotelInstant(today, "00:30:00"), desk!.id,
     );
     const item = await saveMenuItem(db, owner, { name: `Chapman ${crypto.randomUUID().slice(0, 4)}`, outlet: "bar", category: "soft_drinks", priceKobo: 350_000, available: true, active: true });
-    await payOrder(db, { id: desk!.id, role: "restaurant_bar" }, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: item, quantity: 2 }], method: "pos_terminal" });
+    await payOrder(db, { id: desk!.id, role: "restaurant_bar" }, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: item, quantity: 2 }], method: "pos_terminal", paymentReference: "4821" });
     const hall = await createHallBooking(db, desk, {
       title: "AGM", customerName: "Ondo Co-op", phone: null, email: null, guests: 50, priceKobo: 20_000_000, notes: null,
       eventDate: day(200 + Math.floor(Math.random() * 300)), startTime: "08:00", endTime: "09:00",

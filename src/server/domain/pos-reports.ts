@@ -59,12 +59,13 @@ export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: O
        WHERE m.created_at >= ? AND m.created_at < ? GROUP BY i.name, i.unit, m.kind`,
       start, end,
     ),
-    // Every transfer sale, by salesperson, for the manager to tick off against the bank statement (I10).
-    all<{ who: string; paid_at: string; receipt_number: string; outlet: Outlet; kobo: number; reference: string | null }>(
+    // Every transfer and POS/card sale, by salesperson, with its reference: for the manager to tick off
+    // against the bank statement and the card terminal's own report (I10, I15).
+    all<{ who: string; paid_at: string; receipt_number: string; outlet: Outlet; kobo: number; method: PayMethod; reference: string | null }>(
       db,
-      `SELECT s.full_name AS who, o.paid_at, o.receipt_number, o.outlet, o.total_kobo AS kobo, o.transfer_reference AS reference
+      `SELECT s.full_name AS who, o.paid_at, o.receipt_number, o.outlet, o.total_kobo AS kobo, o.method, o.payment_reference AS reference
        FROM pos_orders o JOIN staff_profiles s ON s.id = o.paid_by
-       WHERE ${PAID} AND o.method = 'bank_transfer' ORDER BY s.full_name, o.paid_at`,
+       WHERE ${PAID} AND o.method IN ('bank_transfer', 'pos_terminal') ORDER BY s.full_name, o.method, o.paid_at`,
       ...args(start, end),
     ),
     // Unpaid orders cancelled, with who and why (rules 2.5: visible to the manager).

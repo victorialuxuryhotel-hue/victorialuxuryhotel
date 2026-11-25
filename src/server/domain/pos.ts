@@ -203,16 +203,16 @@ const lineInserts = (db: Db, id: string, priced: Priced[]) =>
       .bind(id, i + 1, p.menuItemId, p.name, p.category, p.unitKobo, p.quantity),
   );
 
-function payStatements(db: Db, id: string, staffId: string, method: PayMethod, totalKobo: number, cashReceivedKobo: number | null, transferReference: string | null) {
+function payStatements(db: Db, id: string, staffId: string, method: PayMethod, totalKobo: number, cashReceivedKobo: number | null, paymentReference: string | null) {
   return [
     db.prepare("UPDATE pos_counters SET value = value + 1 WHERE name = 'receipt'"),
     db
       .prepare(
-        `UPDATE pos_orders SET status = 'paid', method = ?, paid_by = ?, cash_received_kobo = ?, transfer_reference = ?, paid_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+        `UPDATE pos_orders SET status = 'paid', method = ?, paid_by = ?, cash_received_kobo = ?, payment_reference = ?, paid_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
            receipt_number = 'RB-' || strftime('%Y', 'now', '+1 hour') || '-' || printf('%06d', (SELECT value FROM pos_counters WHERE name = 'receipt'))
          WHERE id = ? AND status = 'open' AND total_kobo = ?`,
       )
-      .bind(method, staffId, cashReceivedKobo, method === "bank_transfer" ? transferReference : null, id, totalKobo),
+      .bind(method, staffId, cashReceivedKobo, method === "cash" ? null : paymentReference, id, totalKobo),
     db.prepare("INSERT INTO _guard (ok) SELECT 0 WHERE changes() = 0"),
     db
       .prepare(
@@ -317,16 +317,22 @@ export async function payOrder(
   actor: Actor,
   v: {
     id: string; outlet?: Outlet; lines?: OrderLine[]; note?: string | null; method: PayMethod; cashReceivedKobo?: number | null;
-    /** Transfers only: last 4 characters of the reference or the sender's name, and the "money is in the bank app" tick. */
-    transferReference?: string | null; transferChecked?: boolean;
+    /**
+     * Transfer: last 4 characters of the reference or the sender's name, plus the "money is in the bank app" tick.
+     * POS / card: last 4 digits of the terminal slip, so it can be matched to the terminal's own report.
+     */
+    paymentReference?: string | null; transferChecked?: boolean;
   },
 ): Promise<PaidOrder> {
   requireRole(actor, POS_SELLERS);
   if (!(v.method in PAY_METHODS)) throw new AppError("VALIDATION", "Choose how the customer paid.");
-  const transferRef = v.transferReference?.trim() || null;
+  const reference = v.paymentReference?.trim() || null;
   if (v.method === "bank_transfer") {
-    if (!transferRef || transferRef.length < 3) throw new AppError("VALIDATION", "For a transfer, enter the last 4 characters of the transfer reference or the sender's name.");
+    if (!reference || reference.length < 3) throw new AppError("VALIDATION", "For a transfer, enter the last 4 characters of the transfer reference or the sender's name.");
     if (v.transferChecked !== true) throw new AppError("VALIDATION", "Check the hotel's bank app first and tick the box: a screenshot or SMS alert is not enough.");
+  }
+  if (v.method === "pos_terminal" && !/^\d{4}$/.test(reference ?? "")) {
+    throw new AppError("VALIDATION", "Enter the last 4 digits of the POS slip, once the terminal says Approved.");
   }
   const cur = await orderState(db, v.id);
   if (cur?.status === "paid" || cur?.status === "void") return paidResult(db, v.id, true);
@@ -354,7 +360,7 @@ export async function payOrder(
   await checkStock(db, lines);
   const cash = validCash(v.method, totalKobo, v.cashReceivedKobo);
   stmts.push(
-    ...payStatements(db, v.id, actor.id, v.method, totalKobo, cash, transferRef),
+    ...payStatements(db, v.id, actor.id, v.method, totalKobo, cash, reference),
     activity(db, "pos.order_paid", "pos_order", v.id, `Sale ${naira(totalKobo)} paid by ${PAY_METHODS[v.method].toLowerCase()}`, { method: v.method, total_kobo: totalKobo }),
   );
   try {
@@ -411,11 +417,11 @@ export async function voidOrder(db: Db, actor: Actor, id: string, reason: string
 // ---------------------------------------------------------------------------
 
 export type OrderRow = {
-  id: string; number: number; outlet: Outlet; status: OrderStatus; total_kobo: number; method: PayMethod | null; receipt_number: string | null;
+  id: string; number: number; outlet: Outlet; status: OrderStatus; total_kobo: number; method: PayMethod | null; payment_reference: string | null; receipt_number: string | null;
   note: string | null; created_at: string; paid_at: string | null; taken_by: string | null; created_by_name: string | null; items: string;
 };
 
-const ORDER_SELECT = `SELECT o.id, o.number, o.outlet, o.status, o.total_kobo, o.method, o.receipt_number, o.note, o.created_at, o.paid_at,
+const ORDER_SELECT = `SELECT o.id, o.number, o.outlet, o.status, o.total_kobo, o.method, o.payment_reference, o.receipt_number, o.note, o.created_at, o.paid_at,
   p.full_name AS taken_by, c.full_name AS created_by_name,
   (SELECT group_concat(i.quantity || ' × ' || i.name, ', ') FROM pos_order_items i WHERE i.order_id = o.id) AS items
   FROM pos_orders o LEFT JOIN staff_profiles p ON p.id = o.paid_by LEFT JOIN staff_profiles c ON c.id = o.created_by`;
@@ -488,7 +494,7 @@ export async function getOrder(db: Db, actor: Actor, id: string): Promise<OrderD
   requireRole(actor, ALL_POS);
   const o = await first<OrderDetail & { paid_by: string | null; created_by: string }>(
     db,
-    `SELECT o.id, o.number, o.outlet, o.status, o.total_kobo, o.method, o.receipt_number, o.note, o.created_at, o.paid_at, o.cash_received_kobo,
+    `SELECT o.id, o.number, o.outlet, o.status, o.total_kobo, o.method, o.payment_reference, o.receipt_number, o.note, o.created_at, o.paid_at, o.cash_received_kobo,
             o.closed_at, o.close_reason, o.paid_by, o.created_by,
             p.full_name AS taken_by, c.full_name AS created_by_name, x.full_name AS closed_by_name, '' AS items
      FROM pos_orders o LEFT JOIN staff_profiles p ON p.id = o.paid_by LEFT JOIN staff_profiles c ON c.id = o.created_by

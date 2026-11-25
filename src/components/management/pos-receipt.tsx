@@ -11,6 +11,8 @@ export type PosReceiptData = {
   lines: { name: string; quantity: number; unitKobo: number }[];
   totalKobo: number;
   method: "cash" | "bank_transfer" | "pos_terminal";
+  /** Transfer reference, or the last 4 digits of the POS slip. */
+  reference?: string | null;
   cashReceivedKobo: number | null;
   attendant: string;
   vatRateBp: number;
@@ -52,6 +54,7 @@ export function PosReceipt({ r, className, printable = true }: { r: PosReceiptDa
       <dl className="space-y-0.5 py-3">
         <div className={cn(row, "text-base font-bold")}><dt>Total</dt><dd className="tabular-nums">{formatNaira(r.totalKobo)}</dd></div>
         <div className={row}><dt>Paid by</dt><dd>{METHOD[r.method]}</dd></div>
+        {r.reference ? <div className={row}><dt>{r.method === "pos_terminal" ? "POS slip" : "Reference"}</dt><dd>{r.method === "pos_terminal" ? `…${r.reference}` : r.reference}</dd></div> : null}
         {r.method === "cash" && r.cashReceivedKobo != null ? (
           <>
             <div className={row}><dt>Cash given</dt><dd className="tabular-nums">{formatNaira(r.cashReceivedKobo)}</dd></div>

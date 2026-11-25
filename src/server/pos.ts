@@ -47,7 +47,7 @@ export async function takePayment(_prev: ActionResult<PaidResult> | null, formDa
       note: z.string().max(120).parse(String(formData.get("note") ?? "")),
       method: method.parse(formData.get("method")),
       cashReceivedKobo: cash,
-      transferReference: z.string().trim().max(80).parse(String(formData.get("transferReference") ?? "")) || null,
+      paymentReference: z.string().trim().max(80).parse(String(formData.get("paymentReference") ?? "")) || null,
       transferChecked: formData.get("transferChecked") === "on",
     });
     refresh();

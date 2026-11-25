@@ -221,8 +221,16 @@ export async function recordOfflinePayment(
   if (input.confirmReceived !== true) throw new AppError("VALIDATION", "Confirm that the hotel has received this money before recording it.");
   if (!["cash", "bank_transfer", "pos_terminal", "other"].includes(input.method)) throw new AppError("VALIDATION", "Choose how the money was received.");
   if (!Number.isInteger(input.amountKobo) || input.amountKobo <= 0) throw new AppError("VALIDATION", "Enter the amount received.");
+  // Every non-cash payment can be checked: transfers against the bank statement, POS slips against the terminal (I7, I16).
   if (input.method === "bank_transfer" && (input.reference?.trim().length ?? 0) < 3) {
-    throw new AppError("VALIDATION", "For a bank transfer, enter the transfer reference or the sender's name, as shown in the hotel's bank app.");
+    throw new AppError("VALIDATION", "This transfer needs its reference. Enter the transfer reference or the sender's name, as shown in the hotel's bank app.", {
+      fieldErrors: { reference: ["Enter the transfer reference or the sender's name"] },
+    });
+  }
+  if (input.method === "pos_terminal" && !/\d{4}/.test(input.reference ?? "")) {
+    throw new AppError("VALIDATION", "This POS payment needs its slip number. Enter the last 4 digits of the slip, once the terminal says Approved.", {
+      fieldErrors: { reference: ["Enter the last 4 digits of the POS slip"] },
+    });
   }
   const today = hotelToday();
   if (!input.paidOn || input.paidOn > today) throw new AppError("VALIDATION", "The payment date can't be in the future.");

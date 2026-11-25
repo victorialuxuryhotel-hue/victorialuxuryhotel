@@ -109,7 +109,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
                       {o.receipt_number ? <span className="ml-2 font-mono text-xs text-ink-500">{o.receipt_number}</span> : null}
                     </p>
                     <p className="truncate text-xs text-ink-500">
-                      {formatDateTime(o.paid_at ?? o.created_at)} · {o.items}{o.method ? ` · ${PAY_METHODS[o.method]}` : ""} · {o.taken_by ?? o.created_by_name ?? "staff"}
+                      {formatDateTime(o.paid_at ?? o.created_at)} · {o.items}{o.method ? ` · ${PAY_METHODS[o.method]}${o.payment_reference ? (o.method === "pos_terminal" ? ` …${o.payment_reference}` : ` (${o.payment_reference})`) : ""}` : ""} · {o.taken_by ?? o.created_by_name ?? "staff"}
                     </p>
                   </div>
                   <Badge tone={tone[o.status]}>{ORDER_STATUS[o.status]}</Badge>

@@ -85,6 +85,9 @@ export async function recordHallPayment(
   if (v.method === "bank_transfer" && (v.reference?.trim().length ?? 0) < 3) {
     throw new AppError("VALIDATION", "For a bank transfer, enter the transfer reference or the sender's name, as shown in the hotel's bank app.");
   }
+  if (v.method === "pos_terminal" && !/\d{4}/.test(v.reference ?? "")) {
+    throw new AppError("VALIDATION", "This POS payment needs its slip number. Enter the last 4 digits of the slip, once the terminal says Approved.");
+  }
   if (b.paid + v.amountKobo > b.price_kobo) throw new AppError("VALIDATION", `That's more than the ${formatNaira(b.price_kobo - b.paid)} owed.`);
   if (v.paidOn > hotelToday()) throw new AppError("VALIDATION", "The date can't be in the future.");
   const id = v.paymentId ?? uuid();
