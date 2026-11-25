@@ -42,7 +42,8 @@ export async function listPaymentsFor(
   const scope = paymentScopeSql(view, actor.id, opts.today ?? hotelToday());
   const rows = await all<ListedPayment>(
     db,
-    `${SELECT} WHERE ${scope.where} ORDER BY ${PAID_OR_CREATED} DESC, p.id LIMIT ? OFFSET ?`,
+    // Money received only (payments and corrections). Online attempts that didn't complete stay on the booking.
+    `${SELECT} WHERE p.status = 'successful' AND ${scope.where} ORDER BY ${PAID_OR_CREATED} DESC, p.id LIMIT ? OFFSET ?`,
     ...scope.params,
     size + 1,
     (page - 1) * size,

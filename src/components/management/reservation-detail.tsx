@@ -88,6 +88,9 @@ export function ReservationDetailView({
         )
       : null;
   const receiptsById = new Map(r.payments.map((p) => [p.id, p.receiptNumber]));
+  // Money received is listed; online attempts that didn't complete are tucked away below it.
+  const received = r.payments.filter((p) => p.status === "successful");
+  const notCompleted = r.payments.filter((p) => p.status !== "successful");
   const open = r.status === "confirmed" || r.status === "pending_payment";
   const steps = reservationSteps(r, today);
   const step = nextStep(r, today);
@@ -246,11 +249,11 @@ export function ReservationDetailView({
                 <PaidProgress paidKobo={r.paidKobo} totalKobo={r.totalKobo} format={formatNaira} />
               </div>
             </div>
-            {r.payments.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-ink-500">No payments recorded yet.</p>
+            {received.length === 0 ? (
+              <p className="px-5 py-4 text-sm text-ink-500">No payments received yet.</p>
             ) : (
               <ul className="divide-y divide-hairline">
-                {r.payments.map((p) => (
+                {received.map((p) => (
                   <li key={p.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-4">
                     {p.kind === "refund" ? (
                       <div className="min-w-0">
@@ -293,6 +296,22 @@ export function ReservationDetailView({
                 ))}
               </ul>
             )}
+            {notCompleted.length ? (
+              <details className="border-t border-hairline px-5 py-3 text-sm">
+                <summary className="cursor-pointer text-ink-600">
+                  Show {notCompleted.length === 1 ? "1 online payment" : `${notCompleted.length} online payments`} not completed
+                </summary>
+                <ul className="mt-2 space-y-1.5 text-ink-600">
+                  {notCompleted.map((p) => (
+                    <li key={p.id} className="flex justify-between gap-3 tabular-nums">
+                      <span>Online payment not completed{p.paidAt ? ` · ${formatDateTime(p.paidAt)}` : ""}</span>
+                      <span>{formatNaira(p.amountKobo)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-ink-500">No money was received for these. They&apos;re kept for checking with Paystack.</p>
+              </details>
+            ) : null}
           </Card>
         </div>
 
