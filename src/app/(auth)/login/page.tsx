@@ -24,7 +24,7 @@ export default function LoginPage(props: PageProps<"/login">) {
         <Logo className="relative w-20" />
         <div className="relative">
           <p className="font-display text-5xl leading-tight text-ivory-50">Hotel management</p>
-          <p className="mt-3 max-w-sm text-ivory-200/70">Reservations, rooms, guests and payments for {hotel.name}.</p>
+          <p className="mt-3 max-w-sm text-ivory-200/70">Bookings, rooms, guests and payments for {hotel.name}.</p>
         </div>
       </div>
 

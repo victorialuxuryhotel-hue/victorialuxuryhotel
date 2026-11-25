@@ -10,7 +10,13 @@ function safeNext(next: string | undefined) {
   return next && /^\/app(\/[\w\-/]*)?$/.test(next) ? next : "/app";
 }
 
-function friendly(code: string | undefined, fallback: string | undefined): string {
+type ClerkFailure = { code?: string; longMessage?: string; errors?: ReadonlyArray<{ code?: string; longMessage?: string }> };
+
+/** Clerk API failures carry the specific code on `errors[0]`; the top-level code is generic. */
+function friendly(error: ClerkFailure): string {
+  const detail = error.errors?.[0];
+  const code = detail?.code ?? error.code;
+  const fallback = detail?.longMessage ?? error.longMessage;
   switch (code) {
     case "form_identifier_not_found":
     case "form_password_incorrect":
@@ -55,7 +61,7 @@ export function SignInPanel({ next }: { next?: string }) {
     if (!signIn) return false;
     const { error } = await signIn.mfa.sendEmailCode();
     if (error) {
-      setMessage(friendly(error.code, error.longMessage));
+      setMessage(friendly(error));
       return false;
     }
     return true;
@@ -66,7 +72,7 @@ export function SignInPanel({ next }: { next?: string }) {
     setMessage(null);
     const { error } = await signIn.password({ identifier: identifier.trim(), password });
     if (error) {
-      setMessage(friendly(error.code, error.longMessage));
+      setMessage(friendly(error));
       return;
     }
     if (signIn.status === "complete") return finish();
@@ -91,7 +97,7 @@ export function SignInPanel({ next }: { next?: string }) {
           : await signIn.mfa.verifyTOTP({ code: code.trim() })
         : await signIn.mfa.verifyEmailCode({ code: code.trim() });
     if (error) {
-      setMessage(friendly(error.code, error.longMessage));
+      setMessage(friendly(error));
       return;
     }
     if (signIn.status === "complete") return finish();
