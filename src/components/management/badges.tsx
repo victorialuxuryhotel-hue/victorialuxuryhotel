@@ -1,8 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import {
+  bookingSource,
   paymentStatus,
   reservationStatus,
   roomReadiness,
+  type BookingSource,
   type PaymentStatus,
   type ReservationStatus,
   type RoomReadiness,
@@ -10,6 +12,11 @@ import {
 
 export const ReservationBadge = ({ status }: { status: ReservationStatus }) => (
   <Badge tone={reservationStatus[status].tone}>{reservationStatus[status].label}</Badge>
+);
+
+/** Where the booking came from (interface brief I4). Always neutral: it's information, not a state. */
+export const SourceBadge = ({ source }: { source: BookingSource }) => (
+  <Badge tone="neutral" className="text-ink-600" data-source={source}>{bookingSource[source]}</Badge>
 );
 
 export const PaymentBadge = ({ status }: { status: PaymentStatus }) => (

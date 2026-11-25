@@ -160,6 +160,13 @@ for (const id of pagingIds) {
   );
   check("Today's headings count arrivals and departures done, with a progress bar", progress.length >= 1, JSON.stringify(progress));
   check("and the count still to go is the list on screen", progress.every((x) => x.total - x.done === x.rows), JSON.stringify(progress));
+  // I4: where each booking came from, as a neutral badge.
+  const SOURCES = /^(Website|Walk-in|Phone|WhatsApp|Staff)$/;
+  const sourceBadges = (page) => page.$$eval("[data-source]", (b) => b.filter((x) => x.offsetParent).map((x) => x.textContent.trim()));
+  const todaySources = await sourceBadges(p);
+  // Arriving / leaving lists and the in-house table (Needs you now rows are actions, not bookings).
+  const todayRows = await p.$$eval(".rounded-card ul > li:not([data-kind]):has(a[href^='/app/reservations/']), .rounded-card tbody tr", (l) => l.filter((x) => x.offsetParent).length);
+  check("every booking on Today shows where it came from", todayRows > 0 && todaySources.length === todayRows && todaySources.every((s) => SOURCES.test(s)), `${todaySources.length} badges, ${todayRows} rows`);
   const card = await p.$("[data-tonight]:has(a[href*='/app/reservations/new?type='])");
   check("Today shows the room types free tonight with New booking", Boolean(card) || /Fully booked tonight/.test(await text(p)));
   if (card) {
@@ -174,6 +181,10 @@ for (const id of pagingIds) {
     check("New booking comes with that room type chosen", chosen === type, `${chosen} vs ${type}`);
     check("and tonight's date", (await p.$eval("input[name=checkIn]", (i) => i.value)) === (await val("SELECT date('now', '-5 hours')")));
   }
+  await go(p, "/app/reservations?tab=all");
+  const listSources = await sourceBadges(p);
+  const listRows = await p.$$eval("table tbody tr", (r) => r.filter((x) => x.offsetParent).length);
+  check("and every row on Bookings", listRows > 0 && listSources.length === listRows && listSources.every((s) => SOURCES.test(s)), `${listSources.length} badges, ${listRows} rows`);
   await ctx.close();
 }
 

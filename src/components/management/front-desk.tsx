@@ -4,7 +4,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import type { ReservationRow } from "@/domain/views";
 import { formatDate, formatNaira, nightsBetween, plural } from "@/lib/format";
-import { ReservationBadge } from "./badges";
+import { ReservationBadge, SourceBadge } from "./badges";
 import { nextStep, owedOf } from "@/domain/next-step";
 import { movementProgress } from "@/domain/today";
 import { cn } from "@/lib/utils/cn";
@@ -70,6 +70,7 @@ export function MovementList({
                   <div className="flex flex-wrap items-center gap-2">
                     <Link href={hrefFor(r)} className="font-medium text-ink-900 hover:text-navy-700">{r.guestName}</Link>
                     <ReservationBadge status={r.status} />
+                    <SourceBadge source={r.source} />
                     {overdue ? <span className="rounded-full border border-danger-600/30 bg-white px-2 py-0.5 text-xs font-semibold text-danger-700">Overdue since {formatDate(r.checkOut, { year: false })}</span> : null}
                   </div>
                   <p className="mt-1 truncate text-sm text-ink-500">

@@ -2,10 +2,9 @@ import { owedOf } from "@/domain/next-step";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
-import { bookingSource } from "@/domain/status";
 import type { ReservationRow } from "@/domain/views";
 import { formatDate, formatNaira, nightsBetween, plural } from "@/lib/format";
-import { PaidProgress, ReservationBadge } from "./badges";
+import { PaidProgress, ReservationBadge, SourceBadge } from "./badges";
 
 /** today: the hotel date from the page, so dates in another year show their year. */
 /** inHouse: the compact Today version: guest, room, check-out, what's owed, status (no source or payment bars). */
@@ -22,7 +21,10 @@ export function ReservationTable({ rows, hrefFor, today, inHouse = false }: { ro
                   <p className="font-medium text-ink-900">{r.guestName}</p>
                   <p className="mt-0.5 font-mono text-xs text-ink-500">{r.reference}</p>
                 </div>
-                <ReservationBadge status={r.status} />
+                <div className="flex flex-col items-end gap-1">
+                  <ReservationBadge status={r.status} />
+                  <SourceBadge source={r.source} />
+                </div>
               </div>
               <p className="mt-2 text-sm text-ink-600">
                 {r.category}
@@ -77,7 +79,7 @@ export function ReservationTable({ rows, hrefFor, today, inHouse = false }: { ro
                   <p className="text-ink-900">{r.roomNumber ? `Room ${r.roomNumber}` : <span className="text-ink-400">Unassigned</span>}</p>
                   <p className="text-xs text-ink-500">{r.category}</p>
                 </TD>
-                {inHouse ? null : <TD>{bookingSource[r.source]}</TD>}
+                {inHouse ? null : <TD><SourceBadge source={r.source} /></TD>}
                 {inHouse ? (
                   <TD>
                     {owedOf(r) > 0 ? <p className="font-semibold tabular-nums text-warning-700">{formatNaira(owedOf(r))}</p> : <p className="text-ink-500">Nothing</p>}
@@ -91,6 +93,7 @@ export function ReservationTable({ rows, hrefFor, today, inHouse = false }: { ro
                 <TD>
                   <div className="flex flex-col items-start gap-1.5">
                     <ReservationBadge status={r.status} />
+                    {inHouse ? <SourceBadge source={r.source} /> : null}
                     {r.attention ? (
                       <span className="flex items-center gap-1 text-xs text-warning-700" title={r.attention}>
                         <AlertTriangle className="size-3.5" aria-hidden /> Attention
