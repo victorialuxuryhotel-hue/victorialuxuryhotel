@@ -64,7 +64,7 @@ export function IdleLock({ name, roleLabel, minutes }: { name: string; roleLabel
 export function SignedInStrip({ name, roleLabel }: { name: string; roleLabel: string }) {
   const { signOut } = useClerk();
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-hairline bg-ivory-50 px-3 py-1.5 text-sm text-ink-600 print:hidden">
+    <div className="flex items-center gap-2 text-sm text-ink-600 print:hidden">
       <span>
         Signed in as <span className="font-medium text-ink-900">{name}</span> ({roleLabel})
       </span>

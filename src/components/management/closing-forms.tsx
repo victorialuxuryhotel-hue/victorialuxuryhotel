@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { NumPad } from "@/components/ui/num-pad";
 import { safeAction } from "@/lib/safe-action";
 import { FormMessage, Input, Textarea } from "@/components/ui/form";
 import { formatNaira } from "@/lib/format";
@@ -43,8 +44,9 @@ export function CloseDayForm({ openOrders }: { openOrders: number }) {
       ) : null}
       <label className="block max-w-xs">
         <span className="mb-1 block text-[13px] text-ink-700">Cash you counted (₦)</span>
-        <Input name="counted" inputMode="decimal" value={counted} onChange={(e) => setCounted(e.target.value.replace(/[^\d.]/g, ""))} className="text-lg tabular-nums" autoComplete="off" required />
+        <Input name="counted" inputMode="none" value={counted} onChange={(e) => setCounted(e.target.value.replace(/[^\d.]/g, ""))} className="text-lg tabular-nums" autoComplete="off" required />
       </label>
+      <NumPad onChange={setCounted} decimal maxLength={10} label="the cash you counted" className="max-w-xs" />
       <p className="text-sm text-ink-600">Count everything in your drawer first. The till&apos;s figure is shown after you submit, and your first count is the one that&apos;s kept.</p>
       {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
       <Button type="submit" size="lg" pending={pending} disabled={!!openOrders || counted === ""}>Submit my count</Button>

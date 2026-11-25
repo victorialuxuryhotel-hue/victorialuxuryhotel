@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils/cn";
 import { cancelOpenOrder, saveOpenOrder, takePayment } from "@/server/pos";
 import { OFFLINE_MESSAGE, safeAction } from "@/lib/safe-action";
 import type { MenuCategory, MenuItem, OpenOrder, Outlet, PayMethod } from "@/server/domain/pos";
+import { NumPad } from "@/components/ui/num-pad";
 import { PosReceipt, type PosReceiptData } from "./pos-receipt";
 
 const OUTLETS: Record<Outlet, string> = { restaurant: "Restaurant", bar: "Bar" };
@@ -19,6 +20,10 @@ const chip = (on: boolean) =>
 const toKobo = (naira: string) => Math.round(Number(naira.replace(/[^\d.]/g, "")) * 100);
 
 type Step = "order" | "pay" | "done";
+
+/** Quick table chips (configurable later). */
+const CANCEL_REASONS = ["Customer left", "Wrong item", "Duplicate order"];
+const TABLES = ["Bar", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
 
 const OFFLINE = `${OFFLINE_MESSAGE} If the internet stays down, use a numbered paper slip.`;
 const saveSafe = safeAction(saveOpenOrder, OFFLINE);
@@ -87,6 +92,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   const [method, setMethod] = useState<PayMethod>("cash");
   const [transferRef, setTransferRef] = useState("");
   const [transferChecked, setTransferChecked] = useState(false);
+  const [typeName, setTypeName] = useState(false);
   const [given, setGiven] = useState("");
   const [receipt, setReceipt] = useState<PosReceiptData | null>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
@@ -122,6 +128,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
     setMethod("cash");
     setTransferRef("");
     setTransferChecked(false);
+    setTypeName(false);
     setStep("order");
   };
   const add = (m: MenuItem, d: number) => {
@@ -222,6 +229,111 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
         </aside>
 
         <section aria-label="Menu" className="min-w-0 space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2 lg:pb-4 xl:col-start-2 xl:row-start-1">
+          {step === "pay" ? (
+            // Taking payment: the details get the wide column (room for the keypad); Confirm stays with the order.
+            <div className="mx-auto w-full max-w-md space-y-4">
+              <h2 className="font-display text-2xl text-navy-950">Take {formatNaira(total)}</h2>
+          <form
+            id="till-pay"
+            action={payAction}
+            onSubmit={(e) => {
+              stampId(e);
+              snapshot.current = {
+                outlet, receiptNumber: "", orderNumber: 0, paidAt: "", attendant, vatRateBp, taxId,
+                lines: lines.map((l) => ({ name: l.item.name, quantity: l.q, unitKobo: l.item.price_kobo })),
+                totalKobo: total, method, cashReceivedKobo: method === "cash" ? givenKobo : null, reference: method === "cash" ? null : transferRef.trim() || null,
+              };
+            }}
+            className="space-y-4"
+          >
+            <input type="hidden" name="id" defaultValue="" />
+            <input type="hidden" name="outlet" value={outlet} />
+            <input type="hidden" name="lines" value={linesJson} />
+            <input type="hidden" name="note" value={note} />
+            <input type="hidden" name="method" value={method} />
+            <fieldset>
+              <legend className="mb-2 text-[13px] text-ink-700">How is the customer paying?</legend>
+              <div className="grid grid-cols-3 gap-2">
+                {(Object.keys(METHODS) as PayMethod[]).map((k) => (
+                  <button key={k} type="button" aria-pressed={method === k} onClick={() => { setMethod(k); setTransferRef(""); }} className={cn(chip(method === k), "rounded-md px-2")}>{METHODS[k]}</button>
+                ))}
+              </div>
+            </fieldset>
+            {method === "cash" ? (
+              <div className="space-y-2 rounded-md bg-white p-3">
+                <label className="block">
+                  <span className="mb-1 block text-[13px] text-ink-700">Customer gave (₦)</span>
+                  <Input name="cashReceived" inputMode="none" value={given} onChange={(e) => setGiven(e.target.value.replace(/[^\d.]/g, ""))} placeholder={String(total / 100)} className="text-lg tabular-nums" />
+                </label>
+                <NumPad onChange={setGiven} decimal maxLength={10} label="cash the customer gave" />
+                <div className="flex flex-wrap gap-2">
+                  {[total, Math.ceil(total / 100_000) * 100_000, Math.ceil(total / 500_000) * 500_000, Math.ceil(total / 1_000_000) * 1_000_000]
+                    .filter((v, i, a) => v >= total && a.indexOf(v) === i)
+                    .slice(0, 4)
+                    .map((v) => (
+                      <button key={v} type="button" onClick={() => setGiven(String(v / 100))} className="rounded-full border border-hairline px-3 py-1.5 text-sm tabular-nums hover:bg-ink-900/5">
+                        {v === total ? "Exact" : formatNaira(v)}
+                      </button>
+                    ))}
+                </div>
+                <p className={cn("flex justify-between text-lg font-semibold tabular-nums", change != null && change < 0 ? "text-danger-700" : "text-success-700")}>
+                  <span>{change != null && change < 0 ? "Still to pay" : "Change"}</span>
+                  <span>{change == null ? "–" : formatNaira(Math.abs(change))}</span>
+                </p>
+              </div>
+            ) : null}
+            {method === "bank_transfer" ? (
+              <div className="space-y-3 rounded-md bg-white p-3">
+                <label className="block">
+                  <span className="mb-1 block text-[13px] text-ink-700">{typeName ? "Sender's name, as in the bank app" : "Last 4 digits of the transfer reference"}</span>
+                  <Input
+                    name="paymentReference"
+                    value={transferRef}
+                    onChange={(e) => setTransferRef(e.target.value)}
+                    inputMode={typeName ? "text" : "none"}
+                    maxLength={80}
+                    autoComplete="off"
+                    required
+                    minLength={3}
+                    className={typeName ? undefined : "text-lg tracking-[0.3em] tabular-nums"}
+                  />
+                </label>
+                {typeName ? null : <NumPad onChange={setTransferRef} maxLength={12} label="the transfer reference" />}
+                <button type="button" onClick={() => { setTypeName(!typeName); setTransferRef(""); }} className="text-sm font-medium text-navy-800 underline-offset-2 hover:underline">
+                  {typeName ? "Use the number pad instead" : "Only the sender's name? Type it instead"}
+                </button>
+                <label className="flex gap-3 rounded-md border border-gold-300 bg-gold-50 p-3 text-sm text-ink-800">
+                  <input type="checkbox" name="transferChecked" checked={transferChecked} onChange={(e) => setTransferChecked(e.target.checked)} required className="mt-0.5 size-4 shrink-0 accent-navy-800" />
+                  <span>
+                    <span className="font-medium">I&apos;ve checked the hotel&apos;s bank app and the money is there.</span> A screenshot or SMS alert is not enough.
+                  </span>
+                </label>
+              </div>
+            ) : null}
+            {method === "pos_terminal" ? (
+              <div className="space-y-2 rounded-md bg-white p-3">
+                <label className="block">
+                  <span className="mb-1 block text-[13px] text-ink-700">Last 4 digits of the POS slip, once the terminal says Approved</span>
+                  <Input
+                    name="paymentReference"
+                    value={transferRef}
+                    onChange={(e) => setTransferRef(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    inputMode="none"
+                    pattern="[0-9]{4}"
+                    maxLength={4}
+                    autoComplete="off"
+                    required
+                    className="text-lg tracking-[0.3em] tabular-nums"
+                  />
+                </label>
+                <NumPad onChange={setTransferRef} maxLength={4} label="the POS slip" />
+                <p className="text-xs text-ink-500">The manager matches these against the terminal&apos;s own report.</p>
+              </div>
+            ) : null}
+          </form>
+            </div>
+          ) : (
+          <>
           <div className="flex gap-2" role="tablist" aria-label="Counter">
             {(Object.keys(OUTLETS) as Outlet[]).map((o) => (
               <button
@@ -308,6 +420,8 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               </ul>
             </section>
           ) : null}
+          </>
+          )}
         </section>
 
         <section id="order" aria-label="This order" className="h-fit space-y-4 rounded-card border border-hairline bg-ivory-50 p-5 lg:max-h-full lg:overflow-y-auto xl:col-start-3 xl:row-start-1">
@@ -384,10 +498,16 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
 
           {step === "order" ? (
             <>
-              <label className="block">
+              <div>
                 <span className="mb-1 block text-[13px] text-ink-700">Table or customer <span className="text-ink-400">(optional)</span></span>
-                <Input value={note} onChange={(e) => setNote(e.target.value.slice(0, 120))} placeholder="e.g. Table 4" />
-              </label>
+                {/* Quick chips instead of typing on the touch screen; a name can still be typed. */}
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {TABLES.map((t) => (
+                    <button key={t} type="button" aria-pressed={note === t} onClick={() => setNote(note === t ? "" : t)} className={cn(chip(note === t), "min-h-10 px-3 pointer-coarse:min-h-11")}>{t}</button>
+                  ))}
+                </div>
+                <Input value={note} onChange={(e) => setNote(e.target.value.slice(0, 120))} placeholder="Or a name" aria-label="Table or customer" />
+              </div>
               <div className="grid gap-2">
                 <Button size="lg" disabled={!lines.length} onClick={() => setStep("pay")}>Take payment</Button>
                 <form action={saveAction} onSubmit={stampId}>
@@ -402,93 +522,13 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               </div>
             </>
           ) : (
-            <form
-              action={payAction}
-              onSubmit={(e) => {
-                stampId(e);
-                snapshot.current = {
-                  outlet, receiptNumber: "", orderNumber: 0, paidAt: "", attendant, vatRateBp, taxId,
-                  lines: lines.map((l) => ({ name: l.item.name, quantity: l.q, unitKobo: l.item.price_kobo })),
-                  totalKobo: total, method, cashReceivedKobo: method === "cash" ? givenKobo : null, reference: method === "cash" ? null : transferRef.trim() || null,
-                };
-              }}
-              className="space-y-4"
-            >
-              <input type="hidden" name="id" defaultValue="" />
-              <input type="hidden" name="outlet" value={outlet} />
-              <input type="hidden" name="lines" value={linesJson} />
-              <input type="hidden" name="note" value={note} />
-              <input type="hidden" name="method" value={method} />
-              <fieldset>
-                <legend className="mb-2 text-[13px] text-ink-700">How is the customer paying?</legend>
-                <div className="grid grid-cols-3 gap-2">
-                  {(Object.keys(METHODS) as PayMethod[]).map((k) => (
-                    <button key={k} type="button" aria-pressed={method === k} onClick={() => { setMethod(k); setTransferRef(""); }} className={cn(chip(method === k), "rounded-md px-2")}>{METHODS[k]}</button>
-                  ))}
-                </div>
-              </fieldset>
-              {method === "cash" ? (
-                <div className="space-y-2 rounded-md bg-white p-3">
-                  <label className="block">
-                    <span className="mb-1 block text-[13px] text-ink-700">Customer gave (₦)</span>
-                    <Input name="cashReceived" inputMode="decimal" value={given} onChange={(e) => setGiven(e.target.value.replace(/[^\d.]/g, ""))} placeholder={String(total / 100)} className="text-lg tabular-nums" />
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {[total, Math.ceil(total / 100_000) * 100_000, Math.ceil(total / 500_000) * 500_000, Math.ceil(total / 1_000_000) * 1_000_000]
-                      .filter((v, i, a) => v >= total && a.indexOf(v) === i)
-                      .slice(0, 4)
-                      .map((v) => (
-                        <button key={v} type="button" onClick={() => setGiven(String(v / 100))} className="rounded-full border border-hairline px-3 py-1.5 text-sm tabular-nums hover:bg-ink-900/5">
-                          {v === total ? "Exact" : formatNaira(v)}
-                        </button>
-                      ))}
-                  </div>
-                  <p className={cn("flex justify-between text-lg font-semibold tabular-nums", change != null && change < 0 ? "text-danger-700" : "text-success-700")}>
-                    <span>{change != null && change < 0 ? "Still to pay" : "Change"}</span>
-                    <span>{change == null ? "–" : formatNaira(Math.abs(change))}</span>
-                  </p>
-                </div>
-              ) : null}
-              {method === "bank_transfer" ? (
-                <div className="space-y-3 rounded-md bg-white p-3">
-                  <label className="block">
-                    <span className="mb-1 block text-[13px] text-ink-700">Last 4 characters of the transfer reference, or the sender&apos;s name</span>
-                    <Input name="paymentReference" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} maxLength={80} autoComplete="off" required minLength={3} />
-                  </label>
-                  <label className="flex gap-3 rounded-md border border-gold-300 bg-gold-50 p-3 text-sm text-ink-800">
-                    <input type="checkbox" name="transferChecked" checked={transferChecked} onChange={(e) => setTransferChecked(e.target.checked)} required className="mt-0.5 size-4 shrink-0 accent-navy-800" />
-                    <span>
-                      <span className="font-medium">I&apos;ve checked the hotel&apos;s bank app and the money is there.</span> A screenshot or SMS alert is not enough.
-                    </span>
-                  </label>
-                </div>
-              ) : null}
-              {method === "pos_terminal" ? (
-                <div className="space-y-2 rounded-md bg-white p-3">
-                  <label className="block">
-                    <span className="mb-1 block text-[13px] text-ink-700">Last 4 digits of the POS slip, once the terminal says Approved</span>
-                    <Input
-                      name="paymentReference"
-                      value={transferRef}
-                      onChange={(e) => setTransferRef(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                      inputMode="numeric"
-                      pattern="[0-9]{4}"
-                      maxLength={4}
-                      autoComplete="off"
-                      required
-                      className="text-lg tracking-[0.3em] tabular-nums"
-                    />
-                  </label>
-                  <p className="text-xs text-ink-500">The manager matches these against the terminal&apos;s own report.</p>
-                </div>
-              ) : null}
               <div className="grid grid-cols-[auto_1fr] gap-2">
+                {/* Back and Confirm stay with the order; the payment details are in the wide column (form="till-pay"). */}
                 <Button type="button" variant="secondary" size="lg" onClick={() => setStep("order")}>Back</Button>
-                <Button type="submit" size="lg" pending={paying} disabled={!lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && (transferRef.trim().length < 3 || !transferChecked)) || (method === "pos_terminal" && !/^\d{4}$/.test(transferRef))}>
+                <Button type="submit" form="till-pay" size="lg" pending={paying} disabled={!lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && (transferRef.trim().length < 3 || !transferChecked)) || (method === "pos_terminal" && !/^\d{4}$/.test(transferRef))}>
                   Confirm {formatNaira(total)} paid
                 </Button>
               </div>
-            </form>
           )}
           </>
           )}
@@ -510,6 +550,8 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
 
 function OpenOrderRow({ o, onOpen, active }: { o: OpenOrder; onOpen: () => void; active: boolean }) {
   const [confirm, setConfirm] = useState(false);
+  const [reason, setReason] = useState("");
+  const [other, setOther] = useState(false);
   const [state, action, pending] = useActionState(cancelSafe, null);
   return (
     <li className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3", active && "bg-navy-50")}>
@@ -521,8 +563,16 @@ function OpenOrderRow({ o, onOpen, active }: { o: OpenOrder; onOpen: () => void;
       {confirm ? (
         <form action={action} className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <input type="hidden" name="id" value={o.id} />
-          <Input name="reason" placeholder="Why? (the manager sees this)" required minLength={3} aria-label="Why is this order cancelled?" className="h-10 min-w-0 flex-1 text-sm sm:w-52" />
-          <Button type="submit" size="sm" variant="danger" pending={pending}>Cancel order</Button>
+          {/* Preset reasons for the touch screen; "Other" types one. The manager sees the reason. */}
+          <input type="hidden" name="reason" value={reason} />
+          <div className="flex w-full flex-wrap gap-1.5" role="group" aria-label="Why is this order cancelled?">
+            {CANCEL_REASONS.map((r) => (
+              <button key={r} type="button" aria-pressed={!other && reason === r} onClick={() => { setOther(false); setReason(r); }} className={cn(chip(!other && reason === r), "min-h-10 px-3 text-xs pointer-coarse:min-h-11")}>{r}</button>
+            ))}
+            <button type="button" aria-pressed={other} onClick={() => { setOther(true); setReason(""); }} className={cn(chip(other), "min-h-10 px-3 text-xs pointer-coarse:min-h-11")}>Other</button>
+          </div>
+          {other ? <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What happened? (the manager sees this)" aria-label="Other reason" className="h-10 min-w-0 flex-1 text-sm" /> : null}
+          <Button type="submit" size="sm" variant="danger" pending={pending} disabled={reason.trim().length < 3}>Cancel order</Button>
           <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Keep</Button>
           {state && !state.ok ? <p className="w-full text-xs text-danger-700">{state.message}</p> : null}
         </form>

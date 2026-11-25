@@ -2,8 +2,8 @@
 import { as, check, clickText, finish, go, settle, text, until, val, waitForText } from "./lib.mjs";
 
 const { ctx, p } = await as("restaurant_bar");
-// A 1280×720 laptop with browser toolbars: the till must work without scrolling the page.
-await p.setViewport({ width: 1280, height: 620 });
+// The bar terminal: 1280×720 in Chrome kiosk (no toolbars), hardware brief H7. The till must work without scrolling the page.
+await p.setViewport({ width: 1280, height: 720 });
 await go(p, "/app/sales");
 await settle(p);
 // The first menu item that can be sold.
@@ -32,8 +32,16 @@ await tile2.click();
 await clickText(p, "button", "Take payment");
 await clickText(p, "button", "POS / card");
 check("POS: Confirm is off until the slip's 4 digits are in", (await confirm()) === true);
-await p.type("input[name=paymentReference]", "77x31");
-check("only digits, at most 4", (await p.$eval("input[name=paymentReference]", (e) => e.value)) === "7731" && (await confirm()) === false);
+// H4: entered on the on-screen keypad (taps only), never the Windows keyboard.
+for (const k of ["7", "7", "3", "1", "9"]) await p.click(`[role=group][aria-label="Number pad for the POS slip"] button[aria-label="${k}"]`);
+const slip = await p.$eval("input[name=paymentReference]", (e) => e.value);
+check("the keypad enters the slip, 4 digits at most", slip === "7731" && (await confirm()) === false, `${slip} confirm-disabled=${await confirm()}`);
+check("the slip field doesn't open the touch keyboard", (await p.$eval("input[name=paymentReference]", (e) => e.inputMode)) === "none");
+check("Confirm is on screen at 1280×720 with the keypad open", await p.$$eval("button[type=submit]", (bs) => {
+  const b = bs.find((x) => /^Confirm .* paid$/.test(x.innerText.trim()));
+  const r = b?.getBoundingClientRect();
+  return Boolean(r && r.top >= 0 && r.bottom <= innerHeight);
+}));
 await clickText(p, "button", "Confirm");
 await waitForText(p, /slip …7731/);
 check("the receipt shows the POS slip", /POS \/ card · slip …7731/.test(await text(p)));
