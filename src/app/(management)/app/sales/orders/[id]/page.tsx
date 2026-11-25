@@ -5,7 +5,9 @@ import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import { AccessDenied } from "@/components/management/access-denied";
 import { CancelOrderForm, PrintReceiptButton, VoidSaleForm } from "@/components/management/pos-actions";
-import { PosReceipt } from "@/components/management/pos-receipt";
+import { StationPosReceipt } from "@/components/management/thermal";
+import { isReprint } from "@/lib/station";
+import { nowIso } from "@/server/clock";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -66,12 +68,13 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
       <div className="space-y-3">
         {receipt ? (
           <>
-            <PosReceipt
+            <StationPosReceipt
               r={{
                 outlet: o.outlet, receiptNumber: o.receipt_number!, orderNumber: o.number, paidAt: o.paid_at!, totalKobo: o.total_kobo, method: o.method!,
                 cashReceivedKobo: o.cash_received_kobo, reference: o.payment_reference, attendant: o.taken_by ?? "staff", vatRateBp: settings?.vat_rate_bp ?? 0, taxId: settings?.tax_id ?? null,
                 lines: o.lines.map((l) => ({ name: l.name, quantity: l.quantity, unitKobo: l.unit_price_kobo })),
                 voided: o.status === "void" ? { reason: o.close_reason ?? "", at: o.closed_at } : null,
+                copy: isReprint(o.paid_at, nowIso()),
               }}
             />
             <div className="flex justify-center print:hidden"><PrintReceiptButton /></div>

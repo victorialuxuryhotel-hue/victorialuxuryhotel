@@ -19,6 +19,8 @@ export type PosReceiptData = {
   /** Printed with the VAT line: a VAT receipt carries the hotel's Tax ID. */
   taxId?: string | null;
   voided?: { reason: string; at: string | null } | null;
+  /** A reprint (more than 10 minutes after the sale): marked COPY. */
+  copy?: boolean;
 };
 
 const METHOD = { cash: "Cash", bank_transfer: "Bank transfer", pos_terminal: "POS / card" } as const;
@@ -33,6 +35,7 @@ export function PosReceipt({ r, className, printable = true }: { r: PosReceiptDa
         <p className="text-xs uppercase tracking-[0.2em]">{r.outlet === "bar" ? "Bar" : "Restaurant"}</p>
         <p className="text-xs text-ink-600">{hotel.address.line1}, {hotel.address.city}</p>
         <p className="text-xs text-ink-600">{hotel.phoneDisplay}</p>
+        {r.copy ? <p className="mt-1 text-sm font-bold tracking-[0.3em]">COPY</p> : null}
       </header>
       <dl className="space-y-0.5 border-b border-dashed border-ink-400 py-3 text-xs">
         <div className={row}><dt>Receipt</dt><dd>{r.receiptNumber}</dd></div>

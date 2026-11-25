@@ -102,6 +102,7 @@ function Row({ b, today }: { b: HallBooking; today: string }) {
       {b.status !== "cancelled" ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {!paying && b.price_kobo > 0 && b.paid_kobo < b.price_kobo ? <Button size="sm" variant="secondary" className="h-11" onClick={() => setPaying(true)}>Take payment</Button> : null}
+          <a href={`/app/events/${b.id}/invoice`} className="inline-flex h-11 items-center rounded-md px-3 text-sm font-medium text-navy-800 hover:bg-ink-900/5">Invoice</a>
           <StatusButton id={b.id} status="cancelled" label="Cancel" variant="ghost" />
         </div>
       ) : null}

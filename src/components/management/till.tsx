@@ -11,6 +11,7 @@ import { OFFLINE_MESSAGE, safeAction } from "@/lib/safe-action";
 import type { MenuCategory, MenuItem, OpenOrder, Outlet, PayMethod } from "@/server/domain/pos";
 import { NumPad } from "@/components/ui/num-pad";
 import { shouldAutoPrint } from "@/lib/station";
+import { useStationConfigured } from "./thermal";
 import { useStation } from "./use-station";
 import { PosReceipt, type PosReceiptData } from "./pos-receipt";
 
@@ -87,6 +88,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   const resumeOrder = open.find((o) => o.id === resume);
   // Which counter: the order being resumed, else what the salesperson picked, else this station's default (H5).
   const station = useStation();
+  const stationConfigured = useStationConfigured();
   const [outletChoice, setOutlet] = useState<Outlet | null>(resumeOrder?.outlet ?? null);
   const outlet: Outlet = outletChoice ?? station.counter ?? startOutlet;
   const [category, setCategory] = useState<MenuCategory | "all">("all");
@@ -219,7 +221,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
     // Laptops: the till fills the window. The menu (and unpaid orders under it) scrolls in its own
     // column and the order panel stays pinned, so the page itself never scrolls (UX brief: 1280×720).
     <div className="space-y-8 pb-24 lg:h-full lg:pb-0">
-      {receipt ? <div className="hidden print:block"><PosReceipt r={receipt} /></div> : null}
+      {receipt ? <div className="hidden print:block"><PosReceipt r={receipt} printable={!stationConfigured || station.printLayout !== "a4"} /></div> : null}
       {/* 1280px and wider: unpaid · menu · order. Narrower laptops and the 15" bar POS (1024×768): menu · order, unpaid orders under the menu. */}
       <div className="grid gap-6 lg:h-full lg:grid-cols-[1fr_21rem] print:hidden xl:grid-cols-[15rem_1fr_22rem]">
         {/* Left: unpaid orders, searchable, with a New order button on top. */}

@@ -74,7 +74,7 @@ export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: Pay
 export type ReceiptPayment = Pick<PaymentRow, "receiptNumber" | "paidAt" | "method" | "providerReference" | "amountKobo" | "provider" | "recordedBy">;
 export type ReceiptStay = Pick<ReservationDetail, "guestName" | "reference" | "category" | "nights" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo"> & { room?: string };
 
-export function Receipt({ payment, reservation, forGuest = false, vatRateBp, taxId }: { payment: ReceiptPayment; reservation: ReceiptStay; forGuest?: boolean; vatRateBp?: number; taxId?: string | null }) {
+export function Receipt({ payment, reservation, forGuest = false, vatRateBp, taxId, copy = false }: { payment: ReceiptPayment; reservation: ReceiptStay; forGuest?: boolean; vatRateBp?: number; taxId?: string | null; copy?: boolean }) {
   return (
     <article className="mx-auto max-w-2xl rounded-card border border-hairline bg-ivory-50 p-5 sm:p-12 print:border-0">
       <header className="flex flex-col-reverse gap-4 border-b border-hairline pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:pb-8">
@@ -87,7 +87,7 @@ export function Receipt({ payment, reservation, forGuest = false, vatRateBp, tax
           </div>
         </div>
         <div className="flex items-baseline justify-between gap-3 sm:block sm:text-right">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-600">Receipt</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-600">Receipt{copy ? " · COPY" : ""}</p>
           <p className="font-mono text-sm whitespace-nowrap text-ink-900 sm:mt-1">{payment.receiptNumber}</p>
         </div>
       </header>

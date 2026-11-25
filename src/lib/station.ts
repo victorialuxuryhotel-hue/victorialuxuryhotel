@@ -69,3 +69,7 @@ export function saveStation(s: StationSettings) {
   }
   listeners.forEach((l) => l());
 }
+
+/** Printed more than 10 minutes after the money was taken: a reprint, so the document says COPY. */
+export const isReprint = (paidAt: string | null | undefined, printedAt: string) =>
+  Boolean(paidAt) && Date.parse(printedAt) - Date.parse(paidAt!) > 10 * 60_000;

@@ -23,6 +23,28 @@ export async function listHallBookings(db: Db, actor: Actor, today = hotelToday(
   );
 }
 
+export type HallPaymentRow = { id: string; amount_kobo: number; method: HallMethod; paid_on: string; reference: string | null; recorded_by_name: string | null; created_at: string };
+
+/** One hall booking with its payments, for the invoice (A4 or 80mm). */
+export async function hallInvoice(db: Db, actor: Actor, id: string): Promise<(HallBooking & { payments: HallPaymentRow[] }) | null> {
+  requireRole(actor, EVENTS_STAFF);
+  const b = await first<HallBooking>(
+    db,
+    `SELECT h.id, h.title, h.customer_name, h.phone, h.email, h.event_date, h.start_time, h.end_time, h.guests, h.price_kobo, h.status, h.notes,
+            (SELECT coalesce(sum(p.amount_kobo), 0) FROM hall_payments p WHERE p.booking_id = h.id) AS paid_kobo
+     FROM hall_bookings h WHERE h.id = ?`,
+    id,
+  );
+  if (!b) return null;
+  const payments = await all<HallPaymentRow>(
+    db,
+    `SELECT p.id, p.amount_kobo, p.method, p.paid_on, p.reference, s.full_name AS recorded_by_name, p.created_at
+     FROM hall_payments p LEFT JOIN staff_profiles s ON s.id = p.recorded_by WHERE p.booking_id = ? ORDER BY p.created_at`,
+    id,
+  );
+  return { ...b, payments };
+}
+
 export async function createHallBooking(
   db: Db,
   actor: Actor,
