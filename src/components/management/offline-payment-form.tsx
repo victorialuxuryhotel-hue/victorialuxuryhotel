@@ -17,6 +17,8 @@ export function OfflinePaymentForm({
   const [state, action, pending] = useActionState(recordOfflinePayment, null);
   const [paymentId] = useState(() => crypto.randomUUID());
   const [review, setReview] = useState<null | { amount: string; method: string; paidOn: string; reference: string }>(null);
+  const [method, setMethod] = useState("cash");
+  const transfer = method === "bank_transfer";
   const [seen, setSeen] = useState(state);
   if (state !== seen) {
     setSeen(state);
@@ -59,15 +61,21 @@ export function OfflinePaymentForm({
           <Input id="amount" name="amount" inputMode="decimal" value={String(balance / 100)} readOnly aria-readonly className="bg-ivory-100 font-semibold tabular-nums" />
         </Field>
         <Field label="Method" htmlFor="method" error={err("method")}>
-          <Select id="method" name="method" defaultValue="cash">
+          <Select id="method" name="method" value={method} onChange={(e) => setMethod(e.target.value)}>
             {(["cash", "bank_transfer", "pos_terminal", "other"] as const).map((m) => <option key={m} value={m}>{paymentMethod[m]}</option>)}
           </Select>
         </Field>
         <Field label="Date received" htmlFor="paidOn" error={err("paidOn")}>
           <Input id="paidOn" name="paidOn" type="date" defaultValue={today} max={today} required />
         </Field>
-        <Field label="Reference" optional htmlFor="ref" hint="Transfer narration or POS slip number." error={err("reference")}>
-          <Input id="ref" name="reference" maxLength={100} />
+        <Field
+          label={transfer ? "Transfer reference or sender's name" : "Reference"}
+          optional={!transfer}
+          htmlFor="ref"
+          hint={transfer ? "As it appears in the hotel's bank app, so it can be matched to the statement." : "POS slip number, if any."}
+          error={err("reference")}
+        >
+          <Input id="ref" name="reference" maxLength={100} required={transfer} minLength={transfer ? 3 : undefined} />
         </Field>
       </div>
       <Field label="Note" optional htmlFor="note"><Textarea id="note" name="notes" rows={2} maxLength={1000} /></Field>

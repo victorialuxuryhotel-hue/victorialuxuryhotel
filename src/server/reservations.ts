@@ -37,7 +37,6 @@ const createSchema = z.object({
   email: z.union([z.literal(""), z.email("Enter a valid email")]).optional(),
   specialRequests: z.string().max(1000).optional(),
   guestId: z.union([z.literal(""), z.uuid()]).optional(),
-  roomId: z.union([z.literal(""), recordId()]).optional(),
   next: z.enum(["payment", "reservation"]).optional(),
 });
 
@@ -51,7 +50,6 @@ export async function createReservation(_prev: ActionResult<{ id: string; next: 
       categoryId: v.categoryId, checkIn: v.checkIn, checkOut: v.checkOut, guests: v.guests, source: v.source,
       fullName: v.fullName, phone: v.phone, email: v.email || null, specialRequests: v.specialRequests || null,
       guestId: v.guestId || null,
-      roomId: v.roomId || null,
     });
     refresh();
     return { id: res.id, next: v.next ?? "reservation" };

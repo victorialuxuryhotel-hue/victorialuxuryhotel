@@ -220,6 +220,9 @@ export async function recordOfflinePayment(
   if (input.confirmReceived !== true) throw new AppError("VALIDATION", "Confirm that the hotel has received this money before recording it.");
   if (!["cash", "bank_transfer", "pos_terminal", "other"].includes(input.method)) throw new AppError("VALIDATION", "Choose how the money was received.");
   if (!Number.isInteger(input.amountKobo) || input.amountKobo <= 0) throw new AppError("VALIDATION", "Enter the amount received.");
+  if (input.method === "bank_transfer" && (input.reference?.trim().length ?? 0) < 3) {
+    throw new AppError("VALIDATION", "For a bank transfer, enter the transfer reference or the sender's name, as shown in the hotel's bank app.");
+  }
   const today = hotelToday();
   if (!input.paidOn || input.paidOn > today) throw new AppError("VALIDATION", "The payment date can't be in the future.");
   if (input.paidOn < addDays(today, -60)) throw new AppError("VALIDATION", "Payments older than 60 days must be recorded by a manager with the accounts team.");

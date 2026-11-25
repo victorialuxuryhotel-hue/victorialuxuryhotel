@@ -1,38 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { day, db, exec, insertReservation, iso, makeCategory, makeGuest, q, q1, rejects, status } from "./helpers";
+import { day, db, exec, insertReservation, iso, makeCategory, makeGuest, payInFull, q, q1, rejects, status } from "./helpers";
 
 describe("room overlap", () => {
   it("rejects a second live reservation on the same room for overlapping nights", async () => {
     const c = await makeCategory(2);
-    await insertReservation({ categoryId: c.id, checkIn: day(10), checkOut: day(13), roomId: c.roomIds[0] });
-    await rejects(insertReservation({ categoryId: c.id, checkIn: day(12), checkOut: day(14), roomId: c.roomIds[0] }), /room_overlap/);
+    await insertReservation({ categoryId: c.id, checkIn: day(10), checkOut: day(13), roomId: c.roomIds[0], status: "confirmed" });
+    await rejects(insertReservation({ categoryId: c.id, checkIn: day(12), checkOut: day(14), roomId: c.roomIds[0], status: "confirmed" }), /room_overlap/);
   });
 
   it("allows same-day turnover: one guest departs the day the next arrives", async () => {
     const c = await makeCategory(1);
-    await insertReservation({ categoryId: c.id, checkIn: day(10), checkOut: day(12), roomId: c.roomIds[0] });
-    await insertReservation({ categoryId: c.id, checkIn: day(12), checkOut: day(14), roomId: c.roomIds[0] });
+    await insertReservation({ categoryId: c.id, checkIn: day(10), checkOut: day(12), roomId: c.roomIds[0], status: "confirmed" });
+    await insertReservation({ categoryId: c.id, checkIn: day(12), checkOut: day(14), roomId: c.roomIds[0], status: "confirmed" });
   });
 
   it("frees the room when a reservation is cancelled", async () => {
     const c = await makeCategory(1);
-    const r = await insertReservation({ categoryId: c.id, checkIn: day(10), checkOut: day(12), roomId: c.roomIds[0] });
+    const r = await insertReservation({ categoryId: c.id, checkIn: day(10), checkOut: day(12), roomId: c.roomIds[0], status: "confirmed" });
     await exec("UPDATE reservations SET status = 'cancelled' WHERE id = ?", r);
-    await insertReservation({ categoryId: c.id, checkIn: day(10), checkOut: day(12), roomId: c.roomIds[0] });
+    await insertReservation({ categoryId: c.id, checkIn: day(10), checkOut: day(12), roomId: c.roomIds[0], status: "confirmed" });
   });
 
-  it("counts awaiting-payment reservations as occupying their room", async () => {
-    const c = await makeCategory(2);
-    await insertReservation({ categoryId: c.id, checkIn: day(10), checkOut: day(12), roomId: c.roomIds[0], status: "pending_payment" });
-    await rejects(insertReservation({ categoryId: c.id, checkIn: day(11), checkOut: day(12), roomId: c.roomIds[0] }), /room_overlap/);
+  it("an awaiting-payment booking holds no room, but still counts against its room type", async () => {
+    const c = await makeCategory(1);
+    await insertReservation({ categoryId: c.id, checkIn: day(10), checkOut: day(12) });
+    await rejects(insertReservation({ categoryId: c.id, checkIn: day(11), checkOut: day(12), status: "confirmed" }), /no_capacity/);
   });
 
   it("a guest still checked in after their check-out date keeps the room", async () => {
     const c = await makeCategory(2);
     const stay = await insertReservation({ categoryId: c.id, checkIn: day(-3), checkOut: day(-1), roomId: c.roomIds[0], status: "confirmed" });
     await exec("UPDATE reservations SET status = 'checked_in' WHERE id = ?", stay);
-    await rejects(insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), roomId: c.roomIds[0] }), /room_overlap/);
-    const later = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1) });
+    await rejects(insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), roomId: c.roomIds[0], status: "confirmed" }), /room_overlap/);
+    const later = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
     await rejects(exec("UPDATE reservations SET room_id = ? WHERE id = ?", c.roomIds[0], later), /room_overlap/);
     // Once they are checked out, the room is free again.
     await exec("UPDATE reservations SET status = 'checked_out' WHERE id = ?", stay);
@@ -49,8 +49,8 @@ describe("room overlap", () => {
 
   it("lets exactly one of two simultaneous assignments of the same room succeed", async () => {
     const c = await makeCategory(2);
-    const a = await insertReservation({ categoryId: c.id, checkIn: day(20), checkOut: day(22) });
-    const b = await insertReservation({ categoryId: c.id, checkIn: day(21), checkOut: day(23) });
+    const a = await insertReservation({ categoryId: c.id, checkIn: day(20), checkOut: day(22), status: "confirmed" });
+    const b = await insertReservation({ categoryId: c.id, checkIn: day(21), checkOut: day(23), status: "confirmed" });
     const results = await Promise.allSettled([a, b].map((id) => exec("UPDATE reservations SET room_id = ? WHERE id = ?", c.roomIds[0], id)));
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
   });
@@ -126,8 +126,10 @@ describe("reservation integrity", () => {
 describe("reservation lifecycle", () => {
   it("allows valid transitions, stamps times, clears the hold, and records history", async () => {
     const c = await makeCategory(1);
-    const r = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), roomId: c.roomIds[0] });
+    const r = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1) });
+    await payInFull(r);
     await exec("UPDATE reservations SET status = 'confirmed' WHERE id = ?", r);
+    await exec("UPDATE reservations SET room_id = ? WHERE id = ?", c.roomIds[0], r);
     await exec("UPDATE reservations SET status = 'checked_in' WHERE id = ?", r);
     await exec("UPDATE reservations SET status = 'checked_out' WHERE id = ?", r);
     const row = await q1<Record<string, string | null>>("SELECT confirmed_at, checked_in_at, checked_out_at, hold_expires_at FROM reservations WHERE id = ?", r);
@@ -206,11 +208,11 @@ describe("payments", () => {
     const r = await insertReservation({ categoryId: c.id, checkIn: day(5), checkOut: day(6) });
     await rejects(
       exec("INSERT INTO payments (id, reservation_id, amount_kobo, provider, provider_reference, status) VALUES (?, ?, 100, 'paystack', 'x1', 'successful')", crypto.randomUUID(), r),
-      /CHECK constraint/,
+      /CHECK constraint|payment_incomplete/,
     );
     await rejects(
       exec("INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, status, paid_at, verified_at) VALUES (?, ?, 100, 'offline', 'cash', 'successful', ?, ?)", crypto.randomUUID(), r, iso(0), iso(0)),
-      /CHECK constraint/,
+      /CHECK constraint|payment_incomplete/,
     );
   });
 

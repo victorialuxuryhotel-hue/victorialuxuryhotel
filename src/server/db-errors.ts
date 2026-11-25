@@ -27,6 +27,14 @@ const tokens: Record<string, [ErrorCode, string]> = {
   closing_immutable: ["CONFLICT", "A signed-off closing can't be changed."],
   lead_needs_restaurant_bar: ["VALIDATION", "Only restaurant & bar staff can be the restaurant & bar manager."],
   hall_booking_delete_forbidden: ["FORBIDDEN", "Hall bookings are cancelled, not deleted."],
+  not_paid: ["VALIDATION", "This booking isn't fully paid. Take the payment first, then check the guest in or out."],
+  payment_incomplete: ["VALIDATION", "A payment needs how it was paid and who took it. For a bank transfer, enter the transfer reference or the sender's name."],
+  hall_not_paid: ["VALIDATION", "A hall booking is confirmed once it has a price and is paid in full. Record the payment first."],
+  transfer_needs_reference: ["VALIDATION", "For a transfer, enter the last 4 characters of the transfer reference or the sender's name."],
+  sales_retired: ["FORBIDDEN", "Charging to a room isn't available. Customers pay at the counter."],
+  room_before_payment: ["VALIDATION", "This booking isn't paid yet. Take the payment first: a room is given automatically once it's paid."],
+  change_immutable: ["CONFLICT", "That change has already been paid for or cancelled. Reload to see where it is now."],
+  change_needs_approval: ["FORBIDDEN", "Only the General Manager or the Owner can apply a change before it's paid, and they must give a reason."],
 };
 
 export function dbErrorToken(err: unknown): string | null {

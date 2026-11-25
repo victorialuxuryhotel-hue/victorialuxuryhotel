@@ -183,10 +183,18 @@ describe("a room is occupied from check-in until check-out", () => {
 });
 
 describe("room assignment", () => {
+  const paidBooking = async (categoryId: string, checkIn: string, checkOut: string) => ({ id: await insertReservation({ categoryId, checkIn, checkOut, status: "confirmed" }) });
+
+  it("refuses a room for a booking that isn't paid yet (I4), with what to do", async () => {
+    const c = await makeCategory(1);
+    const r = await staffBooking(c.id, day(40), day(41));
+    await rejects(assignRoom(db, desk, r.id, c.roomIds[0]!), /isn't paid yet\. Take the payment first: a room is given automatically/, "VALIDATION");
+  });
+
   it("assigns a room, and refuses a second overlapping assignment with a clear message", async () => {
     const c = await makeCategory(2);
-    const a = await staffBooking(c.id, day(40), day(42));
-    const b = await staffBooking(c.id, day(41), day(43));
+    const a = await paidBooking(c.id, day(40), day(42));
+    const b = await paidBooking(c.id, day(41), day(43));
     await assignRoom(db, desk, a.id, c.roomIds[0]!);
     await rejects(assignRoom(db, desk, b.id, c.roomIds[0]!), /is already booked for some of these nights/, "CONFLICT");
   });
@@ -194,16 +202,16 @@ describe("room assignment", () => {
   it("refuses rooms under maintenance", async () => {
     const c = await makeCategory(1);
     const broken = await makeRoom(c.id, { serviceStatus: "maintenance" });
-    const r = await staffBooking(c.id, day(40), day(41));
+    const r = await paidBooking(c.id, day(40), day(41));
     await rejects(assignRoom(db, desk, r.id, broken), /under maintenance/);
   });
 
   it("allows an upgrade only when the better room type has capacity", async () => {
     const std = await makeCategory(1);
     const suite = await makeCategory(1);
-    const r = await staffBooking(std.id, day(40), day(41));
+    const r = await paidBooking(std.id, day(40), day(41));
     await assignRoom(db, desk, r.id, suite.roomIds[0]!);
-    const r2 = await staffBooking(std.id, day(40), day(41)); // standard is free again after the upgrade
+    const r2 = await paidBooking(std.id, day(40), day(41)); // standard is free again after the upgrade
     const extraSuiteRoom = await makeRoom(suite.id);
     await exec("UPDATE rooms SET service_status = 'maintenance' WHERE id = ?", extraSuiteRoom);
     await rejects(assignRoom(db, desk, r2.id, suite.roomIds[0]!), /are free on all of these nights|already booked/);

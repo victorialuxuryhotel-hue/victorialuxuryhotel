@@ -17,7 +17,7 @@ const success = (reference: string, amountKobo: number, extra: Partial<Parameter
   applyPaystackResult(db, { reference, status: "success", amountKobo, currency: "NGN", paidAt: iso(0), channel: "card", gatewayResponse: "Approved", ...extra });
 
 const offline = (reservationId: string, amountKobo: number, extra: Partial<Parameters<typeof recordOfflinePayment>[2]> = {}) =>
-  recordOfflinePayment(db, desk, { reservationId, amountKobo, method: "bank_transfer", paidOn: day(0), confirmReceived: true, ...extra });
+  recordOfflinePayment(db, desk, { reservationId, amountKobo, method: "bank_transfer", reference: `GTB ${crypto.randomUUID().slice(0, 8)}`, paidOn: day(0), confirmReceived: true, ...extra });
 
 describe("Paystack payments", () => {
   it("starting a payment charges the server-calculated balance", async () => {
@@ -48,13 +48,12 @@ describe("Paystack payments", () => {
     expect(log).toEqual([{ action: "reservation.room_auto_assigned", actor_type: "system" }]);
   });
 
-  it("confirming keeps a room staff already assigned", async () => {
+  it("an unpaid booking can't be given a room before payment (I4); payment assigns one", async () => {
     const b = await heldBooking(2);
-    await exec("UPDATE reservations SET room_id = ? WHERE id = ?", b.category.roomIds[1], b.id);
+    await rejects(exec("UPDATE reservations SET room_id = ? WHERE id = ?", b.category.roomIds[1], b.id), /room_before_payment/);
     const p = await beginPaystackPayment(db, b.publicToken);
     await success(p.reference, p.amountKobo);
-    expect((await q1<{ room_id: string }>("SELECT room_id FROM reservations WHERE id = ?", b.id)).room_id).toBe(b.category.roomIds[1]);
-    expect(await q("SELECT 1 FROM activity_log WHERE entity_id = ? AND action = 'reservation.room_auto_assigned'", b.id)).toEqual([]);
+    expect((await q1<{ room_id: string | null }>("SELECT room_id FROM reservations WHERE id = ?", b.id)).room_id).not.toBeNull();
   });
 
   it("duplicate notifications are no-ops", async () => {

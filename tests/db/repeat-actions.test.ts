@@ -10,12 +10,12 @@ describe("repeated and concurrent actions", () => {
   it("a failed or repeated status change writes no extra log entry", async () => {
     const id = await createHallBooking(db, gm, {
       title: "Workshop", customerName: "Acme", phone: null, email: null, guests: 10, priceKobo: 0, notes: null,
-      eventDate: day(300 + Math.floor(Math.random() * 300)), startTime: "09:00", endTime: "10:00", status: "enquiry",
+      eventDate: day(300 + Math.floor(Math.random() * 300)), startTime: "09:00", endTime: "10:00",
     });
     await setHallStatus(db, gm, id, "cancelled");
     const after = await logCount(id);
     await rejects(setHallStatus(db, gm, id, "cancelled"), /already cancelled, or already at that stage/);
-    await rejects(setHallStatus(db, gm, crypto.randomUUID(), "confirmed"), /already cancelled, or already at that stage/);
+    await rejects(setHallStatus(db, gm, crypto.randomUUID(), "cancelled"), /already cancelled, or already at that stage/);
     expect(await logCount(id)).toBe(after);
   });
 
@@ -34,7 +34,7 @@ describe("repeated and concurrent actions", () => {
   it("two hall payments at once can't overpay", async () => {
     const id = await createHallBooking(db, gm, {
       title: "Wedding", customerName: "Ade", phone: null, email: null, guests: 100, priceKobo: 6_000_000, notes: null,
-      eventDate: day(300 + Math.floor(Math.random() * 300)), startTime: "11:00", endTime: "12:00", status: "confirmed",
+      eventDate: day(300 + Math.floor(Math.random() * 300)), startTime: "11:00", endTime: "12:00",
     });
     const pay = () => recordHallPayment(db, gm, { bookingId: id, amountKobo: 5_000_000, method: "cash", paidOn: day(0), reference: null });
     const results = await Promise.allSettled([pay(), pay(), pay()]);

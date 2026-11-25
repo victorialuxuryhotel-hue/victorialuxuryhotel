@@ -91,7 +91,7 @@ describe("selling", () => {
     expect(await onHand(stockId)).toBe(10);
     expect((await posReport(db, mgr, "today", "bar")).salesKobo).toBe(before.salesKobo);
 
-    const results = await Promise.all([1, 2, 3].map(() => payOrder(db, att, { id: order.id, method: "bank_transfer" })));
+    const results = await Promise.all([1, 2, 3].map(() => payOrder(db, att, { id: order.id, method: "bank_transfer", transferReference: "4821", transferChecked: true })));
     expect(new Set(results.map((r) => r.receiptNumber)).size).toBe(1);
     expect(results.filter((r) => !r.alreadyPaid)).toHaveLength(1);
     expect(await onHand(stockId)).toBe(6);
@@ -180,7 +180,7 @@ describe("restaurant & bar reports and the hotel's books", () => {
     const beforeBar = await posReport(db, mgr, "today", "bar");
 
     await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: maltId, quantity: 2 }], method: "cash" });
-    const food = await payOrder(db, att, { id: crypto.randomUUID(), outlet: "restaurant", lines: [{ menuItemId: rice, quantity: 1 }], method: "bank_transfer" });
+    const food = await payOrder(db, att, { id: crypto.randomUUID(), outlet: "restaurant", lines: [{ menuItemId: rice, quantity: 1 }], method: "bank_transfer", transferReference: "ADA OKAFOR", transferChecked: true });
     const oops = await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: maltId, quantity: 1 }], method: "cash" });
     await voidOrder(db, mgr, oops.id, "Wrong drink");
 

@@ -63,7 +63,7 @@ describe("income by day, by staff and method, and the accountant's download", ()
     await payOrder(db, { id: desk!.id, role: "restaurant_bar" }, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: item, quantity: 2 }], method: "pos_terminal" });
     const hall = await createHallBooking(db, desk, {
       title: "AGM", customerName: "Ondo Co-op", phone: null, email: null, guests: 50, priceKobo: 20_000_000, notes: null,
-      eventDate: day(200 + Math.floor(Math.random() * 300)), startTime: "08:00", endTime: "09:00", status: "confirmed",
+      eventDate: day(200 + Math.floor(Math.random() * 300)), startTime: "08:00", endTime: "09:00",
     });
     await recordHallPayment(db, desk, { bookingId: hall, amountKobo: 4_000_000, method: "bank_transfer", paidOn: day(0), reference: "TRF-1" });
 

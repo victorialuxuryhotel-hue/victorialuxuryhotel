@@ -203,16 +203,16 @@ const lineInserts = (db: Db, id: string, priced: Priced[]) =>
       .bind(id, i + 1, p.menuItemId, p.name, p.category, p.unitKobo, p.quantity),
   );
 
-function payStatements(db: Db, id: string, staffId: string, method: PayMethod, totalKobo: number, cashReceivedKobo: number | null) {
+function payStatements(db: Db, id: string, staffId: string, method: PayMethod, totalKobo: number, cashReceivedKobo: number | null, transferReference: string | null) {
   return [
     db.prepare("UPDATE pos_counters SET value = value + 1 WHERE name = 'receipt'"),
     db
       .prepare(
-        `UPDATE pos_orders SET status = 'paid', method = ?, paid_by = ?, cash_received_kobo = ?, paid_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+        `UPDATE pos_orders SET status = 'paid', method = ?, paid_by = ?, cash_received_kobo = ?, transfer_reference = ?, paid_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
            receipt_number = 'RB-' || strftime('%Y', 'now', '+1 hour') || '-' || printf('%06d', (SELECT value FROM pos_counters WHERE name = 'receipt'))
          WHERE id = ? AND status = 'open' AND total_kobo = ?`,
       )
-      .bind(method, staffId, cashReceivedKobo, id, totalKobo),
+      .bind(method, staffId, cashReceivedKobo, method === "bank_transfer" ? transferReference : null, id, totalKobo),
     db.prepare("INSERT INTO _guard (ok) SELECT 0 WHERE changes() = 0"),
     db
       .prepare(
@@ -315,10 +315,19 @@ async function paidResult(db: Db, id: string, alreadyPaid: boolean): Promise<Pai
 export async function payOrder(
   db: Db,
   actor: Actor,
-  v: { id: string; outlet?: Outlet; lines?: OrderLine[]; note?: string | null; method: PayMethod; cashReceivedKobo?: number | null },
+  v: {
+    id: string; outlet?: Outlet; lines?: OrderLine[]; note?: string | null; method: PayMethod; cashReceivedKobo?: number | null;
+    /** Transfers only: last 4 characters of the reference or the sender's name, and the "money is in the bank app" tick. */
+    transferReference?: string | null; transferChecked?: boolean;
+  },
 ): Promise<PaidOrder> {
   requireRole(actor, POS_SELLERS);
   if (!(v.method in PAY_METHODS)) throw new AppError("VALIDATION", "Choose how the customer paid.");
+  const transferRef = v.transferReference?.trim() || null;
+  if (v.method === "bank_transfer") {
+    if (!transferRef || transferRef.length < 3) throw new AppError("VALIDATION", "For a transfer, enter the last 4 characters of the transfer reference or the sender's name.");
+    if (v.transferChecked !== true) throw new AppError("VALIDATION", "Check the hotel's bank app first and tick the box: a screenshot or SMS alert is not enough.");
+  }
   const cur = await orderState(db, v.id);
   if (cur?.status === "paid" || cur?.status === "void") return paidResult(db, v.id, true);
   if (cur?.status === "cancelled") throw new AppError("INVALID_TRANSITION", "This order was cancelled.");
@@ -345,7 +354,7 @@ export async function payOrder(
   await checkStock(db, lines);
   const cash = validCash(v.method, totalKobo, v.cashReceivedKobo);
   stmts.push(
-    ...payStatements(db, v.id, actor.id, v.method, totalKobo, cash),
+    ...payStatements(db, v.id, actor.id, v.method, totalKobo, cash, transferRef),
     activity(db, "pos.order_paid", "pos_order", v.id, `Sale ${naira(totalKobo)} paid by ${PAY_METHODS[v.method].toLowerCase()}`, { method: v.method, total_kobo: totalKobo }),
   );
   try {

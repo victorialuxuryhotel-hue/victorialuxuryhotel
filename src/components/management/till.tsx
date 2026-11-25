@@ -36,6 +36,8 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
   const [editing, setEditing] = useState<{ id: string; number: number } | null>(resumeOrder ? { id: resumeOrder.id, number: resumeOrder.number } : null);
   const [step, setStep] = useState<Step>("order");
   const [method, setMethod] = useState<PayMethod>("cash");
+  const [transferRef, setTransferRef] = useState("");
+  const [transferChecked, setTransferChecked] = useState(false);
   const [given, setGiven] = useState("");
   const [receipt, setReceipt] = useState<PosReceiptData | null>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
@@ -68,6 +70,8 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
     setEditing(null);
     setGiven("");
     setMethod("cash");
+    setTransferRef("");
+    setTransferChecked(false);
     setStep("order");
   };
   const add = (m: MenuItem, d: number) => setCart((c) => ({ ...c, [m.id]: Math.max(0, Math.min(maxFor(m), (c[m.id] ?? 0) + d)) }));
@@ -296,9 +300,23 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
                   </p>
                 </div>
               ) : null}
+              {method === "bank_transfer" ? (
+                <div className="space-y-3 rounded-md bg-white p-3">
+                  <label className="block">
+                    <span className="mb-1 block text-[13px] text-ink-700">Last 4 characters of the transfer reference, or the sender&apos;s name</span>
+                    <Input name="transferReference" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} maxLength={80} autoComplete="off" required minLength={3} />
+                  </label>
+                  <label className="flex gap-3 rounded-md border border-gold-300 bg-gold-50 p-3 text-sm text-ink-800">
+                    <input type="checkbox" name="transferChecked" checked={transferChecked} onChange={(e) => setTransferChecked(e.target.checked)} required className="mt-0.5 size-4 shrink-0 accent-navy-800" />
+                    <span>
+                      <span className="font-medium">I&apos;ve checked the hotel&apos;s bank app and the money is there.</span> A screenshot or SMS alert is not enough.
+                    </span>
+                  </label>
+                </div>
+              ) : null}
               <div className="grid grid-cols-[auto_1fr] gap-2">
                 <Button type="button" variant="secondary" size="lg" onClick={() => setStep("order")}>Back</Button>
-                <Button type="submit" size="lg" pending={paying} disabled={!lines.length || (method === "cash" && change != null && change < 0)}>
+                <Button type="submit" size="lg" pending={paying} disabled={!lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && (transferRef.trim().length < 3 || !transferChecked))}>
                   Confirm {formatNaira(total)} paid
                 </Button>
               </div>

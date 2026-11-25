@@ -1,4 +1,4 @@
-# Release review: security, roles and migrations 0012–0013
+# Release review: security, roles and migrations 0012–0015
 
 Nothing on this page has been run against production. Each step needs your review first. Run the steps in this order.
 
@@ -51,6 +51,35 @@ SELECT a.reference, b.reference, a.room_id FROM reservations a JOIN reservations
   ON a.room_id = b.room_id AND a.id < b.id
  WHERE a.status = 'checked_in' AND b.status IN ('confirmed', 'pending_payment', 'checked_in')
    AND b.check_in < max(a.check_out, date('now', '+1 hour', '+1 day'));
+```
+
+### What 0015 changes (the invariants in docs/rules-and-edge-cases.md, section 3)
+
+`migrations/0015_invariants.sql`. Every statement is a new rule on new writes, plus one new empty column. No existing rows are changed.
+
+| Rule | Statement | Effect on existing data |
+|---|---|---|
+| I3 | `reservations_paid_before_check_in_out` | Check-in and check-out are refused by the database while money is owed (the app already refused). None. |
+| I4 | `reservations_no_room_before_payment_insert/update` | A booking awaiting payment can't be given a room; payment assigns one. Unpaid bookings that already hold a room keep it. |
+| I7 | `payments_complete_insert/update`, `hall_payments_transfer_reference` | A successful payment needs its method and the staff member (desk) or verification (online); a bank transfer needs its reference or the sender's name. None. |
+| I9 | `hall_bookings_confirmed_paid_insert/update` | A hall booking becomes confirmed only when it has a price and is paid in full (the app now confirms it automatically on the last payment). Existing confirmed bookings stay confirmed. |
+| I10 | `ALTER TABLE pos_orders ADD COLUMN transfer_reference`, `pos_orders_transfer_reference` | Adds an empty column. A transfer at the till needs a reference. Past orders are not touched. |
+| I13 | `sales_retired` | Nothing may write to the retired `sales` table (charge to room). The app hasn't written to it since 0012. |
+
+Read-only checks to run first. Each lists rows that already break a rule, so staff can resolve them after go-live (the rule only stops new ones):
+
+```sql
+-- I3: checked in or out with money owed
+SELECT reference, status FROM reservations r WHERE status IN ('checked_in', 'checked_out')
+  AND (SELECT coalesce(sum(CASE WHEN kind = 'payment' THEN amount_kobo ELSE -amount_kobo END), 0) FROM payments
+       WHERE reservation_id = r.id AND status = 'successful') < total_amount_kobo + extras_kobo + room_change_kobo - discount_kobo;
+-- I4: awaiting payment with a room
+SELECT reference FROM reservations WHERE status = 'pending_payment' AND room_id IS NOT NULL;
+-- I9: hall bookings confirmed but not paid in full
+SELECT id, title FROM hall_bookings h WHERE status = 'confirmed'
+  AND (price_kobo = 0 OR (SELECT coalesce(sum(amount_kobo), 0) FROM hall_payments WHERE booking_id = h.id) < price_kobo);
+-- I13: anything in the retired sales table
+SELECT count(*) FROM sales;
 ```
 
 ### Proof that data is kept
@@ -148,7 +177,7 @@ These are deliberately **not final** in the app:
 
 1. Rotate keys and set the Cloudflare secrets (section 2).
 2. Set up the Clerk production instance (section 3).
-3. Record the Time Travel bookmark, then apply 0012, 0013 and 0014 (section 1).
+3. Record the Time Travel bookmark, then apply 0012 to 0015 (section 1).
 4. Build (`pnpm cf:build`; it must report no secrets), upload, compare `wrangler versions view` secrets, remove `EMAIL_ALLOWLIST` if inherited, and deploy.
 5. In the app: deactivate the 3 demo staff (they're linked to development Clerk users). Create the first owner with `scripts/create-owner.mts`. Sign in and set up the authenticator app. Then invite the real staff.
 6. Remove the demo data from the live site: `npx wrangler d1 execute victoria-hotel-db --remote --file db/demo-live-undo.sql` (switches off the demo extras, the WELCOME10 promo code, demo menu and stock items, and clears the demo room descriptions). Check it first: it only switches things off, it deletes nothing.

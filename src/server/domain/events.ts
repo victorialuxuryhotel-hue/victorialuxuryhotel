@@ -25,7 +25,7 @@ export async function listHallBookings(db: Db, actor: Actor, today = hotelToday(
 export async function createHallBooking(
   db: Db,
   actor: Actor,
-  v: { title: string; customerName: string; phone: string | null; email: string | null; eventDate: string; startTime: string; endTime: string; guests: number | null; priceKobo: number; status: Exclude<HallStatus, "cancelled">; notes: string | null },
+  v: { title: string; customerName: string; phone: string | null; email: string | null; eventDate: string; startTime: string; endTime: string; guests: number | null; priceKobo: number; notes: string | null },
 ): Promise<string> {
   requireRole(actor, EVENTS_STAFF);
   if (v.endTime <= v.startTime) throw new AppError("VALIDATION", "The end time must be after the start time.");
@@ -35,16 +35,23 @@ export async function createHallBooking(
     db
       .prepare(
         `INSERT INTO hall_bookings (id, title, customer_name, phone, email, event_date, start_time, end_time, guests, price_kobo, status, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enquiry', ?, ?)`,
       )
-      .bind(id, v.title.trim(), v.customerName.trim(), v.phone, v.email, v.eventDate, v.startTime, v.endTime, v.guests, v.priceKobo, v.status, v.notes, actor.id),
-    activity(db, "hall.created", "hall_booking", id, `Hall ${v.status}: ${v.title.trim()} on ${v.eventDate} ${v.startTime}–${v.endTime} (${v.customerName.trim()})`),
+      .bind(id, v.title.trim(), v.customerName.trim(), v.phone, v.email, v.eventDate, v.startTime, v.endTime, v.guests, v.priceKobo, v.notes, actor.id),
+    activity(db, "hall.created", "hall_booking", id, `Hall enquiry: ${v.title.trim()} on ${v.eventDate} ${v.startTime}–${v.endTime} (${v.customerName.trim()})`),
   ]);
   return id;
 }
 
+/** Confirmed means paid in full (rules I9), so the only status staff set by hand is cancelled. */
 export async function setHallStatus(db: Db, actor: Actor, id: string, status: Exclude<HallStatus, "enquiry">): Promise<void> {
   requireRole(actor, EVENTS_STAFF);
+  if (status === "confirmed") {
+    const b = await first<{ price_kobo: number; paid: number }>(db, "SELECT price_kobo, (SELECT coalesce(sum(amount_kobo), 0) FROM hall_payments WHERE booking_id = h.id) AS paid FROM hall_bookings h WHERE id = ?", id);
+    if (!b) throw new AppError("NOT_FOUND", "Hall booking not found.");
+    if (b.price_kobo <= 0) throw new AppError("VALIDATION", "Set the price first. A hall booking is confirmed once it's paid in full.");
+    if (b.paid < b.price_kobo) throw new AppError("VALIDATION", `${formatNaira(b.price_kobo - b.paid)} is still owed. A hall booking is confirmed once it's paid in full.`);
+  }
   const [r] = await writeBatch(db, actor, [
     db.prepare(`UPDATE hall_bookings SET status = ? WHERE id = ? AND status <> 'cancelled' AND status <> ?`).bind(status, id, status),
     activityIfChanged(db, `hall.${status}`, "hall_booking", id, `Hall booking ${status}`),
@@ -65,7 +72,11 @@ export async function recordHallPayment(
   );
   if (!b) throw new AppError("NOT_FOUND", "Hall booking not found.");
   if (b.status === "cancelled") throw new AppError("INVALID_TRANSITION", "This booking is cancelled.");
-  if (b.price_kobo > 0 && b.paid + v.amountKobo > b.price_kobo) throw new AppError("VALIDATION", `That's more than the ${formatNaira(b.price_kobo - b.paid)} owed.`);
+  if (b.price_kobo <= 0) throw new AppError("VALIDATION", "Set the price for this event before taking a payment.");
+  if (v.method === "bank_transfer" && (v.reference?.trim().length ?? 0) < 3) {
+    throw new AppError("VALIDATION", "For a bank transfer, enter the transfer reference or the sender's name, as shown in the hotel's bank app.");
+  }
+  if (b.paid + v.amountKobo > b.price_kobo) throw new AppError("VALIDATION", `That's more than the ${formatNaira(b.price_kobo - b.paid)} owed.`);
   if (v.paidOn > hotelToday()) throw new AppError("VALIDATION", "The date can't be in the future.");
   const id = uuid();
   const [r] = await writeBatch(db, actor, [
@@ -74,10 +85,18 @@ export async function recordHallPayment(
         `INSERT INTO hall_payments (id, booking_id, amount_kobo, method, paid_on, reference, recorded_by)
          SELECT ?1, h.id, ?3, ?4, ?5, ?6, ?7 FROM hall_bookings h
          WHERE h.id = ?2 AND h.status <> 'cancelled'
-           AND (h.price_kobo = 0 OR (SELECT coalesce(sum(amount_kobo), 0) FROM hall_payments WHERE booking_id = h.id) + ?3 <= h.price_kobo)`,
+           AND h.price_kobo > 0 AND (SELECT coalesce(sum(amount_kobo), 0) FROM hall_payments WHERE booking_id = h.id) + ?3 <= h.price_kobo`,
       )
       .bind(id, v.bookingId, v.amountKobo, v.method, v.paidOn, v.reference, actor.id),
     activityIfChanged(db, "hall.payment", "hall_booking", v.bookingId, `Hall payment ${formatNaira(v.amountKobo)} for ${b.title}`),
+    // Paid in full: the booking is confirmed in the same step (refused if it would clash with another confirmed event).
+    db
+      .prepare(
+        `UPDATE hall_bookings SET status = 'confirmed' WHERE id = ? AND status = 'enquiry'
+           AND (SELECT coalesce(sum(amount_kobo), 0) FROM hall_payments WHERE booking_id = hall_bookings.id) >= price_kobo`,
+      )
+      .bind(v.bookingId),
+    activityIfChanged(db, "hall.confirmed", "hall_booking", v.bookingId, `Hall booking confirmed: paid in full`),
   ]);
   if (!r?.meta.changes) throw new AppError("CONFLICT", "Someone just recorded a payment or changed this booking. Reload and try again.");
 }

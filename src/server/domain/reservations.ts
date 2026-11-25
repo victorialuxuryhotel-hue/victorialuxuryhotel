@@ -90,7 +90,6 @@ type CreateInput = {
   checkOut: string;
   guests: number;
   guestId?: string | null;
-  roomId?: string | null;
   fullName?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -115,12 +114,6 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
   if (input.guests > cat.max_occupancy) throw new AppError("VALIDATION", `${cat.name} sleeps up to ${cat.max_occupancy} guests.`);
   const unavailable = new AppError("UNAVAILABLE", `Sorry, ${cat.name} is no longer available for those dates.`);
   if ((await freeUnits(db, cat.id, input.checkIn, input.checkOut)) <= 0) throw unavailable;
-
-  if (input.roomId) {
-    const room = await loadRoom(db, input.roomId);
-    if (!room || !room.is_active || room.category_id !== cat.id) throw new AppError("VALIDATION", `Choose a ${cat.name} room.`);
-    if (room.service_status !== "in_service") throw new AppError("UNAVAILABLE", `Room ${room.room_number} is under maintenance.`);
-  }
 
   const email = input.email?.trim().toLowerCase() || null;
   const phone = input.phone?.trim() || null;
@@ -184,7 +177,7 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
            VALUES (?, ?, ?, ${guestExpr}, ?, ?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
-          id, reference, publicToken, guestParam, cat.id, input.roomId || null, input.checkIn, input.checkOut, input.guests,
+          id, reference, publicToken, guestParam, cat.id, null, input.checkIn, input.checkOut, input.guests,
           cat.nightly_rate_kobo, total, input.source, input.specialRequests?.trim() || null, holdExpiresAt, input.createdBy,
           extrasKobo, discountPct, discountKobo, promo ? code : null,
         ),
@@ -272,7 +265,10 @@ export async function assignRoom(
   if (opts.waiveCharge && !MONEY_APPROVERS.includes(actor.role as (typeof MONEY_APPROVERS)[number])) throw new AppError("FORBIDDEN", "Only the general manager or owner can give a free upgrade.");
   return retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
-    if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) {
+    if (res.status === "pending_payment") {
+      throw new AppError("VALIDATION", "This booking isn't paid yet. Take the payment first: a room is given automatically once it's paid.");
+    }
+    if (res.status !== "confirmed" && res.status !== "checked_in") {
       throw new AppError("INVALID_TRANSITION", "A room can only be given to a booking that hasn't ended.");
     }
     const room = await loadRoom(db, roomId);
