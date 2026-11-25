@@ -293,9 +293,13 @@ async function stillValid(acc, needsApp) {
 }
 
 /** One Clerk user per role. The four managers/finance roles get an authenticator app on first use. */
-/** Whether the Clerk instance offers authenticator apps. When it doesn't, the dev server must run with TWO_STEP_OPTIONAL=1. */
+/**
+ * Whether two-step sign-in is in force for these tests: TWO_STEP_ENFORCED=1 in .env.local (two-step is on
+ * hold until then) and authenticator apps switched on in the Clerk instance.
+ */
 let mfaAvailable;
 export async function twoStepAvailable() {
+  if (process.env.TWO_STEP_ENFORCED !== "1") return false;
   if (mfaAvailable === undefined) {
     const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
     const host = Buffer.from(pk.split("_")[2] ?? "", "base64").toString().replace(/\$$/, "");

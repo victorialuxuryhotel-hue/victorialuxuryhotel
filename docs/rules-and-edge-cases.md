@@ -84,7 +84,7 @@ Legacy: the old `sales` table from 0009 still allows `status = 'room_charge'` an
 
 ### 2.7 Staff access
 
-Invite → active → removed. Removing access ends sessions immediately **[verify]**. There must always be at least one owner **[exists]**. Two-step sign-in for owner, GM, hotel manager, finance **[exists]**. Owner phone lost: recovery via backup codes, documented in the staff guide **[new: doc]**.
+Invite → active → removed. Removing access ends sessions immediately **[verify]**. There must always be at least one owner **[exists]**. Two-step sign-in for owner, GM, hotel manager, finance **[exists; on hold for testing until TWO_STEP_ENFORCED=1, to be set before go-live — Tobi, 25 Nov]**. Owner phone lost: recovery via backup codes, documented in the staff guide **[new: doc]**.
 
 ---
 

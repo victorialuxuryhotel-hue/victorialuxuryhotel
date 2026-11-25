@@ -2,7 +2,7 @@
 import { BASE, check, clerk, createUser, deleteUser, enrolAuthenticator, finish, freshTotp, go, session, signIn, signOut, text, twoStepAvailable, waitForText } from "./lib.mjs";
 
 if (!(await twoStepAvailable())) {
-  console.log("SKIP  two-step sign-in: authenticator apps are off in this Clerk instance (turn them on under Configure → Multi-factor)");
+  console.log("SKIP  two-step sign-in: on hold (TWO_STEP_ENFORCED isn't 1), or authenticator apps are off in this Clerk instance (Configure → Multi-factor)");
   await finish();
 }
 

@@ -170,7 +170,9 @@ In the **production** instance for victorialuxuryhotel.com:
 - After the password, these roles must enter a code from an authenticator app. A backup code works if the phone is lost.
 - Until they set one up, every page and action sends them to **Two-step sign-in**. The page walks them through adding the app. If they added the app but this session didn't use it, it asks them to sign in again.
 - Front desk and restaurant & bar staff are not affected.
-- It can be switched off only on a developer's own machine (`TWO_STEP_OPTIONAL=1` with a localhost site URL). It can't be switched off on the live site.
+- **On hold for testing (decided by Tobi, 25 Nov).** It is enforced only when the Worker has `TWO_STEP_ENFORCED=1` (a plain variable, not a secret). Until then these roles sign in with a password, can still add an app under Manage sign-in, and the owner and general manager see a reminder on the Dashboard.
+- **Before go-live:** turn on authenticator apps and backup codes in the Clerk production instance (section 3), then set `TWO_STEP_ENFORCED=1` in the Cloudflare dashboard (or `wrangler.jsonc` vars) and deploy. Check: the reminder is gone and a finance account is asked for its code.
+- On a developer's own machine, `TWO_STEP_OPTIONAL=1` (localhost site URL only) still skips it.
 
 ## 5. Removing a staff member's access
 
@@ -196,7 +198,7 @@ These are deliberately **not final** in the app:
 ## 8. Cutover order (after you've reviewed all of the above)
 
 1. Rotate keys and set the Cloudflare secrets (section 2).
-2. Set up the Clerk production instance (section 3).
+2. Set up the Clerk production instance (section 3). Two-step sign-in stays on hold until you set `TWO_STEP_ENFORCED=1` (section 4); do that before go-live.
 3. Record the Time Travel bookmark, then apply 0012 to 0018 (section 1).
 4. Build (`pnpm cf:build`; it must report no secrets), upload, compare `wrangler versions view` secrets, remove `EMAIL_ALLOWLIST` if inherited, and deploy.
 5. In the app: deactivate the 3 demo staff (they're linked to development Clerk users). Create the first owner with `scripts/create-owner.mts`. Sign in and set up the authenticator app. Then invite the real staff.

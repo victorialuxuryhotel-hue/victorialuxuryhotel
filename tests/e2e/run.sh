@@ -16,7 +16,7 @@ if (!key.startsWith("sk_test_") || !pk.startsWith("pk_test_")) { console.error("
 const host = Buffer.from(pk.split("_")[2], "base64").toString().replace(/\$$/, "");
 const a = (await (await fetch(`https://${host}/v1/environment`)).json()).user_settings.attributes;
 if (!a.authenticator_app?.enabled || !a.backup_code?.enabled) {
-  console.warn("Note: authenticator apps are off in the Clerk development instance. The two-step test is skipped, and the dev server must run with TWO_STEP_OPTIONAL=1 (localhost only) for owner, general manager, hotel manager and finance to sign in.");
+  if (process.env.TWO_STEP_ENFORCED === "1") console.warn("Note: TWO_STEP_ENFORCED=1 but authenticator apps are off in the Clerk development instance. Turn them on, or run the dev server with TWO_STEP_OPTIONAL=1 (localhost only).");
 }'
 
 if ! curl -sf -o /dev/null http://127.0.0.1:4010/__health; then

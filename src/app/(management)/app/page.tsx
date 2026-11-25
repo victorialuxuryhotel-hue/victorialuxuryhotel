@@ -86,8 +86,16 @@ async function Content() {
   const [m, rooms, awaiting, recent] = await Promise.all([movements(), roomBoard(), awaitingPaymentCount(), listReservations({ tab: "all" })]);
   const noRoom = m.arrivals.filter((a) => !a.roomNumber).length;
   const owing = m.departures.filter((d) => owedOf(d) > 0).length;
+  // Two-step sign-in is on hold for testing; the owner and GM see this until it's enforced before go-live.
+  const twoStepOnHold = (staff.role === "owner" || staff.role === "general_manager") && process.env.TWO_STEP_ENFORCED !== "1";
   return (
     <div className="space-y-8 px-4 py-6 lg:px-8">
+      {twoStepOnHold ? (
+        <p role="status" className="rounded-md border border-warning-600/30 bg-warning-50 px-4 py-3 text-sm text-warning-700">
+          <b>Two-step sign-in is on hold for testing.</b> The owner, managers and finance sign in with a password only. Switch it on before go-live (set
+          TWO_STEP_ENFORCED=1; see the release review).
+        </p>
+      ) : null}
       <p className="-mt-2 text-sm text-ink-500">{formatDate(m.today)}</p>
       <StatGrid>
         <Stat label="Arrivals today" value={m.arrivals.length} caption={noRoom ? `${noRoom} still need a room` : "All have rooms assigned"} />

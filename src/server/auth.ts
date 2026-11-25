@@ -8,15 +8,19 @@ import type { StaffRole } from "@/domain/status";
 import { canAny, type Permission } from "@/lib/auth/permissions";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { TWO_STEP_ROLES, twoStepOptional, twoStepState, type TwoStepState } from "@/lib/auth/two-step";
+import { TWO_STEP_ROLES, twoStepRequired, twoStepState, type TwoStepState } from "@/lib/auth/two-step";
 import { verifyViewAs } from "@/lib/auth/view-as-token";
 import { first, getDb, VIEW_AS_READ_ONLY, type Actor } from "./db";
 import { LAST_SEEN_EVERY_MS, linkClerkUser, ROLE, touchLastSeen, type StaffRecord } from "./domain/admin";
 
+/** Two-step sign-in is on hold until TWO_STEP_ENFORCED=1 (see lib/auth/two-step.ts). */
+export const twoStepRequiredHere = () =>
+  twoStepRequired({ enforced: process.env.TWO_STEP_ENFORCED, optional: process.env.TWO_STEP_OPTIONAL, siteUrl: process.env.NEXT_PUBLIC_SITE_URL });
+
 export type Staff = { id: string; fullName: string; email: string; role: StaffRole; viewAs?: boolean; twoStep?: TwoStepState };
 
 async function currentTwoStep(role: StaffRole, secondFactorAge: number | undefined, claims: Record<string, unknown> | null): Promise<TwoStepState | undefined> {
-  if (!TWO_STEP_ROLES.includes(role) || twoStepOptional(process.env.TWO_STEP_OPTIONAL, process.env.NEXT_PUBLIC_SITE_URL)) return undefined;
+  if (!TWO_STEP_ROLES.includes(role) || !twoStepRequiredHere()) return undefined;
   const totp = typeof claims?.totp === "boolean" ? claims.totp : Boolean((await currentUser())?.totpEnabled);
   return twoStepState(role, totp, secondFactorAge);
 }

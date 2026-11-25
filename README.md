@@ -62,9 +62,12 @@ pnpm mock:integrations            # local Paystack + Resend stand-in (port 4010)
 pnpm dev                          # http://localhost:3000
 ```
 
-Two-step sign-in is required for owner, general manager, hotel manager and finance.
-On your own machine only, `TWO_STEP_OPTIONAL=1 pnpm dev` skips it (it is ignored
-unless the site URL is localhost). It cannot be switched off on the live site.
+Two-step sign-in (an authenticator app) for owner, general manager, hotel manager and
+finance is **on hold while the system is tested**: it's required only when
+`TWO_STEP_ENFORCED=1` is set, which must happen before go-live (see
+[docs/release-review.md](docs/release-review.md)). Until then the owner and general manager
+see a reminder on the Dashboard. On your own machine, `TWO_STEP_OPTIONAL=1` skips it even
+when enforced (ignored unless the site URL is localhost).
 
 Test accounts for each role are listed in the git-ignored `.test-accounts.local`.
 
