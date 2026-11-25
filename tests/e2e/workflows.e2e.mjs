@@ -72,7 +72,9 @@ let id;
   await go(p, `/app/reservations/${id}`);
   const firstRoom = await val("SELECT room_id FROM reservations WHERE id = ?", id);
   check("a room is assigned once the booking is paid", Boolean(firstRoom));
-  const other = await p.$$eval("#room optgroup:first-of-type option", (os, cur) => os.find((o) => o.value !== cur)?.value, firstRoom);
+  // The picker greys out rooms that can't be chosen ("To clean", "Occupied · …"); pick one that can.
+  const other = await p.$$eval("#room optgroup:first-of-type option", (os, cur) => os.find((o) => o.value !== cur && !o.disabled)?.value, firstRoom);
+  check("the picker offers another free, clean room of the same type", Boolean(other));
   await p.select("#room", other);
   await clickText(p, "button", "Change");
   await waitForText(p, /Moved to Room/);
@@ -86,7 +88,8 @@ let id;
   check("front desk checks the guest in", (await val("SELECT status FROM reservations WHERE id = ?", id)) === "checked_in");
   await go(p, "/app/rooms");
   const board = await text(p);
-  check("room board shows the room occupied by the guest", board.includes("Walk In Guest"), board.slice(0, 300));
+  // Tiles show the status word and the guest's surname ("Walk In Guest" → "Guest").
+  check("room board shows the room occupied by the guest", new RegExp(`${roomNo}[\\s\\S]{0,60}(Occupied|Due out today)[\\s\\S]{0,40}Guest`).test(board), board.slice(0, 300));
   await go(p, `/app/reservations/${id}`);
   await clickText(p, "button", "Check out");
   await waitForText(p, /Checked out/);
