@@ -7,7 +7,7 @@ import { z } from "zod";
 import { nearestFreeStart } from "@/domain/availability";
 import type { AvailabilityOption } from "@/domain/views";
 import { AppError } from "@/lib/errors";
-import { addDays, hotelToday, nightsBetween } from "@/lib/hotel-date";
+import { addDays, nightsBetween, tonight } from "@/lib/hotel-date";
 import { publicText, roomLabel } from "@/lib/format";
 import { logger } from "@/lib/logger";
 import { all, first, getDb } from "../db";
@@ -36,7 +36,7 @@ export async function searchStay(stay: Stay): Promise<{ ok: true; options: Avail
     const rows = await searchAvailability(db, stay.checkIn, stay.checkOut, stay.guests);
     const full = rows.filter((c) => !c.is_available && c.max_occupancy >= stay.guests);
     const nights = nightsBetween(stay.checkIn, stay.checkOut);
-    const today = hotelToday();
+    const today = tonight();
     const from = [addDays(stay.checkIn, -SUGGEST_WITHIN_DAYS), today].sort().at(-1)!;
     const [free, photos] = await Promise.all([
       full.length ? freeNights(db, full.map((c) => c.slug), from, addDays(stay.checkOut, SUGGEST_WITHIN_DAYS)) : Promise.resolve(new Map<string, Map<string, boolean>>()),

@@ -1,5 +1,5 @@
 import { AppError } from "@/lib/errors";
-import { addDays, hotelToday, isIsoDate, nightsBetween } from "@/lib/hotel-date";
+import { addDays, hotelToday, isIsoDate, nightsBetween, tonight } from "@/lib/hotel-date";
 import { all, first, type Db, type Stmt } from "../db";
 
 /**
@@ -96,7 +96,7 @@ export function validateStay(checkIn: string | null | undefined, checkOut: strin
   if (checkOut <= checkIn) throw new AppError("VALIDATION", "Check-out must be after check-in.");
   if (nightsBetween(checkIn, checkOut) > 90) throw new AppError("VALIDATION", "Stays longer than 90 nights must be arranged with the hotel.");
   const today = hotelToday();
-  if (!allowPast && checkIn < today) throw new AppError("VALIDATION", "Check-in can't be in the past.");
+  if (!allowPast && checkIn < tonight()) throw new AppError("VALIDATION", "Check-in can't be in the past.");
   if (checkIn > addDays(today, 730)) throw new AppError("VALIDATION", "Bookings open up to two years ahead.");
   if (guests == null || !Number.isInteger(guests) || guests < 1 || guests > 20) throw new AppError("VALIDATION", "Enter the number of guests.");
 }

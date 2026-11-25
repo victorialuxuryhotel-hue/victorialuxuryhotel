@@ -36,6 +36,15 @@ export const BUSINESS_DAY_START_HOUR: number = policy.businessDayStartHour;
 export function businessDate(at: Date = new Date()): string {
   return hotelToday(new Date(at.getTime() - BUSINESS_DAY_START_HOUR * 3_600_000));
 }
+/**
+ * The first night a booking can start now ("tonight"). Before the business-day cut-off
+ * (policy.businessDayStartHour, 06:00) it is still last night, so a guest arriving at 2am on the
+ * 26th books 25th → 26th and pays for the night they sleep in. Used by booking validation (staff and
+ * website), Today and check-in; the capacity triggers use the same date (migration 0022).
+ */
+export function tonight(at: Date = new Date()): string {
+  return businessDate(at);
+}
 export function businessDayStart(date: string): string {
   return hotelInstant(date, `${String(BUSINESS_DAY_START_HOUR).padStart(2, "0")}:00:00`);
 }

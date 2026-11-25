@@ -6,7 +6,7 @@ import { ReservationForm } from "@/components/management/reservation-form";
 import { LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
 import { requireStaff } from "@/server/auth";
-import { hotelToday } from "@/server/queries/reservations";
+import { bookingTonight } from "@/server/queries/reservations";
 import { listCategories } from "@/server/queries/rooms";
 import { getBookingRules } from "@/server/queries/settings";
 
@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "New booking" };
 async function Content() {
   const staff = await requireStaff();
   if (!can(staff.role, "reservations.manage")) return <AccessDenied />;
-  const [categories, today, rules] = await Promise.all([listCategories(), hotelToday(), getBookingRules()]);
+  const [categories, today, rules] = await Promise.all([listCategories(), bookingTonight(), getBookingRules()]);
   return <ReservationForm categories={categories} today={today} holdHours={rules.staffHoldHours} aboveTabs={staff.role === "front_desk"} />;
 }
 

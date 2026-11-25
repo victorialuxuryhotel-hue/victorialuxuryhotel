@@ -2,7 +2,7 @@ import "server-only";
 import type { ReservationStatus } from "@/domain/status";
 import type { HistoryEntry, PaymentRow, ReservationDetail, ReservationRow } from "@/domain/views";
 import { formatNaira } from "@/lib/format";
-import { hotelToday as today } from "@/lib/hotel-date";
+import { hotelToday as today, tonight } from "@/lib/hotel-date";
 import { reservationStatus } from "@/domain/status";
 import { authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
@@ -48,6 +48,11 @@ function toRow(r: ListRow): ReservationRow {
 
 export async function hotelToday(): Promise<string> {
   return today();
+}
+
+/** The first night a booking can start now (before 06:00, still last night). */
+export async function bookingTonight(): Promise<string> {
+  return tonight();
 }
 
 export type ReservationTab = "upcoming" | "in_house" | "awaiting" | "attention" | "all";
@@ -114,13 +119,15 @@ export async function movements(day?: string) {
   await authorizeRead(["reservations.manage", "reports.view"]);
   const db = await getDb();
   const d = day ?? today();
+  // Before the 06:00 cut-off, last night's arrivals are still arriving (not yet no-shows).
+  const from = d === today() ? tonight() : d;
   const [arrivals, departures, inHouse, missed] = await Promise.all([
-    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_in = ? AND r.status IN ('confirmed', 'pending_payment') ORDER BY r.created_at`, d),
+    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_in BETWEEN ? AND ? AND r.status IN ('confirmed', 'pending_payment') ORDER BY r.created_at`, from, d),
     // Overdue guests first (oldest check-out date), then today's.
     all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_out <= ? AND r.status = 'checked_in' ORDER BY r.check_out`, d),
     all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.status = 'checked_in' ORDER BY r.check_out`),
     // Paid, due before today, never checked in: still holding a room until someone decides.
-    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_in < ? AND r.status = 'confirmed' ORDER BY r.check_in`, d),
+    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_in < ? AND r.status = 'confirmed' ORDER BY r.check_in`, from),
   ]);
   return { today: d, arrivals: arrivals.map(toRow), departures: departures.map(toRow), inHouse: inHouse.map(toRow), missed: missed.map(toRow) };
 }

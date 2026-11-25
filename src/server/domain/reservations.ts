@@ -1,7 +1,7 @@
 import { stayPrice } from "@/domain/pricing";
 import { AppError } from "@/lib/errors";
 import { formatDate, formatNaira } from "@/lib/format";
-import { hotelToday, nightsBetween } from "@/lib/hotel-date";
+import { hotelToday, nightsBetween, tonight } from "@/lib/hotel-date";
 import { dbErrorToken } from "../db-errors";
 import {
   assertNetPaid,
@@ -275,7 +275,7 @@ export async function roomChangeCharge(db: Db, res: Pick<ReservationRow, "room_i
   if (current === toCategory) return { perNight: 0, nights: 0, kobo: 0 };
   const paying = Math.max(res.nightly_rate_kobo, await categoryRate(db, current));
   const perNight = Math.max(0, (await categoryRate(db, toCategory)) - paying);
-  const from = res.check_in > hotelToday() ? res.check_in : hotelToday();
+  const from = res.check_in > tonight() ? res.check_in : tonight();
   const nights = Math.max(0, nightsBetween(from, res.check_out));
   return { perNight, nights, kobo: perNight * nights };
 }
@@ -370,7 +370,7 @@ export async function assignRoom(
     const oldRoom = res.room_id ? await loadRoom(db, res.room_id) : null;
     const currentCategory = oldRoom?.category_id ?? res.category_id;
     if (room.category_id !== currentCategory) {
-      const from = res.check_in > hotelToday() ? res.check_in : hotelToday();
+      const from = res.check_in > tonight() ? res.check_in : tonight();
       if ((await freeUnits(db, room.category_id, from, res.check_out, res.id)) <= 0) {
         const cat = await first<{ name: string }>(db, "SELECT name FROM room_categories WHERE id = ?", room.category_id);
         throw new AppError("UNAVAILABLE", cat ? `No ${cat.name} rooms are free on all of these nights.` : "No rooms of that type are free on all of these nights.");
@@ -419,7 +419,8 @@ export async function checkInReservation(db: Db, actor: Actor, reservationId: st
     if (res.check_in > today) throw new AppError("VALIDATION", `This guest arrives on ${formatDate(res.check_in, { year: false })}. Check-in opens that day.`);
     const owed = dueOf(res) - (await netPaid(db, res.id));
     if (owed > 0) throw new AppError("VALIDATION", `${naira(owed)} owed. Take the payment before check-in.`);
-    if (res.check_out <= today) throw new AppError("VALIDATION", "This stay has already ended.");
+    // Before the 06:00 cut-off last night is still running: a 2am walk-in booked for it can check in.
+    if (res.check_out <= tonight()) throw new AppError("VALIDATION", "This stay has already ended.");
     if (!res.room_id) throw new AppError("VALIDATION", "Assign a room before checking in.");
     const room = (await loadRoom(db, res.room_id))!;
     if (room.service_status !== "in_service") throw new AppError("UNAVAILABLE", `Room ${room.room_number} is under maintenance. Assign another room.`);

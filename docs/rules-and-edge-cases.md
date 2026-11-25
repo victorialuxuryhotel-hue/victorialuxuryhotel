@@ -145,6 +145,7 @@ Each row: expected behaviour + a test (unit, DB or e2e). "Today" means the busin
 |---|---|
 | Guest arrives, room not clean yet | Can't check in; Today shows "Room 204 being cleaned · Mark clean". Option to move to another ready room of the same type (no charge). |
 | Guest arrives early | Check-in is any time on the arrival day once the room is ready; no early check-in fee. Check-out is by 12:00. **[decided by Tobi, 25 Nov]** |
+| Walk-in after midnight, before 06:00 | Books the night that's still running (business date): at 2am on the 26th, 25th → 26th, paid and checked in straight away. Last night's arrivals stay in "Arriving today" until 06:00; they're not no-shows yet. **[decided by Tobi, 25 Nov]** |
 | Guest arrives a day late, booking still confirmed | Allowed. Missed night isn't refunded (no-show policy for that night) **[decide]**. Check-out date unchanged. |
 | Paid guest never arrives | Shows in "Didn't arrive" from the next business day. Front desk marks no-show; GM/Owner decides refund per policy. Room released for resale from the moment of no-show. |
 | Guest wants to extend while in house | Creates a pending extension with price; applied when paid. If the room isn't free for the new nights, offer another room (room change on the extension date). |
@@ -235,7 +236,10 @@ Each row: expected behaviour + a test (unit, DB or e2e). "Today" means the busin
 
 ## 7. Decisions needed (defaults in brackets — build the default)
 
-1. Business-day cut-off time (06:00).
+1. Business-day cut-off time (06:00). **Decided:** before the cut-off, "tonight" is the business date (25 Nov). A guest
+   arriving at 2am on the 26th books 25th → 26th and pays that night. The same date governs booking validation (staff
+   and website), Today's "available tonight" and arrivals, check-in, and the capacity triggers (`tonight()` in
+   `src/lib/hotel-date.ts`; migration 0022). The cut-off hour is `policy.businessDayStartHour`.
 2. Overstay: when does an extra night start, and is there a late check-out fee (extra night from 12:00 + 2h grace; no fee).
 3. No-show and late-arrival refund policy (first night kept, rest refunded; GM/Owner decides).
 4. Early departure refund (unused nights refunded on request; GM/Owner decides).

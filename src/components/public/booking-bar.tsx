@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { CalendarDays, Minus, Plus, Users } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
+import { tonight } from "@/lib/hotel-date";
 import { cn } from "@/lib/utils/cn";
 
 function isoDate(d: Date) {
@@ -28,7 +29,8 @@ export function BookingBar({
   variant?: "floating" | "inline" | "stacked";
   defaults?: { checkIn?: string; checkOut?: string; guests?: string };
 }) {
-  const today = useSyncExternalStore(noopSubscribe, () => isoDate(new Date()), () => "");
+  // Lagos time with the 06:00 cut-off, whatever the visitor's own clock or time zone says.
+  const today = useSyncExternalStore(noopSubscribe, () => tonight(), () => "");
   const [checkInValue, setCheckIn] = useState(defaults?.checkIn ?? "");
   const [checkOutValue, setCheckOut] = useState(defaults?.checkOut ?? "");
   const [guests, setGuests] = useState(() => Math.min(MAX_GUESTS, Math.max(MIN_GUESTS, Number(defaults?.guests) || 2)));
