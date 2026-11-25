@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addExtra, addPromo } from "@/server/domain/admin";
-import { applyPaystackResult, beginPaystackPayment } from "@/server/domain/payments";
+import { applyPaystackResult, beginPaystackPayment, recordOfflinePayment } from "@/server/domain/payments";
 import { changeReservationDates, createWebsiteReservation } from "@/server/domain/reservations";
 import { day, db, desk, gm, iso, makeCategory, q1, rejects, status } from "./helpers";
 
@@ -33,7 +33,10 @@ describe("extras and promo codes", () => {
     expect(await applyPaystackResult(db, { reference: p.reference, status: "success", amountKobo: p.amountKobo, currency: "NGN", paidAt: iso(0), channel: "card", gatewayResponse: "ok" })).toBe("confirmed");
     expect(await status(b.id)).toBe("confirmed");
 
-    await changeReservationDates(db, desk, b.id, day(40), day(43));
+    // Paid booking: the extra night waits for its payment, which re-prices extras and the promo too.
+    const { chargeKobo } = await changeReservationDates(db, desk, b.id, day(40), day(43));
+    expect(chargeKobo).toBe(16_500_000 + 3_000_000 - 1_650_000 - 12_400_000);
+    await recordOfflinePayment(db, desk, { reservationId: b.id, amountKobo: chargeKobo, method: "cash", paidOn: day(0), confirmReceived: true });
     expect(await q1("SELECT total_amount_kobo, extras_kobo, discount_kobo FROM reservations WHERE id = ?", b.id)).toEqual({
       total_amount_kobo: 16_500_000, extras_kobo: 3_000_000, discount_kobo: 1_650_000,
     });

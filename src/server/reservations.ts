@@ -9,6 +9,7 @@ import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize, authorizeRead } from "./auth";
 import { getDb } from "./db";
+import * as changes from "./domain/changes";
 import * as engine from "./domain/reservations";
 import { availabilityForStay, findGuestsByPhone, type PhoneMatch, type TypeAvailability } from "./domain/staff-booking";
 import { deliverEmails } from "./notifications";
@@ -59,8 +60,10 @@ export async function createReservation(_prev: ActionResult<{ id: string; next: 
 }
 
 export type Undoable = { undoId: number | null };
+/** A change that costs more waits for its payment: chargeKobo is what to take, pendingChangeId set when it's waiting. */
+export type ChangeOutcome = { chargeKobo: number; pendingChangeId?: string };
 
-export async function assignRoom(_prev: ActionResult<Undoable> | null, formData: FormData): Promise<ActionResult<Undoable>> {
+export async function assignRoom(_prev: ActionResult<Undoable & ChangeOutcome> | null, formData: FormData): Promise<ActionResult<Undoable & ChangeOutcome>> {
   return run("reservation.assign_room", async () => {
     const staff = await authorize("reservations.manage");
     const reservationId = id.parse(formData.get("reservationId"));
@@ -159,14 +162,32 @@ export async function updateGuest(_prev: ActionResult | null, formData: FormData
   });
 }
 
-export async function changeDates(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+export async function changeDates(_prev: ActionResult<ChangeOutcome> | null, formData: FormData): Promise<ActionResult<ChangeOutcome>> {
   return run("reservation.change_dates", async () => {
     const staff = await authorize("reservations.manage");
     const reservationId = id.parse(formData.get("reservationId"));
     const checkIn = isoDate.safeParse(formData.get("checkIn"));
     const checkOut = isoDate.safeParse(formData.get("checkOut"));
     if (!checkIn.success || !checkOut.success) throw new AppError("VALIDATION", "Choose both dates");
-    await engine.changeReservationDates(await getDb(), actorOf(staff), reservationId, checkIn.data, checkOut.data);
+    const result = await engine.changeReservationDates(await getDb(), actorOf(staff), reservationId, checkIn.data, checkOut.data);
+    refresh();
+    return result;
+  });
+}
+
+export async function cancelPendingChange(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return run("reservation.change_cancel", async () => {
+    const staff = await authorize("reservations.manage");
+    await changes.cancelChange(await getDb(), actorOf(staff), id.parse(formData.get("changeId")));
+    refresh();
+  });
+}
+
+/** General Manager or Owner: let a change take effect before it's paid. The guest pays before check-out. */
+export async function applyChangeUnpaid(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  return run("reservation.change_apply_unpaid", async () => {
+    const staff = await authorize("payments.approve");
+    await changes.applyChangeWithoutPayment(await getDb(), actorOf(staff), id.parse(formData.get("changeId")), String(formData.get("reason") ?? ""));
     refresh();
   });
 }

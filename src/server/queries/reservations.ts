@@ -12,7 +12,8 @@ const LIST_COLUMNS = `
   r.id, r.reference, r.check_in, r.check_out, r.guest_count, (r.total_amount_kobo + r.extras_kobo + r.room_change_kobo - r.discount_kobo) AS total_amount_kobo, r.status, r.source, r.hold_expires_at, r.attention_reason,
   g.full_name AS guest_name, g.phone AS guest_phone, c.name AS category_name, rm.room_number,
   (SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
-     FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful') AS paid_kobo`;
+     FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful') AS paid_kobo,
+  (SELECT coalesce(sum(x.amount_kobo), 0) FROM reservation_changes x WHERE x.reservation_id = r.id AND x.status = 'pending') AS pending_kobo`;
 const LIST_FROM = `FROM reservations r
   JOIN guests g ON g.id = r.guest_id
   JOIN room_categories c ON c.id = r.category_id
@@ -21,7 +22,7 @@ const LIST_FROM = `FROM reservations r
 type ListRow = {
   id: string; reference: string; check_in: string; check_out: string; guest_count: number; total_amount_kobo: number;
   status: ReservationStatus; source: ReservationRow["source"]; hold_expires_at: string | null; attention_reason: string | null;
-  guest_name: string; guest_phone: string | null; category_name: string; room_number: string | null; paid_kobo: number;
+  guest_name: string; guest_phone: string | null; category_name: string; room_number: string | null; paid_kobo: number; pending_kobo: number;
 };
 
 function toRow(r: ListRow): ReservationRow {
@@ -41,6 +42,7 @@ function toRow(r: ListRow): ReservationRow {
     source: r.source,
     holdExpiresAt: r.hold_expires_at ?? undefined,
     attention: r.attention_reason ?? undefined,
+    pendingKobo: r.pending_kobo || undefined,
   };
 }
 
@@ -143,7 +145,7 @@ export async function getReservation(
   );
   if (!r) return null;
 
-  const [paymentRows, historyRows] = await Promise.all([
+  const [paymentRows, historyRows, change] = await Promise.all([
     all<{
       id: string; amount_kobo: number; method: string | null; provider: "paystack" | "offline"; provider_reference: string | null;
       status: PaymentRow["status"]; paid_at: string | null; receipt_number: string | null; recorder: string | null;
@@ -162,6 +164,11 @@ export async function getReservation(
       `SELECT h.created_at, h.from_status, h.to_status, h.reason, s.full_name AS changer
        FROM reservation_status_history h LEFT JOIN staff_profiles s ON s.id = h.changed_by
        WHERE h.reservation_id = ? ORDER BY h.created_at, h.id`,
+      id,
+    ),
+    first<{ id: string; kind: "room" | "dates"; description: string; amount_kobo: number }>(
+      db,
+      "SELECT id, kind, description, amount_kobo FROM reservation_changes WHERE reservation_id = ? AND status = 'pending'",
       id,
     ),
   ]);
@@ -203,6 +210,7 @@ export async function getReservation(
     publicToken: r.public_token,
     payments,
     history,
+    pendingChange: change ? { id: change.id, kind: change.kind, description: change.description, amountKobo: change.amount_kobo } : undefined,
   };
 }
 

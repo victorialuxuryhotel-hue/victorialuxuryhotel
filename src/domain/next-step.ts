@@ -20,9 +20,11 @@ export type NextStepInput = {
   roomNumber?: string | null;
   checkIn: string;
   checkOut: string;
+  /** A change waiting for its payment counts as owed: Take payment comes first. */
+  pendingKobo?: number;
 };
 
-export const owedOf = (r: Pick<NextStepInput, "totalKobo" | "paidKobo">) => Math.max(0, r.totalKobo - r.paidKobo);
+export const owedOf = (r: Pick<NextStepInput, "totalKobo" | "paidKobo" | "pendingKobo">) => Math.max(0, r.totalKobo - r.paidKobo) + (r.pendingKobo ?? 0);
 
 export function nextStep(r: NextStepInput, today: string): NextStep {
   const owedKobo = owedOf(r);

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { owedOf } from "@/domain/next-step";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -84,7 +85,7 @@ async function Content() {
   if (staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager") redirect("/app/sales");
   const [m, rooms, awaiting, recent] = await Promise.all([movements(), roomBoard(), awaitingPaymentCount(), listReservations({ tab: "all" })]);
   const noRoom = m.arrivals.filter((a) => !a.roomNumber).length;
-  const owing = m.departures.filter((d) => d.totalKobo > d.paidKobo).length;
+  const owing = m.departures.filter((d) => owedOf(d) > 0).length;
   return (
     <div className="space-y-8 px-4 py-6 lg:px-8">
       <p className="-mt-2 text-sm text-ink-500">{formatDate(m.today)}</p>

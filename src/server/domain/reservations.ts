@@ -254,13 +254,64 @@ export async function roomChangeCharge(db: Db, res: Pick<ReservationRow, "room_i
   return { perNight, nights, kobo: perNight * nights };
 }
 
+/** What a room move writes: the room, any extra charge, the old room to cleaning if the guest is in house, and the activity line. */
+export function roomMoveStatements(
+  db: Db,
+  res: Pick<ReservationRow, "id" | "reference" | "status" | "room_id">,
+  room: Pick<RoomRow, "id" | "room_number">,
+  oldRoom: Pick<RoomRow, "readiness"> | null,
+  chargeKobo: number,
+  note = "",
+): Stmt[] {
+  const stmts = [db.prepare("UPDATE reservations SET room_id = ?, room_change_kobo = room_change_kobo + ? WHERE id = ?").bind(room.id, chargeKobo, res.id)];
+  if (res.status === "checked_in" && res.room_id) stmts.push(db.prepare("UPDATE rooms SET readiness = 'needs_cleaning' WHERE id = ?").bind(res.room_id));
+  stmts.push(
+    activity(db, "reservation.room_assigned", "reservation", res.id, `Room ${room.room_number} assigned to ${res.reference}${chargeKobo ? ` (${naira(chargeKobo)} paid)` : ""}${note}`, {
+      room_id: room.id,
+      previous_room_id: res.room_id,
+      previous_room_readiness: oldRoom?.readiness ?? null,
+      charge_kobo: chargeKobo,
+    }),
+  );
+  return stmts;
+}
+
+export type ChangeRequest = { kind: "room"; roomId: string; amountKobo: number; description: string } | { kind: "dates"; checkIn: string; checkOut: string; amountKobo: number; description: string };
+
+/** Records a change that costs more as waiting for payment. One at a time per booking. */
+async function requestChange(db: Db, actor: Actor, res: Pick<ReservationRow, "id" | "reference">, c: ChangeRequest): Promise<string> {
+  const waiting = await first<{ description: string; amount_kobo: number }>(db, "SELECT description, amount_kobo FROM reservation_changes WHERE reservation_id = ? AND status = 'pending'", res.id);
+  if (waiting) {
+    throw new AppError("CONFLICT", `This booking already has a change waiting for payment: ${waiting.description} (${naira(waiting.amount_kobo)}). Take that payment or cancel the change first.`);
+  }
+  const changeId = uuid();
+  try {
+    await writeBatch(db, actor, [
+      db
+        .prepare(
+          `INSERT INTO reservation_changes (id, reservation_id, kind, room_id, check_in, check_out, amount_kobo, description, requested_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(changeId, res.id, c.kind, c.kind === "room" ? c.roomId : null, c.kind === "dates" ? c.checkIn : null, c.kind === "dates" ? c.checkOut : null, c.amountKobo, c.description, actor?.id ?? null),
+      activity(db, "reservation.change_requested", "reservation", res.id, `${res.reference}: ${c.description}. ${naira(c.amountKobo)} to pay before it takes effect`, {
+        change_id: changeId,
+        amount_kobo: c.amountKobo,
+      }),
+    ]);
+  } catch (err) {
+    if (dbErrorToken(err instanceof AppError ? err.cause : err) === "unique") throw new AppError("CONFLICT", "Someone just asked for another change on this booking. Reload to see it.");
+    throw err;
+  }
+  return changeId;
+}
+
 export async function assignRoom(
   db: Db,
   actor: Actor,
   reservationId: string,
   roomId: string,
   opts: { waiveCharge?: boolean } = {},
-): Promise<{ undoId: number | null; chargeKobo: number }> {
+): Promise<{ undoId: number | null; chargeKobo: number; pendingChangeId?: string }> {
   requireRole(actor, ALL_STAFF);
   if (opts.waiveCharge && !MONEY_APPROVERS.includes(actor.role as (typeof MONEY_APPROVERS)[number])) throw new AppError("FORBIDDEN", "Only the general manager or owner can give a free upgrade.");
   return retryOnStale(async () => {
@@ -301,23 +352,17 @@ export async function assignRoom(
     }
 
     const charge = opts.waiveCharge ? { perNight: 0, nights: 0, kobo: 0 } : await roomChangeCharge(db, res, room.category_id);
+    if (charge.kobo > 0) {
+      // Money first: a move that costs more waits for its payment (rules 2.1). Taking that payment applies it.
+      const cat = await first<{ name: string }>(db, "SELECT name FROM room_categories WHERE id = ?", room.category_id);
+      const description = `${oldRoom ? `Move from Room ${oldRoom.room_number} to` : "Upgrade to"} Room ${room.room_number}${cat ? ` (${cat.name})` : ""}: ${charge.nights} night${charge.nights === 1 ? "" : "s"} × ${naira(charge.perNight)}`;
+      const pendingChangeId = await requestChange(db, actor, res, { kind: "room", roomId, amountKobo: charge.kobo, description });
+      return { undoId: null, chargeKobo: charge.kobo, pendingChangeId };
+    }
     const stmts = [
       assertVersion(db, "reservations", res.id, res.version),
-      db.prepare("UPDATE reservations SET room_id = ?, room_change_kobo = room_change_kobo + ? WHERE id = ?").bind(roomId, charge.kobo, res.id),
+      ...roomMoveStatements(db, res, room, oldRoom, 0, opts.waiveCharge ? " (free upgrade)" : ""),
     ];
-    if (res.status === "checked_in" && res.room_id) {
-      stmts.push(db.prepare("UPDATE rooms SET readiness = 'needs_cleaning' WHERE id = ?").bind(res.room_id));
-    }
-    stmts.push(
-      activity(
-        db,
-        "reservation.room_assigned",
-        "reservation",
-        res.id,
-        `Room ${room.room_number} assigned to ${res.reference}${charge.kobo ? `: ${naira(charge.kobo)} more to pay (${charge.nights} night${charge.nights === 1 ? "" : "s"} × ${naira(charge.perNight)})` : opts.waiveCharge ? " (free upgrade)" : ""}`,
-        { room_id: roomId, previous_room_id: res.room_id, previous_room_readiness: oldRoom?.readiness ?? null, charge_kobo: charge.kobo },
-      ),
-    );
     try {
       const results = await writeBatch(db, actor, stmts);
       return { undoId: results.at(-1)?.meta.last_row_id ?? null, chargeKobo: charge.kobo };
@@ -575,65 +620,97 @@ export async function overridePaymentRequirement(
   });
 }
 
-export async function changeReservationDates(db: Db, actor: Actor, reservationId: string, checkIn: string, checkOut: string): Promise<void> {
+export async function changeReservationDates(db: Db, actor: Actor, reservationId: string, checkIn: string, checkOut: string): Promise<{ chargeKobo: number; pendingChangeId?: string }> {
   requireRole(actor, ALL_STAFF);
-  await changeDates(db, actor, reservationId, checkIn, checkOut);
+  return changeDates(db, actor, reservationId, checkIn, checkOut);
 }
 
-export async function changeDates(db: Db, actor: Actor, reservationId: string, checkIn: string, checkOut: string, byGuest = false): Promise<void> {
-  await retryOnStale(async () => {
+/**
+ * What new dates write: re-priced at the rate agreed at booking (extras, discount and any upgrade
+ * re-applied), a refund flag if the guest has now paid more than the new total, and the activity line.
+ */
+export async function datesStatements(db: Db, res: ReservationRow, checkIn: string, checkOut: string, paidKobo: number, note = ""): Promise<{ stmts: Stmt[]; newDue: number }> {
+  const category = res.room_id ? ((await loadRoom(db, res.room_id))?.category_id ?? res.category_id) : res.category_id;
+  const nights = nightsBetween(checkIn, checkOut);
+  const newTotal = res.nightly_rate_kobo * nights;
+  const addedNights = Math.max(0, nights - nightsBetween(res.check_in, res.check_out));
+  const upgrade = res.room_id && category !== res.category_id ? Math.max(0, (await categoryRate(db, category)) - res.nightly_rate_kobo) : 0;
+  const extraUpgrade = upgrade * addedNights;
+  const newDue = newTotal + (await newExtras(db, res.id, nights)) + res.room_change_kobo + extraUpgrade - Math.round((newTotal * res.discount_pct) / 100);
+  const stmts = [
+    db
+      .prepare(
+        `UPDATE reservations SET check_in = ?1, check_out = ?2, total_amount_kobo = ?3,
+           discount_kobo = CAST(round(?3 * discount_pct / 100.0) AS INTEGER),
+           extras_kobo = (SELECT coalesce(sum(unit_price_kobo * CASE per_night WHEN 1 THEN ?4 ELSE 1 END), 0) FROM reservation_extras WHERE reservation_id = ?5),
+           room_change_kobo = room_change_kobo + ?6
+         WHERE id = ?5`,
+      )
+      .bind(checkIn, checkOut, newTotal, nights, res.id, extraUpgrade),
+  ];
+  if (paidKobo > newDue) {
+    stmts.push(
+      db.prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?").bind("Dates shortened: the guest has paid more than the new total. Arrange a refund for the difference.", res.id),
+    );
+  }
+  stmts.push(
+    activity(db, "reservation.dates_changed", "reservation", res.id, `${res.reference} dates changed: ${checkIn} → ${checkOut} (was ${res.check_in} → ${res.check_out})${note}`, {
+      from_total_kobo: res.total_amount_kobo,
+      to_total_kobo: newTotal,
+    }),
+  );
+  return { stmts, newDue };
+}
+
+export const datesConflicts = (checkIn: string, checkOut: string) => ({
+  room_overlap: new AppError("CONFLICT", "The assigned room is booked on some of the new nights. Change the room first, or choose other dates."),
+  no_capacity: new AppError("UNAVAILABLE", `No availability for ${formatDate(checkIn, { year: false })} to ${formatDate(checkOut, { year: false })} in this room type.`),
+});
+
+export async function changeDates(db: Db, actor: Actor, reservationId: string, checkIn: string, checkOut: string, byGuest = false): Promise<{ chargeKobo: number; pendingChangeId?: string }> {
+  return retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
     if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) throw new AppError("INVALID_TRANSITION", "This booking has ended (checked out, cancelled or a no-show), so its dates and room can't change. Make a new booking instead.");
     if (res.status === "checked_in" && checkIn !== res.check_in) throw new AppError("VALIDATION", "The guest is in house: only the check-out date can change.");
     validateStay(checkIn, checkOut, res.guest_count, res.status === "checked_in");
-    if (checkIn === res.check_in && checkOut === res.check_out) return;
+    if (checkIn === res.check_in && checkOut === res.check_out) return { chargeKobo: 0 };
 
     const category = res.room_id ? ((await loadRoom(db, res.room_id))?.category_id ?? res.category_id) : res.category_id;
-    const noRoom = new AppError("UNAVAILABLE", "No availability for the new dates in this room type.");
-    if ((await freeUnits(db, category, checkIn, checkOut, res.id)) <= 0) throw noRoom;
-
-    const newTotal = res.nightly_rate_kobo * nightsBetween(checkIn, checkOut);
-    const paid = await netPaid(db, res.id);
-    const addedNights = Math.max(0, nightsBetween(checkIn, checkOut) - nightsBetween(res.check_in, res.check_out));
-    const upgrade = res.room_id && category !== res.category_id ? Math.max(0, (await categoryRate(db, category)) - res.nightly_rate_kobo) : 0;
-    const extraUpgrade = upgrade * addedNights;
-    const stmts = [
-      assertVersion(db, "reservations", res.id, res.version),
-      db
-        .prepare(
-          `UPDATE reservations SET check_in = ?1, check_out = ?2, total_amount_kobo = ?3,
-             discount_kobo = CAST(round(?3 * discount_pct / 100.0) AS INTEGER),
-             extras_kobo = (SELECT coalesce(sum(unit_price_kobo * CASE per_night WHEN 1 THEN ?4 ELSE 1 END), 0) FROM reservation_extras WHERE reservation_id = ?5),
-             room_change_kobo = room_change_kobo + ?6
-           WHERE id = ?5`,
-        )
-        .bind(checkIn, checkOut, newTotal, nightsBetween(checkIn, checkOut), res.id, extraUpgrade),
-    ];
-    const newDue = newTotal + (await newExtras(db, res.id, nightsBetween(checkIn, checkOut))) + res.room_change_kobo + extraUpgrade - Math.round((newTotal * res.discount_pct) / 100);
-    if (byGuest && res.status === "confirmed" && newDue > paid) {
-      throw new AppError("VALIDATION", `These dates cost ${formatNaira(newDue - paid)} more. Bookings are paid in full, so please contact the hotel to change to these dates.`);
-    }
-    if (paid > newDue) {
-      stmts.push(
-        db
-          .prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?")
-          .bind("Dates shortened: the guest has paid more than the new total. Arrange a refund for the difference.", res.id),
+    const conflicts = datesConflicts(checkIn, checkOut);
+    if ((await freeUnits(db, category, checkIn, checkOut, res.id)) <= 0) throw conflicts.no_capacity;
+    if (res.room_id) {
+      const busy = await first(
+        db,
+        `SELECT 1 FROM reservations o WHERE o.room_id = ? AND o.id <> ? AND o.status IN ('pending_payment', 'confirmed', 'checked_in')
+           AND o.check_in < ? AND ? < ${stayEndSql("o")}`,
+        res.room_id, res.id, checkOut, checkIn,
       );
+      if (busy) throw conflicts.room_overlap;
     }
-    stmts.push(
-      activity(db, "reservation.dates_changed", "reservation", res.id, `${res.reference} dates changed: ${checkIn} → ${checkOut} (was ${res.check_in} → ${res.check_out})`, {
-        from_total_kobo: res.total_amount_kobo,
-        to_total_kobo: newTotal,
-      }),
-    );
+
+    const paid = await netPaid(db, res.id);
+    const plan = await datesStatements(db, res, checkIn, checkOut, paid);
+    const increase = plan.newDue - dueOf(res);
+    if (byGuest && res.status === "confirmed" && plan.newDue > paid) {
+      throw new AppError("VALIDATION", `These dates cost ${formatNaira(plan.newDue - paid)} more. Bookings are paid in full, so please contact the hotel to change to these dates.`);
+    }
+    if (increase > 0 && (res.status === "confirmed" || res.status === "checked_in")) {
+      // Money first: extra nights on a paid booking wait for their payment (rules 2.1).
+      const added = nightsBetween(checkIn, checkOut) - nightsBetween(res.check_in, res.check_out);
+      const more = added > 0 ? ` (${added} more night${added === 1 ? "" : "s"})` : "";
+      const description =
+        res.status === "checked_in"
+          ? `Stay extended to ${formatDate(checkOut, { year: false })}${more}`
+          : `New dates: ${formatDate(checkIn, { year: false })} to ${formatDate(checkOut, { year: false })}${more}`;
+      const pendingChangeId = await requestChange(db, actor, res, { kind: "dates", checkIn, checkOut, amountKobo: increase, description });
+      return { chargeKobo: increase, pendingChangeId };
+    }
     try {
-      await writeBatch(db, actor, stmts);
+      await writeBatch(db, actor, [assertVersion(db, "reservations", res.id, res.version), ...plan.stmts]);
     } catch (err) {
-      rethrow(err, {
-        room_overlap: new AppError("CONFLICT", "The assigned room is booked on some of the new nights. Unassign or change the room first."),
-        no_capacity: noRoom,
-      });
+      rethrow(err, conflicts);
     }
+    return { chargeKobo: 0 };
   });
 }
 

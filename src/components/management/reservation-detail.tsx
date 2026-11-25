@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { owedOf } from "@/domain/next-step";
 import { AlertTriangle, ArrowLeft, BedDouble, CalendarDays, Clock, Mail, Phone, Printer, Users } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -21,6 +22,7 @@ import {
   DetailsForm,
   NoShowButton,
   OverrideForm,
+  PendingChangeCard,
   ResolveAttentionForm,
   type RoomOption,
 } from "./reservation-actions";
@@ -76,7 +78,7 @@ export function ReservationDetailView({
   paidReceipt?: string;
   manager?: ManagerToAsk | null;
 }) {
-  const balance = r.totalKobo - r.paidKobo;
+  const balance = owedOf(r);
   const receiptLink = r.publicToken ? `${publicEnv().NEXT_PUBLIC_SITE_URL}/book/confirmation/${r.publicToken}` : null;
   const shareReceipt = (receipt: string) =>
     receiptLink
@@ -168,6 +170,8 @@ export function ReservationDetailView({
         </p>
       ) : null}
 
+      {canManage && r.pendingChange ? <PendingChangeCard reservationId={r.id} change={r.pendingChange} owedKobo={balance} canApprove={Boolean(canApprove)} /> : null}
+
       {r.attention ? (
         <div role="alert" className="mt-6 flex gap-3 rounded-card border border-warning-600/30 bg-warning-50 p-4 text-sm text-warning-700">
           <AlertTriangle className="size-5 shrink-0" aria-hidden />
@@ -202,10 +206,14 @@ export function ReservationDetailView({
             ) : null}
             {canManage && (open || r.status === "checked_in") ? (
               <div className="border-t border-hairline xl:border-0">
-                <Collapsible id="change-stay" title="Change dates or room">
+                <Collapsible id="change-stay" title={r.status === "pending_payment" ? "Change dates" : "Change dates or room"}>
                   <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
                   <ChangeDatesForm reservationId={r.id} checkIn={r.checkIn} checkOut={r.checkOut} inHouse={r.status === "checked_in"} />
-                  <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} specialRequests={r.specialRequests} />
+                  {r.status === "pending_payment" ? (
+                    <p className="border-t border-hairline bg-ivory-50 px-5 py-4 text-sm text-ink-600">A room is given automatically once the booking is paid.</p>
+                  ) : (
+                    <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} specialRequests={r.specialRequests} />
+                  )}
                 </Collapsible>
               </div>
             ) : null}

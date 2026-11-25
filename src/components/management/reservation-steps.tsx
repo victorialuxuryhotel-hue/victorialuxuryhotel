@@ -1,15 +1,16 @@
 import { Check } from "lucide-react";
+import { owedOf } from "@/domain/next-step";
 import type { ReservationDetail } from "@/domain/views";
 import { formatDate, formatNaira } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 
-type R = Pick<ReservationDetail, "status" | "roomNumber" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo" | "source" | "createdAt">;
+type R = Pick<ReservationDetail, "status" | "roomNumber" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo" | "pendingKobo" | "source" | "createdAt">;
 
 export type Step = { title: string; detail: string; state: "done" | "now" | "later" };
 
 export function reservationSteps(r: R, today: string): Step[] | null {
   if (!["pending_payment", "confirmed", "checked_in", "checked_out"].includes(r.status)) return null;
-  const balance = r.totalKobo - r.paidKobo;
+  const balance = owedOf(r);
   // Paid means nothing is owed: a later charge (room change, extension, extras) reopens this step.
   const paid = r.status !== "pending_payment" && balance <= 0;
   const inHouse = r.status === "checked_in" || r.status === "checked_out";

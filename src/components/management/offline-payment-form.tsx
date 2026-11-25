@@ -4,6 +4,7 @@ import { startTransition, useActionState, useState, type FormEvent } from "react
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { paymentMethod } from "@/domain/status";
+import { owedOf } from "@/domain/next-step";
 import { formatNaira } from "@/lib/format";
 import { recordOfflinePayment } from "@/server/payments";
 
@@ -11,7 +12,7 @@ export function OfflinePaymentForm({
   reservation,
   today,
 }: {
-  reservation: { id: string; reference: string; guestName: string; totalKobo: number; paidKobo: number };
+  reservation: { id: string; reference: string; guestName: string; totalKobo: number; paidKobo: number; pendingKobo?: number; pendingChange?: { description: string; amountKobo: number } };
   today: string;
 }) {
   const [state, action, pending] = useActionState(recordOfflinePayment, null);
@@ -25,7 +26,7 @@ export function OfflinePaymentForm({
     setReview(null);
   }
   const err = (n: string) => (state && !state.ok ? state.fieldErrors?.[n]?.[0] : undefined);
-  const balance = reservation.totalKobo - reservation.paidKobo;
+  const balance = owedOf(reservation);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,6 +54,11 @@ export function OfflinePaymentForm({
           Total {formatNaira(reservation.totalKobo)} · received {formatNaira(reservation.paidKobo)} ·{" "}
           <span className="font-medium text-warning-700">{formatNaira(balance)} owed</span>
         </p>
+        {reservation.pendingChange ? (
+          <p className="mt-2 text-ink-700">
+            Includes {formatNaira(reservation.pendingChange.amountKobo)} for: <span className="font-medium">{reservation.pendingChange.description}</span>. It takes effect once this payment is recorded.
+          </p>
+        ) : null}
       </div>
       {state && !state.ok && !state.fieldErrors ? <FormMessage>{state.message}</FormMessage> : null}
       <div hidden={Boolean(review)} className="space-y-5">

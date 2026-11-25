@@ -41,7 +41,7 @@ Anything not listed is rejected by the database.
 
 Rules on a booking **[new unless marked]**:
 - A room may be assigned or changed only when status is `confirmed` or `checked_in`. Not `pending_payment`. **[exists — 0015; staff no longer pick a room when creating a booking]**
-- Any change that increases the total (extra night, upgrade, extra guest, extra) on a `confirmed` or `checked_in` booking does **not** take effect until paid: it is created as a pending change with its own price; payment applies it. (Replaces today's `assignRoom`/`changeDates` adding cost immediately.)
+- Any change that increases the total (extra night, upgrade, extra guest, extra) on a `confirmed` or `checked_in` booking does **not** take effect until paid: it is created as a pending change with its own price; payment applies it. **[exists — 0017 for room moves/upgrades and extra nights; GM/Owner can apply one before payment with a reason, and the guest pays before check-out]**
 - Any change that decreases the total creates a refund request for GM/Owner approval; it never silently reduces "paid".
 - `checked_in` bookings: dates/category frozen **[exists: in_house_frozen]** except via the paid change above.
 

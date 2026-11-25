@@ -18,6 +18,7 @@ import {
   type Db,
   type Stmt,
 } from "../db";
+import { applyChangeStatements, pendingChange, rethrowChangeError } from "./changes";
 import { autoAssignRoomStatements, freeUnits } from "./inventory";
 import { dueOf, loadReservation, netPaid, RES_COLUMNS, type ReservationRow } from "./reservations";
 
@@ -42,7 +43,7 @@ function retryIfCapacityRace(err: unknown): never {
 }
 
 
-async function settleStatements(db: Db, res: ReservationRow, paidAfter: number): Promise<{ outcome: SettleOutcome; stmts: Stmt[]; reason?: string }> {
+async function settleStatements(db: Db, res: ReservationRow, paidAfter: number, dueAfter = dueOf(res)): Promise<{ outcome: SettleOutcome; stmts: Stmt[]; reason?: string }> {
   const stmts: Stmt[] = [];
   let outcome: SettleOutcome;
   let reason: string | undefined;
@@ -53,7 +54,7 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number):
     );
   const flag = (text: string) => stmts.push(db.prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?").bind(text, res.id));
 
-  if (paidAfter < dueOf(res)) {
+  if (paidAfter < dueAfter) {
     outcome = "part_paid";
   } else if (res.status === "pending_payment" && res.hold_expires_at && res.hold_expires_at > now()) {
     confirm();
@@ -77,7 +78,7 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number):
     outcome = "already_settled"; // confirmed / checked in / checked out
   }
 
-  const over = paidAfter - dueOf(res);
+  const over = paidAfter - dueAfter;
   if (over > 0) {
     flag(`Overpaid by ${naira(over)}: more than one payment was received. Refund the difference.`);
     stmts.push(activity(db, "payment.overpaid", "reservation", res.id, `${res.reference} overpaid by ${naira(over)}`, { over_kobo: over }));
@@ -242,12 +243,16 @@ export async function recordOfflinePayment(
       throw new AppError("INVALID_TRANSITION", "Payments can't be taken against a cancelled booking.");
     }
     const paid = await netPaid(db, res.id);
-    const balance = dueOf(res) - paid;
+    // A change waiting for payment (upgrade, move, extra nights) is paid with everything else owed, and applied in the same step.
+    const change = await pendingChange(db, res.id);
+    const dueAfter = dueOf(res) + (change?.amount_kobo ?? 0);
+    const balance = dueAfter - paid;
     if (balance <= 0) throw new AppError("VALIDATION", "This booking is already paid in full.");
     if (input.amountKobo !== balance) throw new AppError("VALIDATION", `Bookings are paid in full. Take the full ${naira(balance)} owed.`);
 
     const paymentId = input.paymentId ?? uuid();
-    const settle = await settleStatements(db, res, paid + input.amountKobo);
+    const settle = await settleStatements(db, res, paid + input.amountKobo, dueAfter);
+    const changeStmts = change ? await applyChangeStatements(db, res, change, { paymentId, decidedBy: actor!.id, paidAfterKobo: paid + input.amountKobo }) : [];
     const methodLabel = input.method.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
     try {
       await writeBatch(
@@ -265,6 +270,7 @@ export async function recordOfflinePayment(
               paymentId, res.id, input.amountKobo, input.method, input.reference?.trim() || null,
               hotelInstant(input.paidOn, hotelTimeNow()), now(), actor.id, input.notes?.trim() || null,
             ),
+          ...changeStmts,
           ...settle.stmts,
           activity(db, "payment.recorded", "reservation", res.id, `${methodLabel} payment of ${naira(input.amountKobo)} recorded for ${res.reference}`, {
             payment_id: paymentId,
@@ -279,6 +285,7 @@ export async function recordOfflinePayment(
         if (done) return done;
         throw new AppError("CONFLICT", "A payment with this reference has already been recorded.");
       }
+      if (change && err instanceof AppError && ["room_overlap", "no_capacity"].includes(dbErrorToken(err.cause) ?? "")) rethrowChangeError(err, change);
       retryIfCapacityRace(err);
     }
     const row = await first<{ receipt_number: string }>(db, "SELECT receipt_number FROM payments WHERE id = ?", paymentId);

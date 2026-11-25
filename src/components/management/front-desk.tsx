@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/ui/feedback";
 import type { ReservationRow } from "@/domain/views";
 import { formatDate, formatNaira, nightsBetween, plural } from "@/lib/format";
 import { ReservationBadge } from "./badges";
-import { nextStep } from "@/domain/next-step";
+import { nextStep, owedOf } from "@/domain/next-step";
 import { cn } from "@/lib/utils/cn";
 import { CheckInButton, CheckOutButton, TakePaymentLink } from "./reservation-actions";
 
@@ -38,7 +38,7 @@ export function MovementList({
       ) : (
         <ul className="divide-y divide-hairline">
           {rows.map((r) => {
-            const balance = r.totalKobo - r.paidKobo;
+            const balance = owedOf(r);
             const overdue = !arrivals && r.checkOut < today;
             return (
               <li key={r.id} className={cn("flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5 sm:py-4", overdue && "bg-danger-50")}>

@@ -14,11 +14,11 @@ import type { ManagerToAsk } from "@/server/domain/admin";
 import { cancelReservation, markNoShow, overridePayment } from "@/server/reservations";
 import { useActionFeedback, withFeedback } from "./action-feedback";
 import { CheckInButton, CheckOutButton } from "./reservation-actions";
-import { nextStep } from "@/domain/next-step";
+import { nextStep, owedOf } from "@/domain/next-step";
 
 type R = Pick<
   ReservationDetail,
-  "id" | "status" | "guestName" | "category" | "roomNumber" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo" | "source" | "createdAt"
+  "id" | "status" | "guestName" | "category" | "roomNumber" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo" | "pendingKobo" | "source" | "createdAt"
 >;
 
 const reasons = ["Guest called to cancel", "Guest changed travel plans", "Booked by mistake", "Duplicate booking"];
@@ -124,7 +124,7 @@ function AskManager({ manager, what, onBack }: { manager: ManagerToAsk | null; w
 export function NextStepBar({ r, today, paymentsHref, canOverride, manager = null }: { r: R; today: string; paymentsHref: string; canOverride: boolean; manager?: ManagerToAsk | null }) {
   const [sheet, setSheet] = useState<null | "menu" | "cancel" | "noshow" | "override" | "ask">(null);
   const moreRef = useRef<HTMLButtonElement>(null);
-  const balance = r.totalKobo - r.paidKobo;
+  const balance = owedOf(r);
   const open = r.status === "pending_payment" || r.status === "confirmed";
   const closed = ["cancelled", "expired", "no_show", "checked_out"].includes(r.status);
   const canPay = balance > 0 && r.status !== "cancelled" && r.status !== "expired";

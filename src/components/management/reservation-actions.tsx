@@ -7,7 +7,7 @@ import { Button, buttonStyles } from "@/components/ui/button";
 import { Stepper } from "@/components/ui/stepper";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { formatNaira } from "@/lib/format";
-import { assignRoom, cancelReservation, changeDates, checkIn, checkOut, markNoShow, overridePayment, resolveAttention, updateReservationDetails } from "@/server/reservations";
+import { applyChangeUnpaid, assignRoom, cancelPendingChange, cancelReservation, changeDates, checkIn, checkOut, markNoShow, overridePayment, resolveAttention, updateReservationDetails } from "@/server/reservations";
 import { ActionButton } from "./action-form";
 import { useActionFeedback, withFeedback } from "./action-feedback";
 import { keepValues } from "@/lib/forms";
@@ -106,7 +106,9 @@ export function AssignRoomForm({
     withFeedback(assignRoom, (d) => {
       const number = rooms.find((r) => r.id === chosen)?.number;
       feedback({
-        message: number ? `${current ? "Moved to" : "Assigned"} Room ${number}.` : "Room updated.",
+        message: d.pendingChangeId
+          ? `Room ${number ?? ""} costs ${formatNaira(d.chargeKobo)} more. Take the payment and the guest moves straight away.`
+          : number ? `${current ? "Moved to" : "Assigned"} Room ${number}.` : "Room updated.",
         undo: d.undoId ? { reservationId, undoId: d.undoId } : undefined,
       });
     }),
@@ -218,7 +220,11 @@ export function ChangeDatesForm({ reservationId, checkIn: ci, checkOut: co, inHo
         </div>
         <p className="text-xs text-ink-500">Availability is re-checked and the total re-priced at the rate agreed at booking.</p>
         {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
-        {state?.ok ? <FormMessage tone="success">Dates updated.</FormMessage> : null}
+        {state?.ok ? (
+          <FormMessage tone="success">
+            {state.data?.pendingChangeId ? `These dates cost ${formatNaira(state.data.chargeKobo)} more. Take the payment and they apply straight away.` : "Dates updated."}
+          </FormMessage>
+        ) : null}
       </form>
     </details>
   );
@@ -234,5 +240,47 @@ export function ResolveAttentionForm({ reservationId }: { reservationId: string 
       <Button type="submit" size="md" variant="secondary" pending={pending}>Mark resolved</Button>
       {state && !state.ok ? <p role="alert" className="text-xs text-danger-700 sm:basis-full">{state.message}</p> : null}
     </form>
+  );
+}
+
+/** A change that costs more, waiting for its payment: pay it (the main action), cancel it, or (General Manager or Owner) apply it first. */
+export function PendingChangeCard({
+  reservationId,
+  change,
+  owedKobo,
+  canApprove,
+}: {
+  reservationId: string;
+  change: { id: string; description: string; amountKobo: number };
+  owedKobo: number;
+  canApprove: boolean;
+}) {
+  const [cancelState, cancelAction, cancelling] = useActionState(cancelPendingChange, null);
+  const [approveState, approveAction, approving] = useActionState(applyChangeUnpaid, null);
+  return (
+    <div className="mt-6 rounded-card border border-gold-300 bg-gold-50 p-4 text-sm">
+      <p className="font-medium text-ink-900">Waiting for payment: {change.description}</p>
+      <p className="mt-0.5 text-ink-700">{formatNaira(change.amountKobo)} more. Nothing changes for the guest until it&apos;s paid.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <TakePaymentLink reservationId={reservationId} balanceKobo={owedKobo} />
+        <form action={cancelAction}>
+          <input type="hidden" name="changeId" value={change.id} />
+          <Button type="submit" variant="ghost" pending={cancelling}>Cancel this change</Button>
+        </form>
+      </div>
+      {cancelState && !cancelState.ok ? <FormMessage>{cancelState.message}</FormMessage> : null}
+      {canApprove ? (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm font-medium text-navy-800">Apply now, before payment (General Manager or Owner)</summary>
+          <form action={approveAction} onSubmit={keepValues(approveAction)} className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start">
+            <input type="hidden" name="changeId" value={change.id} />
+            <Input name="reason" required minLength={5} placeholder="Why it can't wait (saved in Activity)" className="flex-1 bg-ivory-50" aria-label="Reason" />
+            <Button type="submit" variant="secondary" pending={approving}>Apply before payment</Button>
+          </form>
+          <p className="mt-1 text-xs text-ink-500">The guest then owes {formatNaira(change.amountKobo)} and can&apos;t check out until it&apos;s paid.</p>
+          {approveState && !approveState.ok ? <FormMessage>{approveState.message}</FormMessage> : null}
+        </details>
+      ) : null}
+    </div>
   );
 }
