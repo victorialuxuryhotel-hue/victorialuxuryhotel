@@ -57,6 +57,36 @@ check("the count comes first", /Submit my count/.test(yourDay));
 await ctx.close();
 
 {
+  // H5: this station prints 80mm receipts automatically, once per receipt.
+  const { ctx, p } = await as("restaurant_bar");
+  await p.setViewport({ width: 1280, height: 720 });
+  await p.evaluateOnNewDocument(() => {
+    window.__prints = 0;
+    window.print = () => { window.__prints++; };
+  });
+  await go(p, "/app/station");
+  await clickText(p, "button", "80mm receipt printer");
+  const saved = await p.evaluate(() => JSON.parse(localStorage.getItem("victoria-station") ?? "{}"));
+  check("This station saves 80mm with auto-print on", saved.printLayout === "80mm" && saved.autoPrint === true, JSON.stringify(saved));
+  await go(p, "/app/sales");
+  await settle(p);
+  await until(async () => {
+    if (/Total · 1 item/.test(await text(p))) return true;
+    await p.click("section[aria-label=Menu] li button:not([disabled])").catch(() => {});
+    return false;
+  }, "item added", 10000);
+  await clickText(p, "button", "Take payment");
+  await clickText(p, "button", "Exact");
+  await clickText(p, "button", "Confirm");
+  await waitForText(p, /Give change/);
+  await new Promise((r) => setTimeout(r, 500));
+  await clickText(p, "button", "Best sellers").catch(() => {}); // any re-render
+  check("the receipt printed automatically, exactly once", (await p.evaluate(() => window.__prints)) === 1, String(await p.evaluate(() => window.__prints)));
+  await p.evaluate(() => localStorage.removeItem("victoria-station"));
+  await ctx.close();
+}
+
+{
   // H3: the idle lock covers the screen; Continue brings back the same order. (Idle time shortened for the test.)
   const { ctx, p } = await as("restaurant_bar");
   await go(p, "/app/sales");

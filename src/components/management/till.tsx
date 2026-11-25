@@ -10,6 +10,8 @@ import { cancelOpenOrder, saveOpenOrder, takePayment } from "@/server/pos";
 import { OFFLINE_MESSAGE, safeAction } from "@/lib/safe-action";
 import type { MenuCategory, MenuItem, OpenOrder, Outlet, PayMethod } from "@/server/domain/pos";
 import { NumPad } from "@/components/ui/num-pad";
+import { shouldAutoPrint } from "@/lib/station";
+import { useStation } from "./use-station";
 import { PosReceipt, type PosReceiptData } from "./pos-receipt";
 
 const OUTLETS: Record<Outlet, string> = { restaurant: "Restaurant", bar: "Bar" };
@@ -83,7 +85,10 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   staffId?: string;
 }) {
   const resumeOrder = open.find((o) => o.id === resume);
-  const [outlet, setOutlet] = useState<Outlet>(resumeOrder?.outlet ?? startOutlet);
+  // Which counter: the order being resumed, else what the salesperson picked, else this station's default (H5).
+  const station = useStation();
+  const [outletChoice, setOutlet] = useState<Outlet | null>(resumeOrder?.outlet ?? null);
+  const outlet: Outlet = outletChoice ?? station.counter ?? startOutlet;
   const [category, setCategory] = useState<MenuCategory | "all">("all");
   const [cart, setCart] = useState<Record<string, number>>(() => Object.fromEntries((resumeOrder?.lines ?? []).map((l) => [l.menuItemId, l.quantity])));
   const [note, setNote] = useState(resumeOrder?.note ?? "");
@@ -171,6 +176,15 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
     setEditing(draft.editing && open.some((o) => o.id === draft.editing!.id) ? draft.editing : null);
     orderId.current = draft.orderId;
   };
+
+  // Auto-print (station setting): once per receipt, after the print copy is on the page.
+  const printed = useRef(new Set<string>());
+  useEffect(() => {
+    const n = receipt?.receiptNumber;
+    if (!shouldAutoPrint(station, n, printed.current)) return;
+    printed.current.add(n!);
+    window.print();
+  }, [receipt?.receiptNumber, station]);
 
   const handledSave = useRef<unknown>(null);
   useEffect(() => {

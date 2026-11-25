@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { KeyRound, LogOut } from "lucide-react";
+import { KeyRound, LogOut, Monitor } from "lucide-react";
 import { SignOutButton } from "@clerk/nextjs";
 import { staffRole, type StaffRole } from "@/domain/status";
 
@@ -19,6 +19,9 @@ export function StaffCard({ fullName, role, children }: { fullName: string; role
         {children}
         <Link href="/app/account" className={row}>
           <KeyRound className="size-4" aria-hidden /> Manage sign-in
+        </Link>
+        <Link href="/app/station" className={row}>
+          <Monitor className="size-4" aria-hidden /> This station
         </Link>
         <SignOutButton redirectUrl="/login">
           <button type="button" className={`${row} w-full text-left`}>
