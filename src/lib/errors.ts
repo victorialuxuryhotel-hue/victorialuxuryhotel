@@ -1,4 +1,5 @@
 import { ZodError } from "zod";
+import { errorRef, unexpectedMessage } from "./error-ref";
 export type ErrorCode =
   | "VALIDATION"
   | "UNAUTHENTICATED"
@@ -30,6 +31,9 @@ export type ActionResult<T = void> =
 export const ok = <T>(data: T): ActionResult<T> => ({ ok: true, data });
 
 export function toActionError(err: unknown): Extract<ActionResult, { ok: false }> {
+  if (err instanceof AppError && err.code === "INTERNAL") {
+    return { ok: false, code: "INTERNAL", message: unexpectedMessage(errorRef(err), err.message.replace(/\s*Please try again\.?$/, "")) };
+  }
   if (err instanceof AppError) {
     return { ok: false, code: err.code, message: err.message, fieldErrors: err.fieldErrors };
   }
@@ -37,5 +41,5 @@ export function toActionError(err: unknown): Extract<ActionResult, { ok: false }
     const msg = err.issues[0]?.message ?? "";
     return { ok: false, code: "VALIDATION", message: !msg || /^(Invalid|Too (big|small))|expected/i.test(msg) ? "Check the details and try again." : msg };
   }
-  return { ok: false, code: "INTERNAL", message: "Something went wrong. Please try again." };
+  return { ok: false, code: "INTERNAL", message: unexpectedMessage(errorRef(err)) };
 }

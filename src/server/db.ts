@@ -91,7 +91,7 @@ export async function retryOnStale<T>(body: () => Promise<T>, attempts = 4): Pro
 
 export function requireRole(actor: Actor, roles: readonly StaffRole[]): asserts actor is NonNullable<Actor> {
   if (!actor) throw new AppError("UNAUTHENTICATED", "Your session has ended. Please sign in again.");
-  if (!roles.includes(actor.role)) throw new AppError("FORBIDDEN", "Your role does not allow this action.");
+  if (!roles.includes(actor.role)) throw new AppError("FORBIDDEN", "Your role can't do this. Ask the General Manager or the Owner.");
 }
 
 export const ALL_STAFF = ["owner", "general_manager", "hotel_manager", "front_desk"] as const;
@@ -99,7 +99,6 @@ export const MANAGERS = ["owner", "general_manager", "hotel_manager"] as const;
 export const MONEY_APPROVERS = ["owner", "general_manager"] as const;
 export const HOTEL_REPORTERS = ["owner", "general_manager", "finance", "hotel_manager"] as const;
 export const OWNER = ["owner"] as const;
-export const FINANCE = ["owner", "general_manager", "finance"] as const;
 export const POS_SELLERS = ["owner", "restaurant_bar", "restaurant_bar_manager"] as const;
 export const POS_MANAGERS = ["owner", "restaurant_bar_manager"] as const;
 export const POS_VIEWERS = ["owner", "general_manager", "finance", "restaurant_bar_manager"] as const;

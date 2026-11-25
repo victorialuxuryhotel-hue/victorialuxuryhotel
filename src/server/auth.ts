@@ -79,7 +79,7 @@ export async function authorizeRead(permission?: Permission | readonly Permissio
   if (!staff) throw new AppError("UNAUTHENTICATED", "Your session has ended. Please sign in again.");
   if (staff.twoStep) throw new AppError("FORBIDDEN", "Set up two-step sign-in first.");
   if (permission && !canAny(staff.role, permission)) {
-    throw new AppError("FORBIDDEN", "Your role does not allow this action.");
+    throw new AppError("FORBIDDEN", "Your role can't do this. Ask the General Manager or the Owner.");
   }
   return staff;
 }
