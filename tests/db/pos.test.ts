@@ -200,6 +200,21 @@ describe("restaurant & bar reports and the hotel's books", () => {
     const rows = await incomeRows(db, gm, sameDay ? "today" : "7d");
     expect(rows.find((r) => r.document === food.receiptNumber)).toMatchObject({ department: "restaurant", method: "transfer", kobo: 850_000 });
     expect(rows.some((r) => r.document === oops.receiptNumber)).toBe(false);
+    // Fix 4: the manager's list of transfers to check against the bank statement carries the reference.
+    const kitchen = await posReport(db, mgr, "today", "restaurant");
+    expect(kitchen.transfers.find((t) => t.receipt_number === food.receiptNumber)).toMatchObject({ reference: "ADA OKAFOR", kobo: 850_000, outlet: "restaurant" });
+    expect(kitchen.transfers.every((t) => t.outlet === "restaurant")).toBe(true);
+  });
+
+  it("a transfer at the till needs the reference and the bank-app tick", async () => {
+    const mgr = await staff("restaurant_bar_manager");
+    const att = await staff("restaurant_bar");
+    const { itemId } = await drink(mgr);
+    const sale = { id: crypto.randomUUID(), outlet: "bar" as const, lines: [{ menuItemId: itemId, quantity: 1 }], method: "bank_transfer" as const };
+    await rejects(payOrder(db, att, { ...sale, transferChecked: true }), /last 4 characters of the transfer reference or the sender's name/);
+    await rejects(payOrder(db, att, { ...sale, transferReference: "4821" }), /Check the hotel's bank app first/);
+    const paid = await payOrder(db, att, { ...sale, transferReference: "4821", transferChecked: true });
+    expect((await q1<{ transfer_reference: string }>("SELECT transfer_reference FROM pos_orders WHERE id = ?", paid.id)).transfer_reference).toBe("4821");
   });
 
   it("restaurant & bar managers record stock waste; finance can view reports but not sell", async () => {

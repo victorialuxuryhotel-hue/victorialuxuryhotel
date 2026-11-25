@@ -8,7 +8,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
-import { formatDate, formatNaira } from "@/lib/format";
+import { formatDate, formatDateTime, formatNaira } from "@/lib/format";
 import { businessDate } from "@/lib/hotel-date";
 import { cn } from "@/lib/utils/cn";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
@@ -106,6 +106,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           ["Orders", `/app/sales/orders/csv?from=${r.from}&to=${r.to}${outlet ? `&outlet=${outlet}` : ""}`],
           ["Sales by item", `/app/sales/reports/items-csv?range=${range}${outlet ? `&outlet=${outlet}` : ""}`],
           ["Stock", `/app/sales/reports/stock-csv?range=${range}`],
+          ["Transfers", `/app/sales/reports/transfers-csv?range=${range}${outlet ? `&outlet=${outlet}` : ""}`],
         ].map(([label, href]) => (
           <span key={label} className="inline-flex">
             <a href={`${href}&format=xlsx`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> {label} (Excel)</a>
@@ -132,6 +133,18 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           <Table head={["Category", "Qty", "Amount"]} rows={r.byCategory.map((c) => [MENU_CATEGORIES[c.category] ?? c.category, c.qty, formatNaira(c.kobo)])} empty="No sales." />
         </Card>
       </div>
+
+      <Card>
+        <CardHeader
+          title="Transfers to check"
+          description={`Every transfer sale, by salesperson, with the reference they entered. Tick each one off against the hotel's bank statement · ${rangeName.toLowerCase()}`}
+        />
+        <Table
+          head={["Sold by", "Time", "Receipt", "Counter", "Amount", "Reference"]}
+          rows={r.transfers.map((t) => [t.who, formatDateTime(t.paid_at), t.receipt_number, OUTLETS[t.outlet], formatNaira(t.kobo), t.reference ?? "None (before references were required)"])}
+          empty="No transfer sales."
+        />
+      </Card>
 
       <Card>
         <CardHeader title="By menu item" description="Best sellers first." />

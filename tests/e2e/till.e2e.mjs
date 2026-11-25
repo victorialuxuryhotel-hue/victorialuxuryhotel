@@ -1,0 +1,32 @@
+// Fix 4 / rule I10: a transfer at the till can't be confirmed without the reference and the bank-app tick.
+import { as, check, clickText, finish, go, settle, text, val, waitForText } from "./lib.mjs";
+
+const { ctx, p } = await as("restaurant_bar");
+await go(p, "/app/sales");
+await settle(p);
+// The first menu item that can be sold.
+const tile = await p.$("section[aria-label=Menu] li button:not([disabled])");
+check("the till has something to sell", Boolean(tile));
+await tile.click();
+await clickText(p, "button", "Take payment");
+await clickText(p, "button", "Transfer");
+const confirm = async () => p.$$eval("button[type=submit]", (bs) => bs.find((b) => /^Confirm .* paid$/.test(b.innerText.trim()))?.disabled);
+check("Confirm is off until there's a reference and the tick", (await confirm()) === true);
+await p.type("input[name=transferReference]", "4821");
+check("a reference alone isn't enough", (await confirm()) === true);
+await p.click("input[name=transferChecked]");
+check("reference and tick: Confirm is on", (await confirm()) === false);
+check("the tick says a screenshot or SMS alert is not enough", /screenshot or SMS alert is not enough/.test(await text(p)));
+const before = await val("SELECT count(*) FROM pos_orders WHERE transfer_reference = '4821'");
+await clickText(p, "button", "Confirm");
+await waitForText(p, /RB-\d{4}-\d{6}/);
+check("the sale is saved with its transfer reference", (await val("SELECT count(*) FROM pos_orders WHERE transfer_reference = '4821' AND status = 'paid' AND method = 'bank_transfer'")) === before + 1);
+await ctx.close();
+
+{
+  const { ctx, p } = await as("restaurant_bar_manager");
+  await go(p, "/app/sales/reports?range=today");
+  check("the manager sees it under Transfers to check, with the reference", /Transfers to check[\s\S]*4821/.test(await text(p)));
+  await ctx.close();
+}
+await finish();

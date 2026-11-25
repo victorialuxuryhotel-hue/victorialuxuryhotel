@@ -17,7 +17,7 @@ export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: O
   const out = outlet ? "AND o.outlet = ?" : "";
   const args = (...a: unknown[]) => [...a, ...(outlet ? [outlet] : [])];
   const PAID = `o.status = 'paid' AND o.paid_at >= ? AND o.paid_at < ? ${out}`;
-  const [byDay, byItem, byCategory, byStaff, byMethod, voids, closings, stock, moves] = await Promise.all([
+  const [byDay, byItem, byCategory, byStaff, byMethod, voids, closings, stock, moves, transfers] = await Promise.all([
     all<{ day: string; kobo: number; n: number }>(db, `SELECT ${DAY} AS day, sum(o.total_kobo) AS kobo, count(*) AS n FROM pos_orders o WHERE ${PAID} GROUP BY day`, ...args(start, end)),
     all<{ name: string; outlet: Outlet; qty: number; kobo: number }>(
       db,
@@ -59,6 +59,14 @@ export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: O
        WHERE m.created_at >= ? AND m.created_at < ? GROUP BY i.name, i.unit, m.kind`,
       start, end,
     ),
+    // Every transfer sale, by salesperson, for the manager to tick off against the bank statement (I10).
+    all<{ who: string; paid_at: string; receipt_number: string; outlet: Outlet; kobo: number; reference: string | null }>(
+      db,
+      `SELECT s.full_name AS who, o.paid_at, o.receipt_number, o.outlet, o.total_kobo AS kobo, o.transfer_reference AS reference
+       FROM pos_orders o JOIN staff_profiles s ON s.id = o.paid_by
+       WHERE ${PAID} AND o.method = 'bank_transfer' ORDER BY s.full_name, o.paid_at`,
+      ...args(start, end),
+    ),
   ]);
   const salesKobo = byDay.reduce((s, d) => s + d.kobo, 0);
   const sales = byDay.reduce((s, d) => s + d.n, 0);
@@ -73,7 +81,7 @@ export async function posReport(db: Db, actor: Actor, range: PosRange, outlet: O
   }
   return {
     from, to, outlet, sales, salesKobo, daily, byItem, byCategory, byStaff, byMethod: method,
-    voids: voids?.n ?? 0, voidsKobo: voids?.kobo ?? 0,
+    voids: voids?.n ?? 0, voidsKobo: voids?.kobo ?? 0, transfers,
     closings: closings[0] ?? { n: 0, diff: 0, unverified: 0 },
     stock, lowStock: stock.filter((s) => s.quantity <= s.min_quantity), stockMoves: [...stockMoves.values()].sort((a, b) => a.name.localeCompare(b.name)),
   };
