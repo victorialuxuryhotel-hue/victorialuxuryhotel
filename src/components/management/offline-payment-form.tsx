@@ -129,7 +129,7 @@ export function OfflinePaymentForm({
           <p className="text-sm text-ink-600">Payments can&apos;t be edited once saved. If something is wrong later, a manager records a correction.</p>
           <div className="grid grid-cols-2 gap-2.5 sm:flex sm:justify-end">
             <Button type="button" variant="secondary" size="lg" onClick={() => setReview(null)} disabled={pending}>Go back</Button>
-            <Button type="submit" size="lg" pending={pending} disabled={!online} title={online ? undefined : OFFLINE_REASON}>Yes, take payment</Button>
+            <Button type="submit" size="lg" autoFocus pending={pending} disabled={!online} title={online ? undefined : OFFLINE_REASON}>Yes, take payment</Button>
           </div>
         </div>
       ) : null}

@@ -149,4 +149,29 @@ for (const id of pagingIds) {
   await ctx.close();
 }
 
+{
+  // H10: front desk shortcuts. "/" jumps to search; Esc closes the Cancel popover.
+  const { ctx, p } = await as("front_desk");
+  const focusedSearch = () => p.evaluate(() => document.activeElement?.hasAttribute("data-search") ?? false);
+  await go(p, "/app/reservations");
+  await p.keyboard.press("/");
+  check("/ focuses the search box on Bookings", await focusedSearch());
+  await go(p, "/app/today");
+  await p.keyboard.press("/");
+  check("/ focuses Find a booking on Today", await focusedSearch());
+  await p.keyboard.type("VL-");
+  await p.keyboard.press("Enter");
+  await p.waitForNavigation({ waitUntil: "load" }).catch(() => {});
+  check("searching from Today opens Bookings with the search", /\/app\/reservations\?.*q=VL-/.test(p.url()), p.url());
+  const pending = await val("SELECT id FROM reservations WHERE status IN ('pending_payment', 'confirmed') ORDER BY created_at DESC LIMIT 1");
+  await go(p, `/app/reservations/${pending}`);
+  const popover = await p.$("details[data-popover]");
+  if (popover) {
+    await p.click("details[data-popover] > summary");
+    await p.keyboard.press("Escape");
+    check("Esc closes the Cancel popover", !(await p.$eval("details[data-popover]", (d) => d.open)));
+  }
+  await ctx.close();
+}
+
 await finish();

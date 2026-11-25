@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CheckCircle2, ChevronRight } from "lucide-react";
+import { CheckCircle2, ChevronRight, Search } from "lucide-react";
+import { Input } from "@/components/ui/form";
+import { SlashHint } from "./shortcuts";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import type { NeedsYou, RoomCounts } from "@/domain/today";
@@ -116,7 +118,17 @@ export function TodayView({
             <h1 className="text-[1.75rem] leading-tight font-semibold text-ink-900">{greeting}, {firstName}</h1>
             <p className="mt-1 text-sm text-ink-500">{formatDate(today)}</p>
           </div>
-          {signedIn}
+          <div className="flex flex-col items-end gap-2">
+            {signedIn}
+            {/* "/" jumps here (front desk shortcut); searches all bookings. */}
+            <form method="get" action="/app/reservations" className="relative w-72 max-w-full" role="search">
+              <input type="hidden" name="tab" value="all" />
+              <label className="sr-only" htmlFor="today-search">Find a booking</label>
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+              <Input id="today-search" type="search" name="q" placeholder="Find a booking: name, phone or VL-…" data-search="" aria-keyshortcuts="/" className="h-10 pl-9 pointer-fine:md:pr-9" />
+              <SlashHint />
+            </form>
+          </div>
         </header>
 
         <section aria-labelledby="needs">

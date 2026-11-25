@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { Input, Select } from "@/components/ui/form";
 import { cn } from "@/lib/utils/cn";
 import { FiltersToggle } from "./filters-toggle";
+import { SlashHint } from "./shortcuts";
 
 export function ListToolbar({
   placeholder,
@@ -32,7 +33,8 @@ export function ListToolbar({
       <label className="relative flex-1">
         <span className="sr-only">Search</span>
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
-        <Input type="search" name="q" placeholder={placeholder} defaultValue={defaultQuery} className="h-11 pl-9 md:h-10" />
+        <Input type="search" name="q" placeholder={placeholder} defaultValue={defaultQuery} data-search="" aria-keyshortcuts="/" className="h-11 pl-9 md:h-10 pointer-fine:md:pr-9" />
+        <SlashHint />
       </label>
       {filters ? <FiltersToggle initiallyOpen={filtersActive}>{filters}</FiltersToggle> : null}
     </form>

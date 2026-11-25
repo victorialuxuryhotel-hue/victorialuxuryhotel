@@ -178,7 +178,7 @@ export function AssignRoomForm({
 export function CancelForm({ reservationId }: { reservationId: string }) {
   const [state, action, pending] = useActionState(cancelReservation, null);
   return (
-    <details className="group relative">
+    <details className="group relative" data-popover="">
       <summary className="inline-flex h-10 cursor-pointer list-none items-center gap-2 rounded-md px-4 text-sm font-medium text-danger-700 hover:bg-danger-50">
         <XCircle className="size-4" aria-hidden /> Cancel
       </summary>

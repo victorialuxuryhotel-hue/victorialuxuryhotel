@@ -6,6 +6,7 @@ import { managementNav } from "@/components/management/nav-items";
 import { BrowserBanner, NoteBrowser } from "@/components/management/browser-check";
 import { ConnectionBanner } from "@/components/management/connection";
 import { IdleLock } from "@/components/management/idle-lock";
+import { Shortcuts } from "@/components/management/shortcuts";
 import { StaffCard } from "@/components/management/staff-card";
 import { policy } from "@/config/policy";
 import { staffRole } from "@/domain/status";
@@ -36,6 +37,7 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <ConnectionBanner />
+      <Shortcuts />
       <BrowserBanner />
       <NoteBrowser sessionKey={staff.id} />
       {staff.viewAs ? <ViewAsBanner /> : null}
