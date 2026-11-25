@@ -2,6 +2,8 @@
 import { as, check, clickText, finish, go, settle, text, val, waitForText } from "./lib.mjs";
 
 const { ctx, p } = await as("restaurant_bar");
+// A 1280×720 laptop with browser toolbars: the till must work without scrolling the page.
+await p.setViewport({ width: 1280, height: 620 });
 await go(p, "/app/sales");
 await settle(p);
 // The first menu item that can be sold.
@@ -16,6 +18,7 @@ await p.type("input[name=transferReference]", "4821");
 check("a reference alone isn't enough", (await confirm()) === true);
 await p.click("input[name=transferChecked]");
 check("reference and tick: Confirm is on", (await confirm()) === false);
+check("at 1280×720 the till, with the Transfer fields open, fits without scrolling the page", (await p.evaluate(() => document.documentElement.scrollHeight - innerHeight)) <= 0);
 check("the tick says a screenshot or SMS alert is not enough", /screenshot or SMS alert is not enough/.test(await text(p)));
 const before = await val("SELECT count(*) FROM pos_orders WHERE transfer_reference = '4821'");
 await clickText(p, "button", "Confirm");

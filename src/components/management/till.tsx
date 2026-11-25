@@ -130,9 +130,11 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
   }
 
   return (
-    <div className="space-y-8 pb-24 lg:pb-0">
-      <div className="grid gap-6 lg:grid-cols-[1fr_24rem]">
-        <section aria-label="Menu" className="min-w-0 space-y-4">
+    // Laptops: the till fills the window. The menu (and unpaid orders under it) scrolls in its own
+    // column and the order panel stays pinned, so the page itself never scrolls (UX brief: 1280×720).
+    <div className="space-y-8 pb-24 lg:h-full lg:pb-0">
+      <div className="grid gap-6 lg:h-full lg:grid-cols-[1fr_24rem]">
+        <section aria-label="Menu" className="min-w-0 space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2 lg:pb-4">
           <div className="flex gap-2" role="tablist" aria-label="Counter">
             {(Object.keys(OUTLETS) as Outlet[]).map((o) => (
               <button
@@ -195,9 +197,17 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
           ) : (
             <p className="rounded-md border border-dashed border-hairline p-6 text-sm text-ink-500">No {OUTLETS[outlet].toLowerCase()} items on the menu yet. A manager adds them under Menu.</p>
           )}
+          {open.length ? (
+            <section aria-labelledby="unpaid" className="rounded-card border border-hairline bg-ivory-50">
+              <h2 id="unpaid" className="border-b border-hairline px-5 py-4 font-display text-xl text-navy-950">Unpaid orders · {open.length}</h2>
+              <ul className="divide-y divide-hairline">
+                {open.map((o) => <OpenOrderRow key={o.id} o={o} onOpen={() => resumeOpen(o)} active={editing?.id === o.id} />)}
+              </ul>
+            </section>
+          ) : null}
         </section>
 
-        <section id="order" aria-label="This order" className="h-fit space-y-4 rounded-card border border-hairline bg-ivory-50 p-5 lg:sticky lg:top-24">
+        <section id="order" aria-label="This order" className="h-fit space-y-4 rounded-card border border-hairline bg-ivory-50 p-5 lg:max-h-full lg:overflow-y-auto">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="font-display text-2xl text-navy-950">{editing ? `Order #${editing.number}` : "New order"}</h2>
             {lines.length ? <button type="button" onClick={reset} className="text-sm text-ink-500 underline-offset-2 hover:underline">Clear</button> : null}
@@ -325,14 +335,6 @@ export function Till({ menu, open, attendant, vatRateBp, startOutlet = "bar", re
         </section>
       </div>
 
-      {open.length ? (
-        <section aria-labelledby="unpaid" className="rounded-card border border-hairline bg-ivory-50">
-          <h2 id="unpaid" className="border-b border-hairline px-5 py-4 font-display text-xl text-navy-950">Unpaid orders · {open.length}</h2>
-          <ul className="divide-y divide-hairline">
-            {open.map((o) => <OpenOrderRow key={o.id} o={o} onOpen={() => resumeOpen(o)} active={editing?.id === o.id} />)}
-          </ul>
-        </section>
-      ) : null}
 
       {step === "order" && lines.length ? (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-hairline bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden print:hidden">
