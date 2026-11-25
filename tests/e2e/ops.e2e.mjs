@@ -124,4 +124,29 @@ for (const id of pagingIds) {
   check("a real room page is fine", (await status("/rooms/deluxe")) === 200);
 }
 
+{
+  // H8: an old browser gets a warning (not blocked); the browser in use is noted once per session.
+  const { ctx, p } = await session();
+  await p.setUserAgent("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36");
+  await go(p, "/login");
+  await waitForText(p, /too old for the system/);
+  check("an old browser on Windows 7 is warned on the sign-in page", /Use Google Chrome on Windows 10 or 11/.test(await text(p)));
+  check("but can still sign in", Boolean(await p.$("input[name=identifier], input[name=username], input[type=password], form")));
+  await ctx.close();
+}
+{
+  const { ctx, p } = await as("front_desk");
+  const count = () => val("SELECT count(*) FROM activity_log WHERE action = 'staff.browser'");
+  await go(p, "/app/today");
+  await new Promise((r) => setTimeout(r, 1500));
+  const afterFirst = await count();
+  check("the browser in use is noted in Activity", afterFirst >= 1);
+  await go(p, "/app/reservations");
+  await go(p, "/app/rooms");
+  await new Promise((r) => setTimeout(r, 1500));
+  check("a current browser gets no warning", !/too old for the system/.test(await text(p)));
+  check("it's noted once per session, not on every page", (await count()) === afterFirst, `${afterFirst} → ${await count()}`);
+  await ctx.close();
+}
+
 await finish();
