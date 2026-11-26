@@ -95,6 +95,8 @@ type CreateInput = {
   email?: string | null;
   phone?: string | null;
   specialRequests?: string | null;
+  /** A room asked for (from the calendar). Still assigned on payment, this one first if it's free. */
+  preferredRoomId?: string | null;
   extraIds?: string[];
   promoCode?: string | null;
   source: ReservationRow["source"];
@@ -195,13 +197,13 @@ async function createReservation(db: Db, actor: Actor, input: CreateInput): Prom
         .prepare(
           `INSERT INTO reservations (id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count,
              nightly_rate_kobo, total_amount_kobo, status, source, special_requests, hold_expires_at, created_by,
-             extras_kobo, discount_pct, discount_kobo, promo_code)
-           VALUES (?, ?, ?, ${guestExpr}, ?, ?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?)`,
+             extras_kobo, discount_pct, discount_kobo, promo_code, preferred_room_id)
+           VALUES (?, ?, ?, ${guestExpr}, ?, ?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id, reference, publicToken, guestParam, cat.id, null, input.checkIn, input.checkOut, input.guests,
           cat.nightly_rate_kobo, total, input.source, input.specialRequests?.trim() || null, holdExpiresAt, input.createdBy,
-          extrasKobo, discountPct, discountKobo, promo ? code : null,
+          extrasKobo, discountPct, discountKobo, promo ? code : null, input.preferredRoomId ?? null,
         ),
       ...extras.map((e) =>
         db

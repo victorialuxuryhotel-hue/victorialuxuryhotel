@@ -1,4 +1,4 @@
-# Release review: security, roles and migrations 0012–0023
+# Release review: security, roles and migrations 0012–0024
 
 Nothing on this page has been run against production. Each step needs your review first. Run the steps in this order.
 
@@ -138,6 +138,13 @@ database now guards that night's stock too. Between 06:00 and midnight nothing c
 A room type costs exactly what the hotel sets; the rate must still be above zero. Bookings keep their
 agreed rate. No rows change.
 
+### What 0024 changes
+
+`migrations/0024_preferred_room.sql`: a new nullable column, `reservations.preferred_room_id`, the room asked for
+when a booking is started from an empty night on the room calendar. Rooms are still assigned on payment (rule I4);
+payment gives this room if it's still free, otherwise the usual choice. A trigger refuses a room of another type.
+No existing rows change.
+
 ### Proof that data is kept
 
 On 24 Nov 2026 a read-only export of the live database was loaded into a local SQLite copy. Both migrations were applied to it with foreign keys on, matching D1. Before and after:
@@ -235,7 +242,7 @@ These are deliberately **not final** in the app:
 
 1. Rotate keys and set the Cloudflare secrets (section 2).
 2. Set up the Clerk production instance (section 3). Two-step sign-in stays on hold until you set `TWO_STEP_ENFORCED=1` (section 4); do that before go-live.
-3. Record the Time Travel bookmark, then apply 0012 to 0023 (section 1).
+3. Record the Time Travel bookmark, then apply 0012 to 0024 (section 1).
 4. Build (`pnpm cf:build`; it must report no secrets), upload, compare `wrangler versions view` secrets, remove `EMAIL_ALLOWLIST` if inherited, and deploy.
 5. In the app: deactivate the 3 demo staff (they're linked to development Clerk users). Create the first owner with `scripts/create-owner.mts`. Sign in and set up the authenticator app. Then invite the real staff.
 6. Remove the demo data from the live site: `npx wrangler d1 execute victoria-hotel-db --remote --file db/demo-live-undo.sql` (switches off the demo extras, the WELCOME10 promo code, demo menu and stock items, and clears the demo room descriptions). Check it first: it only switches things off, it deletes nothing.

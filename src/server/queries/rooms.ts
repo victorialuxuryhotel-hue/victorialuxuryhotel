@@ -2,10 +2,11 @@ import "server-only";
 import { boardState } from "@/domain/room-board";
 import type { TonightType } from "@/domain/today";
 import type { CategoryRow, RoomTile } from "@/domain/views";
-import { hotelToday, tonight } from "@/lib/hotel-date";
+import { hotelToday, isIsoDate, tonight } from "@/lib/hotel-date";
 import { mediaUrl } from "@/lib/media";
-import { authorizeRead } from "../auth";
+import { actorOf, authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
+import { calendarData } from "../domain/calendar";
 import { availableOnNight, roomChoices, roomStays } from "../domain/inventory";
 
 export type BoardRoom = RoomTile & { categoryId: string; serviceStatus: "in_service" | "maintenance"; reservationId?: string };
@@ -15,6 +16,25 @@ export async function availableTonight(): Promise<TonightType[]> {
   await authorizeRead("reservations.manage");
   const rows = await availableOnNight(await getDb(), tonight());
   return rows.map((r) => ({ categoryId: r.category_id, name: r.name, rateKobo: r.nightly_rate_kobo, rooms: r.rooms, free: r.free, held: r.held }));
+}
+
+/** The room calendar (I6): 14 nights from `from` (default: tonight's business date). */
+export async function roomCalendar(from?: string) {
+  const staff = await authorizeRead("reservations.manage");
+  const start = from && isIsoDate(from) && from >= "2024-01-01" && from <= "2045-12-01" ? from : tonight();
+  const data = await calendarData(await getDb(), actorOf(staff), start, CALENDAR_DAYS);
+  return { from: start, today: hotelToday(), firstBookable: tonight(), ...data };
+}
+export const CALENDAR_DAYS = 14;
+
+/** A room asked for from the calendar: only an active room in service. */
+export async function roomToAskFor(id: string): Promise<{ id: string; number: string; categoryId: string } | null> {
+  await authorizeRead("reservations.manage");
+  return first<{ id: string; number: string; categoryId: string }>(
+    await getDb(),
+    "SELECT id, room_number AS number, category_id AS categoryId FROM rooms WHERE id = ? AND is_active = 1 AND service_status = 'in_service'",
+    id,
+  );
 }
 
 export async function roomBoard(): Promise<BoardRoom[]> {

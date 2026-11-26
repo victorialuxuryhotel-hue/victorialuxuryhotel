@@ -128,7 +128,7 @@ export function autoAssignRoomStatements(db: Db, reservationId: string): Stmt[] 
                SELECT 1 FROM reservations o WHERE o.room_id = rm.id AND o.id <> reservations.id
                  AND o.status IN ('pending_payment', 'confirmed', 'checked_in')
                  AND o.check_in < reservations.check_out AND reservations.check_in < ${stayEndSql("o")})
-           ORDER BY rm.readiness = 'ready' DESC, length(rm.room_number), rm.room_number
+           ORDER BY rm.id IS reservations.preferred_room_id DESC, rm.readiness = 'ready' DESC, length(rm.room_number), rm.room_number
            LIMIT 1)
          WHERE id = ? AND room_id IS NULL`,
       )

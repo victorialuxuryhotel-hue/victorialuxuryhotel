@@ -24,7 +24,24 @@ const chip = (on: boolean) =>
     on ? "border-navy-800 bg-navy-50 text-navy-800" : "border-hairline text-ink-900 hover:bg-ink-900/7",
   );
 
-export function ReservationForm({ categories, today, holdHours, aboveTabs = false, initialCategoryId }: { categories: CategoryRow[]; today: string; holdHours: number; aboveTabs?: boolean; initialCategoryId?: string }) {
+export function ReservationForm({
+  categories,
+  today,
+  holdHours,
+  aboveTabs = false,
+  initialCategoryId,
+  initialCheckIn,
+  preferredRoom,
+}: {
+  categories: CategoryRow[];
+  today: string;
+  holdHours: number;
+  aboveTabs?: boolean;
+  initialCategoryId?: string;
+  initialCheckIn?: string;
+  /** From an empty night on the calendar: asked for, assigned on payment if still free. */
+  preferredRoom?: { id: string; number: string; categoryId: string };
+}) {
   const [state, action, pending] = useActionState(createReservation, null);
   // One id per form: a double tap or a retry after a timeout returns the same booking, not a second hold.
   const [requestId] = useState(() => crypto.randomUUID());
@@ -50,8 +67,9 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
   }, [phone, searchable]);
   const matches = searchable && found.phone === phone ? found.list : [];
 
-  const [checkIn, setCheckIn] = useState(today);
-  const [checkOut, setCheckOut] = useState(addDays(today, 1));
+  const [checkIn, setCheckIn] = useState(initialCheckIn ?? today);
+  const [checkOut, setCheckOut] = useState(addDays(initialCheckIn ?? today, 1));
+  const [askedRoom, setAskedRoom] = useState(preferredRoom ?? null);
   const [source, setSource] = useState<Source>("walk_in");
   const nights = checkIn && checkOut && checkOut > checkIn ? nightsBetween(checkIn, checkOut) : 0;
 
@@ -159,6 +177,15 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
               <Stepper id="ng" name="guests" max={cat?.maxOccupancy ?? 20} unit={["guest", "guests"]} />
             </Field>
           </div>
+          {askedRoom && askedRoom.categoryId === categoryId ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-hairline px-5 py-3 text-sm text-ink-700" data-asked-room={askedRoom.number}>
+              <input type="hidden" name="preferredRoomId" value={askedRoom.id} />
+              <span>
+                <b className="font-medium text-ink-900">Room {askedRoom.number}</b> asked for. It&apos;s given to this booking when it&apos;s paid, if it&apos;s still free.
+              </span>
+              <button type="button" onClick={() => setAskedRoom(null)} className="text-sm font-medium text-navy-800 underline">Any room</button>
+            </div>
+          ) : null}
           <fieldset className="border-t border-hairline p-5">
             <legend className="mb-3 text-sm text-ink-700">Booked by</legend>
             <input type="hidden" name="source" value={source} />

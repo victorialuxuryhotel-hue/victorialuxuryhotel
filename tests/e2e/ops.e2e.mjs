@@ -175,11 +175,8 @@ for (const id of pagingIds) {
   if (card) {
     const type = await card.evaluate((el) => el.getAttribute("data-tonight"));
     check("each card says how many are free of the rooms in service", /\d+ of \d+ free · ₦/.test(await card.evaluate((el) => el.textContent)));
-    await until(async () => {
-      await p.evaluate((t) => document.querySelector(`[data-tonight="${t}"] a`)?.click(), type);
-      await p.waitForSelector("input[name=categoryId]", { timeout: 4000 });
-      return true;
-    }, "New booking opens");
+    await go(p, await card.$eval("a", (a) => a.getAttribute("href")));
+    await p.waitForSelector("input[name=categoryId]");
     const chosen = await until(() => p.evaluate(() => document.querySelector("input[name=categoryId]:checked")?.value ?? null), "type chosen");
     check("New booking comes with that room type chosen", chosen === type, `${chosen} vs ${type}`);
     check("and tonight's date", (await p.$eval("input[name=checkIn]", (i) => i.value)) === (await val("SELECT date('now', '-5 hours')")));
@@ -188,6 +185,33 @@ for (const id of pagingIds) {
   const listSources = await sourceBadges(p);
   const listRows = await p.$$eval("table tbody tr", (r) => r.filter((x) => x.offsetParent).length);
   check("and every row on Bookings", listRows > 0 && listSources.length === listRows && listSources.every((s) => SOURCES.test(s)), `${listSources.length} badges, ${listRows} rows`);
+  await ctx.close();
+}
+
+{
+  // I6: room calendar. Fits the desk screen; an empty night starts a booking for that type, date and room.
+  const { ctx, p } = await as("front_desk");
+  await p.setViewport({ width: 1366, height: 768 });
+  await go(p, "/app/calendar");
+  await p.waitForSelector("[data-calendar] [data-lane]");
+  const fit = await p.evaluate(() => {
+    const cal = document.querySelector("[data-calendar]");
+    return { page: document.documentElement.scrollWidth <= window.innerWidth, grid: cal.scrollWidth <= cal.clientWidth + 1 };
+  });
+  check("the calendar fits 1366×768 without scrolling sideways", fit.page && fit.grid, JSON.stringify(fit));
+  check("it has the legend and a free count per night for each room type", /Awaiting payment/.test(await text(p)) && (await p.$$("[data-type] [data-free]")).length % 14 === 0);
+  const cell = await p.$("[data-lane]:not([data-lane=unassigned]) a[href*='/app/reservations/new?type='][href*='&room=']");
+  const href = await cell.evaluate((a) => a.getAttribute("href"));
+  const q = new URL(href, "http://x").searchParams;
+  const roomNumber = await val("SELECT room_number FROM rooms WHERE id = ?", q.get("room"));
+  await go(p, href);
+  await p.waitForSelector("input[name=categoryId]");
+  const form = await until(() => p.evaluate(() => ({
+    type: document.querySelector("input[name=categoryId]:checked")?.value ?? null,
+    checkIn: document.querySelector("input[name=checkIn]")?.value,
+    asked: document.querySelector("[data-asked-room]")?.getAttribute("data-asked-room") ?? null,
+  })).then((f) => (f.type && f.asked ? f : null)), "form prefilled");
+  check("an empty night opens New booking with the type, date and room", form.type === q.get("type") && form.checkIn === q.get("checkIn") && form.asked === roomNumber, JSON.stringify(form));
   await ctx.close();
 }
 

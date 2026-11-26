@@ -3,6 +3,7 @@ import { AppError, type ErrorCode } from "@/lib/errors";
 const tokens: Record<string, [ErrorCode, string]> = {
   room_overlap: ["CONFLICT", "That room is already booked for some of these nights."],
   no_capacity: ["UNAVAILABLE", "Sorry, this room type is no longer available for those dates."],
+  preferred_room_type: ["VALIDATION", "That room isn't one of the chosen room type. Choose the type again from the calendar."],
   too_many_holds: ["CONFLICT", "You already have bookings waiting for payment. Please complete or wait for those first, or contact the hotel."],
   invalid_transition: ["INVALID_TRANSITION", "This booking has changed since you opened it, for example it was checked in or cancelled. Reload to see where it is now."],
   invalid_initial_status: ["INVALID_TRANSITION", "This booking couldn't be created. Reload the page and try again."],
