@@ -1,3 +1,4 @@
+import { stayTimesSentence } from "@/lib/stay-times";
 import { connection } from "next/server";
 import { hotel } from "@/config/hotel";
 import { facilities } from "@/content/site";
@@ -20,14 +21,14 @@ export async function GET() {
     `- Email: ${hotel.email}`,
     `- Map: ${hotel.mapsUrl}`,
     "",
-    "## Rooms (price per night, Nigerian naira, VAT included)",
+    "## Rooms (price per night, Nigerian naira)",
     ...rooms.map((r) => `- [${r.name}](${SITE_URL}/rooms/${r.slug}): sleeps ${r.maxOccupancy}, ${formatNaira(r.fromRateKobo)}`),
     "",
     "## Facilities",
     ...facilities.map((f) => `- ${f.name}: ${f.text}`),
     "",
     "## Stay details",
-    ...(rules ? [`- Check-in from ${rules.checkInTime.slice(0, 5)}, check-out by ${rules.checkOutTime.slice(0, 5)}`] : []),
+    ...(rules ? [`- ${stayTimesSentence(rules.checkInTime, rules.checkOutTime)}`] : []),
     ...(rules?.cancellationPolicy ? [`- Cancellation: ${rules.cancellationPolicy}`] : []),
     "- Payment: online by card or bank transfer (Paystack), or at the front desk by cash, transfer or POS",
     "",

@@ -3,14 +3,14 @@ import { AppError, type ErrorCode } from "@/lib/errors";
 const tokens: Record<string, [ErrorCode, string]> = {
   room_overlap: ["CONFLICT", "That room is already booked for some of these nights."],
   no_capacity: ["UNAVAILABLE", "Sorry, this room type is no longer available for those dates."],
+  preferred_room_type: ["VALIDATION", "That room isn't one of the chosen room type. Choose the type again from the calendar."],
   too_many_holds: ["CONFLICT", "You already have bookings waiting for payment. Please complete or wait for those first, or contact the hotel."],
-  invalid_transition: ["INVALID_TRANSITION", "That change isn't allowed for this reservation's current status."],
-  invalid_initial_status: ["INVALID_TRANSITION", "A new reservation must start as awaiting payment or confirmed."],
-  reservation_closed: ["INVALID_TRANSITION", "This reservation is closed and its stay details can't change."],
+  invalid_transition: ["INVALID_TRANSITION", "This booking has changed since you opened it, for example it was checked in or cancelled. Reload to see where it is now."],
+  invalid_initial_status: ["INVALID_TRANSITION", "This booking couldn't be created. Reload the page and try again."],
+  reservation_closed: ["INVALID_TRANSITION", "This booking has ended (checked out, cancelled or a no-show), so its dates and room can't change. Make a new booking instead."],
   in_house_frozen: ["VALIDATION", "The guest is in house: only the check-out date can change."],
-  payment_immutable: ["CONFLICT", "Successful payments can't be changed. Record a correction instead."],
-  payment_closed: ["CONFLICT", "A closed payment attempt can't be reopened."],
-  rate_below_minimum: ["VALIDATION", "The minimum rate is ₦40,000 a night."],
+  payment_immutable: ["CONFLICT", "Payments can't be edited once saved. A manager can record a correction instead."],
+  payment_closed: ["CONFLICT", "That online payment attempt has ended. Start a new payment."],
   invalid_correction: ["VALIDATION", "A correction can't be more than what was paid with that payment."],
   activity_log_immutable: ["FORBIDDEN", "Activity records can't be changed or deleted."],
   last_owner: ["CONFLICT", "At least one active owner is required."],
@@ -19,18 +19,25 @@ const tokens: Record<string, [ErrorCode, string]> = {
   department_needs_front_desk: ["VALIDATION", "Finance and Restaurant & bar are separate roles."],
   discount_too_large: ["VALIDATION", "The discount can't be more than the room price."],
   promo_invalid: ["VALIDATION", "That promo code can no longer be used."],
-  expense_immutable: ["CONFLICT", "Expenses can't be changed or deleted. Void it with a reason instead."],
-  sale_immutable: ["CONFLICT", "Sales can't be changed or deleted. A manager can void one with a reason."],
-  room_charge_not_in_house: ["VALIDATION", "Only guests staying now can charge to their room."],
-  unsettled_charges: ["VALIDATION", "Restaurant & bar charges are unpaid. Settle them before check-out."],
-  stock_move_immutable: ["CONFLICT", "Stock records can't be changed or deleted. Record an adjustment instead."],
+  stock_move_immutable: ["CONFLICT", "Stock records can't be edited once saved. Record a count fix instead."],
   hall_overlap: ["CONFLICT", "The hall is already booked at that time."],
-  history_immutable: ["FORBIDDEN", "Booking history can't be deleted."],
+  history_immutable: ["FORBIDDEN", "Activity records can't be deleted."],
   order_immutable: ["CONFLICT", "Paid and closed orders can't be changed. A manager can void a sale with a reason."],
-  order_transition: ["INVALID_TRANSITION", "That change isn't allowed for this order."],
+  order_transition: ["INVALID_TRANSITION", "This order has changed since you opened it, for example it was paid or cancelled. Reload to see where it is now."],
   closing_immutable: ["CONFLICT", "A signed-off closing can't be changed."],
   lead_needs_restaurant_bar: ["VALIDATION", "Only restaurant & bar staff can be the restaurant & bar manager."],
   hall_booking_delete_forbidden: ["FORBIDDEN", "Hall bookings are cancelled, not deleted."],
+  not_paid: ["VALIDATION", "This booking isn't fully paid. Take the payment first, then check the guest in or out."],
+  payment_incomplete: ["VALIDATION", "A payment needs how it was paid and who took it. For a bank transfer, enter the transfer reference or the sender's name."],
+  hall_not_paid: ["VALIDATION", "A hall booking is confirmed once it has a price and is paid in full. Record the payment first."],
+  payment_needs_reference: ["VALIDATION", "This payment needs its reference: the last 4 digits of the POS slip, or for a transfer the reference or sender's name."],
+  sales_retired: ["FORBIDDEN", "Charging to a room isn't available. Customers pay at the counter."],
+  vat_needs_tax_id: ["VALIDATION", "VAT can't be shown on receipts without the hotel's Tax ID (TIN). Enter the TIN first."],
+  payment_check_immutable: ["CONFLICT", "A payment check can't be changed or deleted. If it was wrong, tell the owner."],
+  payment_check_forbidden: ["FORBIDDEN", "Only the General Manager or the Owner can confirm payments."],
+  room_before_payment: ["VALIDATION", "This booking isn't paid yet. Take the payment first: a room is given automatically once it's paid."],
+  change_immutable: ["CONFLICT", "That change has already been paid for or cancelled. Reload to see where it is now."],
+  change_needs_approval: ["FORBIDDEN", "Only the General Manager or the Owner can apply a change before it's paid, and they must give a reason."],
 };
 
 export function dbErrorToken(err: unknown): string | null {
@@ -57,7 +64,7 @@ export function translateDbError(err: unknown): Error {
   const known = token ? tokens[token] : undefined;
   if (known) return new AppError(known[0], known[1], { cause: err });
   if (token === "unique") return new AppError("CONFLICT", "That already exists.", { cause: err });
-  if (token === "check" || token === "foreign_key") return new AppError("VALIDATION", "Some details aren't valid. Check and try again.", { cause: err });
+  if (token === "check" || token === "foreign_key") return new AppError("VALIDATION", "Some details aren't valid. Check the highlighted fields and try again.", { cause: err });
   return new AppError("INTERNAL", "Something went wrong. Please try again.", { cause: err });
 }
 

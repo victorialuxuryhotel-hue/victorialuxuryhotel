@@ -1,17 +1,19 @@
 import "server-only";
 import { cancellationRuleText } from "@/lib/cancellation";
+import { cancellationFee, cancelRule } from "../domain/cancellation-rule";
 import type { PaymentMethod } from "@/domain/status";
 import { connection } from "next/server";
 import { z } from "zod";
 import { nearestFreeStart } from "@/domain/availability";
 import type { AvailabilityOption } from "@/domain/views";
 import { AppError } from "@/lib/errors";
-import { addDays, hotelToday, nightsBetween } from "@/lib/hotel-date";
+import { addDays, nightsBetween, tonight } from "@/lib/hotel-date";
 import { publicText, roomLabel } from "@/lib/format";
 import { logger } from "@/lib/logger";
 import { all, first, getDb } from "../db";
 import { freeNights, searchAvailability } from "../domain/inventory";
 import { coverPhotos } from "./catalogue";
+import { VAT_SHOWN_SQL } from "../vat";
 
 const SUGGEST_WITHIN_DAYS = 14;
 
@@ -34,7 +36,7 @@ export async function searchStay(stay: Stay): Promise<{ ok: true; options: Avail
     const rows = await searchAvailability(db, stay.checkIn, stay.checkOut, stay.guests);
     const full = rows.filter((c) => !c.is_available && c.max_occupancy >= stay.guests);
     const nights = nightsBetween(stay.checkIn, stay.checkOut);
-    const today = hotelToday();
+    const today = tonight();
     const from = [addDays(stay.checkIn, -SUGGEST_WITHIN_DAYS), today].sort().at(-1)!;
     const [free, photos] = await Promise.all([
       full.length ? freeNights(db, full.map((c) => c.slug), from, addDays(stay.checkOut, SUGGEST_WITHIN_DAYS)) : Promise.resolve(new Map<string, Map<string, boolean>>()),
@@ -96,6 +98,8 @@ export async function getBookingByToken(token: string) {
       r.id,
     );
     const holdActive = r.status === "pending_payment" && Boolean(r.hold_expires_at) && Date.parse(r.hold_expires_at!) > Date.now();
+    // Already inside the late-cancellation window (e.g. a same-day booking): the review page says so before payment.
+    const lateCancelNow = cancellationFee(r.total_amount_kobo, r.check_in, await cancelRule(db)) > 0;
     const paystack = payments.filter((p) => p.provider === "paystack");
     const paidKobo = payments.filter((p) => p.status === "successful").reduce((sum, p) => sum + (p.kind === "refund" ? -p.amount_kobo : p.amount_kobo), 0);
     const receipt = payments.find((p) => p.status === "successful" && p.receipt_number)?.receipt_number ?? undefined;
@@ -124,6 +128,7 @@ export async function getBookingByToken(token: string) {
       roomCategory: r.room_category ?? r.category_name,
       payments,
       holdActive,
+      lateCancelNow,
       latestAttempt: paystack[0],
       paidKobo,
       receipt,
@@ -160,9 +165,10 @@ export async function getGuestReceipt(token: string, receiptNumber: string) {
     ),
   ]);
   if (!p) return null;
-  const vat = await first<{ vat_rate_bp: number }>(db, "SELECT vat_rate_bp FROM hotel_settings WHERE id = 1");
+  const vat = await first<{ vat_rate_bp: number; tax_id: string | null }>(db, `SELECT ${VAT_SHOWN_SQL} AS vat_rate_bp, tax_id FROM hotel_settings WHERE id = 1`);
   return {
     vatRateBp: vat?.vat_rate_bp ?? 0,
+    taxId: vat?.tax_id ?? null,
     payment: {
       receiptNumber: p.receipt_number, paidAt: p.paid_at ?? undefined, method: (p.provider === "paystack" ? "card" : (p.method ?? "other")) as PaymentMethod,
       provider: p.provider, providerReference: p.provider_reference ?? undefined, amountKobo: p.amount_kobo,
@@ -183,9 +189,11 @@ export async function publicBookingRules() {
     "SELECT check_in_time, check_out_time, website_hold_minutes, cancellation_policy, free_cancel_hours, late_cancel_fee_pct FROM hotel_settings WHERE id = 1",
   );
   return {
-    checkInTime: data?.check_in_time ?? "14:00",
+    checkInTime: data?.check_in_time ?? "00:00",
     checkOutTime: data?.check_out_time ?? "12:00",
     holdMinutes: data?.website_hold_minutes ?? 30,
+    freeCancelHours: data?.free_cancel_hours ?? 24,
+    lateCancelFeePct: data?.late_cancel_fee_pct ?? 50,
     cancellationPolicy: data?.cancellation_policy ?? (data ? cancellationRuleText(data.free_cancel_hours, data.late_cancel_fee_pct, data.check_in_time) : null),
   };
 }

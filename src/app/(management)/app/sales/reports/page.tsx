@@ -8,14 +8,14 @@ import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
-import { formatDate, formatNaira } from "@/lib/format";
+import { formatDate, formatDateTime, formatNaira } from "@/lib/format";
 import { businessDate } from "@/lib/hotel-date";
 import { cn } from "@/lib/utils/cn";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { getDb } from "@/server/db";
 import { MENU_CATEGORIES, OUTLETS, PAY_METHODS, type Outlet, type PayMethod } from "@/server/domain/pos";
 import { posReport, type PosRange } from "@/server/domain/pos-reports";
-import { recentMonths, reportRange } from "@/server/domain/reports";
+import { rangeLabel, recentMonths, reportRange } from "@/server/domain/reports";
 
 export const metadata: Metadata = { title: "Sales reports" };
 
@@ -60,7 +60,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     }
     return `/app/sales/reports?${p}`;
   };
-  const rangeName = range in FIXED ? FIXED[range as keyof typeof FIXED] : monthName(range);
+  const rangeName = rangeLabel(range);
   const months = recentMonths(businessDate()).slice(1);
   const days = [...r.daily].reverse().filter((d) => d.kobo || d.day === businessDate());
   const stat = (label: string, value: string, sub?: string, bad = false) => (
@@ -102,9 +102,17 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <a href={`/app/sales/orders/csv?from=${r.from}&to=${r.to}${outlet ? `&outlet=${outlet}` : ""}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Orders (CSV)</a>
-        <a href={`/app/sales/reports/items-csv?range=${range}${outlet ? `&outlet=${outlet}` : ""}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Sales by item (CSV)</a>
-        <a href={`/app/sales/reports/stock-csv?range=${range}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Stock (CSV)</a>
+        {[
+          ["Orders", `/app/sales/orders/csv?from=${r.from}&to=${r.to}${outlet ? `&outlet=${outlet}` : ""}`],
+          ["Sales by item", `/app/sales/reports/items-csv?range=${range}${outlet ? `&outlet=${outlet}` : ""}`],
+          ["Stock", `/app/sales/reports/stock-csv?range=${range}`],
+          ["Transfers and POS", `/app/sales/reports/transfers-csv?range=${range}${outlet ? `&outlet=${outlet}` : ""}`],
+        ].map(([label, href]) => (
+          <span key={label} className="inline-flex">
+            <a href={`${href}&format=xlsx`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> {label} (Excel)</a>
+            <a href={href} className={buttonStyles({ variant: "ghost", size: "sm" })} aria-label={`${label} as CSV`}>CSV</a>
+          </span>
+        ))}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -117,14 +125,38 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           <Table head={["Method", "Amount"]} rows={(Object.keys(PAY_METHODS) as PayMethod[]).map((m) => [PAY_METHODS[m], formatNaira(r.byMethod[m])])} empty="No sales." />
         </Card>
         <Card>
-          <CardHeader title="By attendant" />
-          <Table head={["Attendant", "Sales", "Amount"]} rows={r.byStaff.map((s) => [s.who, s.n, formatNaira(s.kobo)])} empty="No sales." />
+          <CardHeader title="By salesperson" />
+          <Table head={["Sold by", "Sales", "Amount"]} rows={r.byStaff.map((s) => [s.who, s.n, formatNaira(s.kobo)])} empty="No sales." />
         </Card>
         <Card>
           <CardHeader title="By category" />
           <Table head={["Category", "Qty", "Amount"]} rows={r.byCategory.map((c) => [MENU_CATEGORIES[c.category] ?? c.category, c.qty, formatNaira(c.kobo)])} empty="No sales." />
         </Card>
       </div>
+
+      <Card>
+        <CardHeader
+          title="Transfers and POS payments to check"
+          description={`Every transfer and POS/card sale, by salesperson, with the reference they entered. Tick transfers off against the bank statement and POS slips against the terminal's report · ${rangeName.toLowerCase()}`}
+        />
+        <Table
+          head={["Sold by", "Time", "Receipt", "Counter", "Method", "Amount", "Reference"]}
+          rows={r.transfers.map((t) => [
+            t.who, formatDateTime(t.paid_at), t.receipt_number, OUTLETS[t.outlet], PAY_METHODS[t.method], formatNaira(t.kobo),
+            t.reference ? (t.method === "pos_terminal" ? `Slip …${t.reference}` : t.reference) : "None (before references were required)",
+          ])}
+          empty="No transfer or POS sales."
+        />
+      </Card>
+
+      <Card>
+        <CardHeader title="Unpaid orders cancelled" description={`Who cancelled what, and why · ${rangeName.toLowerCase()}`} />
+        <Table
+          head={["Cancelled by", "Time", "Order", "Counter", "Amount", "Reason"]}
+          rows={r.cancelled.map((c) => [c.who, formatDateTime(c.closed_at), `#${c.number}`, OUTLETS[c.outlet], formatNaira(c.kobo), c.reason ?? "None given (before reasons were required)"])}
+          empty="No orders cancelled."
+        />
+      </Card>
 
       <Card>
         <CardHeader title="By menu item" description="Best sellers first." />

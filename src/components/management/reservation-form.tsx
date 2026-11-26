@@ -24,8 +24,27 @@ const chip = (on: boolean) =>
     on ? "border-navy-800 bg-navy-50 text-navy-800" : "border-hairline text-ink-900 hover:bg-ink-900/7",
   );
 
-export function ReservationForm({ categories, today, holdHours, aboveTabs = false }: { categories: CategoryRow[]; today: string; holdHours: number; aboveTabs?: boolean }) {
+export function ReservationForm({
+  categories,
+  today,
+  holdHours,
+  aboveTabs = false,
+  initialCategoryId,
+  initialCheckIn,
+  preferredRoom,
+}: {
+  categories: CategoryRow[];
+  today: string;
+  holdHours: number;
+  aboveTabs?: boolean;
+  initialCategoryId?: string;
+  initialCheckIn?: string;
+  /** From an empty night on the calendar: asked for, assigned on payment if still free. */
+  preferredRoom?: { id: string; number: string; categoryId: string };
+}) {
   const [state, action, pending] = useActionState(createReservation, null);
+  // One id per form: a double tap or a retry after a timeout returns the same booking, not a second hold.
+  const [requestId] = useState(() => crypto.randomUUID());
   const err = (n: string) => (state && !state.ok ? state.fieldErrors?.[n]?.[0] : undefined);
   const active = categories.filter((c) => c.isActive);
 
@@ -48,14 +67,15 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
   }, [phone, searchable]);
   const matches = searchable && found.phone === phone ? found.list : [];
 
-  const [checkIn, setCheckIn] = useState(today);
-  const [checkOut, setCheckOut] = useState(addDays(today, 1));
+  const [checkIn, setCheckIn] = useState(initialCheckIn ?? today);
+  const [checkOut, setCheckOut] = useState(addDays(initialCheckIn ?? today, 1));
+  const [askedRoom, setAskedRoom] = useState(preferredRoom ?? null);
   const [source, setSource] = useState<Source>("walk_in");
   const nights = checkIn && checkOut && checkOut > checkIn ? nightsBetween(checkIn, checkOut) : 0;
 
   const stayKey = `${checkIn}|${checkOut}`;
   const [freeFor, setFreeFor] = useState<{ key: string; map: Map<string, TypeAvailability> | null }>({ key: "", map: null });
-  const [picked, setPicked] = useState("");
+  const [picked, setPicked] = useState(initialCategoryId ?? "");
   useEffect(() => {
     if (!nights) return;
     let live = true;
@@ -72,9 +92,6 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
   const setCategoryId = setPicked;
 
   const cat = active.find((c) => c.id === categoryId);
-  const [pickedRoom, setPickedRoom] = useState("");
-  const freeRooms = categoryId ? (typeInfo(categoryId)?.rooms ?? []) : [];
-  const room = freeRooms.find((r) => r.id === pickedRoom) ?? freeRooms[0];
   const total = cat && nights ? cat.nightlyRateKobo * nights : 0;
   const tonight = checkIn === today;
 
@@ -160,10 +177,19 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
               <Stepper id="ng" name="guests" max={cat?.maxOccupancy ?? 20} unit={["guest", "guests"]} />
             </Field>
           </div>
+          {askedRoom && askedRoom.categoryId === categoryId ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-hairline px-5 py-3 text-sm text-ink-700" data-asked-room={askedRoom.number}>
+              <input type="hidden" name="preferredRoomId" value={askedRoom.id} />
+              <span>
+                <b className="font-medium text-ink-900">Room {askedRoom.number}</b> asked for. It&apos;s given to this booking when it&apos;s paid, if it&apos;s still free.
+              </span>
+              <button type="button" onClick={() => setAskedRoom(null)} className="text-sm font-medium text-navy-800 underline">Any room</button>
+            </div>
+          ) : null}
           <fieldset className="border-t border-hairline p-5">
             <legend className="mb-3 text-sm text-ink-700">Booked by</legend>
             <input type="hidden" name="source" value={source} />
-            <input type="hidden" name="roomId" value={room?.id ?? ""} />
+            <input type="hidden" name="requestId" value={requestId} />
             <div className="flex flex-wrap gap-2">
               {(["walk_in", "phone", "whatsapp"] as const).map((s) => (
                 <button key={s} type="button" aria-pressed={source === s} onClick={() => setSource(s)} className={chip(source === s)}>
@@ -203,20 +229,6 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
                       </span>
                       <span className="text-right text-sm tabular-nums text-ink-700">{formatNaira(c.nightlyRateKobo)}<span className="block text-xs text-ink-500">a night</span></span>
                     </label>
-                    {categoryId === c.id && freeRooms.length ? (
-                      <fieldset className="bg-navy-50 px-5 pb-4">
-                        <legend className="mb-2 pt-1 text-[13px] text-ink-700">Room</legend>
-                        <div className="flex flex-wrap gap-2">
-                          {freeRooms.map((r) => (
-                            <button key={r.id} type="button" aria-pressed={room?.id === r.id} onClick={() => setPickedRoom(r.id)} className={cn(chip(room?.id === r.id), "bg-ivory-50")}>
-                              {room?.id === r.id ? <Check className="size-3.5" aria-hidden /> : null}
-                              {r.number}
-                              {r.floor ? <span className="text-xs text-ink-500">{/^\d+$/.test(r.floor) ? `Floor ${r.floor}` : r.floor}</span> : null}
-                            </button>
-                          ))}
-                        </div>
-                      </fieldset>
-                    ) : null}
                   </li>
                 );
               })}
@@ -226,7 +238,7 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
         </Card>
 
         <p className="text-sm text-ink-600">
-          Held for {plural(holdHours, "hour")} until paid.
+          Held for {plural(holdHours, "hour")} until paid. A ready room is given automatically when the payment is taken.
         </p>
       </div>
 
@@ -240,7 +252,7 @@ export function ReservationForm({ categories, today, holdHours, aboveTabs = fals
           <p className="min-w-0 text-sm text-ink-600">
             {cat && nights ? (
               <>
-                <span className="block truncate">{room ? `Room ${room.number} · ` : ""}{cat.name} · {plural(nights, "night")}</span>
+                <span className="block truncate">{cat.name} · {plural(nights, "night")}</span>
                 <span className="block text-lg font-semibold tabular-nums text-navy-950">{formatNaira(total)}</span>
               </>
             ) : (

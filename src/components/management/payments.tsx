@@ -34,7 +34,7 @@ export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: Pay
       <THead>
         <tr>
           <TH>Date</TH>
-          <TH>Reservation</TH>
+          <TH>Booking</TH>
           <TH>Method</TH>
           <TH>Reference</TH>
           <TH className="text-right">Amount</TH>
@@ -74,7 +74,7 @@ export function PaymentTable({ rows, receiptHref, reservationHref }: { rows: Pay
 export type ReceiptPayment = Pick<PaymentRow, "receiptNumber" | "paidAt" | "method" | "providerReference" | "amountKobo" | "provider" | "recordedBy">;
 export type ReceiptStay = Pick<ReservationDetail, "guestName" | "reference" | "category" | "nights" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo"> & { room?: string };
 
-export function Receipt({ payment, reservation, forGuest = false, vatRateBp }: { payment: ReceiptPayment; reservation: ReceiptStay; forGuest?: boolean; vatRateBp?: number }) {
+export function Receipt({ payment, reservation, forGuest = false, vatRateBp, taxId, copy = false }: { payment: ReceiptPayment; reservation: ReceiptStay; forGuest?: boolean; vatRateBp?: number; taxId?: string | null; copy?: boolean }) {
   return (
     <article className="mx-auto max-w-2xl rounded-card border border-hairline bg-ivory-50 p-5 sm:p-12 print:border-0">
       <header className="flex flex-col-reverse gap-4 border-b border-hairline pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:pb-8">
@@ -87,7 +87,7 @@ export function Receipt({ payment, reservation, forGuest = false, vatRateBp }: {
           </div>
         </div>
         <div className="flex items-baseline justify-between gap-3 sm:block sm:text-right">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-600">Receipt</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-600">Receipt{copy ? " · COPY" : ""}</p>
           <p className="font-mono text-sm whitespace-nowrap text-ink-900 sm:mt-1">{payment.receiptNumber}</p>
         </div>
       </header>
@@ -95,7 +95,7 @@ export function Receipt({ payment, reservation, forGuest = false, vatRateBp }: {
       <dl className="grid grid-cols-2 gap-5 py-6 text-sm sm:gap-6 sm:py-8">
         <div><dt className="text-ink-500">Received from</dt><dd className="mt-1 font-medium text-ink-900">{reservation.guestName}</dd></div>
         <div><dt className="text-ink-500">Date</dt><dd className="mt-1 text-ink-900">{payment.paidAt ? formatDateTime(payment.paidAt) : "—"}</dd></div>
-        <div><dt className="text-ink-500">Reservation</dt><dd className="mt-1 font-mono text-ink-900">{reservation.reference}</dd></div>
+        <div><dt className="text-ink-500">Booking</dt><dd className="mt-1 font-mono text-ink-900">{reservation.reference}</dd></div>
         <div><dt className="text-ink-500">Method</dt><dd className="mt-1 text-ink-900">{paymentMethod[payment.method]}{payment.providerReference ? ` · ${payment.providerReference}` : ""}</dd></div>
       </dl>
 
@@ -115,9 +115,12 @@ export function Receipt({ payment, reservation, forGuest = false, vatRateBp }: {
         <tfoot>
           <tr><td className="pt-4 text-ink-500">This payment</td><td className="pt-4 text-right text-lg font-semibold tabular-nums">{formatNaira(payment.amountKobo)}</td></tr>
           {vatRateBp ? (
-            <tr><td className="pt-1 text-ink-500">Includes VAT ({vatRateBp / 100}%)</td><td className="pt-1 text-right tabular-nums">{formatNaira(vatIncluded(payment.amountKobo, vatRateBp))}</td></tr>
+            <>
+              <tr><td className="pt-1 text-ink-500">Includes VAT ({vatRateBp / 100}%)</td><td className="pt-1 text-right tabular-nums">{formatNaira(vatIncluded(payment.amountKobo, vatRateBp))}</td></tr>
+              {taxId ? <tr><td className="pt-1 text-ink-500">TIN</td><td className="pt-1 text-right tabular-nums">{taxId}</td></tr> : null}
+            </>
           ) : null}
-          <tr><td className="pt-1 text-ink-500">Balance remaining</td><td className="pt-1 text-right tabular-nums">{formatNaira(reservation.totalKobo - reservation.paidKobo)}</td></tr>
+          <tr><td className="pt-1 text-ink-500">Still owed</td><td className="pt-1 text-right tabular-nums">{formatNaira(reservation.totalKobo - reservation.paidKobo)}</td></tr>
         </tfoot>
       </table>
 
@@ -135,7 +138,7 @@ export type BillLines = {
   extras: { name: string; unitKobo: number; perNight: boolean; amountKobo: number }[];
 };
 
-export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillStay; lines: BillLines; vatRateBp: number; printedAt: string }) {
+export function GuestBill({ stay, lines, vatRateBp, printedAt, taxId }: { stay: BillStay; lines: BillLines; vatRateBp: number; printedAt: string; taxId?: string | null }) {
   const extrasListed = lines.extras.reduce((s, e) => s + e.amountKobo, 0);
   const adjustment = lines.extrasKobo - extrasListed;
   const paid = stay.payments.filter((p) => p.status === "successful");
@@ -196,6 +199,7 @@ export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillSta
         <tfoot>
           <tr><td className="pt-3 font-semibold text-ink-900">Total charges</td><td className="pt-3 text-right font-semibold tabular-nums">{formatNaira(stay.totalKobo)}</td></tr>
           {vatRateBp ? <tr><td className="pt-1 text-xs text-ink-500">Includes VAT ({vatRateBp / 100}%)</td><td className="pt-1 text-right text-xs tabular-nums text-ink-500">{formatNaira(vatIncluded(stay.totalKobo, vatRateBp))}</td></tr> : null}
+          {vatRateBp && taxId ? <tr><td className="pt-1 text-xs text-ink-500">TIN</td><td className="pt-1 text-right text-xs tabular-nums text-ink-500">{taxId}</td></tr> : null}
         </tfoot>
       </table>
 
@@ -208,7 +212,7 @@ export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillSta
             paid.map((p) => (
               <tr key={p.id} className={row}>
                 <td className="py-3">
-                  {p.kind === "refund" ? "Correction" : p.provider === "paystack" ? "Card (online)" : paymentMethod[p.method]}
+                  {p.kind === "refund" ? "Correction" : p.provider === "paystack" ? "Card online" : paymentMethod[p.method]}
                   <p className="text-xs text-ink-500">{p.paidAt ? formatDateTime(p.paidAt) : ""}</p>
                 </td>
                 <td className="py-3 font-mono text-xs">{p.receiptNumber ?? ""}</td>
@@ -222,7 +226,7 @@ export function GuestBill({ stay, lines, vatRateBp, printedAt }: { stay: BillSta
         <tfoot>
           <tr><td colSpan={2} className="pt-3 text-ink-500">Total paid</td><td className="pt-3 text-right tabular-nums">{formatNaira(stay.paidKobo)}</td></tr>
           <tr>
-            <td colSpan={2} className="pt-2 text-base font-semibold text-ink-900">{balance > 0 ? "Balance due" : balance < 0 ? "Paid over" : "Balance"}</td>
+            <td colSpan={2} className="pt-2 text-base font-semibold text-ink-900">{balance > 0 ? "Owed" : balance < 0 ? "Paid over" : "Paid in full"}</td>
             <td className="pt-2 text-right text-lg font-semibold tabular-nums">{formatNaira(Math.abs(balance))}</td>
           </tr>
         </tfoot>

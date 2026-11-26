@@ -1,0 +1,54 @@
+# Every pull request and push: the same checks as `pnpm check` and `pnpm test:db`, the migration lock,
+# a production build that must contain no secrets, and a secret scan. Branch protection on main
+# requires this to pass (Settings → Branches).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, d1-clerk]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck, lint, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Migrations are append-only
+        run: node scripts/check-migrations.mjs
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - name: Unit tests
+        run: pnpm test
+      - name: Database tests (local D1)
+        run: pnpm test:db
+      - name: Production build, checked for secrets
+        run: pnpm cf:build
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.STAGING_SITE_URL || 'https://staging.victorialuxuryhotel.com' }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.STAGING_CLERK_PUBLISHABLE_KEY }}
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks (whole history, findings redacted)
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 git /repo --config /repo/.gitleaks.toml --redact --no-banner

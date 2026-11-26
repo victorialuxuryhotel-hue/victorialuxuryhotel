@@ -128,3 +128,7 @@ automatically.
 - `/api/health` returns `{"ok":true}`.
 - `/`, `/rooms`, `/book` load; `/app` redirects to `/login`.
 - Worker logs show the cron run every 10 minutes.
+
+## Day-to-day operations
+
+Deploy pipeline, staging, monitoring, backups, rollbacks, secrets and incidents: see [`docs/operations.md`](operations.md).

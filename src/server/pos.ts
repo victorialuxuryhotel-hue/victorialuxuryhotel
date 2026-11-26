@@ -11,7 +11,7 @@ import * as pos from "./domain/pos";
 
 const outlet = z.enum(["restaurant", "bar"]);
 const method = z.enum(["cash", "bank_transfer", "pos_terminal"], "Choose how the customer paid");
-const lines = z.array(z.object({ menuItemId: recordId(), quantity: z.number().int().min(1).max(99) })).min(1, "Add at least one item").max(50);
+const lines = z.array(z.object({ menuItemId: recordId(), quantity: z.number().int().min(1).max(99), note: z.string().max(60).nullish() })).min(1, "Add at least one item").max(50);
 const naira = z.coerce.number().min(0).max(100_000_000).transform((n) => Math.round(n * 100));
 const fail = (err: unknown, event: string) => {
   if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error(event, err);
@@ -47,6 +47,8 @@ export async function takePayment(_prev: ActionResult<PaidResult> | null, formDa
       note: z.string().max(120).parse(String(formData.get("note") ?? "")),
       method: method.parse(formData.get("method")),
       cashReceivedKobo: cash,
+      paymentReference: z.string().trim().max(80).parse(String(formData.get("paymentReference") ?? "")) || null,
+      transferChecked: formData.get("transferChecked") === "on",
     });
     refresh();
     return ok(r);
@@ -121,15 +123,15 @@ export async function saveMenuStock(_prev: ActionResult | null, formData: FormDa
   }
 }
 
-export async function closeMyDay(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+export async function closeMyDay(_prev: ActionResult<pos.CloseResult> | null, formData: FormData): Promise<ActionResult<pos.CloseResult>> {
   try {
     const staff = await authorize("pos.sell");
-    await pos.closeDay(await getDb(), actorOf(staff), {
+    const r = await pos.closeDay(await getDb(), actorOf(staff), {
       countedCashKobo: naira.parse(formData.get("counted")),
       explanation: z.string().max(500).parse(String(formData.get("explanation") ?? "")) || null,
     });
-    refresh();
-    return ok(undefined);
+    if (r.closed) refresh();
+    return ok(r);
   } catch (err) {
     return fail(err, "pos.close_failed");
   }

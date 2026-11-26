@@ -39,12 +39,12 @@ describe("front desk", () => {
 
   it("cannot change rates, room types, rooms, photos, settings or staff", async () => {
     const c = await makeCategory(1);
-    await rejects(saveCategory(db, desk, category()), /role does not allow/, "FORBIDDEN");
-    await rejects(createRoom(db, desk, { roomNumber: "X1", categoryId: c.id, floor: null }), /role does not allow/);
-    await rejects(addCategoryPhoto(db, desk, { categoryId: c.id, storagePath: "x.jpg", altText: "A room" }), /role does not allow/);
-    await rejects(updateBookingRules(db, desk, { checkInTime: "14:00", checkOutTime: "12:00", websiteHoldMinutes: 30, staffHoldHours: 24, cancellationPolicy: null, freeCancelHours: 48, lateCancelFeePct: 50, vatRatePct: 750 }), /role does not allow/);
-    await rejects(createStaffProfile(db, desk, { fullName: "New Person", email: "new@example.com", role: "owner" }), /role does not allow/);
-    await rejects(updateStaffProfile(db, desk, { staffId: desk!.id, role: "owner", isActive: true }), /role does not allow/);
+    await rejects(saveCategory(db, desk, category()), /role can't do this/, "FORBIDDEN");
+    await rejects(createRoom(db, desk, { roomNumber: "X1", categoryId: c.id, floor: null }), /role can't do this/);
+    await rejects(addCategoryPhoto(db, desk, { categoryId: c.id, storagePath: "x.jpg", altText: "A room" }), /role can't do this/);
+    await rejects(updateBookingRules(db, desk, { checkInTime: "14:00", checkOutTime: "12:00", websiteHoldMinutes: 30, staffHoldHours: 24, cancellationPolicy: null, freeCancelHours: 48, lateCancelFeePct: 50, vatRatePct: 750 }), /role can't do this/);
+    await rejects(createStaffProfile(db, desk, { fullName: "New Person", email: "new@example.com", role: "owner" }), /role can't do this/);
+    await rejects(updateStaffProfile(db, desk, { staffId: desk!.id, role: "owner", isActive: true }), /role can't do this/);
   });
 });
 
@@ -74,7 +74,7 @@ describe("general manager", () => {
   });
 
   it("cannot manage staff", async () => {
-    await rejects(createStaffProfile(db, gm, { fullName: "New Person", email: "gm-new@example.com", role: "front_desk" }), /role does not allow/);
+    await rejects(createStaffProfile(db, gm, { fullName: "New Person", email: "gm-new@example.com", role: "front_desk" }), /role can't do this/);
   });
 });
 
@@ -141,7 +141,7 @@ describe("owner and staff", () => {
     await rejects(createStaffProfile(db, owner, { fullName: "Want Owner", email: `own-${crypto.randomUUID().slice(0, 6)}@example.com`, role: "owner" }), /Make them owner afterwards/);
     const id = await createStaffProfile(db, owner, { fullName: "Next Owner", email: `next-${crypto.randomUUID().slice(0, 6)}@example.com`, role: "general_manager" });
     await rejects(updateStaffProfile(db, owner, { staffId: id, role: "owner", isActive: true }), /Make owner/);
-    await rejects(promoteToOwner(db, gm, id), /role does not allow/);
+    await rejects(promoteToOwner(db, gm, id), /role can't do this/);
     expect((await promoteToOwner(db, owner, id)).role).toBe("owner");
     await updateStaffProfile(db, owner, { staffId: id, role: "owner", isActive: true, phone: "+234 803 000 0000" });
     const logs = await q<{ action: string }>("SELECT action FROM activity_log WHERE entity_id = ? ORDER BY id", id);

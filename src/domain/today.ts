@@ -1,37 +1,106 @@
+import { owedOf } from "./next-step";
 import type { ReservationRow, RoomTile } from "./views";
 
+/**
+ * One job per guest on Today's "Needs you now", in the order the front desk should do them.
+ * Status comes from what was recorded (checked in, paid), never from dates alone: a date that
+ * passed with nothing recorded is a job, not something to hide.
+ */
 export type NeedsYou =
-  | { kind: "unpaid"; reservation: ReservationRow; dueKobo: number }
+  | { kind: "owes"; reservation: ReservationRow; owedKobo: number }
+  | { kind: "overdue_checkout"; reservation: ReservationRow }
+  | { kind: "not_arrived"; reservation: ReservationRow }
+  | { kind: "unpaid"; reservation: ReservationRow; owedKobo: number }
   | { kind: "no_room"; reservation: ReservationRow }
+  | { kind: "room_occupied"; reservation: ReservationRow; occupant: ReservationRow }
   | { kind: "room_not_ready"; reservation: ReservationRow; room: Pick<RoomTile, "id" | "number" | "readiness"> };
 
-export type RoomCounts = { ready: number; guestsIn: number; toClean: number };
+export type TodayInput = {
+  today: string;
+  /** Everyone checked in, whatever their dates. */
+  inHouse: ReservationRow[];
+  /** Bookings arriving today that aren't checked in yet. */
+  arrivals: ReservationRow[];
+  /** Paid bookings whose check-in date has passed with no check-in recorded. */
+  missed: ReservationRow[];
+};
 
-export function needsYouNow(arrivals: ReservationRow[], rooms: Pick<RoomTile, "id" | "number" | "readiness">[]): NeedsYou[] {
+const ORDER: Record<NeedsYou["kind"], number> = { owes: 0, overdue_checkout: 1, not_arrived: 2, unpaid: 3, room_occupied: 4, no_room: 5, room_not_ready: 6 };
+
+export function needsYouNow(input: TodayInput, rooms: Pick<RoomTile, "id" | "number" | "readiness">[]): NeedsYou[] {
   const byNumber = new Map(rooms.map((r) => [r.number, r]));
+  const occupantOf = new Map(input.inHouse.filter((x) => x.status === "checked_in" && x.roomNumber).map((x) => [x.roomNumber!, x]));
   const out: NeedsYou[] = [];
-  for (const r of arrivals.filter((a) => a.status === "pending_payment" || a.status === "confirmed")) {
-    const due = r.totalKobo - r.paidKobo;
-    if (r.status === "pending_payment" || due > 0) out.push({ kind: "unpaid", reservation: r, dueKobo: Math.max(0, due) });
-    if (!r.roomNumber) {
-      out.push({ kind: "no_room", reservation: r });
-      continue;
-    }
-    const room = byNumber.get(r.roomNumber);
-    if (room && room.readiness !== "ready") out.push({ kind: "room_not_ready", reservation: r, room });
+  const seen = new Set<string>();
+  const add = (n: NeedsYou) => {
+    if (seen.has(n.reservation.id)) return;
+    seen.add(n.reservation.id);
+    out.push(n);
+  };
+
+  for (const r of input.inHouse.filter((x) => x.status === "checked_in")) {
+    const owed = owedOf(r);
+    if (owed > 0) add({ kind: "owes", reservation: r, owedKobo: owed });
+    else if (r.checkOut < input.today) add({ kind: "overdue_checkout", reservation: r });
   }
-  const order = { unpaid: 0, no_room: 1, room_not_ready: 2 } as const;
-  return out.sort((a, b) => order[a.kind] - order[b.kind]);
+  for (const r of input.missed.filter((x) => x.status === "confirmed" && x.checkIn < input.today)) add({ kind: "not_arrived", reservation: r });
+  for (const r of input.arrivals.filter((x) => x.status === "pending_payment" || x.status === "confirmed")) {
+    const owed = owedOf(r);
+    // Payment comes first; the room is assigned automatically once it is paid.
+    if (r.status === "pending_payment" || owed > 0) add({ kind: "unpaid", reservation: r, owedKobo: owed });
+    else if (!r.roomNumber) add({ kind: "no_room", reservation: r });
+    else if (occupantOf.has(r.roomNumber)) add({ kind: "room_occupied", reservation: r, occupant: occupantOf.get(r.roomNumber)! });
+    else {
+      const room = byNumber.get(r.roomNumber);
+      if (room && room.readiness !== "ready") add({ kind: "room_not_ready", reservation: r, room });
+    }
+  }
+  return out.sort((a, b) => ORDER[a.kind] - ORDER[b.kind]);
 }
 
-export function roomCounts(rooms: Pick<RoomTile, "state">[]): RoomCounts {
-  return {
-    ready: rooms.filter((r) => r.state === "available").length,
-    guestsIn: rooms.filter((r) => r.state === "occupied").length,
-    toClean: rooms.filter((r) => r.state === "dirty").length,
-  };
+export type RoomCounts = { ready: number; occupied: number; toClean: number; outOfOrder: number };
+
+/** Every active room falls in exactly one group, so the four add up to the number of rooms. Occupied = guests checked in. */
+export function roomCounts(rooms: Pick<RoomTile, "state" | "readiness">[]): RoomCounts {
+  const counts: RoomCounts = { ready: 0, occupied: 0, toClean: 0, outOfOrder: 0 };
+  for (const r of rooms) {
+    if (r.state === "occupied") counts.occupied++;
+    else if (r.state === "maintenance") counts.outOfOrder++;
+    else if (r.readiness === "ready") counts.ready++;
+    else counts.toClean++;
+  }
+  return counts;
 }
 
 export function greeting(hour: number): string {
   return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+}
+
+/** One room type on one night, from inventory.ts availableOnNight (the shared definition of free). */
+export type TonightType = { categoryId: string; name: string; rateKobo: number; rooms: number; free: number; held: number };
+export type TonightCard = TonightType & { shown: number; full: boolean };
+
+/**
+ * "Available tonight" on Today (interface brief I2). `free` below zero means overbooked: the card
+ * shows 0 and the type goes to Needs you now. `held` counts unpaid holds already taken out of free.
+ */
+export function tonightView(types: TonightType[]): { cards: TonightCard[]; fullyBooked: boolean; overbooked: TonightType[] } {
+  const cards = types.map((t) => ({ ...t, shown: Math.max(0, t.free), full: t.free <= 0 }));
+  return {
+    cards,
+    fullyBooked: cards.length > 0 && cards.every((c) => c.full),
+    overbooked: types.filter((t) => t.free < 0),
+  };
+}
+
+export type Progress = { done: number; total: number; pct: number; label: string };
+
+/**
+ * "13 of 18 arrived" (interface brief I3). `due` is the list's own rows and `done` the guests who
+ * have already arrived or left, counted with the same conditions (server/domain/movements.ts), so
+ * checking a guest in moves them from due to done and the total stays put.
+ */
+export function movementProgress(kind: "arrivals" | "departures", due: number, done: number): Progress {
+  const total = due + done;
+  return { done, total, pct: total ? Math.round((done / total) * 100) : 0, label: `${done} of ${total} ${kind === "arrivals" ? "arrived" : "left"}` };
 }

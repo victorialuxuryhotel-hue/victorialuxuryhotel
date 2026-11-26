@@ -1,0 +1,14 @@
+# Weekly dependency updates, grouped so they arrive as a few pull requests. Security fixes come as
+# soon as they're published. CI must pass before merging.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday, time: "06:00", timezone: Africa/Lagos }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }

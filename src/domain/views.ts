@@ -24,7 +24,11 @@ export type ReservationRow = {
   source: BookingSource;
   holdExpiresAt?: string;
   attention?: string;
+  /** A change (upgrade, move, extra nights) waiting for its payment: owed now, applied when paid. */
+  pendingKobo?: number;
 };
+
+export type PendingChange = { id: string; kind: "room" | "dates"; description: string; amountKobo: number };
 
 export type PaymentRow = {
   id: string;
@@ -56,6 +60,7 @@ export type ReservationDetail = ReservationRow & {
   createdBy?: string;
   payments: PaymentRow[];
   history: HistoryEntry[];
+  pendingChange?: PendingChange;
 };
 
 export type RoomTile = {
@@ -68,6 +73,8 @@ export type RoomTile = {
   guestName?: string;
   until?: string;
   note?: string;
+  /** Occupied rooms: the guest is due out today, or should have left already. */
+  due?: "today" | "overdue";
 };
 
 export type CategoryRow = {

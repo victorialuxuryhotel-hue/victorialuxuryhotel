@@ -1,8 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { recordOfflinePayment } from "@/server/domain/payments";
-import { createWebsiteReservation } from "@/server/domain/reservations";
+import { cancelReservation, createWebsiteReservation } from "@/server/domain/reservations";
 import { cancellationFee, checkGuestCode, guestBookings, guestCancel, guestChangeDates, issueGuestCode } from "@/server/domain/guest-account";
-import { day, db, desk, makeCategory, q1, rejects, status } from "./helpers";
+import { day, db, desk, exec, makeCategory, q1, rejects, status } from "./helpers";
+
+// "Tomorrow" must be inside the late-cancellation window whatever the time of day (2pm check-in is 14 to 38 hours away).
+let windowHours: number;
+beforeAll(async () => {
+  windowHours = (await q1<{ h: number }>("SELECT free_cancel_hours AS h FROM hotel_settings WHERE id = 1")).h;
+  await exec("UPDATE hotel_settings SET free_cancel_hours = 48 WHERE id = 1");
+});
+afterAll(() => exec("UPDATE hotel_settings SET free_cancel_hours = ? WHERE id = 1", windowHours));
 
 const mail = () => `g-${crypto.randomUUID().slice(0, 8)}@example.com`;
 
@@ -33,6 +41,13 @@ describe("guest accounts", () => {
     expect(cancellationFee(11_000_000, "2026-12-02", rule, at)).toBe(5_500_000);
   });
 
+  it("with check-in any time (00:00), the window counts back from midnight starting the arrival day", () => {
+    const rule = { checkInTime: "00:00", freeHours: 24, feePct: 50 };
+    // Arrival 3 Dec: the window opens at midnight 2 Dec, Lagos time (23:00 UTC on 1 Dec).
+    expect(cancellationFee(10_000_000, "2026-12-03", rule, Date.parse("2026-12-01T22:59:00Z"))).toBe(0);
+    expect(cancellationFee(10_000_000, "2026-12-03", rule, Date.parse("2026-12-01T23:01:00Z"))).toBe(5_000_000);
+  });
+
   it("lists only the guest's bookings; cancelling a paid one keeps the fee and flags the refund", async () => {
     const e = mail();
     const far = await book(e, 30);
@@ -49,6 +64,20 @@ describe("guest accounts", () => {
     await rejects(guestCancel(db, mail(), far.id), /not found/i);
     await guestChangeDates(db, e, far.id, day(31), day(34));
     expect(await q1("SELECT check_in, check_out, total_amount_kobo FROM reservations WHERE id = ?", far.id)).toEqual({ check_in: day(31), check_out: day(34), total_amount_kobo: 16_500_000 });
+  });
+
+  it("staff cancelling a paid booking flags the refund for the general manager, with the same fee as the guest would pay", async () => {
+    const paidFar = await book(mail(), 60);
+    const paidNear = await book(mail(), 1);
+    const unpaid = await book(mail(), 61);
+    for (const r of [paidFar, paidNear]) await recordOfflinePayment(db, desk, { reservationId: r.id, amountKobo: 11_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
+    for (const r of [paidFar, paidNear, unpaid]) await cancelReservation(db, desk, r.id, "Guest phoned to cancel");
+
+    const row = (id: string) => q1<{ status: string; cancellation_fee_kobo: number | null; attention_reason: string | null }>("SELECT status, cancellation_fee_kobo, attention_reason FROM reservations WHERE id = ?", id);
+    expect(await row(paidFar.id)).toEqual({ status: "cancelled", cancellation_fee_kobo: 0, attention_reason: expect.stringMatching(/Refund ₦110,000 \(fee kept: ₦0\)\. For the general manager/) });
+    expect(await row(paidNear.id)).toEqual({ status: "cancelled", cancellation_fee_kobo: 5_500_000, attention_reason: expect.stringMatching(/Refund ₦55,000 \(fee kept: ₦55,000\)/) });
+    expect(await row(unpaid.id)).toEqual({ status: "cancelled", cancellation_fee_kobo: null, attention_reason: null });
+    expect((await q1<{ n: number }>("SELECT count(*) AS n FROM payments WHERE reservation_id = ? AND amount_kobo < 0", paidFar.id)).n).toBe(0);
   });
 
   it("parallel wrong guesses still get only five tries", async () => {

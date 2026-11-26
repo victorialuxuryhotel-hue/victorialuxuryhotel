@@ -16,7 +16,7 @@ import { can, canAny } from "@/lib/auth/permissions";
 import { formatDate, formatNaira, plural } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 import { requireStaff } from "@/server/auth";
-import { recentMonths, reportDepartment, reportRange, type Bucket, type Department, type ReportRange } from "@/server/domain/reports";
+import { rangeLabel, recentMonths, reportDepartment, reportRange, type Bucket, type Department, type ReportRange } from "@/server/domain/reports";
 import { activityPageData, moneyPageData, occupancyPageData } from "@/server/queries/reports";
 
 export const metadata: Metadata = { title: "Reports" };
@@ -27,7 +27,7 @@ const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : u
 
 const fixedLabel = { today: "Today", "14d": "14 days", month: "This month" } as const;
 const monthName = (m: string) => new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`));
-const rangeName = (r: ReportRange) => (r in fixedLabel ? fixedLabel[r as keyof typeof fixedLabel] : monthName(r));
+const rangeName = (r: ReportRange) => rangeLabel(r);
 const METHODS: [Bucket, string][] = [["cash", "Cash"], ["transfer", "Transfer"], ["pos", "POS / card"], ["cardOnline", "Card online"], ["other", "Other"]];
 
 const DEPARTMENTS: [Department | null, string][] = [[null, "All departments"], ["rooms", "Rooms"], ["restaurant", "Restaurant"], ["bar", "Bar"], ["hall", "Conference hall"]];
@@ -127,20 +127,20 @@ async function Money({ range, dept }: { range: ReportRange; dept: Department | n
         {mine ? (
           <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
             <div>{line("Received", mine.incomeKobo, true)}</div>
-            <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, mine.vatKobo)}</div>
+            {finance.vatRateBp ? <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, mine.vatKobo)}</div> : null}
           </dl>
         ) : (
           <>
             <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
               <div>{line("Total received", finance.incomeTotal, true)}</div>
-              <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, finance.vatKobo)}</div>
+              {finance.vatRateBp ? <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, finance.vatKobo)}</div> : null}
             </dl>
             <div className="overflow-x-auto border-t border-hairline">
               <table className="w-full min-w-[24rem] text-sm">
                 <thead className="text-xs text-ink-500">
                   <tr className="border-b border-hairline">
                     <th scope="col" className="px-5 py-2.5 text-left font-medium">Department</th>
-                    <th scope="col" className={cn(cell, "font-medium")}>VAT included</th>
+                    {finance.vatRateBp ? <th scope="col" className={cn(cell, "font-medium")}>VAT included</th> : null}
                     <th scope="col" className={cn(cell, "pr-5 font-medium")}>Received</th>
                   </tr>
                 </thead>
@@ -150,7 +150,7 @@ async function Money({ range, dept }: { range: ReportRange; dept: Department | n
                       <th scope="row" className="px-5 py-2.5 text-left font-medium text-ink-900">
                         <Link href={`/app/reports?tab=money&range=${range}&dept=${d.key}`} className="hover:underline">{d.label}</Link>
                       </th>
-                      <td className={cell}>{formatNaira(d.vatKobo)}</td>
+                      {finance.vatRateBp ? <td className={cell}>{formatNaira(d.vatKobo)}</td> : null}
                       <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(d.incomeKobo)}</td>
                     </tr>
                   ))}
@@ -160,8 +160,11 @@ async function Money({ range, dept }: { range: ReportRange; dept: Department | n
           </>
         )}
         <div className="flex flex-col gap-2 border-t border-hairline px-5 py-4 sm:flex-row">
-          <a href={`/app/reports/income-csv?range=${range}${deptQuery(dept)}`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
-            <Download className="size-4" aria-hidden /> Income (CSV)
+          <a href={`/app/reports/income-csv?range=${range}${deptQuery(dept)}&format=xlsx`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
+            <Download className="size-4" aria-hidden /> Income (Excel)
+          </a>
+          <a href={`/app/reports/income-csv?range=${range}${deptQuery(dept)}`} className={buttonStyles({ variant: "ghost", className: "w-full sm:w-auto" })}>
+            Income (CSV)
           </a>
         </div>
       </Card>
@@ -306,7 +309,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
           items={[
             { label: "Money", href: `/app/reports?tab=money&range=${range}`, active: tab === "money" },
             { label: "Occupancy", href: `/app/reports?tab=occupancy&range=${range}`, active: tab === "occupancy" },
-            ...(can(staff.role, "activity.view") ? [{ label: "Activity log", href: "/app/reports?tab=activity", active: tab === "activity" }] : []),
+            ...(can(staff.role, "activity.view") ? [{ label: "Activity", href: "/app/reports?tab=activity", active: tab === "activity" }] : []),
           ]}
         />
       </div>

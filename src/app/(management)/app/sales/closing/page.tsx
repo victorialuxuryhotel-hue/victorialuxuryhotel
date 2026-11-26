@@ -7,14 +7,25 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { can, canAny } from "@/lib/auth/permissions";
-import { formatDate, formatDateTime, formatNaira } from "@/lib/format";
-import { addDays, businessDate, businessDaySql } from "@/lib/hotel-date";
+import { formatDateTime, formatNaira } from "@/lib/format";
+import { addDays, businessDate, businessDayLabel, businessDaySql } from "@/lib/hotel-date";
 import { cn } from "@/lib/utils/cn";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { all, getDb } from "@/server/db";
 import { closingSummary, listClosings, type ClosingSummary } from "@/server/domain/pos";
 
 export const metadata: Metadata = { title: "Daily closing" };
+
+/** Before the blind count: how many sales and what's still open, but no money figures (they'd give away the expected cash). */
+function BeforeCount({ s }: { s: ClosingSummary }) {
+  return (
+    <dl className="grid max-w-md grid-cols-3 gap-3 text-sm">
+      <div><dt className="text-ink-500">Completed sales</dt><dd className="text-lg font-semibold tabular-nums">{s.sales}</dd></div>
+      <div><dt className="text-ink-500">Voided</dt><dd className="text-lg font-semibold tabular-nums">{s.voids}</dd></div>
+      <div><dt className="text-ink-500">Unpaid orders</dt><dd className={cn("text-lg font-semibold tabular-nums", s.openOrders > 0 && "text-danger-700")}>{s.openOrders}</dd></div>
+    </dl>
+  );
+}
 
 function Summary({ s }: { s: ClosingSummary }) {
   const line = (label: string, value: string, strong = false) => (
@@ -65,16 +76,16 @@ async function Content() {
     <div className="space-y-6 px-4 py-6 lg:px-8">
       {seller && mine ? (
         <Card>
-          <CardHeader title={`Your day · ${formatDate(today)}`} description={myClosing ? "Closed." : "Count the cash in your drawer, then close your day."} />
+          <CardHeader title={`Your day · ${businessDayLabel(today)}`} description={myClosing ? "Closed." : "Count the cash in your drawer, then submit your count."} />
           <div className="space-y-5 p-5">
-            <Summary s={myClosing ? (JSON.parse(myClosing.summary) as ClosingSummary) : mine} />
+            {myClosing ? <Summary s={JSON.parse(myClosing.summary) as ClosingSummary} /> : <BeforeCount s={mine} />}
             {myClosing ? (
               <p className="text-sm text-ink-700">
                 You counted <b className="tabular-nums">{formatNaira(myClosing.counted_cash_kobo)}</b> at {formatDateTime(myClosing.closed_at)}.{" "}
                 {myClosing.verified_at ? `Signed off by ${myClosing.verified_by_name}.` : "Waiting for a manager to sign it off."}
               </p>
             ) : (
-              <CloseDayForm expectedCashKobo={mine.byMethod.cash} openOrders={mine.openOrders} />
+              <CloseDayForm openOrders={mine.openOrders} />
             )}
           </div>
         </Card>
@@ -87,7 +98,7 @@ async function Content() {
       ) : null}
 
       <Card>
-        <CardHeader title="Closings · last 14 days" description={viewer ? "Every attendant's cash count against the till." : "Your closings."} />
+        <CardHeader title="Closings · last 14 days" description={viewer ? "Every salesperson's cash count against the till." : "Your closings."} />
         {closings.length ? (
           <ul className="divide-y divide-hairline">
             {closings.map((c) => {
@@ -96,7 +107,7 @@ async function Content() {
               return (
                 <li key={c.id} className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[15px] text-ink-900">{formatDate(c.business_date)} · {c.staff}</p>
+                    <p className="text-[15px] text-ink-900">{businessDayLabel(c.business_date)} · {c.staff}</p>
                     <p className="text-xs text-ink-500">
                       Sold {formatNaira(s.salesKobo)} · cash expected {formatNaira(c.expected_cash_kobo)}, counted {formatNaira(c.counted_cash_kobo)}
                       {c.explanation ? ` · “${c.explanation}”` : ""}

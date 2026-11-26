@@ -7,7 +7,7 @@ import { ReservationTable } from "@/components/management/reservation-table";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader, Stat, StatGrid } from "@/components/ui/card";
 import { formatNaira } from "@/lib/format";
-import { reservations, rooms } from "../_sample";
+import { reservations, rooms, today } from "../_sample";
 
 const href = () => "/preview/app/reservations/vl-7kq3pm";
 
@@ -32,7 +32,7 @@ export default function Page() {
         </StatGrid>
 
         <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-          <MovementList kind="arrivals" rows={arrivals} hrefFor={href} />
+          <MovementList kind="arrivals" rows={arrivals} hrefFor={href} today={today} />
           <Card>
             <CardHeader title="Rooms right now" action={<Link href="/preview/app/rooms" className="text-sm font-medium text-navy-800">Room board</Link>} />
             <div className="p-5">
@@ -67,7 +67,7 @@ export default function Page() {
 
         <Card>
           <CardHeader title="Recent bookings" action={<Link href="/preview/app/reservations" className="text-sm font-medium text-navy-800">All reservations</Link>} />
-          <ReservationTable rows={reservations.slice(0, 5)} hrefFor={href} />
+          <ReservationTable rows={reservations.slice(0, 5)} hrefFor={href} today={today} />
         </Card>
       </div>
     </>

@@ -30,7 +30,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           <Pager basePath="/app/guests" params={{ q: term }} page={page} hasMore={fetched.length > PAGE_SIZE} />
         </>
       ) : (
-        <div className="p-5"><EmptyState title={term ? "No guests match your search" : "No guests yet"} description={term ? undefined : "Guests are added automatically when a reservation is made."} /></div>
+        <div className="p-5"><EmptyState title={term ? "No guests match your search" : "No guests yet"} description={term ? undefined : "Guests are added automatically when a booking is made."} /></div>
       )}
     </Card>
   );
@@ -39,7 +39,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
 export default function GuestsPage(props: PageProps<"/app/guests">) {
   return (
     <>
-      <PageHeader title="Guests" description="Contact details and booking history." />
+      <PageHeader title="Guests" description="Contact details and activity." />
       <div className="px-4 py-6 lg:px-8"><Suspense fallback={<LoadingState />}><Content searchParams={props.searchParams} /></Suspense></div>
     </>
   );

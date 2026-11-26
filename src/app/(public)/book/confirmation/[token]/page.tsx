@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { checkInWhen, checkOutWhen } from "@/lib/stay-times";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -13,11 +14,6 @@ import { getBookingByToken, publicBookingRules } from "@/server/queries/booking"
 import { settlePaystackReference } from "@/server/payment-flow";
 
 export const metadata: Metadata = { title: "Your booking", robots: { index: false, follow: false } };
-
-const timeLabel = (t: string) => {
-  const [h = 0, m = 0] = t.split(":").map(Number);
-  return h === 12 && m === 0 ? "12:00 noon" : `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "pm" : "am"}`;
-};
 
 async function Outcome({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -40,7 +36,7 @@ async function Outcome({ params }: { params: Promise<{ token: string }> }) {
         stay={{
           reference: b.reference, guestName: b.guest.full_name, email: b.guest.email ?? "", category: b.roomCategory, room: b.room,
           checkIn: b.check_in, checkOut: b.check_out, nights: b.nights ?? 0, guests: b.guest_count, paidKobo: b.paidKobo,
-          receiptNumber: b.receipt ?? "", checkInTime: timeLabel(rules.checkInTime), checkOutTime: timeLabel(rules.checkOutTime),
+          receiptNumber: b.receipt ?? "", checkInTime: checkInWhen(rules.checkInTime), checkOutTime: checkOutWhen(rules.checkOutTime),
           token, siteUrl: publicEnv().NEXT_PUBLIC_SITE_URL,
         }}
       />

@@ -110,17 +110,94 @@
 .delayed-show { animation: delayed-show 150ms ease-out 300ms both; }
 @media (prefers-reduced-motion: reduce) { .delayed-show { animation-duration: 1ms; } }
 
+/*
+ * The till (interface brief I8).
+ * - Full screen (bar station or restaurant & bar staff): no sidebar or bottom bars while the till
+ *   is open; the till page's own strip has the business day, who's signed in, Orders and Closing.
+ * - Dark till (station setting): the palette re-pointed while the till is open. Pay (navy-800 with
+ *   white text) becomes the brightest thing on the screen. Never applies to printing.
+ */
+html[data-till-full] [data-app-nav] { display: none !important; }
+@media screen {
+  html[data-till-dark] {
+    color-scheme: dark;
+    --color-ivory-50: #131b2f;
+    --color-ivory-100: #19233b;
+    --color-ivory-200: #233050;
+    --color-ink-300: #4b5672;
+    --color-ink-400: #8a93a8;
+    --color-ink-500: #a3abbd;
+    --color-ink-600: #bcc3d2;
+    --color-ink-700: #d6dbe5;
+    --color-ink-900: #f4f2ec;
+    --color-navy-50: #1f2f5c;
+    --color-navy-700: #9db2ff;
+    --color-navy-800: #3d6bff;
+    --color-navy-950: #f4f2ec;
+    --color-hairline: rgb(244 242 236 / 0.16);
+    --color-gold-50: #3a3016;
+    --color-gold-300: #8a6d22;
+    --color-success-50: #10301f;
+    --color-success-700: #6fdc9a;
+    --color-warning-50: #3a2a0c;
+    --color-warning-700: #f5b84a;
+    --color-danger-50: #3b1414;
+    --color-danger-700: #ff8a8a;
+  }
+  html[data-till-dark] body { background: var(--color-ivory-100); }
+  html[data-till-dark] .bg-white { background-color: var(--color-ivory-50); }
+}
+
+/*
+ * Printing. Two printers in the hotel: an 80mm thermal roll (bar receipts) and A4 (guest bills,
+ * room receipts, reports). docs/printing-and-kiosk.md has the Chrome and printer settings.
+ * - Default pages are A4 with a small margin.
+ * - A page with a till receipt (.pos-receipt[data-print]) prints only that receipt, on the
+ *   "thermal" page: 80mm wide, no margins (so Chrome has no room for its date/URL header),
+ *   black ink only (grey fades on thermal paper), sized to the 72mm a roll can print.
+ */
+@page {
+  size: A4;
+  margin: 12mm;
+}
+@page thermal {
+  /* Width is what matters. CSS needs a height too; receipt-roll drivers stop and cut at the end of the content. */
+  size: 80mm 297mm;
+  margin: 0;
+}
 @media print {
-  body:has(.pos-receipt[data-print]) * {
-    visibility: hidden;
+  body:has(.pos-receipt[data-print]) {
+    background: #fff;
   }
-  body:has(.pos-receipt[data-print]) .pos-receipt[data-print],
-  body:has(.pos-receipt[data-print]) .pos-receipt[data-print] * {
-    visibility: visible;
+  /* Remove (not just hide) everything except the receipt and the boxes around it, so nothing else takes paper. */
+  body:has(.pos-receipt[data-print]) *:not(:has(.pos-receipt[data-print])):not(.pos-receipt[data-print]):not(.pos-receipt[data-print] *) {
+    display: none !important;
   }
-  body:has(.pos-receipt[data-print]) .pos-receipt[data-print] {
-    position: absolute;
-    inset: 0 auto auto 0;
-    width: 80mm;
+  body:has(.pos-receipt[data-print]) *:has(.pos-receipt[data-print]) {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  .pos-receipt[data-print] {
+    page: thermal;
+    width: 72mm !important;
+    max-width: 72mm !important;
+    margin: 0 auto !important;
+    padding: 2mm 0 6mm !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+  .pos-receipt[data-print],
+  .pos-receipt[data-print] * {
+    color: #000 !important;
+    border-color: #000 !important;
+    background: transparent !important;
   }
 }

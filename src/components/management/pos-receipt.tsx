@@ -8,13 +8,19 @@ export type PosReceiptData = {
   receiptNumber: string;
   orderNumber: number;
   paidAt: string;
-  lines: { name: string; quantity: number; unitKobo: number }[];
+  lines: { name: string; quantity: number; unitKobo: number; note?: string | null }[];
   totalKobo: number;
   method: "cash" | "bank_transfer" | "pos_terminal";
+  /** Transfer reference, or the last 4 digits of the POS slip. */
+  reference?: string | null;
   cashReceivedKobo: number | null;
   attendant: string;
   vatRateBp: number;
+  /** Printed with the VAT line: a VAT receipt carries the hotel's Tax ID. */
+  taxId?: string | null;
   voided?: { reason: string; at: string | null } | null;
+  /** A reprint (more than 10 minutes after the sale): marked COPY. */
+  copy?: boolean;
 };
 
 const METHOD = { cash: "Cash", bank_transfer: "Bank transfer", pos_terminal: "POS / card" } as const;
@@ -29,6 +35,7 @@ export function PosReceipt({ r, className, printable = true }: { r: PosReceiptDa
         <p className="text-xs uppercase tracking-[0.2em]">{r.outlet === "bar" ? "Bar" : "Restaurant"}</p>
         <p className="text-xs text-ink-600">{hotel.address.line1}, {hotel.address.city}</p>
         <p className="text-xs text-ink-600">{hotel.phoneDisplay}</p>
+        {r.copy ? <p className="mt-1 text-sm font-bold tracking-[0.3em]">COPY</p> : null}
       </header>
       <dl className="space-y-0.5 border-b border-dashed border-ink-400 py-3 text-xs">
         <div className={row}><dt>Receipt</dt><dd>{r.receiptNumber}</dd></div>
@@ -40,6 +47,7 @@ export function PosReceipt({ r, className, printable = true }: { r: PosReceiptDa
         {r.lines.map((l, i) => (
           <li key={i}>
             <p>{l.name}</p>
+            {l.note ? <p className="pl-2 text-xs italic">– {l.note}</p> : null}
             <p className={cn(row, "text-ink-700")}>
               <span>{l.quantity} × {formatNaira(l.unitKobo)}</span>
               <span className="tabular-nums text-ink-900">{formatNaira(l.quantity * l.unitKobo)}</span>
@@ -50,6 +58,7 @@ export function PosReceipt({ r, className, printable = true }: { r: PosReceiptDa
       <dl className="space-y-0.5 py-3">
         <div className={cn(row, "text-base font-bold")}><dt>Total</dt><dd className="tabular-nums">{formatNaira(r.totalKobo)}</dd></div>
         <div className={row}><dt>Paid by</dt><dd>{METHOD[r.method]}</dd></div>
+        {r.reference ? <div className={row}><dt>{r.method === "pos_terminal" ? "POS slip" : "Reference"}</dt><dd>{r.method === "pos_terminal" ? `…${r.reference}` : r.reference}</dd></div> : null}
         {r.method === "cash" && r.cashReceivedKobo != null ? (
           <>
             <div className={row}><dt>Cash given</dt><dd className="tabular-nums">{formatNaira(r.cashReceivedKobo)}</dd></div>
@@ -57,6 +66,7 @@ export function PosReceipt({ r, className, printable = true }: { r: PosReceiptDa
           </>
         ) : null}
         {r.vatRateBp ? <div className={cn(row, "text-xs text-ink-600")}><dt>Includes VAT ({r.vatRateBp / 100}%)</dt><dd className="tabular-nums">{formatNaira(vatIncluded(r.totalKobo, r.vatRateBp))}</dd></div> : null}
+        {r.vatRateBp && r.taxId ? <div className={cn(row, "text-xs text-ink-600")}><dt>TIN</dt><dd className="tabular-nums">{r.taxId}</dd></div> : null}
       </dl>
       {r.voided ? (
         <p className="rounded border-2 border-danger-600 p-2 text-center text-sm font-bold text-danger-700">VOIDED{r.voided.at ? ` ${formatDateTime(r.voided.at)}` : ""}: {r.voided.reason}</p>

@@ -24,7 +24,6 @@ export async function addHallBooking(_prev: ActionResult | null, formData: FormD
         endTime: time,
         guests: z.union([z.literal(""), z.coerce.number().int().positive()]).transform((n) => (n === "" ? null : n)),
         price: z.union([z.literal(""), z.coerce.number().min(0).max(1_000_000_000, "That price is too high")]).transform((n) => (n === "" ? 0 : Math.round(n * 100))),
-        status: z.enum(["enquiry", "confirmed"]),
         notes: opt(1000),
       })
       .safeParse(Object.fromEntries(formData));
@@ -40,7 +39,7 @@ export async function addHallBooking(_prev: ActionResult | null, formData: FormD
 export async function changeHallStatus(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
     const staff = await authorize("events.manage");
-    await setHallStatus(await getDb(), actorOf(staff), z.uuid().parse(formData.get("id")), z.enum(["confirmed", "cancelled"]).parse(formData.get("status")));
+    await setHallStatus(await getDb(), actorOf(staff), z.uuid().parse(formData.get("id")), z.literal("cancelled").parse(formData.get("status")));
     refresh();
     return ok(undefined);
   } catch (err) {
@@ -58,6 +57,7 @@ export async function addHallPayment(_prev: ActionResult | null, formData: FormD
         method: z.enum(["cash", "bank_transfer", "pos_terminal", "card"]),
         paidOn: z.iso.date(),
         reference: opt(80),
+        paymentId: z.uuid().optional(),
       })
       .safeParse(Object.fromEntries(formData));
     if (!v.success) throw new AppError("VALIDATION", v.error.issues[0]?.message ?? "Check the payment");

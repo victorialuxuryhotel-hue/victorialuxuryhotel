@@ -5,7 +5,7 @@ export function RatesTabs({ current }: { current: "types" | "photos" }) {
     <div className="bg-ivory-50">
       <Tabs
         items={[
-          { label: "Room types & rates", href: "/app/rooms/categories", active: current === "types" },
+          { label: "Rates & room types", href: "/app/rooms/categories", active: current === "types" },
           { label: "Website photos", href: "/app/rooms/categories/photos", active: current === "photos" },
         ]}
       />

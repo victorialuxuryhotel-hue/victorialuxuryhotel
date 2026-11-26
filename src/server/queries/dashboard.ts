@@ -115,7 +115,7 @@ export async function departmentsOverview() {
       { key: "rooms", label: "Hotel rooms", today: day.income.rooms, month: month.income.rooms, note: `${c.in_house} of ${c.rooms} rooms occupied · ${c.bookings} ${c.bookings === 1 ? "booking" : "bookings"} this month`, href: "/app/reports?tab=money&range=month&dept=rooms" },
       { key: "restaurant", label: "Restaurant", today: day.income.restaurant, month: month.income.restaurant, note: `${c.restaurant} ${c.restaurant === 1 ? "sale" : "sales"} today`, href: "/app/sales/reports?range=month&outlet=restaurant" },
       { key: "bar", label: "Bar", today: day.income.bar, month: month.income.bar, note: `${c.bar} ${c.bar === 1 ? "sale" : "sales"} today`, href: "/app/sales/reports?range=month&outlet=bar" },
-      { key: "hall", label: "Conference hall", today: day.income.hall, month: month.income.hall, note: `${c.halls} confirmed ${c.halls === 1 ? "event" : "events"} coming up`, href: "/app/events" },
+      { key: "hall", label: "Conference hall", today: day.income.hall, month: month.income.hall, note: `${c.halls} confirmed ${c.halls === 1 ? "hall booking" : "hall bookings"} coming up`, href: "/app/events" },
     ],
     total: { today: day.incomeTotal, month: month.incomeTotal },
   };

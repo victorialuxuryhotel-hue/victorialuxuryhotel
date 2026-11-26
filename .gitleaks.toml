@@ -1,0 +1,8 @@
+# Secret scanning (CI). Uses gitleaks' default rules; these files only hold generated names that look
+# like keys (for example Cloudflare's AI model type names in cloudflare-env.d.ts).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Generated files"
+paths = ['''cloudflare-env\.d\.ts''', '''pnpm-lock\.yaml''']

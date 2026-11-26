@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { formatDate, formatNaira } from "@/lib/format";
+import { keepValues } from "@/lib/forms";
 import { cn } from "@/lib/utils/cn";
 import { addHallBooking, addHallPayment, changeHallStatus } from "@/server/events";
 import type { HallBooking } from "@/server/domain/events";
@@ -16,7 +17,8 @@ export function HallBookingForm({ today }: { today: string }) {
   }, [state]);
   const err = (n: string) => (state && !state.ok ? state.fieldErrors?.[n]?.[0] : undefined);
   return (
-    <form ref={form} action={action} className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
+    // keepValues: an error (e.g. "The hall is already booked at that time.") keeps what was typed; success clears the form.
+    <form ref={form} action={action} onSubmit={keepValues(action)} className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
       {state?.ok ? <div className="sm:col-span-2 lg:col-span-4"><FormMessage tone="success">Saved.</FormMessage></div> : null}
       {state && !state.ok && !state.fieldErrors ? <div className="sm:col-span-2 lg:col-span-4"><FormMessage>{state.message}</FormMessage></div> : null}
       <Field label="Event" htmlFor="htitle" error={err("title")} className="sm:col-span-2"><Input id="htitle" name="title" placeholder="Staff training" required /></Field>
@@ -30,16 +32,14 @@ export function HallBookingForm({ today }: { today: string }) {
       </div>
       <Field label="Guests" optional htmlFor="hguests"><Input id="hguests" name="guests" type="number" min={1} /></Field>
       <Field label="Price (₦)" optional htmlFor="hprice" error={err("price")}><Input id="hprice" name="price" type="number" min={0} step="any" inputMode="decimal" /></Field>
-      <Field label="Status" htmlFor="hstatus">
-        <Select id="hstatus" name="status" defaultValue="enquiry"><option value="enquiry">Enquiry</option><option value="confirmed">Confirmed</option></Select>
-      </Field>
+      <p className="self-end pb-3 text-sm text-ink-500">Saved as an enquiry. It&apos;s confirmed once paid in full.</p>
       <Field label="Notes" optional htmlFor="hnotes" className="sm:col-span-2 lg:col-span-4"><Textarea id="hnotes" name="notes" rows={2} placeholder="Setup, catering, projector…" /></Field>
       <div className="sm:col-span-2 lg:col-span-4"><Button type="submit" pending={pending}>Save hall booking</Button></div>
     </form>
   );
 }
 
-function StatusButton({ id, status, label, variant }: { id: string; status: "confirmed" | "cancelled"; label: string; variant: "secondary" | "ghost" }) {
+function StatusButton({ id, status, label, variant }: { id: string; status: "cancelled"; label: string; variant: "secondary" | "ghost" }) {
   const [state, action, pending] = useActionState(changeHallStatus, null);
   return (
     <form action={action}>
@@ -53,27 +53,35 @@ function StatusButton({ id, status, label, variant }: { id: string; status: "con
 
 function PaymentForm({ b, today, onDone }: { b: HallBooking; today: string; onDone: () => void }) {
   const [state, action, pending] = useActionState(addHallPayment, null);
+  const [paymentId] = useState(() => crypto.randomUUID());
+  const [method, setMethod] = useState("bank_transfer");
+  const transfer = method === "bank_transfer";
+  const pos = method === "pos_terminal";
   useEffect(() => {
     if (state?.ok) onDone();
   }, [state, onDone]);
   return (
-    <form action={action} className="mt-3 flex flex-wrap items-end gap-2 rounded-md border border-hairline p-3">
+    <form action={action} onSubmit={keepValues(action)} className="mt-3 flex flex-wrap items-end gap-2 rounded-md border border-hairline p-3">
       <input type="hidden" name="bookingId" value={b.id} />
+      <input type="hidden" name="paymentId" value={paymentId} />
       <Field label="Amount (₦)" htmlFor={`pa-${b.id}`}><Input id={`pa-${b.id}`} name="amount" type="number" min={1} step="any" defaultValue={b.price_kobo > b.paid_kobo ? (b.price_kobo - b.paid_kobo) / 100 : undefined} className="h-11 w-32" required /></Field>
       <Field label="Method" htmlFor={`pm-${b.id}`}>
-        <Select id={`pm-${b.id}`} name="method" defaultValue="bank_transfer" className="h-11">
+        <Select id={`pm-${b.id}`} name="method" value={method} onChange={(e) => setMethod(e.target.value)} className="h-11">
           <option value="bank_transfer">Transfer</option><option value="cash">Cash</option><option value="pos_terminal">POS</option><option value="card">Card</option>
         </Select>
       </Field>
       <Field label="Date" htmlFor={`pd-${b.id}`}><Input id={`pd-${b.id}`} name="paidOn" type="date" max={today} defaultValue={today} className="h-11" /></Field>
-      <Field label="Reference" optional htmlFor={`pr-${b.id}`}><Input id={`pr-${b.id}`} name="reference" className="h-11 w-36" /></Field>
-      <Button type="submit" size="sm" className="h-11" pending={pending}>Record</Button>
+      <Field label={transfer ? "Transfer reference or sender" : pos ? "POS slip, last 4" : "Reference"} optional={!transfer && !pos} htmlFor={`pr-${b.id}`}>
+        <Input id={`pr-${b.id}`} name="reference" className="h-11 w-44" required={transfer || pos} minLength={transfer ? 3 : pos ? 4 : undefined} maxLength={pos ? 4 : undefined} inputMode={pos ? "numeric" : undefined} pattern={pos ? "[0-9]{4}" : undefined} />
+      </Field>
+      <Button type="submit" size="sm" className="h-11" pending={pending}>Take payment</Button>
       {state && !state.ok ? <p className="w-full text-xs text-danger-700">{state.message}</p> : null}
     </form>
   );
 }
 
-const statusText = { enquiry: "Enquiry", confirmed: "Confirmed", cancelled: "Cancelled" } as const;
+const statusText = (b: HallBooking) =>
+  b.status === "confirmed" ? "Confirmed · paid" : b.status === "cancelled" ? "Cancelled" : b.price_kobo > 0 ? "Awaiting payment" : "Enquiry";
 
 function Row({ b, today }: { b: HallBooking; today: string }) {
   const [paying, setPaying] = useState(false);
@@ -87,14 +95,14 @@ function Row({ b, today }: { b: HallBooking; today: string }) {
           {b.notes ? <p className="mt-1 text-xs text-ink-500">{b.notes}</p> : null}
         </div>
         <div className="text-right">
-          <span className={cn("rounded-full border px-2.5 py-0.5 text-xs", b.status === "confirmed" ? "border-navy-800 text-navy-800" : "border-hairline text-ink-700")}>{statusText[b.status]}</span>
+          <span className={cn("rounded-full border px-2.5 py-0.5 text-xs", b.status === "confirmed" ? "border-navy-800 text-navy-800" : "border-hairline text-ink-700")}>{statusText(b)}</span>
           <p className="mt-1 text-sm tabular-nums text-ink-700">{b.price_kobo ? `${formatNaira(b.paid_kobo)} of ${formatNaira(b.price_kobo)}` : b.paid_kobo ? `${formatNaira(b.paid_kobo)} paid` : "No price set"}</p>
         </div>
       </div>
       {b.status !== "cancelled" ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          {b.status === "enquiry" ? <StatusButton id={b.id} status="confirmed" label="Confirm" variant="secondary" /> : null}
-          {!paying && (!b.price_kobo || b.paid_kobo < b.price_kobo) ? <Button size="sm" variant="secondary" className="h-11" onClick={() => setPaying(true)}>Record payment</Button> : null}
+          {!paying && b.price_kobo > 0 && b.paid_kobo < b.price_kobo ? <Button size="sm" variant="secondary" className="h-11" onClick={() => setPaying(true)}>Take payment</Button> : null}
+          <a href={`/app/events/${b.id}/invoice`} className="inline-flex h-11 items-center rounded-md px-3 text-sm font-medium text-navy-800 hover:bg-ink-900/5">Invoice</a>
           <StatusButton id={b.id} status="cancelled" label="Cancel" variant="ghost" />
         </div>
       ) : null}

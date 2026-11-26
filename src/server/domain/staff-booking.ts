@@ -1,6 +1,6 @@
 import { phoneMatches, localDigits } from "@/lib/phone";
 import { ALL_STAFF, all, requireRole, type Actor, type Db } from "../db";
-import { freeUnits, validateStay } from "./inventory";
+import { freeUnits, stayEndSql, validateStay } from "./inventory";
 
 export type PhoneMatch = { id: string; name: string; phone: string | null; email: string | null; stays: number };
 
@@ -32,11 +32,12 @@ export async function availabilityForStay(db: Db, actor: Actor, checkIn: string,
     all<FreeRoom & { category_id: string }>(
       db,
       `SELECT rm.id, rm.room_number AS number, rm.floor, rm.category_id FROM rooms rm
+       -- An overstaying guest holds their room until checked out, as in the count (freeUnits).
        WHERE rm.is_active = 1 AND rm.service_status = 'in_service'
          AND NOT EXISTS (
            SELECT 1 FROM reservations o WHERE o.room_id = rm.id
              AND o.status IN ('pending_payment', 'confirmed', 'checked_in')
-             AND o.check_in < ?2 AND ?1 < o.check_out)
+             AND o.check_in < ?2 AND ?1 < ${stayEndSql("o")})
        ORDER BY rm.readiness = 'ready' DESC, length(rm.room_number), rm.room_number`,
       checkIn,
       checkOut,

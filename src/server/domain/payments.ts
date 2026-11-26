@@ -5,6 +5,7 @@ import { dbErrorToken, StaleStateError } from "../db-errors";
 import {
   assertNetPaid,
   activity,
+  all,
   ALL_STAFF,
   assertVersion,
   first,
@@ -18,8 +19,31 @@ import {
   type Db,
   type Stmt,
 } from "../db";
+import { applyChangeStatements, pendingChange, rethrowChangeError } from "./changes";
 import { autoAssignRoomStatements, freeUnits } from "./inventory";
 import { dueOf, loadReservation, netPaid, RES_COLUMNS, type ReservationRow } from "./reservations";
+
+/** Marker on a Paystack payment whose amount or currency didn't match: it waits for a person (alerted once). */
+export const MISMATCH_FLAG = "Amount/currency mismatch";
+
+/**
+ * Pending Paystack payments the scheduled job should ask Paystack about: 30 minutes to 48 hours old,
+ * oldest first. Payments already flagged for a mismatch are left for a person, so they never take
+ * the batch's places and starve newer payments.
+ */
+export async function paymentsToSweep(db: Db, now = Date.now(), limit = 50): Promise<string[]> {
+  const rows = await all<{ provider_reference: string }>(
+    db,
+    `SELECT provider_reference FROM payments
+     WHERE provider = 'paystack' AND status = 'pending' AND created_at >= ? AND created_at <= ?
+       AND coalesce(gateway_response, '') NOT LIKE '${MISMATCH_FLAG}%'
+     ORDER BY created_at LIMIT ?`,
+    new Date(now - 48 * 3600_000).toISOString(),
+    new Date(now - 30 * 60_000).toISOString(),
+    limit,
+  );
+  return rows.map((r) => r.provider_reference);
+}
 
 export type SettleOutcome =
   | "confirmed" | "part_paid" | "paid_unavailable" | "paid_closed" | "already_settled" | "already_processed"
@@ -42,7 +66,7 @@ function retryIfCapacityRace(err: unknown): never {
 }
 
 
-async function settleStatements(db: Db, res: ReservationRow, paidAfter: number): Promise<{ outcome: SettleOutcome; stmts: Stmt[]; reason?: string }> {
+async function settleStatements(db: Db, res: ReservationRow, paidAfter: number, dueAfter = dueOf(res)): Promise<{ outcome: SettleOutcome; stmts: Stmt[]; reason?: string }> {
   const stmts: Stmt[] = [];
   let outcome: SettleOutcome;
   let reason: string | undefined;
@@ -53,7 +77,7 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number):
     );
   const flag = (text: string) => stmts.push(db.prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?").bind(text, res.id));
 
-  if (paidAfter < dueOf(res)) {
+  if (paidAfter < dueAfter) {
     outcome = "part_paid";
   } else if (res.status === "pending_payment" && res.hold_expires_at && res.hold_expires_at > now()) {
     confirm();
@@ -71,13 +95,13 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number):
       outcome = "paid_unavailable";
     }
   } else if (res.status === "cancelled" || res.status === "no_show") {
-    flag("Payment received for a cancelled reservation. Arrange a refund or rebook.");
+    flag("Payment received for a cancelled booking. Arrange a refund or rebook.");
     outcome = "paid_closed";
   } else {
     outcome = "already_settled"; // confirmed / checked in / checked out
   }
 
-  const over = paidAfter - dueOf(res);
+  const over = paidAfter - dueAfter;
   if (over > 0) {
     flag(`Overpaid by ${naira(over)}: more than one payment was received. Refund the difference.`);
     stmts.push(activity(db, "payment.overpaid", "reservation", res.id, `${res.reference} overpaid by ${naira(over)}`, { over_kobo: over }));
@@ -131,22 +155,22 @@ export async function applyPaystackResult(
       "SELECT id, reservation_id, amount_kobo, status, gateway_response, version FROM payments WHERE provider = 'paystack' AND provider_reference = ?",
       r.reference,
     );
-    if (!pay) throw new AppError("NOT_FOUND", "Unknown payment reference.");
+    if (!pay) throw new AppError("NOT_FOUND", "We couldn't find that payment. If money has left your account, contact the hotel with your bank reference.");
     if (pay.status === "successful") return "already_processed";
     const res = await loadReservation(db, pay.reservation_id);
     const guard = [assertVersion(db, "payments", pay.id, pay.version), assertVersion(db, "reservations", res.id, res.version)];
 
     if (r.status === "success") {
       if (r.currency.toUpperCase() !== "NGN" || r.amountKobo !== pay.amount_kobo) {
-        if (pay.gateway_response?.startsWith("Amount/currency mismatch")) return "already_flagged";
+        if (pay.gateway_response?.startsWith(MISMATCH_FLAG)) return "already_flagged";
         await writeBatch(db, null, [
           ...guard,
           db
             .prepare("UPDATE payments SET gateway_response = ? WHERE id = ?")
-            .bind(`Amount/currency mismatch: expected ${pay.amount_kobo} NGN, Paystack reported ${r.amountKobo} ${r.currency}`, pay.id),
+            .bind(`${MISMATCH_FLAG}: expected ${pay.amount_kobo} NGN, Paystack reported ${r.amountKobo} ${r.currency}`, pay.id),
           db
             .prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?")
-            .bind("Paystack reported a payment that does not match the amount due. Check the Paystack dashboard before confirming.", res.id),
+            .bind("Paystack reported a payment that does not match the amount owed. Check the Paystack dashboard before confirming.", res.id),
           activity(db, "payment.mismatch", "reservation", res.id, `Payment ${r.reference} for ${res.reference} did not match the amount due`, {
             expected_kobo: pay.amount_kobo,
             reported_kobo: r.amountKobo,
@@ -220,6 +244,17 @@ export async function recordOfflinePayment(
   if (input.confirmReceived !== true) throw new AppError("VALIDATION", "Confirm that the hotel has received this money before recording it.");
   if (!["cash", "bank_transfer", "pos_terminal", "other"].includes(input.method)) throw new AppError("VALIDATION", "Choose how the money was received.");
   if (!Number.isInteger(input.amountKobo) || input.amountKobo <= 0) throw new AppError("VALIDATION", "Enter the amount received.");
+  // Every non-cash payment can be checked: transfers against the bank statement, POS slips against the terminal (I7, I16).
+  if (input.method === "bank_transfer" && (input.reference?.trim().length ?? 0) < 3) {
+    throw new AppError("VALIDATION", "This transfer needs its reference. Enter the transfer reference or the sender's name, as shown in the hotel's bank app.", {
+      fieldErrors: { reference: ["Enter the transfer reference or the sender's name"] },
+    });
+  }
+  if (input.method === "pos_terminal" && !/\d{4}/.test(input.reference ?? "")) {
+    throw new AppError("VALIDATION", "This POS payment needs its slip number. Enter the last 4 digits of the slip, once the terminal says Approved.", {
+      fieldErrors: { reference: ["Enter the last 4 digits of the POS slip"] },
+    });
+  }
   const today = hotelToday();
   if (!input.paidOn || input.paidOn > today) throw new AppError("VALIDATION", "The payment date can't be in the future.");
   if (input.paidOn < addDays(today, -60)) throw new AppError("VALIDATION", "Payments older than 60 days must be recorded by a manager with the accounts team.");
@@ -236,15 +271,19 @@ export async function recordOfflinePayment(
     if (done) return done;
     const res = await loadReservation(db, input.reservationId);
     if (!["pending_payment", "confirmed", "checked_in", "checked_out", "expired"].includes(res.status)) {
-      throw new AppError("INVALID_TRANSITION", "Payments can't be recorded against a cancelled reservation.");
+      throw new AppError("INVALID_TRANSITION", "Payments can't be taken against a cancelled booking.");
     }
     const paid = await netPaid(db, res.id);
-    const balance = dueOf(res) - paid;
-    if (balance <= 0) throw new AppError("VALIDATION", "This reservation is already paid in full.");
-    if (input.amountKobo !== balance) throw new AppError("VALIDATION", `Bookings are paid in full. Record the full ${naira(balance)} balance.`);
+    // A change waiting for payment (upgrade, move, extra nights) is paid with everything else owed, and applied in the same step.
+    const change = await pendingChange(db, res.id);
+    const dueAfter = dueOf(res) + (change?.amount_kobo ?? 0);
+    const balance = dueAfter - paid;
+    if (balance <= 0) throw new AppError("VALIDATION", "This booking is already paid in full.");
+    if (input.amountKobo !== balance) throw new AppError("VALIDATION", `Bookings are paid in full. Take the full ${naira(balance)} owed.`);
 
     const paymentId = input.paymentId ?? uuid();
-    const settle = await settleStatements(db, res, paid + input.amountKobo);
+    const settle = await settleStatements(db, res, paid + input.amountKobo, dueAfter);
+    const changeStmts = change ? await applyChangeStatements(db, res, change, { paymentId, decidedBy: actor!.id, paidAfterKobo: paid + input.amountKobo }) : [];
     const methodLabel = input.method.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
     try {
       await writeBatch(
@@ -262,6 +301,7 @@ export async function recordOfflinePayment(
               paymentId, res.id, input.amountKobo, input.method, input.reference?.trim() || null,
               hotelInstant(input.paidOn, hotelTimeNow()), now(), actor.id, input.notes?.trim() || null,
             ),
+          ...changeStmts,
           ...settle.stmts,
           activity(db, "payment.recorded", "reservation", res.id, `${methodLabel} payment of ${naira(input.amountKobo)} recorded for ${res.reference}`, {
             payment_id: paymentId,
@@ -276,6 +316,7 @@ export async function recordOfflinePayment(
         if (done) return done;
         throw new AppError("CONFLICT", "A payment with this reference has already been recorded.");
       }
+      if (change && err instanceof AppError && ["room_overlap", "no_capacity"].includes(dbErrorToken(err.cause) ?? "")) rethrowChangeError(err, change);
       retryIfCapacityRace(err);
     }
     const row = await first<{ receipt_number: string }>(db, "SELECT receipt_number FROM payments WHERE id = ?", paymentId);

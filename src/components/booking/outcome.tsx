@@ -27,8 +27,8 @@ export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
   const share = `https://wa.me/?text=${encodeURIComponent(`I'm staying at ${hotel.name}, ${formatDate(stay.checkIn)} to ${formatDate(stay.checkOut)}. ${stay.siteUrl}`)}`;
   const rows: Array<[string, string]> = [
     ["Room", `${stay.room ? `${stay.room} · ` : ""}${stay.category} · ${plural(stay.guests, "guest")}`],
-    ["Check-in", `${formatDate(stay.checkIn)}, from ${stay.checkInTime}`],
-    ["Check-out", `${formatDate(stay.checkOut)}, by ${stay.checkOutTime}`],
+    ["Check-in", `${formatDate(stay.checkIn)}, ${stay.checkInTime}`],
+    ["Check-out", `${formatDate(stay.checkOut)}, ${stay.checkOutTime}`],
     ["Paid", formatNaira(stay.paidKobo)],
   ];
   const action = "flex min-h-14 flex-col items-center justify-center gap-1 rounded-md border border-hairline px-2 text-xs text-ink-900 hover:bg-ink-900/7";
@@ -69,7 +69,7 @@ export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
         <ol className="mt-1.5">
           {[
             stay.email ? "Your confirmation and receipt are in your email." : "Keep your booking reference; you'll need it at the front desk.",
-            `Arrive from ${stay.checkInTime}. Your room key is waiting at the front desk.`,
+            `Arrive ${stay.checkInTime === "any time" ? "any time that day" : stay.checkInTime}. Your room key is waiting at the front desk.`,
             "Running late? Message us on WhatsApp.",
           ].map((t, i) => (
             <li key={t} className="grid grid-cols-[22px_1fr] gap-2.5 border-t border-hairline py-2.5 text-sm">

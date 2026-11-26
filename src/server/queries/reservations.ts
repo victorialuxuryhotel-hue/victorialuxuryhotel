@@ -2,17 +2,19 @@ import "server-only";
 import type { ReservationStatus } from "@/domain/status";
 import type { HistoryEntry, PaymentRow, ReservationDetail, ReservationRow } from "@/domain/views";
 import { formatNaira } from "@/lib/format";
-import { hotelToday as today } from "@/lib/hotel-date";
+import { hotelToday as today, tonight } from "@/lib/hotel-date";
 import { reservationStatus } from "@/domain/status";
 import { authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
 import { cleanSearch } from "../db-errors";
+import { DUE_IN_SQL, DUE_OUT_SQL, movementProgress } from "../domain/movements";
 
 const LIST_COLUMNS = `
   r.id, r.reference, r.check_in, r.check_out, r.guest_count, (r.total_amount_kobo + r.extras_kobo + r.room_change_kobo - r.discount_kobo) AS total_amount_kobo, r.status, r.source, r.hold_expires_at, r.attention_reason,
   g.full_name AS guest_name, g.phone AS guest_phone, c.name AS category_name, rm.room_number,
   (SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
-     FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful') AS paid_kobo`;
+     FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful') AS paid_kobo,
+  (SELECT coalesce(sum(x.amount_kobo), 0) FROM reservation_changes x WHERE x.reservation_id = r.id AND x.status = 'pending') AS pending_kobo`;
 const LIST_FROM = `FROM reservations r
   JOIN guests g ON g.id = r.guest_id
   JOIN room_categories c ON c.id = r.category_id
@@ -21,7 +23,7 @@ const LIST_FROM = `FROM reservations r
 type ListRow = {
   id: string; reference: string; check_in: string; check_out: string; guest_count: number; total_amount_kobo: number;
   status: ReservationStatus; source: ReservationRow["source"]; hold_expires_at: string | null; attention_reason: string | null;
-  guest_name: string; guest_phone: string | null; category_name: string; room_number: string | null; paid_kobo: number;
+  guest_name: string; guest_phone: string | null; category_name: string; room_number: string | null; paid_kobo: number; pending_kobo: number;
 };
 
 function toRow(r: ListRow): ReservationRow {
@@ -41,11 +43,17 @@ function toRow(r: ListRow): ReservationRow {
     source: r.source,
     holdExpiresAt: r.hold_expires_at ?? undefined,
     attention: r.attention_reason ?? undefined,
+    pendingKobo: r.pending_kobo || undefined,
   };
 }
 
 export async function hotelToday(): Promise<string> {
   return today();
+}
+
+/** The first night a booking can start now (before 06:00, still last night). */
+export async function bookingTonight(): Promise<string> {
+  return tonight();
 }
 
 export type ReservationTab = "upcoming" | "in_house" | "awaiting" | "attention" | "all";
@@ -112,12 +120,26 @@ export async function movements(day?: string) {
   await authorizeRead(["reservations.manage", "reports.view"]);
   const db = await getDb();
   const d = day ?? today();
-  const [arrivals, departures, inHouse] = await Promise.all([
-    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_in = ? AND r.status IN ('confirmed', 'pending_payment') ORDER BY r.created_at`, d),
-    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_out <= ? AND r.status = 'checked_in' ORDER BY r.check_out`, d),
+  // Before the 06:00 cut-off, last night's arrivals are still arriving (not yet no-shows).
+  const from = d === today() ? tonight() : d;
+  const [arrivals, departures, inHouse, missed, progress] = await Promise.all([
+    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE ${DUE_IN_SQL} ORDER BY r.created_at`, from, d),
+    // Overdue guests first (oldest check-out date), then today's.
+    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE ${DUE_OUT_SQL} ORDER BY r.check_out`, from, d),
     all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.status = 'checked_in' ORDER BY r.check_out`),
+    // Paid, due before today, never checked in: still holding a room until someone decides.
+    all<ListRow>(db, `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE r.check_in < ? AND r.status = 'confirmed' ORDER BY r.check_in`, from),
+    movementProgress(db, from, d),
   ]);
-  return { today: d, arrivals: arrivals.map(toRow), departures: departures.map(toRow), inHouse: inHouse.map(toRow) };
+  return { today: d, arrivals: arrivals.map(toRow), departures: departures.map(toRow), inHouse: inHouse.map(toRow), missed: missed.map(toRow), progress };
+}
+
+/** The booking side panel (I7) is addressed by reference (?booking=VL-…), which staff read and say aloud. */
+export async function reservationIdByReference(reference: string): Promise<string | null> {
+  await authorizeRead(["reservations.manage", "payments.record", "reports.view"]);
+  if (!/^VL-[A-Z0-9]{4,12}$/i.test(reference)) return null;
+  const r = await first<{ id: string }>(await getDb(), "SELECT id FROM reservations WHERE reference = ? COLLATE NOCASE", reference);
+  return r?.id ?? null;
 }
 
 export async function getReservation(
@@ -140,7 +162,7 @@ export async function getReservation(
   );
   if (!r) return null;
 
-  const [paymentRows, historyRows] = await Promise.all([
+  const [paymentRows, historyRows, change] = await Promise.all([
     all<{
       id: string; amount_kobo: number; method: string | null; provider: "paystack" | "offline"; provider_reference: string | null;
       status: PaymentRow["status"]; paid_at: string | null; receipt_number: string | null; recorder: string | null;
@@ -159,6 +181,11 @@ export async function getReservation(
       `SELECT h.created_at, h.from_status, h.to_status, h.reason, s.full_name AS changer
        FROM reservation_status_history h LEFT JOIN staff_profiles s ON s.id = h.changed_by
        WHERE h.reservation_id = ? ORDER BY h.created_at, h.id`,
+      id,
+    ),
+    first<{ id: string; kind: "room" | "dates"; description: string; amount_kobo: number }>(
+      db,
+      "SELECT id, kind, description, amount_kobo FROM reservation_changes WHERE reservation_id = ? AND status = 'pending'",
       id,
     ),
   ]);
@@ -200,6 +227,7 @@ export async function getReservation(
     publicToken: r.public_token,
     payments,
     history,
+    pendingChange: change ? { id: change.id, kind: change.kind, description: change.description, amountKobo: change.amount_kobo } : undefined,
   };
 }
 

@@ -1,3 +1,5 @@
+import { errorRef } from "./error-ref";
+
 type Level = "debug" | "info" | "warn" | "error";
 type Context = Record<string, unknown>;
 
@@ -28,5 +30,5 @@ export const logger = {
   info: (event: string, context?: Context) => emit("info", event, context),
   warn: (event: string, context?: Context) => emit("warn", event, context),
   error: (event: string, err?: unknown, context?: Context) =>
-    emit("error", event, { ...context, ...(err === undefined ? {} : serializeError(err)) }),
+    emit("error", event, { ...context, ...(err === undefined ? {} : { ref: errorRef(err), ...serializeError(err) }) }),
 };

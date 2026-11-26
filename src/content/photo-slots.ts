@@ -11,6 +11,5 @@ export const photoSlots = [
   { slot: "about", label: "About page feature", where: "Spare feature photo for the About page", shape: "Landscape, 3:2", shot: "A detail that says 'royalty': gold accents, textures, considered styling." },
 ] as const;
 
-export type PhotoSlot = (typeof photoSlots)[number]["slot"];
 
 export const galleryGroups = ["Rooms", "Pool & spa", "Dining", "The hotel"] as const;

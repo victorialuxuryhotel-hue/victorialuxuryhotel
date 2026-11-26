@@ -40,7 +40,11 @@ const dayStart = (d: string) => businessDayStart(d);
 
 export type MenuItem = {
   id: string; name: string; outlet: Outlet; category: MenuCategory; price_kobo: number; is_active: number; is_available: number;
-  stock_left: number | null; links: { stockItemId: string; name: string; unit: string; quantity: number }[];
+  /** How many can be sold from stock; null = made to order (no stock tracked). */
+  stock_left: number | null;
+  /** A stock item behind it is at or below its reorder level (the till shows "N left"). */
+  low: boolean;
+  links: { stockItemId: string; name: string; unit: string; quantity: number }[];
 };
 
 export async function listMenu(db: Db, actor: Actor, opts: { includeInactive?: boolean } = {}): Promise<MenuItem[]> {
@@ -51,9 +55,9 @@ export async function listMenu(db: Db, actor: Actor, opts: { includeInactive?: b
       `SELECT id, name, outlet, category, price_kobo, is_active, is_available FROM menu_items
        ${opts.includeInactive ? "" : "WHERE is_active = 1"} ORDER BY outlet, is_active DESC, sort_order, name`,
     ),
-    all<{ menu_item_id: string; stock_item_id: string; name: string; unit: string; quantity: number; on_hand: number }>(
+    all<{ menu_item_id: string; stock_item_id: string; name: string; unit: string; quantity: number; on_hand: number; min_quantity: number }>(
       db,
-      `SELECT l.menu_item_id, l.stock_item_id, s.name, s.unit, l.quantity, s.quantity AS on_hand
+      `SELECT l.menu_item_id, l.stock_item_id, s.name, s.unit, l.quantity, s.quantity AS on_hand, s.min_quantity
        FROM menu_item_stock l JOIN stock_items s ON s.id = l.stock_item_id ORDER BY s.name`,
     ),
   ]);
@@ -63,6 +67,7 @@ export async function listMenu(db: Db, actor: Actor, opts: { includeInactive?: b
       ...m,
       links: mine.map((l) => ({ stockItemId: l.stock_item_id, name: l.name, unit: l.unit, quantity: l.quantity })),
       stock_left: mine.length ? Math.min(...mine.map((l) => Math.floor(l.on_hand / l.quantity))) : null,
+      low: mine.some((l) => l.on_hand <= l.min_quantity),
     };
   });
 }
@@ -132,32 +137,44 @@ export async function setMenuItemStock(db: Db, actor: Actor, menuItemId: string,
 // Orders
 // ---------------------------------------------------------------------------
 
-export type OrderLine = { menuItemId: string; quantity: number };
+/** One line of an order. The same item with a different note ("No ice") is a separate line. */
+export type OrderLine = { menuItemId: string; quantity: number; note?: string | null };
 
-type Priced = { menuItemId: string; name: string; category: MenuCategory; unitKobo: number; quantity: number };
+type Priced = { menuItemId: string; name: string; category: MenuCategory; unitKobo: number; quantity: number; note: string | null };
+
+const cleanNote = (n: string | null | undefined) => n?.trim().replace(/\s+/g, " ").slice(0, 60) || null;
+const lineKey = (l: { menuItemId: string; note?: string | null }) => `${l.menuItemId}\u0001${cleanNote(l.note) ?? ""}`;
 
 async function price(db: Db, outlet: Outlet, lines: OrderLine[]): Promise<{ priced: Priced[]; totalKobo: number }> {
   if (!lines.length) throw new AppError("VALIDATION", "Add at least one item.");
   if (lines.length > 50) throw new AppError("VALIDATION", "That's too many lines for one order.");
-  const merged = new Map<string, number>();
+  // Same item and same note: one line. Same item, different notes: separate lines.
+  const merged = new Map<string, { menuItemId: string; note: string | null; quantity: number }>();
+  const perItem = new Map<string, number>();
   for (const l of lines) {
     if (!Number.isInteger(l.quantity) || l.quantity < 1) throw new AppError("VALIDATION", "Quantities must be whole numbers from 1.");
-    merged.set(l.menuItemId, (merged.get(l.menuItemId) ?? 0) + l.quantity);
+    const k = lineKey(l);
+    const m = merged.get(k) ?? { menuItemId: l.menuItemId, note: cleanNote(l.note), quantity: 0 };
+    m.quantity += l.quantity;
+    merged.set(k, m);
+    perItem.set(l.menuItemId, (perItem.get(l.menuItemId) ?? 0) + l.quantity);
   }
-  const ids = [...merged.keys()];
+  const ids = [...perItem.keys()];
   const menu = await all<{ id: string; name: string; outlet: Outlet; category: MenuCategory; price_kobo: number; is_active: number; is_available: number }>(
     db,
     `SELECT id, name, outlet, category, price_kobo, is_active, is_available FROM menu_items WHERE id IN (${ids.map(() => "?").join(",")})`,
     ...ids,
   );
-  const priced = ids.map((id) => {
+  for (const id of ids) {
     const m = menu.find((x) => x.id === id);
     if (!m || !m.is_active) throw new AppError("VALIDATION", "An item is no longer on the menu. Remove it and try again.");
     if (!m.is_available) throw new AppError("VALIDATION", `${m.name} is unavailable today.`);
     if (m.outlet !== outlet) throw new AppError("VALIDATION", `${m.name} is on the ${OUTLETS[m.outlet].toLowerCase()} menu.`);
-    const quantity = merged.get(id)!;
-    if (quantity > 99) throw new AppError("VALIDATION", `At most 99 × ${m.name} in one order.`);
-    return { menuItemId: id, name: m.name, category: m.category, unitKobo: m.price_kobo, quantity };
+    if (perItem.get(id)! > 99) throw new AppError("VALIDATION", `At most 99 × ${m.name} in one order.`);
+  }
+  const priced = [...merged.values()].map((l) => {
+    const m = menu.find((x) => x.id === l.menuItemId)!;
+    return { menuItemId: l.menuItemId, name: m.name, category: m.category, unitKobo: m.price_kobo, quantity: l.quantity, note: l.note };
   });
   return { priced, totalKobo: priced.reduce((s, p) => s + p.unitKobo * p.quantity, 0) };
 }
@@ -172,8 +189,11 @@ async function checkStock(db: Db, lines: { menuItemId: string; quantity: number 
     ...lines.map((l) => l.menuItemId),
   );
   const total = new Map<string, { name: string; unit: string; on_hand: number; need: number }>();
+  // An item can be on several lines (different notes): count them all.
+  const qtyOf = new Map<string, number>();
+  for (const l of lines) qtyOf.set(l.menuItemId, (qtyOf.get(l.menuItemId) ?? 0) + l.quantity);
   for (const n of need) {
-    const qty = lines.find((l) => l.menuItemId === n.menu_item_id)!.quantity;
+    const qty = qtyOf.get(n.menu_item_id)!;
     const t = total.get(n.stock_item_id) ?? { name: n.name, unit: n.unit, on_hand: n.on_hand, need: 0 };
     t.need += n.per * qty;
     total.set(n.stock_item_id, t);
@@ -199,20 +219,20 @@ const orderInsert = (db: Db, id: string, outlet: Outlet, totalKobo: number, note
 const lineInserts = (db: Db, id: string, priced: Priced[]) =>
   priced.map((p, i) =>
     db
-      .prepare("INSERT INTO pos_order_items (order_id, line, menu_item_id, name, category, unit_price_kobo, quantity) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .bind(id, i + 1, p.menuItemId, p.name, p.category, p.unitKobo, p.quantity),
+      .prepare("INSERT INTO pos_order_items (order_id, line, menu_item_id, name, category, unit_price_kobo, quantity, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(id, i + 1, p.menuItemId, p.name, p.category, p.unitKobo, p.quantity, p.note),
   );
 
-function payStatements(db: Db, id: string, staffId: string, method: PayMethod, totalKobo: number, cashReceivedKobo: number | null) {
+function payStatements(db: Db, id: string, staffId: string, method: PayMethod, totalKobo: number, cashReceivedKobo: number | null, paymentReference: string | null) {
   return [
     db.prepare("UPDATE pos_counters SET value = value + 1 WHERE name = 'receipt'"),
     db
       .prepare(
-        `UPDATE pos_orders SET status = 'paid', method = ?, paid_by = ?, cash_received_kobo = ?, paid_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+        `UPDATE pos_orders SET status = 'paid', method = ?, paid_by = ?, cash_received_kobo = ?, payment_reference = ?, paid_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
            receipt_number = 'RB-' || strftime('%Y', 'now', '+1 hour') || '-' || printf('%06d', (SELECT value FROM pos_counters WHERE name = 'receipt'))
          WHERE id = ? AND status = 'open' AND total_kobo = ?`,
       )
-      .bind(method, staffId, cashReceivedKobo, id, totalKobo),
+      .bind(method, staffId, cashReceivedKobo, method === "cash" ? null : paymentReference, id, totalKobo),
     db.prepare("INSERT INTO _guard (ok) SELECT 0 WHERE changes() = 0"),
     db
       .prepare(
@@ -248,6 +268,20 @@ async function orderState(db: Db, id: string) {
   return first<{ status: OrderStatus; outlet: Outlet; total_kobo: number }>(db, "SELECT status, outlet, total_kobo FROM pos_orders WHERE id = ?", id);
 }
 
+/** The lines added since the order was last saved: "Same again" repeats them. */
+export function addedLines(before: OrderLine[], after: OrderLine[]): OrderLine[] {
+  const had = new Map<string, number>();
+  for (const l of before) had.set(lineKey(l), (had.get(lineKey(l)) ?? 0) + l.quantity);
+  const out: OrderLine[] = [];
+  for (const l of after) {
+    const k = lineKey(l);
+    const extra = l.quantity - (had.get(k) ?? 0);
+    had.set(k, Math.max(0, (had.get(k) ?? 0) - l.quantity));
+    if (extra > 0) out.push({ menuItemId: l.menuItemId, quantity: extra, note: cleanNote(l.note) });
+  }
+  return out;
+}
+
 const replaceLines = (db: Db, id: string, priced: Priced[], totalKobo: number, note: string | null) => [
   db.prepare("DELETE FROM pos_order_items WHERE order_id = ?").bind(id),
   ...lineInserts(db, id, priced),
@@ -275,7 +309,12 @@ export async function saveOrder(
     if (cur.status === "paid") throw new AppError("CONFLICT", "This order is already paid.");
     if (cur.status !== "open") throw new AppError("INVALID_TRANSITION", "This order was cancelled.");
     if (cur.outlet !== v.outlet) throw new AppError("VALIDATION", "An order stays with the counter it was opened at.");
-    await writeBatch(db, actor, replaceLines(db, v.id, priced, totalKobo, note)).catch((err) => payFailed(db, err, priced));
+    const before = await all<OrderLine>(db, "SELECT menu_item_id AS menuItemId, quantity, note FROM pos_order_items WHERE order_id = ?", v.id);
+    const round = addedLines(before, priced);
+    await writeBatch(db, actor, [
+      ...replaceLines(db, v.id, priced, totalKobo, note),
+      ...(round.length ? [db.prepare("UPDATE pos_orders SET last_round = ? WHERE id = ? AND status = 'open'").bind(JSON.stringify(round), v.id)] : []),
+    ]).catch((err) => payFailed(db, err, priced));
   };
   if (await orderState(db, v.id)) await update();
   else {
@@ -283,6 +322,7 @@ export async function saveOrder(
       await writeBatch(db, actor, [
         ...orderInsert(db, v.id, v.outlet, totalKobo, note, actor.id),
         ...lineInserts(db, v.id, priced),
+        db.prepare("UPDATE pos_orders SET last_round = ? WHERE id = ?").bind(JSON.stringify(addedLines([], priced)), v.id),
         activity(db, "pos.order_opened", "pos_order", v.id, `${OUTLETS[v.outlet]} order opened: ${naira(totalKobo)} (unpaid)`),
       ]);
     } catch (err) {
@@ -315,10 +355,25 @@ async function paidResult(db: Db, id: string, alreadyPaid: boolean): Promise<Pai
 export async function payOrder(
   db: Db,
   actor: Actor,
-  v: { id: string; outlet?: Outlet; lines?: OrderLine[]; note?: string | null; method: PayMethod; cashReceivedKobo?: number | null },
+  v: {
+    id: string; outlet?: Outlet; lines?: OrderLine[]; note?: string | null; method: PayMethod; cashReceivedKobo?: number | null;
+    /**
+     * Transfer: last 4 characters of the reference or the sender's name, plus the "money is in the bank app" tick.
+     * POS / card: last 4 digits of the terminal slip, so it can be matched to the terminal's own report.
+     */
+    paymentReference?: string | null; transferChecked?: boolean;
+  },
 ): Promise<PaidOrder> {
   requireRole(actor, POS_SELLERS);
   if (!(v.method in PAY_METHODS)) throw new AppError("VALIDATION", "Choose how the customer paid.");
+  const reference = v.paymentReference?.trim() || null;
+  if (v.method === "bank_transfer") {
+    if (!reference || reference.length < 3) throw new AppError("VALIDATION", "For a transfer, enter the last 4 characters of the transfer reference or the sender's name.");
+    if (v.transferChecked !== true) throw new AppError("VALIDATION", "Check the hotel's bank app first and tick the box: a screenshot or SMS alert is not enough.");
+  }
+  if (v.method === "pos_terminal" && !/^\d{4}$/.test(reference ?? "")) {
+    throw new AppError("VALIDATION", "Enter the last 4 digits of the POS slip, once the terminal says Approved.");
+  }
   const cur = await orderState(db, v.id);
   if (cur?.status === "paid" || cur?.status === "void") return paidResult(db, v.id, true);
   if (cur?.status === "cancelled") throw new AppError("INVALID_TRANSITION", "This order was cancelled.");
@@ -345,7 +400,7 @@ export async function payOrder(
   await checkStock(db, lines);
   const cash = validCash(v.method, totalKobo, v.cashReceivedKobo);
   stmts.push(
-    ...payStatements(db, v.id, actor.id, v.method, totalKobo, cash),
+    ...payStatements(db, v.id, actor.id, v.method, totalKobo, cash, reference),
     activity(db, "pos.order_paid", "pos_order", v.id, `Sale ${naira(totalKobo)} paid by ${PAY_METHODS[v.method].toLowerCase()}`, { method: v.method, total_kobo: totalKobo }),
   );
   try {
@@ -360,13 +415,16 @@ export async function payOrder(
 }
 
 /** Drop an unpaid order. It stays on record as cancelled. */
+/** Cancel an unpaid order. A reason is required (rules 2.5); the manager sees it in Sales reports. */
 export async function cancelOrder(db: Db, actor: Actor, id: string, reason: string | null): Promise<void> {
   requireRole(actor, POS_SELLERS);
+  const why = reason?.trim() ?? "";
+  if (why.length < 3) throw new AppError("VALIDATION", "Say why the order is cancelled. The manager sees this.");
   const [r] = await writeBatch(db, actor, [
     db
       .prepare("UPDATE pos_orders SET status = 'cancelled', closed_by = ?, closed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), close_reason = ? WHERE id = ? AND status = 'open'")
-      .bind(actor.id, reason?.trim().slice(0, 200) || null, id),
-    activityIfChanged(db, "pos.order_cancelled", "pos_order", id, `Unpaid order cancelled${reason?.trim() ? `: ${reason.trim()}` : ""}`),
+      .bind(actor.id, why.slice(0, 200), id),
+    activityIfChanged(db, "pos.order_cancelled", "pos_order", id, `Unpaid order cancelled: ${why}`),
   ]);
   if (!r?.meta.changes) throw new AppError("INVALID_TRANSITION", "Only unpaid orders can be cancelled.");
 }
@@ -399,29 +457,60 @@ export async function voidOrder(db: Db, actor: Actor, id: string, reason: string
 // ---------------------------------------------------------------------------
 
 export type OrderRow = {
-  id: string; number: number; outlet: Outlet; status: OrderStatus; total_kobo: number; method: PayMethod | null; receipt_number: string | null;
+  id: string; number: number; outlet: Outlet; status: OrderStatus; total_kobo: number; method: PayMethod | null; payment_reference: string | null; receipt_number: string | null;
   note: string | null; created_at: string; paid_at: string | null; taken_by: string | null; created_by_name: string | null; items: string;
 };
 
-const ORDER_SELECT = `SELECT o.id, o.number, o.outlet, o.status, o.total_kobo, o.method, o.receipt_number, o.note, o.created_at, o.paid_at,
+const ORDER_SELECT = `SELECT o.id, o.number, o.outlet, o.status, o.total_kobo, o.method, o.payment_reference, o.receipt_number, o.note, o.created_at, o.paid_at,
   p.full_name AS taken_by, c.full_name AS created_by_name,
-  (SELECT group_concat(i.quantity || ' × ' || i.name, ', ') FROM pos_order_items i WHERE i.order_id = o.id) AS items
+  (SELECT group_concat(i.quantity || ' × ' || i.name || coalesce(' (' || i.note || ')', ''), ', ') FROM pos_order_items i WHERE i.order_id = o.id) AS items
   FROM pos_orders o LEFT JOIN staff_profiles p ON p.id = o.paid_by LEFT JOIN staff_profiles c ON c.id = o.created_by`;
 
 const sees = (actor: NonNullable<Actor>) => (POS_VIEWERS as readonly StaffRole[]).includes(actor.role);
 
-export type OpenOrder = OrderRow & { lines: OrderLine[] };
+/** The till's favourites row: each counter's 8 best sellers by quantity over the last 30 days. */
+export async function topSellers(db: Db, actor: Actor, days = 30, limit = 8): Promise<Record<Outlet, string[]>> {
+  requireRole(actor, ALL_POS);
+  const rows = await all<{ outlet: Outlet; menu_item_id: string }>(
+    db,
+    `SELECT outlet, menu_item_id FROM (
+       SELECT o.outlet, i.menu_item_id, sum(i.quantity) AS qty,
+              row_number() OVER (PARTITION BY o.outlet ORDER BY sum(i.quantity) DESC, i.menu_item_id) AS rank
+       FROM pos_order_items i JOIN pos_orders o ON o.id = i.order_id
+       WHERE o.status = 'paid' AND o.paid_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?)
+       GROUP BY o.outlet, i.menu_item_id)
+     WHERE rank <= ? ORDER BY outlet, rank`,
+    `-${days} days`,
+    limit,
+  );
+  const out: Record<Outlet, string[]> = { restaurant: [], bar: [] };
+  for (const r of rows) out[r.outlet].push(r.menu_item_id);
+  return out;
+}
+
+export type OpenOrder = OrderRow & { lines: OrderLine[]; lastRound: OrderLine[] };
 
 export async function openOrders(db: Db, actor: Actor): Promise<OpenOrder[]> {
   requireRole(actor, POS_SELLERS);
   const [orders, lines] = await Promise.all([
-    all<OrderRow>(db, `${ORDER_SELECT} WHERE o.status = 'open' ORDER BY o.created_at`),
-    all<{ order_id: string; menuItemId: string; quantity: number }>(
+    all<OrderRow & { last_round: string | null }>(db, `${ORDER_SELECT.replace("o.note, o.created_at", "o.note, o.last_round, o.created_at")} WHERE o.status = 'open' ORDER BY o.created_at`),
+    all<{ order_id: string; menuItemId: string; quantity: number; note: string | null }>(
       db,
-      "SELECT i.order_id, i.menu_item_id AS menuItemId, i.quantity FROM pos_order_items i JOIN pos_orders o ON o.id = i.order_id WHERE o.status = 'open' ORDER BY i.line",
+      "SELECT i.order_id, i.menu_item_id AS menuItemId, i.quantity, i.note FROM pos_order_items i JOIN pos_orders o ON o.id = i.order_id WHERE o.status = 'open' ORDER BY i.line",
     ),
   ]);
-  return orders.map((o) => ({ ...o, lines: lines.filter((l) => l.order_id === o.id).map(({ menuItemId, quantity }) => ({ menuItemId, quantity })) }));
+  const round = (json: string | null): OrderLine[] => {
+    try {
+      return json ? (JSON.parse(json) as OrderLine[]) : [];
+    } catch {
+      return [];
+    }
+  };
+  return orders.map(({ last_round, ...o }) => ({
+    ...o,
+    lines: lines.filter((l) => l.order_id === o.id).map(({ menuItemId, quantity, note }) => ({ menuItemId, quantity, note })),
+    lastRound: round(last_round),
+  }));
 }
 
 export type OrderFilter = { from: string; to: string; method?: PayMethod; status?: OrderStatus; staffId?: string; outlet?: Outlet; q?: string };
@@ -448,7 +537,7 @@ export async function listOrders(db: Db, actor: Actor, f: OrderFilter, limit = 2
 }
 
 export type OrderDetail = OrderRow & {
-  lines: { line: number; name: string; category: MenuCategory; unit_price_kobo: number; quantity: number }[];
+  lines: { line: number; name: string; category: MenuCategory; unit_price_kobo: number; quantity: number; note: string | null }[];
   cash_received_kobo: number | null; closed_by_name: string | null; closed_at: string | null; close_reason: string | null;
 };
 
@@ -456,7 +545,7 @@ export async function getOrder(db: Db, actor: Actor, id: string): Promise<OrderD
   requireRole(actor, ALL_POS);
   const o = await first<OrderDetail & { paid_by: string | null; created_by: string }>(
     db,
-    `SELECT o.id, o.number, o.outlet, o.status, o.total_kobo, o.method, o.receipt_number, o.note, o.created_at, o.paid_at, o.cash_received_kobo,
+    `SELECT o.id, o.number, o.outlet, o.status, o.total_kobo, o.method, o.payment_reference, o.receipt_number, o.note, o.created_at, o.paid_at, o.cash_received_kobo,
             o.closed_at, o.close_reason, o.paid_by, o.created_by,
             p.full_name AS taken_by, c.full_name AS created_by_name, x.full_name AS closed_by_name, '' AS items
      FROM pos_orders o LEFT JOIN staff_profiles p ON p.id = o.paid_by LEFT JOIN staff_profiles c ON c.id = o.created_by
@@ -465,7 +554,7 @@ export async function getOrder(db: Db, actor: Actor, id: string): Promise<OrderD
   );
   if (!o) return null;
   if (!sees(actor) && o.paid_by !== actor.id && o.created_by !== actor.id && o.status !== "open") return null;
-  const lines = await all<OrderDetail["lines"][number]>(db, "SELECT line, name, category, unit_price_kobo, quantity FROM pos_order_items WHERE order_id = ? ORDER BY line", id);
+  const lines = await all<OrderDetail["lines"][number]>(db, "SELECT line, name, category, unit_price_kobo, quantity, note FROM pos_order_items WHERE order_id = ? ORDER BY line", id);
   return { ...o, lines };
 }
 
@@ -507,31 +596,51 @@ export async function closingSummary(db: Db, actor: Actor, staffId: string, date
   };
 }
 
-export async function closeDay(db: Db, actor: Actor, v: { countedCashKobo: number; explanation: string | null }): Promise<string> {
+export type CloseResult = { closed: true; id: string } | { closed: false; expectedKobo: number; countedKobo: number };
+
+/**
+ * Blind cash count (rules 2.6). The salesperson counts without seeing the expected cash. The first
+ * count of the business day is recorded at once and is final: seeing the expected figure afterwards
+ * can't change it. If it matches, the day is closed; if not, they give a reason and the day closes
+ * with that first count.
+ */
+export async function closeDay(db: Db, actor: Actor, v: { countedCashKobo: number; explanation: string | null }): Promise<CloseResult> {
   requireRole(actor, POS_SELLERS);
   const date = businessDate();
   const s = await closingSummary(db, actor, actor.id, date);
   if (s.openOrders) throw new AppError("VALIDATION", `${s.openOrders === 1 ? "1 order is" : `${s.openOrders} orders are`} still unpaid. Take payment or cancel ${s.openOrders === 1 ? "it" : "them"} first.`);
   if (!Number.isInteger(v.countedCashKobo) || v.countedCashKobo < 0 || v.countedCashKobo > 10_000_000_000) throw new AppError("VALIDATION", "Enter the cash you counted.");
+  if (await first(db, "SELECT 1 FROM pos_closings WHERE staff_id = ? AND business_date = ?", actor.id, date)) throw new AppError("CONFLICT", "You've already closed today's sales.");
   const expected = s.byMethod.cash;
+  const earlier = await first<{ counted: number }>(
+    db,
+    "SELECT json_extract(metadata, '$.counted_kobo') AS counted FROM activity_log WHERE action = 'pos.cash_counted' AND actor_id = ? AND entity_id = ? ORDER BY id LIMIT 1",
+    actor.id, date,
+  );
+  const counted = earlier ? earlier.counted : v.countedCashKobo;
+  const diff = counted - expected;
   const why = v.explanation?.trim() || null;
-  if (v.countedCashKobo !== expected && (!why || why.length < 3)) {
-    throw new AppError("VALIDATION", `The cash is ${naira(Math.abs(v.countedCashKobo - expected))} ${v.countedCashKobo < expected ? "short" : "over"}. Say why.`);
+  if (diff !== 0 && (!why || why.length < 3)) {
+    if (!earlier) {
+      await writeBatch(db, actor, [
+        activity(db, "pos.cash_counted", "pos_closing", date, `Cash counted for ${date}: ${naira(counted)} (blind count)`, { counted_kobo: counted, expected_kobo: expected }),
+      ]);
+    }
+    return { closed: false, expectedKobo: expected, countedKobo: counted };
   }
   const id = uuid();
-  const diff = v.countedCashKobo - expected;
   try {
     await writeBatch(db, actor, [
       db
         .prepare("INSERT INTO pos_closings (id, business_date, staff_id, summary, expected_cash_kobo, counted_cash_kobo, explanation) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(id, date, actor.id, JSON.stringify(s), expected, v.countedCashKobo, why),
-      activity(db, "pos.day_closed", "pos_closing", id, `Restaurant & bar sales closed for ${date}: ${naira(s.salesKobo)} sold, cash ${diff === 0 ? "matches" : `${naira(Math.abs(diff))} ${diff < 0 ? "short" : "over"}`}`),
+        .bind(id, date, actor.id, JSON.stringify(s), expected, counted, diff === 0 ? null : why),
+      activity(db, "pos.day_closed", "pos_closing", id, `Restaurant & bar sales closed for ${date}: ${naira(s.salesKobo)} sold, cash ${diff === 0 ? "matches" : `${naira(Math.abs(diff))} ${diff < 0 ? "short" : "over"}: ${why}`}`),
     ]);
   } catch (err) {
     if (err instanceof AppError && dbErrorToken(err.cause) === "unique") throw new AppError("CONFLICT", "You've already closed today's sales.");
     throw err;
   }
-  return id;
+  return { closed: true, id };
 }
 
 export async function verifyClosing(db: Db, actor: Actor, id: string, note: string | null): Promise<void> {

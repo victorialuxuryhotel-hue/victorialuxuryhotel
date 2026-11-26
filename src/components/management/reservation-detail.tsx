@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BedDouble, CalendarDays, Clock, Mail, Phone, Printer, Users, Wallet } from "lucide-react";
+import { owedOf } from "@/domain/next-step";
+import { AlertTriangle, ArrowLeft, BedDouble, CalendarDays, Clock, Mail, Phone, Printer, Users } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Collapsible } from "@/components/ui/collapsible";
@@ -17,9 +18,11 @@ import {
   ChangeDatesForm,
   CheckInButton,
   CheckOutButton,
+  TakePaymentLink,
   DetailsForm,
   NoShowButton,
   OverrideForm,
+  PendingChangeCard,
   ResolveAttentionForm,
   type RoomOption,
 } from "./reservation-actions";
@@ -27,6 +30,7 @@ import { ActionFeedbackProvider } from "./action-feedback";
 import { CorrectPaymentForm } from "./payment-correction";
 import type { ManagerToAsk } from "@/server/domain/admin";
 import { NextStepBar } from "./reservation-guide";
+import { nextStep } from "@/domain/next-step";
 import { reservationSteps, StepList } from "./reservation-steps";
 
 function Fact({ icon: Icon, label, children }: { icon: typeof CalendarDays; label: string; children: React.ReactNode }) {
@@ -74,7 +78,7 @@ export function ReservationDetailView({
   paidReceipt?: string;
   manager?: ManagerToAsk | null;
 }) {
-  const balance = r.totalKobo - r.paidKobo;
+  const balance = owedOf(r);
   const receiptLink = r.publicToken ? `${publicEnv().NEXT_PUBLIC_SITE_URL}/book/confirmation/${r.publicToken}` : null;
   const shareReceipt = (receipt: string) =>
     receiptLink
@@ -84,22 +88,24 @@ export function ReservationDetailView({
         )
       : null;
   const receiptsById = new Map(r.payments.map((p) => [p.id, p.receiptNumber]));
+  // Money received is listed; online attempts that didn't complete are tucked away below it.
+  const received = r.payments.filter((p) => p.status === "successful");
+  const notCompleted = r.payments.filter((p) => p.status !== "successful");
   const open = r.status === "confirmed" || r.status === "pending_payment";
   const steps = reservationSteps(r, today);
-  const checkInBlocker =
-    r.status !== "confirmed" ? undefined : !r.roomNumber ? "Assign a room first" : r.checkIn > today ? `Arrival is ${formatDate(r.checkIn)}` : undefined;
+  const step = nextStep(r, today);
 
   return (
     <ActionFeedbackProvider>
     <div className="px-4 py-6 lg:px-8">
       <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-900">
-        <ArrowLeft className="size-4" aria-hidden /> Reservations
+        <ArrowLeft className="size-4" aria-hidden /> Bookings
       </Link>
 
       {justCreated ? (
         <div className="mt-4">
           <FormMessage tone="success">
-            Reservation {r.reference} created. The room is held until {r.holdExpiresAt ? formatDateTime(r.holdExpiresAt) : "payment"}. Record payment to confirm it.
+            Booking {r.reference} created. The room is held until {r.holdExpiresAt ? formatDateTime(r.holdExpiresAt) : "payment"}. Take payment to confirm it.
           </FormMessage>
         </div>
       ) : null}
@@ -134,6 +140,11 @@ export function ReservationDetailView({
             <span className="font-mono">{r.reference}</span> · {bookingSource[r.source]} · created {formatDateTime(r.createdAt)}
             {r.createdBy ? ` by ${r.createdBy}` : ""}
           </p>
+          {/* One money line, so the first thing staff read is whether anything is owed. */}
+          <p className="mt-2 text-[15px] tabular-nums text-ink-700">
+            Total {formatNaira(r.totalKobo + (r.pendingKobo ?? 0))} · Paid {formatNaira(r.paidKobo)} ·{" "}
+            <span className={balance > 0 ? "font-semibold text-warning-700" : "text-ink-700"}>{balance > 0 ? `Owes ${formatNaira(balance)}` : "Nothing owed"}</span>
+          </p>
           {r.status === "pending_payment" && r.holdExpiresAt ? (
             <p className="mt-2 flex items-center gap-1.5 text-sm text-warning-700">
               <Clock className="size-4" aria-hidden /> Held until {formatDateTime(r.holdExpiresAt)}, then released if unpaid
@@ -141,13 +152,12 @@ export function ReservationDetailView({
           ) : null}
         </div>
         <div className="hidden flex-wrap items-start gap-2 lg:flex">
-          {canManage && r.status === "confirmed" ? <CheckInButton reservationId={r.id} roomNumber={r.roomNumber} disabledReason={checkInBlocker} /> : null}
-          {canManage && r.status === "checked_in" ? <CheckOutButton reservationId={r.id} balanceKobo={balance} /> : null}
-          {canManage && balance > 0 && r.status !== "cancelled" && r.status !== "expired" ? (
-            <Link href={paymentsHref} className={buttonStyles({ variant: "secondary" })}>
-              <Wallet className="size-4" aria-hidden /> Record payment
-            </Link>
+          {canManage && step.kind === "take_payment" ? <TakePaymentLink reservationId={r.id} balanceKobo={step.owedKobo} /> : null}
+          {canManage && step.kind === "check_in" ? <CheckInButton reservationId={r.id} roomNumber={r.roomNumber} /> : null}
+          {canManage && (step.kind === "assign_room" || step.kind === "wait_for_arrival") ? (
+            <CheckInButton reservationId={r.id} disabledReason={step.kind === "assign_room" ? "Assign a room first" : `Arrival is ${formatDate(step.checkIn)}`} />
           ) : null}
+          {canManage && step.kind === "check_out" ? <CheckOutButton reservationId={r.id} balanceKobo={0} /> : null}
           {billHref && (r.status === "checked_in" || r.status === "checked_out") ? (
             <Link href={billHref} className={buttonStyles({ variant: "secondary" })}>
               <Printer className="size-4" aria-hidden /> Guest bill
@@ -168,6 +178,8 @@ export function ReservationDetailView({
         </p>
       ) : null}
 
+      {canManage && r.pendingChange ? <PendingChangeCard reservationId={r.id} change={r.pendingChange} owedKobo={balance} canApprove={Boolean(canApprove)} /> : null}
+
       {r.attention ? (
         <div role="alert" className="mt-6 flex gap-3 rounded-card border border-warning-600/30 bg-warning-50 p-4 text-sm text-warning-700">
           <AlertTriangle className="size-5 shrink-0" aria-hidden />
@@ -182,45 +194,12 @@ export function ReservationDetailView({
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Stay" />
-            <div className="grid grid-cols-2 gap-x-4 gap-y-5 p-4 sm:gap-6 sm:p-5">
-              <Fact icon={CalendarDays} label="Dates">
-                {formatDate(r.checkIn)} → {formatDate(r.checkOut)}
-                <p className="text-sm text-ink-500">{plural(r.nights, "night")}</p>
-              </Fact>
-              <Fact icon={Users} label="Guests">{plural(r.guests, "guest")}</Fact>
-              <Fact icon={BedDouble} label="Booked">{r.category}</Fact>
-              <Fact icon={BedDouble} label="Room">
-                {r.roomNumber ? `Room ${r.roomNumber}` : <span className="text-ink-400">Not assigned</span>}
-              </Fact>
-            </div>
-            {r.specialRequests && !(canManage && (r.status === "checked_in" || open)) ? (
-              <div className="border-t border-hairline px-5 py-4">
-                <p className="text-xs uppercase tracking-wide text-ink-500">Special requests</p>
-                <p className="mt-1 text-sm text-ink-700">{r.specialRequests}</p>
-              </div>
-            ) : null}
-            {canManage && (open || r.status === "checked_in") ? (
-              <div className="border-t border-hairline xl:border-0">
-                <Collapsible id="change-stay" title="Change dates or room">
-                  <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
-                  <ChangeDatesForm reservationId={r.id} checkIn={r.checkIn} checkOut={r.checkOut} inHouse={r.status === "checked_in"} />
-                  <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} specialRequests={r.specialRequests} />
-                </Collapsible>
-              </div>
-            ) : null}
-          </Card>
-
-          <Card>
             <CardHeader
               title="Payments"
               action={
                 <span className="flex gap-4">
                   {billHref && r.status !== "cancelled" && r.status !== "expired" ? (
                     <Link href={billHref} className="text-sm font-medium text-navy-800 hover:text-navy-600">Guest bill</Link>
-                  ) : null}
-                  {balance > 0 && r.status !== "cancelled" && r.status !== "expired" ? (
-                    <Link href={paymentsHref} className="text-sm font-medium text-navy-800 hover:text-navy-600">Record payment</Link>
                   ) : null}
                 </span>
               }
@@ -236,16 +215,16 @@ export function ReservationDetailView({
                 <p className="mt-1 text-base sm:text-lg font-semibold tabular-nums text-success-700">{formatNaira(r.paidKobo)}</p>
               </div>
               <div>
-                <p className="text-xs text-ink-500">Balance</p>
+                <p className="text-xs text-ink-500">Owed</p>
                 <p className={`mt-1 text-base font-semibold tabular-nums sm:text-lg ${balance > 0 ? "text-warning-700" : "text-ink-900"}`}>{formatNaira(Math.max(0, balance))}</p>
                 <PaidProgress paidKobo={r.paidKobo} totalKobo={r.totalKobo} format={formatNaira} />
               </div>
             </div>
-            {r.payments.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-ink-500">No payments recorded yet.</p>
+            {received.length === 0 ? (
+              <p className="px-5 py-4 text-sm text-ink-500">No payments received yet.</p>
             ) : (
               <ul className="divide-y divide-hairline">
-                {r.payments.map((p) => (
+                {received.map((p) => (
                   <li key={p.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-4">
                     {p.kind === "refund" ? (
                       <div className="min-w-0">
@@ -263,7 +242,7 @@ export function ReservationDetailView({
                         {p.correctedKobo ? <span className="ml-2 text-xs font-normal text-ink-500">{formatNaira(p.correctedKobo)} corrected</span> : null}
                       </p>
                       <p className="text-xs text-ink-500">
-                        {paymentMethod[p.method]} · {p.provider === "paystack" ? "Paystack" : `Recorded by ${p.recordedBy ?? "staff"}`}
+                        {paymentMethod[p.method]} · {p.provider === "paystack" ? "Paid online" : `Taken by ${p.recordedBy ?? "staff"}`}
                         {p.paidAt ? ` · ${formatDateTime(p.paidAt)}` : ""}
                       </p>
                     </div>
@@ -288,6 +267,56 @@ export function ReservationDetailView({
                 ))}
               </ul>
             )}
+            {notCompleted.length ? (
+              <details className="border-t border-hairline px-5 py-3 text-sm">
+                <summary className="cursor-pointer text-ink-600">
+                  Show {notCompleted.length === 1 ? "1 online payment" : `${notCompleted.length} online payments`} not completed
+                </summary>
+                <ul className="mt-2 space-y-1.5 text-ink-600">
+                  {notCompleted.map((p) => (
+                    <li key={p.id} className="flex justify-between gap-3 tabular-nums">
+                      <span>Online payment not completed{p.paidAt ? ` · ${formatDateTime(p.paidAt)}` : ""}</span>
+                      <span>{formatNaira(p.amountKobo)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-ink-500">No money was received for these. They&apos;re kept for checking with Paystack.</p>
+              </details>
+            ) : null}
+          </Card>
+
+          <Card>
+            <CardHeader title="Stay" />
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5 p-4 sm:gap-6 sm:p-5">
+              <Fact icon={CalendarDays} label="Dates">
+                {formatDate(r.checkIn)} → {formatDate(r.checkOut)}
+                <p className="text-sm text-ink-500">{plural(r.nights, "night")}</p>
+              </Fact>
+              <Fact icon={Users} label="Guests">{plural(r.guests, "guest")}</Fact>
+              <Fact icon={BedDouble} label="Booked">{r.category}</Fact>
+              <Fact icon={BedDouble} label="Room">
+                {r.roomNumber ? `Room ${r.roomNumber}` : <span className="text-ink-400">Not assigned</span>}
+              </Fact>
+            </div>
+            {r.specialRequests && !(canManage && (r.status === "checked_in" || open)) ? (
+              <div className="border-t border-hairline px-5 py-4">
+                <p className="text-xs uppercase tracking-wide text-ink-500">Special requests</p>
+                <p className="mt-1 text-sm text-ink-700">{r.specialRequests}</p>
+              </div>
+            ) : null}
+            {canManage && (open || r.status === "checked_in") ? (
+              <div className="border-t border-hairline xl:border-0">
+                <Collapsible id="change-stay" title={r.status === "pending_payment" ? "Change dates" : "Change dates or room"}>
+                  <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
+                  <ChangeDatesForm reservationId={r.id} checkIn={r.checkIn} checkOut={r.checkOut} inHouse={r.status === "checked_in"} />
+                  {r.status === "pending_payment" ? (
+                    <p className="border-t border-hairline bg-ivory-50 px-5 py-4 text-sm text-ink-600">A room is given automatically once the booking is paid.</p>
+                  ) : (
+                    <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} specialRequests={r.specialRequests} />
+                  )}
+                </Collapsible>
+              </div>
+            ) : null}
           </Card>
         </div>
 

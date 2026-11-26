@@ -12,7 +12,7 @@ import { can } from "@/lib/auth/permissions";
 import { requireStaff } from "@/server/auth";
 import { getCategory } from "@/server/queries/rooms";
 
-export const metadata: Metadata = { title: "Edit category" };
+export const metadata: Metadata = { title: "Edit room type" };
 
 async function Content({ params }: { params: Promise<{ id: string }> }) {
   const staff = await requireStaff();

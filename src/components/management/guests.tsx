@@ -59,7 +59,7 @@ export function GuestTable({ rows, hrefFor }: { rows: GuestRow[]; hrefFor: (g: G
   );
 }
 
-export function GuestProfile({ guest, stays, stayHref }: { guest: GuestRow & { notes?: string }; stays: ReservationRow[]; stayHref: (r: ReservationRow) => string }) {
+export function GuestProfile({ guest, stays, stayHref, today }: { guest: GuestRow & { notes?: string }; stays: ReservationRow[]; stayHref: (r: ReservationRow) => string; today: string }) {
   return (
     <div className="grid gap-6 px-4 py-6 lg:grid-cols-[1fr_2fr] lg:px-8">
       <Card>
@@ -80,8 +80,8 @@ export function GuestProfile({ guest, stays, stayHref }: { guest: GuestRow & { n
         <GuestEditForm guest={guest} />
       </Card>
       <Card>
-        <CardHeader title="Booking history" />
-        <ReservationTable rows={stays} hrefFor={stayHref} />
+        <CardHeader title="Activity" />
+        <ReservationTable rows={stays} hrefFor={stayHref} today={today} />
       </Card>
     </div>
   );

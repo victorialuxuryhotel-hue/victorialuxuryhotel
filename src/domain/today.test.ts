@@ -1,53 +1,98 @@
 import { describe, expect, it } from "vitest";
 import type { ReservationRow } from "./views";
-import { greeting, needsYouNow, roomCounts } from "./today";
+import { greeting, movementProgress, needsYouNow, roomCounts, tonightView, type TodayInput, type TonightType } from "./today";
 
+const today = "2026-11-25";
 const base: ReservationRow = {
-  id: "a", reference: "VL-A", guestName: "Ada", category: "Deluxe", checkIn: "2026-12-01", checkOut: "2026-12-02",
+  id: "a", reference: "VL-A", guestName: "Ada", category: "Deluxe", checkIn: today, checkOut: "2026-11-27",
   guests: 1, totalKobo: 100, paidKobo: 100, status: "confirmed", source: "website",
 };
 const rooms = [
   { id: "1", number: "101", readiness: "ready" as const },
   { id: "2", number: "102", readiness: "needs_cleaning" as const },
 ];
+const day = (input: Partial<TodayInput>) => needsYouNow({ today, inHouse: [], arrivals: [], missed: [], ...input }, rooms);
+const kinds = (list: ReturnType<typeof needsYouNow>) => list.map((n) => [n.kind, n.reservation.id]);
 
 describe("needsYouNow", () => {
-  it("is empty when every arrival is paid, has a room and the room is ready", () => {
-    expect(needsYouNow([{ ...base, roomNumber: "101" }], rooms)).toEqual([]);
+  it("is empty when nobody owes, nobody is overdue and every arrival is paid with a clean room", () => {
+    expect(day({ arrivals: [{ ...base, roomNumber: "101" }], inHouse: [{ ...base, id: "in", status: "checked_in", checkIn: "2026-11-24" }] })).toEqual([]);
   });
 
-  it("flags unpaid arrivals, missing rooms and rooms not ready, money first", () => {
-    const list = needsYouNow(
-      [
-        { ...base, id: "dirty", roomNumber: "102" },
-        { ...base, id: "noroom" },
-        { ...base, id: "unpaid", roomNumber: "101", paidKobo: 40 },
+  it("a guest in house who owes money: Take payment, with the amount", () => {
+    const list = day({ inHouse: [{ ...base, id: "ibrahim", status: "checked_in", totalKobo: 108_000_000, paidKobo: 0 }] });
+    expect(list).toEqual([expect.objectContaining({ kind: "owes", owedKobo: 108_000_000 })]);
+  });
+
+  it("a guest still checked in after their check-out date is overdue", () => {
+    const list = day({ inHouse: [{ ...base, id: "grace", status: "checked_in", checkIn: "2026-11-20", checkOut: "2026-11-22" }] });
+    expect(kinds(list)).toEqual([["overdue_checkout", "grace"]]);
+  });
+
+  it("leaving today is not overdue", () => {
+    expect(day({ inHouse: [{ ...base, status: "checked_in", checkIn: "2026-11-23", checkOut: today }] })).toEqual([]);
+  });
+
+  it("a paid guest who was due before today and never arrived: didn't arrive", () => {
+    const list = day({ missed: [{ ...base, id: "chioma", checkIn: "2026-11-24", checkOut: "2026-11-26", roomNumber: "104" }] });
+    expect(kinds(list)).toEqual([["not_arrived", "chioma"]]);
+  });
+
+  it("an arrival who hasn't paid has one job only: Take payment (not also 'no room')", () => {
+    const list = day({ arrivals: [{ ...base, id: "hold", status: "pending_payment", paidKobo: 0 }] });
+    expect(list).toEqual([expect.objectContaining({ kind: "unpaid", owedKobo: 100 })]);
+  });
+
+  it("a paid arrival with no room, or a room not clean, gets that one job", () => {
+    const list = day({ arrivals: [{ ...base, id: "dirty", roomNumber: "102" }, { ...base, id: "noroom" }] });
+    expect(kinds(list)).toEqual([["no_room", "noroom"], ["room_not_ready", "dirty"]]);
+  });
+
+  it("a paid arrival whose room still has a guest checked in must be moved", () => {
+    const list = day({
+      arrivals: [{ ...base, id: "qa", roomNumber: "107" }],
+      inHouse: [{ ...base, id: "grace", guestName: "Grace", status: "checked_in", checkIn: "2026-11-19", checkOut: "2026-11-22", roomNumber: "107" }],
+    });
+    expect(kinds(list)).toEqual([["overdue_checkout", "grace"], ["room_occupied", "qa"]]);
+    expect(list[1]).toMatchObject({ occupant: { id: "grace" } });
+  });
+
+  it("orders money owed, overdue, didn't arrive, then today's arrivals", () => {
+    const list = day({
+      arrivals: [{ ...base, id: "unpaid", status: "pending_payment", paidKobo: 0 }],
+      missed: [{ ...base, id: "missed", checkIn: "2026-11-24" }],
+      inHouse: [
+        { ...base, id: "overdue", status: "checked_in", checkIn: "2026-11-20", checkOut: "2026-11-22" },
+        { ...base, id: "owes", status: "checked_in", paidKobo: 10 },
       ],
-      rooms,
-    );
-    expect(list.map((n) => [n.kind, n.reservation.id])).toEqual([
-      ["unpaid", "unpaid"],
-      ["no_room", "noroom"],
-      ["room_not_ready", "dirty"],
-    ]);
-    expect(list[0]).toMatchObject({ dueKobo: 60 });
+    });
+    expect(list.map((n) => n.kind)).toEqual(["owes", "overdue_checkout", "not_arrived", "unpaid"]);
   });
 
-  it("an unpaid hold with no room shows both problems", () => {
-    const list = needsYouNow([{ ...base, status: "pending_payment", paidKobo: 0 }], rooms);
-    expect(list.map((n) => n.kind)).toEqual(["unpaid", "no_room"]);
+  it("never lists one guest twice: an overdue guest who owes shows only Take payment", () => {
+    const r = { ...base, id: "both", status: "checked_in" as const, checkIn: "2026-11-20", checkOut: "2026-11-22", paidKobo: 0 };
+    expect(kinds(day({ inHouse: [r] }))).toEqual([["owes", "both"]]);
   });
 
-  it("ignores guests already checked in, cancelled or no-show", () => {
-    const done = (["checked_in", "cancelled", "no_show", "expired"] as const).map((status) => ({ ...base, status, paidKobo: 0 }));
-    expect(needsYouNow(done, rooms)).toEqual([]);
+  it("ignores bookings already finished", () => {
+    const done = (["checked_out", "cancelled", "no_show", "expired"] as const).map((status, i) => ({ ...base, id: `d${i}`, status, paidKobo: 0 }));
+    expect(day({ arrivals: done, inHouse: done, missed: done })).toEqual([]);
   });
 });
 
 describe("roomCounts", () => {
-  it("counts ready, occupied and dirty rooms; arriving and maintenance are neither", () => {
-    const states = ["available", "available", "occupied", "dirty", "arriving", "maintenance"] as const;
-    expect(roomCounts(states.map((state) => ({ state })))).toEqual({ ready: 2, guestsIn: 1, toClean: 1 });
+  it("puts every room in exactly one group, so the groups add up to all rooms", () => {
+    const tiles = [
+      { state: "available", readiness: "ready" },
+      { state: "arriving", readiness: "ready" },
+      { state: "arriving", readiness: "needs_cleaning" },
+      { state: "occupied", readiness: "ready" },
+      { state: "dirty", readiness: "needs_cleaning" },
+      { state: "maintenance", readiness: "ready" },
+    ] as const;
+    const counts = roomCounts([...tiles]);
+    expect(counts).toEqual({ ready: 2, occupied: 1, toClean: 2, outOfOrder: 1 });
+    expect(counts.ready + counts.occupied + counts.toClean + counts.outOfOrder).toBe(tiles.length);
   });
 });
 
@@ -56,5 +101,54 @@ describe("greeting", () => {
     expect([greeting(0), greeting(11), greeting(12), greeting(16), greeting(17), greeting(23)]).toEqual([
       "Good morning", "Good morning", "Good afternoon", "Good afternoon", "Good evening", "Good evening",
     ]);
+  });
+});
+
+describe("available tonight (I2)", () => {
+  const t = (name: string, rooms: number, free: number, held = 0): TonightType => ({ categoryId: name.toLowerCase(), name, rateKobo: 4_000_000, rooms, free, held });
+
+  it("shows free of rooms in service per type; a type with none free is full", () => {
+    const v = tonightView([t("Standard", 28, 16, 2), t("Suite", 4, 0)]);
+    expect(v.cards.map((c) => [c.name, c.shown, c.rooms, c.full, c.held])).toEqual([
+      ["Standard", 16, 28, false, 2],
+      ["Suite", 0, 4, true, 0],
+    ]);
+    expect(v.fullyBooked).toBe(false);
+    expect(v.overbooked).toEqual([]);
+  });
+
+  it("fully booked only when every type is full", () => {
+    expect(tonightView([t("Standard", 28, 0, 1), t("Suite", 4, 0)]).fullyBooked).toBe(true);
+    expect(tonightView([t("Standard", 28, 0), t("Suite", 4, 1)]).fullyBooked).toBe(false);
+  });
+
+  it("overbooked: the card shows 0 and the type goes to Needs you now", () => {
+    const v = tonightView([t("Standard", 28, -2), t("Deluxe", 10, 3)]);
+    expect(v.cards[0]).toMatchObject({ shown: 0, full: true });
+    expect(v.overbooked.map((o) => [o.name, o.free])).toEqual([["Standard", -2]]);
+  });
+
+  it("a type with no rooms in service is full, and no types shows nothing", () => {
+    expect(tonightView([t("Apartment", 0, 0)]).cards[0]).toMatchObject({ shown: 0, full: true });
+    expect(tonightView([])).toEqual({ cards: [], fullyBooked: false, overbooked: [] });
+  });
+});
+
+describe("progress counts (I3)", () => {
+  it("total is the list plus those done", () => {
+    expect(movementProgress("arrivals", 5, 13)).toEqual({ done: 13, total: 18, pct: 72, label: "13 of 18 arrived" });
+    expect(movementProgress("departures", 3, 35)).toMatchObject({ total: 38, label: "35 of 38 left" });
+  });
+
+  it("checking a guest in moves them from the list to done; the total doesn't change", () => {
+    const before = movementProgress("arrivals", 5, 13);
+    const after = movementProgress("arrivals", 4, 14);
+    expect(after.total).toBe(before.total);
+    expect(after.done).toBe(before.done + 1);
+  });
+
+  it("nobody due: 0 of 0, no division by zero; everyone done: 100%", () => {
+    expect(movementProgress("arrivals", 0, 0)).toMatchObject({ total: 0, pct: 0, label: "0 of 0 arrived" });
+    expect(movementProgress("departures", 0, 4).pct).toBe(100);
   });
 });

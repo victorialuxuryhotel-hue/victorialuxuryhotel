@@ -1,12 +1,41 @@
 import "server-only";
-import type { RoomBoardState } from "@/domain/status";
+import { boardState } from "@/domain/room-board";
+import type { TonightType } from "@/domain/today";
 import type { CategoryRow, RoomTile } from "@/domain/views";
-import { hotelToday } from "@/lib/hotel-date";
+import { hotelToday, isIsoDate, tonight } from "@/lib/hotel-date";
 import { mediaUrl } from "@/lib/media";
-import { authorizeRead } from "../auth";
+import { actorOf, authorizeRead } from "../auth";
 import { all, first, getDb } from "../db";
+import { calendarData } from "../domain/calendar";
+import { availableOnNight, roomChoices, roomStays } from "../domain/inventory";
 
 export type BoardRoom = RoomTile & { categoryId: string; serviceStatus: "in_service" | "maintenance"; reservationId?: string };
+
+/** Room types free tonight (business date), counted exactly as the website and the booking form count. */
+export async function availableTonight(): Promise<TonightType[]> {
+  await authorizeRead("reservations.manage");
+  const rows = await availableOnNight(await getDb(), tonight());
+  return rows.map((r) => ({ categoryId: r.category_id, name: r.name, rateKobo: r.nightly_rate_kobo, rooms: r.rooms, free: r.free, held: r.held }));
+}
+
+/** The room calendar (I6): 14 nights from `from` (default: tonight's business date). */
+export async function roomCalendar(from?: string) {
+  const staff = await authorizeRead("reservations.manage");
+  const start = from && isIsoDate(from) && from >= "2024-01-01" && from <= "2045-12-01" ? from : tonight();
+  const data = await calendarData(await getDb(), actorOf(staff), start, CALENDAR_DAYS);
+  return { from: start, today: hotelToday(), firstBookable: tonight(), ...data };
+}
+export const CALENDAR_DAYS = 14;
+
+/** A room asked for from the calendar: only an active room in service. */
+export async function roomToAskFor(id: string): Promise<{ id: string; number: string; categoryId: string } | null> {
+  await authorizeRead("reservations.manage");
+  return first<{ id: string; number: string; categoryId: string }>(
+    await getDb(),
+    "SELECT id, room_number AS number, category_id AS categoryId FROM rooms WHERE id = ? AND is_active = 1 AND service_status = 'in_service'",
+    id,
+  );
+}
 
 export async function roomBoard(): Promise<BoardRoom[]> {
   await authorizeRead(["rooms.status", "reports.view"]);
@@ -18,13 +47,7 @@ export async function roomBoard(): Promise<BoardRoom[]> {
       `SELECT rm.id, rm.room_number, rm.floor, rm.readiness, rm.service_status, rm.maintenance_note, rm.category_id, c.name AS category_name
        FROM rooms rm JOIN room_categories c ON c.id = rm.category_id WHERE rm.is_active = 1`,
     ),
-    all<{ id: string; room_id: string; status: string; check_in: string; check_out: string; guest_name: string }>(
-      db,
-      `SELECT r.id, r.room_id, r.status, r.check_in, r.check_out, g.full_name AS guest_name
-       FROM reservations r JOIN guests g ON g.id = r.guest_id
-       WHERE r.room_id IS NOT NULL AND r.status IN ('checked_in', 'confirmed', 'pending_payment') AND r.check_in <= ?1 AND r.check_out >= ?1`,
-      today,
-    ),
+    roomStays(db, today),
   ]);
 
   const byRoom = new Map<string, typeof stays>();
@@ -36,11 +59,10 @@ export async function roomBoard(): Promise<BoardRoom[]> {
       const roomStays = byRoom.get(room.id) ?? [];
       const inHouse = roomStays.find((s) => s.status === "checked_in");
       const arriving = roomStays.find((s) => s.status !== "checked_in" && s.check_in === today);
-      let state: RoomBoardState = "available";
-      if (room.service_status === "maintenance") state = "maintenance";
-      else if (inHouse) state = "occupied";
-      else if (arriving) state = "arriving";
-      else if (room.readiness !== "ready") state = "dirty";
+      const { state, due } = boardState(
+        { serviceStatus: room.service_status, readiness: room.readiness, inHouse: inHouse ? { checkOut: inHouse.check_out } : null, arrivingToday: Boolean(arriving) },
+        today,
+      );
       const stay = inHouse ?? arriving;
       return {
         id: room.id,
@@ -53,6 +75,7 @@ export async function roomBoard(): Promise<BoardRoom[]> {
         serviceStatus: room.service_status,
         guestName: stay?.guest_name,
         until: inHouse?.check_out,
+        due,
         note: room.maintenance_note ?? undefined,
         reservationId: stay?.id,
       };
@@ -61,22 +84,8 @@ export async function roomBoard(): Promise<BoardRoom[]> {
 
 export async function assignableRooms(reservationId: string, checkIn: string, checkOut: string) {
   await authorizeRead("reservations.manage");
-  const rows = await all<{ id: string; room_number: string; readiness: string; category_name: string }>(
-    await getDb(),
-    `SELECT rm.id, rm.room_number, rm.readiness, c.name AS category_name
-     FROM rooms rm JOIN room_categories c ON c.id = rm.category_id
-     WHERE rm.is_active = 1 AND rm.service_status = 'in_service'
-       AND NOT EXISTS (
-         SELECT 1 FROM reservations r
-         WHERE r.room_id = rm.id AND r.id <> ?1 AND r.status IN ('pending_payment', 'confirmed', 'checked_in')
-           AND r.check_in < ?3 AND r.check_out > ?2)`,
-    reservationId,
-    checkIn,
-    checkOut,
-  );
-  return rows
-    .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
-    .map((r) => ({ id: r.id, number: r.room_number, category: r.category_name, ready: r.readiness === "ready" }));
+  const rows = await roomChoices(await getDb(), reservationId, checkIn, checkOut, hotelToday());
+  return rows.map((r) => ({ id: r.id, number: r.room_number, category: r.category_name, ready: r.readiness === "ready", blocked: r.blocked ?? undefined }));
 }
 
 export async function listCategories(): Promise<CategoryRow[]> {

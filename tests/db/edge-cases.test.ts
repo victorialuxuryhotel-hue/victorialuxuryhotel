@@ -1,3 +1,4 @@
+import { cancelChange } from "@/server/domain/changes";
 import { describe, expect, it } from "vitest";
 import { occupancyReport } from "@/server/domain/reports";
 import { recordOfflinePayment } from "@/server/domain/payments";
@@ -54,28 +55,29 @@ describe("edge cases", () => {
     expect(await q1("SELECT status, cancellation_fee_kobo AS fee, attention_reason AS note FROM reservations WHERE id = ?", id)).toEqual({ status: "confirmed", fee: null, note: null });
   });
 
-  it("moving to a dearer room type charges the difference for the nights left; undo removes it; a manager can waive it", async () => {
+  it("moving to a dearer room type costs the difference for the nights left, paid before the move; a manager can waive it", async () => {
     const std = await makeCategory(2, { rateKobo: 5_500_000 });
     const dlx = await makeCategory(2, { rateKobo: 7_500_000 });
     const id = await insertReservation({ categoryId: std.id, checkIn: day(0), checkOut: day(3), roomId: std.roomIds[0], status: "confirmed", rateKobo: 5_500_000 });
-    const { undoId, chargeKobo } = await assignRoom(db, desk, id, dlx.roomIds[0]!);
+    const { chargeKobo, pendingChangeId } = await assignRoom(db, desk, id, dlx.roomIds[0]!);
     expect(chargeKobo).toBe(3 * 2_000_000);
-    await rejects(checkInReservation(db, desk, id), /₦60,000 still to pay/);
-    await undoAction(db, desk, id, undoId!);
-    expect((await q1<{ c: number }>("SELECT room_change_kobo AS c FROM reservations WHERE id = ?", id)).c).toBe(0);
+    expect((await q1<{ room_id: string }>("SELECT room_id FROM reservations WHERE id = ?", id)).room_id).toBe(std.roomIds[0]);
+    await cancelChange(db, desk, pendingChangeId!);
     await rejects(assignRoom(db, desk, id, dlx.roomIds[1]!, { waiveCharge: true }), /Only the general manager or owner/);
     expect((await assignRoom(db, gm, id, dlx.roomIds[1]!, { waiveCharge: true })).chargeKobo).toBe(0);
     expect((await assignRoom(db, desk, id, std.roomIds[1]!)).chargeKobo).toBe(0);
   });
 
-  it("extending a stay leaves the extra to pay, and the guest can't check out until it's paid", async () => {
+  it("extending a stay waits for the payment; the guest can still check out on the old date until then", async () => {
     const c = await makeCategory(1, { rateKobo: 5_000_000 });
     const id = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
     await assignRoom(db, desk, id, c.roomIds[0]!);
     await checkInReservation(db, desk, id);
-    await changeReservationDates(db, desk, id, day(0), day(2));
-    await rejects(checkOutReservation(db, desk, id), /₦50,000 still to pay/);
+    const { chargeKobo } = await changeReservationDates(db, desk, id, day(0), day(2));
+    expect(chargeKobo).toBe(5_000_000);
+    expect((await q1<{ check_out: string }>("SELECT check_out FROM reservations WHERE id = ?", id)).check_out).toBe(day(1));
     await recordOfflinePayment(db, desk, { reservationId: id, amountKobo: 5_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
+    expect((await q1<{ check_out: string }>("SELECT check_out FROM reservations WHERE id = ?", id)).check_out).toBe(day(2));
     expect((await checkOutReservation(db, desk, id)).balance).toBe(0);
   });
 });

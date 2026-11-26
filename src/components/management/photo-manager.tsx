@@ -19,6 +19,7 @@ import {
   uploadSitePhoto,
 } from "@/server/photos";
 import { ActionButton } from "./action-form";
+import { fromPhotoStore } from "@/lib/media";
 
 export type ManagedPhoto = { id: string; url: string; alt: string; isCover?: boolean; group?: string };
 
@@ -114,7 +115,7 @@ export function CategoryPhotoManager({ categoryId, photos }: { categoryId: strin
           {photos.map((p, i) => (
             <li key={p.id} className="overflow-hidden rounded-md border border-hairline bg-ivory-50">
               <div className="relative aspect-[4/3] bg-ivory-200">
-                <Image src={p.url} alt={p.alt} fill sizes="(min-width: 1280px) 20vw, 50vw" className="object-cover" />
+                <Image src={p.url} alt={p.alt} fill sizes="(min-width: 1280px) 20vw, 50vw" unoptimized={fromPhotoStore(p.url)} className="object-cover" />
                 {p.isCover ? <span className="absolute top-2 left-2 rounded-full bg-gold-400 px-2 py-0.5 text-xs font-semibold text-navy-950">Cover</span> : null}
               </div>
               <div className="space-y-2 p-3">
@@ -160,7 +161,7 @@ export function SitePhotoSlot({
     <div className="grid gap-5 border-b border-hairline p-5 last:border-0 md:grid-cols-[16rem_1fr]">
       <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-ivory-200">
         {photo ? (
-          <Image src={photo.url} alt={photo.alt} fill sizes="16rem" className="object-cover" />
+          <Image src={photo.url} alt={photo.alt} fill sizes="16rem" unoptimized={fromPhotoStore(photo.url)} className="object-cover" />
         ) : (
           <span className="absolute inset-0 flex items-center justify-center text-xs text-ink-500">No photo yet</span>
         )}

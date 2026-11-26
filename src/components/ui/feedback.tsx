@@ -16,19 +16,6 @@ export function LoadingState({ label = "Loading…" }: { label?: string }) {
   );
 }
 
-export function SkeletonRows({ rows = 4, label = "Loading" }: { rows?: number; label?: string }) {
-  return (
-    <div role="status" aria-label={label} aria-busy className="delayed-show divide-y divide-hairline">
-      {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="space-y-2 px-4 py-3.5">
-          <div className="h-3.5 w-3/5 animate-pulse rounded bg-ivory-200" />
-          <div className="h-3 w-4/5 animate-pulse rounded bg-ivory-200" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function EmptyState({ title, description, action, icon }: { title: string; description?: string; action?: ReactNode; icon?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-card border border-hairline px-6 py-12 text-center">
@@ -40,11 +27,12 @@ export function EmptyState({ title, description, action, icon }: { title: string
   );
 }
 
-export function ErrorState({ title = "Something went wrong", description, onRetry }: { title?: string; description?: string; onRetry?: () => void }) {
+export function ErrorState({ title = "Something went wrong", description, onRetry, reference }: { title?: string; description?: string; onRetry?: () => void; reference?: string }) {
   return (
     <div role="alert" className="flex flex-col items-center justify-center rounded-card border border-danger-700 px-6 py-12 text-center">
       <p className="font-display text-[21px] font-semibold text-ink-900">{title}</p>
       <p className="mt-1 max-w-sm text-sm text-ink-600">{description ?? "The connection may have dropped. Nothing was changed. Please try again."}</p>
+      {reference ? <p className="mt-2 text-sm text-ink-600">If it happens again, contact support and quote <span className="font-mono font-medium text-ink-900">Ref {reference}</span>.</p> : null}
       {onRetry ? (
         <button type="button" onClick={onRetry} className="mt-4 min-h-11 rounded-md border border-hairline px-4 text-sm hover:bg-ink-900/7">
           Try again

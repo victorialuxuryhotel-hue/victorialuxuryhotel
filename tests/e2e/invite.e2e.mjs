@@ -1,60 +1,98 @@
-import puppeteer from "puppeteer-core";
-import { execSync } from "node:child_process";
-const BASE = "http://localhost:3000", MAIL = "http://127.0.0.1:54324";
-const sql = (q) => execSync(`docker exec -i supabase_db_victoria-hotel psql -U postgres -qtA`, { input: q }).toString().trim();
-let pass = 0, fail = 0;
-const check = (n, c, x = "") => { if (c) pass++; else fail++; console.log(`${c ? "PASS" : "FAIL"}  ${n}${c ? "" : "  " + x}`); };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const waitForUrl = (p, pred) => p.waitForFunction(pred, { timeout: 15000 });
-const waitForText = (p, re) => p.waitForFunction((src) => new RegExp(src).test(document.body.innerText), { timeout: 15000 }, re.source);
+import { randomBytes } from "node:crypto";
+import { as, BASE, passBotCheck, check, clerk, clickText, fill, finish, go, navLabels, one, session, settle, text, until, val, waitForText } from "./lib.mjs";
 
-const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: true });
-const email = `newstaff-${Date.now()}@victoria.test`;
+const stamp = Date.now();
+const email = `e2e-invite-${stamp}+clerk_test@victorialuxuryhotel.com`;
+const invitee = `New Receptionist ${stamp.toString(36)}`;
+const list = (r) => (Array.isArray(r) ? r : (r?.data ?? []));
+const pendingInvites = async () => list(await clerk("GET", `/invitations?status=pending&query=${encodeURIComponent(email)}`));
+/** Clerk's invitation link redirects to our accept page with the ticket attached; return that redirect. */
+const acceptUrl = async (invite) => new URL((await fetch(invite.url, { redirect: "manual" })).headers.get("location") ?? "", BASE);
 
-let ctx = await browser.createBrowserContext(); let p = await ctx.newPage();
-await p.goto(`${BASE}/login`, { waitUntil: "networkidle0" });
-await p.type("#email", "owner@victoria.test"); await p.type("#password", "victoria-dev-2026!");
-await p.click("button[type=submit]"); await waitForUrl(p, () => location.pathname === "/app");
-await p.goto(`${BASE}/app/settings`, { waitUntil: "networkidle0" });
-await p.type("#sname", "New Receptionist"); await p.type("#semail", email);
-await p.click('button::-p-text(Send invite)'); await waitForText(p, /Invitation sent|already has an account|Could not/).catch(() => {});
-check("owner sees invitation confirmation", (await p.evaluate(() => document.body.innerText)).includes(`Invitation sent to ${email}`));
-check("profile created as front desk", sql(`select role from staff_profiles where email='${email}';`) === "front_desk");
-check("invite is audited", sql(`select count(*) from activity_log a join staff_profiles s on s.id = a.entity_id where a.action='staff.created' and s.email='${email}';`) === "1");
-await ctx.close();
+{
+  const { ctx, p } = await as("owner");
+  await go(p, "/app/staff");
+  await clickText(p, "button", "Invite");
+  await fill(p, "#sname", invitee);
+  await fill(p, "#semail", email);
+  await clickText(p, "button", "Send invitation");
+  await waitForText(p, /Invitation sent to|already|Could not/);
+  check("owner sees the invitation confirmation", (await text(p)).includes(`Invitation sent to ${email}`));
+  const staff = await one("SELECT id, role, clerk_user_id FROM staff_profiles WHERE email = ?", email);
+  check("staff record created as front desk, not yet linked", staff?.role === "front_desk" && staff?.clerk_user_id === null, JSON.stringify(staff));
+  check("the invitation is in the activity log", (await val("SELECT count(*) FROM activity_log WHERE action = 'staff.created' AND entity_id = ?", staff?.id)) === 1);
+  const invites = await pendingInvites();
+  const landing = invites[0] ? await acceptUrl(invites[0]) : null;
+  check("Clerk holds one pending invitation that returns to the app", invites.length === 1 && landing?.pathname === "/auth/accept", String(landing));
 
-let link;
-for (let i = 0; i < 10 && !link; i++) {
-  const list = await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent("to:" + email)}`)).json();
-  const id = list.messages?.[0]?.ID;
-  if (id) { const msg = await (await fetch(`${MAIL}/api/v1/message/${id}`)).json(); link = msg.HTML.match(/href="([^"]+auth\/confirm[^"]+)"/)?.[1]?.replaceAll("&amp;", "&"); }
-  if (!link) await sleep(500);
+  await go(p, "/app/staff");
+  await clickText(p, "button", invitee).catch(() => clickText(p, "a", invitee));
+  await clickText(p, "button", "Send the invitation again");
+  await waitForText(p, /Invitation sent again/);
+  const again = await pendingInvites();
+  check("sending again replaces the old invitation", again.length === 1 && again[0].id !== invites[0]?.id, `old ${invites[0]?.id} now ${JSON.stringify(again.map((i) => i.id))}`);
+  await ctx.close();
 }
-check("invite email arrives with a confirm link", Boolean(link), "no link");
 
-ctx = await browser.createBrowserContext(); p = await ctx.newPage();
-await p.goto(link.replace("http://127.0.0.1:3000", BASE).replace("http://localhost:3000", BASE), { waitUntil: "networkidle0" });
-check("invite link signs them in and opens the account page", p.url() === `${BASE}/app/account`, p.url());
-await p.type("#pw", "short"); await p.type("#pw2", "short");
-await p.$eval("#pw", (e) => e.removeAttribute("minlength"));
-await p.click("button::-p-text(Save password)"); await waitForText(p, /at least 10 characters|Password saved|Could not/).catch(() => {});
-check("server rejects a short password", (await p.evaluate(() => document.body.innerText)).includes("at least 10 characters"));
-await p.$eval("#pw", (e) => (e.value = "")); await p.$eval("#pw2", (e) => (e.value = ""));
-await p.type("#pw", "a-strong-pass-2026"); await p.type("#pw2", "a-strong-pass-2026");
-await p.click("button::-p-text(Save password)"); await waitForText(p, /Password saved|Could not|weak/).catch(() => {});
-check("password saved", (await p.evaluate(() => document.body.innerText)).includes("Password saved"));
-await ctx.close();
+let password;
+{
+  const [invite] = await pendingInvites();
+  const landing = await acceptUrl(invite);
+  const { ctx, p } = await session();
+  await passBotCheck(p);
+  await go(p, `${landing.pathname}${landing.search}`);
+  password = randomBytes(12).toString("base64url");
+  await p.waitForSelector("input[name=password]", { visible: true, timeout: 30000 });
+  const name = `e2e_new_${Date.now().toString(36)}`;
+  const fillUsername = async () => { if (await p.$("input[name=username]")) await fill(p, "input[name=username]", name).catch(() => {}); };
+  await fillUsername();
+  await fill(p, "input[name=password]", "short");
+  await clickText(p, "button", "Continue");
+  await waitForText(p, /at least|too short|characters/i);
+  check("a short password is refused", (await val("SELECT clerk_user_id FROM staff_profiles WHERE email = ?", email)) === null);
+  await fill(p, "input[name=password]", password);
+  await fillUsername();
+  await clickText(p, "button", "Continue");
+  // Clerk may ask for the username on a second "continue" step.
+  await until(async () => p.url().includes("/app") || (await p.$("input[name=username]")), "next step", 30000).catch(() => {});
+  if (!p.url().includes("/app") && (await p.$("input[name=username]"))) {
+    await fillUsername();
+    await clickText(p, "button", "Continue", 5000).catch(() => {});
+  }
+  await p.waitForFunction(() => location.pathname.startsWith("/app"), { timeout: 45000 }).catch(() => {});
+  await settle(p);
+  check("accepting the invitation signs them in to the app", p.url().startsWith(`${BASE}/app`), p.url());
+  const linked = await until(() => val("SELECT clerk_user_id FROM staff_profiles WHERE email = ?", email), "staff linked").catch(() => null);
+  check("their Clerk account is linked to the staff record", Boolean(linked));
+  const nav = (await navLabels(p)).join(",");
+  check("and they get the front-desk menu", nav.includes("Bookings") && !nav.includes("Booking rules"), nav);
+  check("front desk is not asked for two-step sign-in", !p.url().includes("/two-step"), p.url());
+  await ctx.close();
+}
 
-ctx = await browser.createBrowserContext(); p = await ctx.newPage();
-await p.goto(`${BASE}/login`, { waitUntil: "networkidle0" });
-await p.type("#email", email); await p.type("#password", "a-strong-pass-2026");
-await p.click("button[type=submit]"); await waitForUrl(p, () => location.pathname === "/app").catch(() => {});
-check("new staff member signs in with their password", p.url() === `${BASE}/app`, p.url());
-const nav = await p.$$eval('aside nav a', (as) => as.map((a) => a.textContent.trim()));
-check("and gets front-desk navigation", !nav.includes("Settings"), nav.join(","));
-const p2 = await (await browser.createBrowserContext()).newPage();
-await p2.goto(link.replace("http://127.0.0.1:3000", BASE), { waitUntil: "networkidle0" });
-check("invite link cannot be reused", p2.url().includes("/login?error=link"), p2.url());
-await browser.close();
-console.log(`\n${pass} passed, ${fail} failed`);
-process.exit(fail ? 1 : 0);
+{
+  const { ctx, p } = await session();
+  await passBotCheck(p);
+  const [used] = list(await clerk("GET", `/invitations?query=${encodeURIComponent(email)}`));
+  const again = await acceptUrl(used);
+  await go(p, `${again.pathname}${again.search}`);
+  await settle(p);
+  await new Promise((r) => setTimeout(r, 2000));
+  check("the invitation link cannot be used again", !p.url().startsWith(`${BASE}/app`), p.url());
+  await ctx.close();
+}
+
+{
+  const { ctx, p } = await as("owner");
+  p.on("dialog", (d) => d.accept());
+  await go(p, "/app/staff");
+  await clickText(p, "button", invitee).catch(() => clickText(p, "a", invitee));
+  await clickText(p, "button", "Remove access");
+  await until(async () => (await val("SELECT is_active FROM staff_profiles WHERE email = ?", email)) === 0, "deactivated");
+  const user = await clerk("GET", `/users/${await val("SELECT clerk_user_id FROM staff_profiles WHERE email = ?", email)}`);
+  check("removing access deactivates them and bans them in Clerk", user.banned === true);
+  await ctx.close();
+  await clerk("DELETE", `/users/${user.id}`).catch(() => {});
+}
+
+await finish();

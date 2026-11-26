@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { twoStepOptional, twoStepState } from "./two-step";
+import { twoStepOptional, twoStepRequired, twoStepState } from "./two-step";
 
 describe("two-step sign-in", () => {
   it("is required for owner, general manager, hotel manager and finance only", () => {
@@ -13,6 +13,15 @@ describe("two-step sign-in", () => {
     expect(twoStepState("finance", true, -1)).toBe("signin");
     expect(twoStepState("finance", true, null)).toBe("signin");
     expect(twoStepState("owner", false, 5)).toBe("setup");
+  });
+
+  it("is on hold until TWO_STEP_ENFORCED=1; a local machine can still skip it", () => {
+    const live = "https://victorialuxuryhotel.com";
+    expect(twoStepRequired({ siteUrl: live })).toBe(false);
+    expect(twoStepRequired({ enforced: "0", siteUrl: live })).toBe(false);
+    expect(twoStepRequired({ enforced: "1", siteUrl: live })).toBe(true);
+    expect(twoStepRequired({ enforced: "1", optional: "1", siteUrl: live })).toBe(true);
+    expect(twoStepRequired({ enforced: "1", optional: "1", siteUrl: "http://localhost:3000" })).toBe(false);
   });
 
   it("can be switched off only on a local machine", () => {

@@ -17,12 +17,12 @@ const included = ["Free Wi-Fi", "24/7 power", "Access to the indoor pool", "On-s
 
 export async function generateMetadata({ params }: PageProps<"/rooms/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const name = slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   const c = await getPublicCategory(slug).catch(() => null);
-  const facts = c ? ` Sleeps ${c.maxOccupancy}, from ${formatNaira(c.fromRateKobo)} a night.` : "";
+  // Unknown room: say so in the tab and keep it out of search results.
+  if (!c) return { title: "Page not found", robots: { index: false, follow: false } };
   return {
-    title: `${c?.name ?? name} room`,
-    description: `${c?.name ?? name} at ${hotel.name}, Alagbaka GRA, Akure.${facts} Book direct online.`,
+    title: `${c.name} room`,
+    description: `${c.name} at ${hotel.name}, Alagbaka GRA, Akure. Sleeps ${c.maxOccupancy}, from ${formatNaira(c.fromRateKobo)} a night. Book direct online.`,
     alternates: { canonical: `/rooms/${slug}` },
   };
 }

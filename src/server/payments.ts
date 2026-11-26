@@ -9,6 +9,7 @@ import { logger } from "@/lib/logger";
 import { actorOf, authorize } from "./auth";
 import { getDb } from "./db";
 import { recordOfflinePayment as record, recordPaymentCorrection } from "./domain/payments";
+import { checkPayment } from "./domain/payment-checks";
 import { deliverEmails } from "./notifications";
 
 const schema = z.object({
@@ -64,6 +65,27 @@ export async function correctPayment(_prev: ActionResult<{ receiptNumber: string
     return { ok: true, data: { receiptNumber: result.receiptNumber } };
   } catch (err) {
     if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("payment.correct_failed", err);
+    return toActionError(err);
+  }
+}
+
+/** Payments to confirm (interface brief I1): the General Manager or Owner marks a transfer or POS payment Matches / Not found. */
+export async function confirmPayment(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  try {
+    const staff = await authorize("payments.approve");
+    const v = z
+      .object({
+        sourceType: z.enum(["payment", "hall_payment", "pos_order"]),
+        sourceId: z.string().min(1).max(64),
+        outcome: z.enum(["matched", "not_found"]),
+        note: z.string().max(500).optional(),
+      })
+      .parse(Object.fromEntries(formData));
+    await checkPayment(await getDb(), actorOf(staff), v);
+    refresh();
+    return { ok: true, data: undefined };
+  } catch (err) {
+    if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("payment.confirm_failed", err);
     return toActionError(err);
   }
 }

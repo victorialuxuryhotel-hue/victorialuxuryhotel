@@ -26,7 +26,7 @@ const bookingSchema = z.object({
     .regex(/^\+?[0-9 ()-]{7,20}$/, "Enter a valid phone number, e.g. +234 803 000 0000"),
   specialRequests: z.string().max(1000).optional(),
   promoCode: z.string().trim().max(20).optional(),
-  acceptTerms: z.literal("on", { error: "Please accept the booking terms" }),
+  acceptTerms: z.literal("on", { error: "Please tick to accept the cancellation policy" }),
 });
 
 export async function createWebsiteBooking(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {

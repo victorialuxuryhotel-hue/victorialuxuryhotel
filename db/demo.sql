@@ -10,7 +10,7 @@ INSERT OR REPLACE INTO _ctx (id, actor_id, reason) VALUES (1, '00000000-0000-400
 INSERT INTO guests (id, full_name, email, phone) VALUES ('00000000-0000-4000-8000-0000000d0001', 'Adaeze Okafor', 'adaeze.okafor@example.com', '+234 803 111 0001');
 INSERT INTO reservations (id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count,
   nightly_rate_kobo, total_amount_kobo, status, source, hold_expires_at, created_by, attention_reason, created_at)
-VALUES ('00000000-0000-4000-8000-0000000e0001', 'VL-DEMO01', '00000000-0000-4000-8000-0000000f0001', '00000000-0000-4000-8000-0000000d0001', '00000000-0000-4000-8000-000000000002', (SELECT id FROM rooms WHERE room_number = '204'), date('now', '+1 hour', '+0 days'), date('now', '+1 hour', '+3 days'), 2,
+VALUES ('00000000-0000-4000-8000-0000000e0001', 'VL-DEMO01', '00000000-0000-4000-8000-0000000f0001', '00000000-0000-4000-8000-0000000d0001', '00000000-0000-4000-8000-000000000002', NULL, date('now', '+1 hour', '+0 days'), date('now', '+1 hour', '+3 days'), 2,
   5500000, 16500000, 'pending_payment', 'website', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+20 hours'), NULL, NULL,
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 days'));
 INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, provider_reference, status, paid_at, verified_at, recorded_by, provider_channel)
@@ -18,6 +18,7 @@ VALUES ('00000000-0000-4000-8000-0000000c0001', '00000000-0000-4000-8000-0000000
   'demo-01-paid', 'successful', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 days'),
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NULL, 'card');
 UPDATE reservations SET status = 'confirmed' WHERE id = '00000000-0000-4000-8000-0000000e0001';
+UPDATE reservations SET room_id = (SELECT id FROM rooms WHERE room_number = '204') WHERE id = '00000000-0000-4000-8000-0000000e0001';
 
 -- Tunde Bakare: suite, pending
 INSERT INTO guests (id, full_name, email, phone) VALUES ('00000000-0000-4000-8000-0000000d0002', 'Tunde Bakare', 'tunde.bakare@example.com', '+234 806 111 0002');
@@ -44,7 +45,7 @@ UPDATE reservations SET status = 'confirmed' WHERE id = '00000000-0000-4000-8000
 INSERT INTO guests (id, full_name, email, phone) VALUES ('00000000-0000-4000-8000-0000000d0004', 'Grace Adeyemi', NULL, '+234 807 111 0004');
 INSERT INTO reservations (id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count,
   nightly_rate_kobo, total_amount_kobo, status, source, hold_expires_at, created_by, attention_reason, created_at)
-VALUES ('00000000-0000-4000-8000-0000000e0004', 'VL-DEMO04', '00000000-0000-4000-8000-0000000f0004', '00000000-0000-4000-8000-0000000d0004', '00000000-0000-4000-8000-000000000001', (SELECT id FROM rooms WHERE room_number = '107'), date('now', '+1 hour', '-3 days'), date('now', '+1 hour', '+0 days'), 1,
+VALUES ('00000000-0000-4000-8000-0000000e0004', 'VL-DEMO04', '00000000-0000-4000-8000-0000000f0004', '00000000-0000-4000-8000-0000000d0004', '00000000-0000-4000-8000-000000000001', NULL, date('now', '+1 hour', '-3 days'), date('now', '+1 hour', '+0 days'), 1,
   4000000, 12000000, 'pending_payment', 'walk_in', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+20 hours'), '00000000-0000-4000-8000-0000000000a3', NULL,
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-5 days'));
 INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, provider_reference, status, paid_at, verified_at, recorded_by, provider_channel)
@@ -52,27 +53,29 @@ VALUES ('00000000-0000-4000-8000-0000000c0004', '00000000-0000-4000-8000-0000000
   NULL, 'successful', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-4 days'),
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), '00000000-0000-4000-8000-0000000000a3', NULL);
 UPDATE reservations SET status = 'confirmed' WHERE id = '00000000-0000-4000-8000-0000000e0004';
+UPDATE reservations SET room_id = (SELECT id FROM rooms WHERE room_number = '107') WHERE id = '00000000-0000-4000-8000-0000000e0004';
 UPDATE reservations SET status = 'checked_in' WHERE id = '00000000-0000-4000-8000-0000000e0004';
 
 -- Ibrahim Musa: apartment, checked_in
 INSERT INTO guests (id, full_name, email, phone) VALUES ('00000000-0000-4000-8000-0000000d0005', 'Ibrahim Musa', 'ibrahim.musa@example.com', '+234 805 111 0005');
 INSERT INTO reservations (id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count,
   nightly_rate_kobo, total_amount_kobo, status, source, hold_expires_at, created_by, attention_reason, created_at)
-VALUES ('00000000-0000-4000-8000-0000000e0005', 'VL-DEMO05', '00000000-0000-4000-8000-0000000f0005', '00000000-0000-4000-8000-0000000d0005', '00000000-0000-4000-8000-000000000004', (SELECT id FROM rooms WHERE room_number = '402'), date('now', '+1 hour', '-8 days'), date('now', '+1 hour', '+10 days'), 4,
+VALUES ('00000000-0000-4000-8000-0000000e0005', 'VL-DEMO05', '00000000-0000-4000-8000-0000000f0005', '00000000-0000-4000-8000-0000000d0005', '00000000-0000-4000-8000-000000000004', NULL, date('now', '+1 hour', '-8 days'), date('now', '+1 hour', '+10 days'), 4,
   12000000, 216000000, 'pending_payment', 'whatsapp', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+20 hours'), '00000000-0000-4000-8000-0000000000a3', NULL,
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-10 days'));
 INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, provider_reference, status, paid_at, verified_at, recorded_by, provider_channel)
-VALUES ('00000000-0000-4000-8000-0000000c0005', '00000000-0000-4000-8000-0000000e0005', 108000000, 'offline', 'bank_transfer',
-  NULL, 'successful', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-9 days'),
+VALUES ('00000000-0000-4000-8000-0000000c0005', '00000000-0000-4000-8000-0000000e0005', 216000000, 'offline', 'bank_transfer',
+  'GTB 0005 IBRAHIM MUSA', 'successful', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-9 days'),
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), '00000000-0000-4000-8000-0000000000a3', NULL);
 UPDATE reservations SET status = 'confirmed' WHERE id = '00000000-0000-4000-8000-0000000e0005';
+UPDATE reservations SET room_id = (SELECT id FROM rooms WHERE room_number = '402') WHERE id = '00000000-0000-4000-8000-0000000e0005';
 UPDATE reservations SET status = 'checked_in' WHERE id = '00000000-0000-4000-8000-0000000e0005';
 
 -- Funmi Adebayo: deluxe, checked_in
 INSERT INTO guests (id, full_name, email, phone) VALUES ('00000000-0000-4000-8000-0000000d0006', 'Funmi Adebayo', 'funmi.a@example.com', '+234 802 111 0006');
 INSERT INTO reservations (id, reference, public_token, guest_id, category_id, room_id, check_in, check_out, guest_count,
   nightly_rate_kobo, total_amount_kobo, status, source, hold_expires_at, created_by, attention_reason, created_at)
-VALUES ('00000000-0000-4000-8000-0000000e0006', 'VL-DEMO06', '00000000-0000-4000-8000-0000000f0006', '00000000-0000-4000-8000-0000000d0006', '00000000-0000-4000-8000-000000000002', (SELECT id FROM rooms WHERE room_number = '201'), date('now', '+1 hour', '-2 days'), date('now', '+1 hour', '+2 days'), 2,
+VALUES ('00000000-0000-4000-8000-0000000e0006', 'VL-DEMO06', '00000000-0000-4000-8000-0000000f0006', '00000000-0000-4000-8000-0000000d0006', '00000000-0000-4000-8000-000000000002', NULL, date('now', '+1 hour', '-2 days'), date('now', '+1 hour', '+2 days'), 2,
   5500000, 22000000, 'pending_payment', 'website', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+20 hours'), NULL, NULL,
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-4 days'));
 INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, provider_reference, status, paid_at, verified_at, recorded_by, provider_channel)
@@ -80,6 +83,7 @@ VALUES ('00000000-0000-4000-8000-0000000c0006', '00000000-0000-4000-8000-0000000
   'demo-06-paid', 'successful', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-3 days'),
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NULL, 'card');
 UPDATE reservations SET status = 'confirmed' WHERE id = '00000000-0000-4000-8000-0000000e0006';
+UPDATE reservations SET room_id = (SELECT id FROM rooms WHERE room_number = '201') WHERE id = '00000000-0000-4000-8000-0000000e0006';
 UPDATE reservations SET status = 'checked_in' WHERE id = '00000000-0000-4000-8000-0000000e0006';
 
 -- Chioma Eze: standard, confirmed

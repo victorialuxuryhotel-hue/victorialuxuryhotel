@@ -1,3 +1,4 @@
+import { policy } from "@/config/policy";
 const HOTEL_TZ = "Africa/Lagos";
 
 export function hotelToday(at: Date = new Date()): string {
@@ -30,13 +31,41 @@ export function hotelInstant(date: string, time: string): string {
   return new Date(`${date}T${time}+01:00`).toISOString();
 }
 
-/** Restaurant & bar trading day: it starts at 05:00 Lagos time, so a sale at 1am belongs to the night before. */
-export const BUSINESS_DAY_START_HOUR = 5;
+/** Business day (closings, the till, sales reports): it starts at policy.businessDayStartHour Lagos time, so a sale at 1am belongs to the night before. */
+export const BUSINESS_DAY_START_HOUR: number = policy.businessDayStartHour;
 export function businessDate(at: Date = new Date()): string {
   return hotelToday(new Date(at.getTime() - BUSINESS_DAY_START_HOUR * 3_600_000));
+}
+/**
+ * The first night a booking can start now ("tonight"). Before the business-day cut-off
+ * (policy.businessDayStartHour, 06:00) it is still last night, so a guest arriving at 2am on the
+ * 26th books 25th → 26th and pays for the night they sleep in. Used by booking validation (staff and
+ * website), Today and check-in; the capacity triggers use the same date (migration 0022).
+ */
+export function tonight(at: Date = new Date()): string {
+  return businessDate(at);
 }
 export function businessDayStart(date: string): string {
   return hotelInstant(date, `${String(BUSINESS_DAY_START_HOUR).padStart(2, "0")}:00:00`);
 }
-/** SQL for the trading day of a UTC timestamp column (Lagos is UTC+1, minus the 5-hour start). */
+/** SQL for the business day of a UTC timestamp column (Lagos is UTC+1, minus the start hour). */
 export const businessDaySql = (col: string) => `date(${col}, '${1 - BUSINESS_DAY_START_HOUR} hours')`;
+
+/** "Business day Tue 24 Nov (ends 06:00)": a sale at 01:25 on the 25th belongs to the 24th. */
+export function businessDayLabel(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  const day = d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "");
+  return `Business day ${day} (ends ${String(BUSINESS_DAY_START_HOUR).padStart(2, "0")}:00)`;
+}
+
+/**
+ * "Business day · Tue 24 Nov" for the sidebar and the till (interface brief I5). After midnight,
+ * until the cut-off, it's still the previous day: "Business day · Tue 24 Nov (until 06:00)".
+ */
+export function businessDayNow(at: Date = new Date()): string {
+  const date = businessDate(at);
+  const day = new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "");
+  const late = date !== hotelToday(at) ? ` (until ${String(BUSINESS_DAY_START_HOUR).padStart(2, "0")}:00)` : "";
+  return `Business day · ${day}${late}`;
+}
+

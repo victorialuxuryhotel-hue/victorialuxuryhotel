@@ -6,13 +6,18 @@ export function formatNaira(kobo: number): string {
 
 const TZ = "Africa/Lagos";
 
-export function formatDate(isoDate: string, opts: { weekday?: boolean; year?: boolean } = {}): string {
+/**
+ * "Thu 26 Nov 2026". year: false drops the year; year: "2026" (the current year, passed in by the page
+ * so nothing reads the clock while rendering) drops it only for dates in that year: "Fri 28 Jan 2027".
+ */
+export function formatDate(isoDate: string, opts: { weekday?: boolean; year?: boolean | string } = {}): string {
   const d = new Date(`${isoDate}T12:00:00Z`);
+  const showYear = opts.year === undefined || opts.year === true || (typeof opts.year === "string" && isoDate.slice(0, 4) !== opts.year);
   return new Intl.DateTimeFormat("en-GB", {
     weekday: opts.weekday === false ? undefined : "short",
     day: "numeric",
     month: "short",
-    year: opts.year === false ? undefined : "numeric",
+    year: showYear ? "numeric" : undefined,
     timeZone: "UTC",
   }).format(d);
 }

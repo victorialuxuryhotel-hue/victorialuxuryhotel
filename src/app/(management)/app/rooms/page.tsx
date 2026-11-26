@@ -40,7 +40,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
       </Card>
       {configure ? (
         <Card>
-          <CardHeader title="Add a room" description="New rooms are bookable straight away in their category." />
+          <CardHeader title="Add a room" description="New rooms can be booked straight away under their room type." />
           <AddRoomForm categories={categories} />
         </Card>
       ) : null}
@@ -54,7 +54,7 @@ export default function RoomsPage(props: PageProps<"/app/rooms">) {
       <PageHeader
         title="Rooms"
         description="Live status, readiness and maintenance."
-        actions={<Link href="/app/rooms/categories" className={buttonStyles({ variant: "secondary" })}>Categories & rates</Link>}
+        actions={<Link href="/app/rooms/categories" className={buttonStyles({ variant: "secondary" })}>Rates & room types</Link>}
       />
       <div className="px-4 py-6 lg:px-8"><Suspense fallback={<LoadingState />}><Content searchParams={props.searchParams} /></Suspense></div>
     </>

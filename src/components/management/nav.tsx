@@ -3,6 +3,8 @@
 import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BusinessDay } from "./business-day";
+import { GlobalSearch } from "./global-search";
 import { BedDouble, CalendarPlus, Menu, Search, Sun, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { useDialog } from "@/lib/use-dialog";
@@ -14,6 +16,10 @@ type NavProps = {
   base?: string;
   allowed?: readonly string[];
 };
+
+/** Global search only for roles that can open something it finds (guests, bookings or rooms). */
+const canSearch = (base: string, allowed?: readonly string[]) =>
+  base === "/app" && (!allowed || ["/app/guests", "/app/reservations", "/app/rooms"].some((h) => allowed.includes(h)));
 
 function NavLinks({ onNavigate, base, allowed }: { onNavigate?: () => void; base: string; allowed?: readonly string[] }) {
   const pathname = usePathname();
@@ -68,12 +74,14 @@ function Brand({ base }: { base: string }) {
 
 export function Sidebar({ footer, base = "/app", allowed }: NavProps) {
   return (
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-navy-950 py-6 lg:flex print:hidden">
+    <aside data-app-nav="" className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-navy-950 py-6 lg:flex print:hidden">
       <Brand base={base} />
-      <div className="mt-8 min-h-0 flex-1 overflow-y-auto pb-4">
+      {canSearch(base, allowed) ? <GlobalSearch /> : null}
+      <div className="mt-6 min-h-0 flex-1 overflow-y-auto pb-4">
         <NavLinks base={base} allowed={allowed} />
       </div>
       {footer ? <div className="border-t border-white/10 px-5 pt-5">{footer}</div> : null}
+      <BusinessDay className="px-7 pt-3 text-ivory-200/60" />
     </aside>
   );
 }
@@ -88,9 +96,10 @@ export function MobileBar({ footer, base = "/app", allowed }: NavProps) {
   useDialog(open, close, panel, toggle);
 
   return (
-    <div className="sticky top-0 z-50 lg:hidden print:hidden">
+    <div data-app-nav="" className="sticky top-0 z-50 lg:hidden print:hidden">
       <div className="flex h-14 items-center justify-between bg-navy-950 pr-1.5">
         <Brand base={base} />
+        <span className="ml-auto">{canSearch(base, allowed) ? <GlobalSearch compact /> : null}</span>
         <button
           ref={toggle}
           type="button"
@@ -114,6 +123,7 @@ export function MobileBar({ footer, base = "/app", allowed }: NavProps) {
         >
           <NavLinks base={base} allowed={allowed} onNavigate={close} />
           {footer ? <div className="mt-auto border-t border-white/10 px-5 pt-5">{footer}</div> : null}
+          <BusinessDay className="px-7 pt-3 text-ivory-200/60" />
         </div>
       ) : null}
     </div>

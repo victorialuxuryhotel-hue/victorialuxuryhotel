@@ -5,7 +5,9 @@ import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import { AccessDenied } from "@/components/management/access-denied";
 import { CancelOrderForm, PrintReceiptButton, VoidSaleForm } from "@/components/management/pos-actions";
-import { PosReceipt } from "@/components/management/pos-receipt";
+import { StationPosReceipt } from "@/components/management/thermal";
+import { isReprint } from "@/lib/station";
+import { nowIso } from "@/server/clock";
 import { Badge, type Tone } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,6 +18,7 @@ import { recordId } from "@/lib/ids";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { first, getDb } from "@/server/db";
 import { getOrder, ORDER_STATUS, OUTLETS, type OrderStatus } from "@/server/domain/pos";
+import { VAT_SHOWN_SQL } from "@/server/vat";
 
 export const metadata: Metadata = { title: "Order" };
 
@@ -28,7 +31,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
   if (!recordId().safeParse(id).success) notFound();
   const reader = await authorizeRead(["pos.sell", "pos.view"]);
   const db = await getDb();
-  const [o, settings] = await Promise.all([getOrder(db, actorOf(reader), id), first<{ vat_rate_bp: number }>(db, "SELECT vat_rate_bp FROM hotel_settings WHERE id = 1")]);
+  const [o, settings] = await Promise.all([getOrder(db, actorOf(reader), id), first<{ vat_rate_bp: number; tax_id: string | null }>(db, `SELECT ${VAT_SHOWN_SQL} AS vat_rate_bp, tax_id FROM hotel_settings WHERE id = 1`)]);
   if (!o) notFound();
   const receipt = o.receipt_number && o.paid_at && o.method;
   const row = "flex justify-between gap-4 py-2";
@@ -65,12 +68,13 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
       <div className="space-y-3">
         {receipt ? (
           <>
-            <PosReceipt
+            <StationPosReceipt
               r={{
                 outlet: o.outlet, receiptNumber: o.receipt_number!, orderNumber: o.number, paidAt: o.paid_at!, totalKobo: o.total_kobo, method: o.method!,
-                cashReceivedKobo: o.cash_received_kobo, attendant: o.taken_by ?? "staff", vatRateBp: settings?.vat_rate_bp ?? 750,
-                lines: o.lines.map((l) => ({ name: l.name, quantity: l.quantity, unitKobo: l.unit_price_kobo })),
+                cashReceivedKobo: o.cash_received_kobo, reference: o.payment_reference, attendant: o.taken_by ?? "staff", vatRateBp: settings?.vat_rate_bp ?? 0, taxId: settings?.tax_id ?? null,
+                lines: o.lines.map((l) => ({ name: l.name, quantity: l.quantity, unitKobo: l.unit_price_kobo, note: l.note })),
                 voided: o.status === "void" ? { reason: o.close_reason ?? "", at: o.closed_at } : null,
+                copy: isReprint(o.paid_at, nowIso()),
               }}
             />
             <div className="flex justify-center print:hidden"><PrintReceiptButton /></div>
@@ -80,7 +84,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
             <p className="text-sm font-medium text-ink-900">Items</p>
             <ul className="mt-2 divide-y divide-hairline text-sm">
               {o.lines.map((l) => (
-                <li key={l.line} className="flex justify-between gap-3 py-2"><span>{l.quantity} × {l.name}</span><span className="tabular-nums">{formatNaira(l.quantity * l.unit_price_kobo)}</span></li>
+                <li key={l.line} className="flex justify-between gap-3 py-2"><span>{l.quantity} × {l.name}{l.note ? <span className="block text-xs text-ink-500 italic">{l.note}</span> : null}</span><span className="tabular-nums">{formatNaira(l.quantity * l.unit_price_kobo)}</span></li>
               ))}
             </ul>
             <p className="mt-3 text-xs text-ink-500">A receipt is made when the order is paid.</p>

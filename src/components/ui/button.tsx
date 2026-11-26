@@ -14,8 +14,9 @@ const variants: Record<Variant, string> = {
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-8 px-3 text-sm",
-  md: "h-11.5 px-4 text-base md:h-10 md:text-sm",
+  // Touch screens (the bar POS is touch at laptop width) get at least 44px, whatever the width.
+  sm: "h-8 px-3 text-sm pointer-coarse:h-11 pointer-coarse:px-4",
+  md: "h-11.5 px-4 text-base md:h-10 md:text-sm pointer-coarse:h-11.5",
   lg: "h-12.5 px-6 text-base",
 };
 

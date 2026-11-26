@@ -3,7 +3,9 @@ import { connection, NextResponse, type NextRequest } from "next/server";
 import { serverEnv } from "@/lib/env.server";
 import { alert } from "@/lib/alert";
 import { logger } from "@/lib/logger";
-import { all, getDb } from "@/server/db";
+import { getDb } from "@/server/db";
+import { paymentsToSweep } from "@/server/domain/payments";
+import { findingsToAlert } from "@/server/domain/self-check";
 import { expireUnpaidReservations } from "@/server/domain/reservations";
 import { deliverEmails } from "@/server/notifications";
 import { settlePaystackReference } from "@/server/payment-flow";
@@ -18,22 +20,15 @@ export async function GET(request: NextRequest) {
   }
 
   const db = await getDb();
-  const pending = await all<{ provider_reference: string }>(
-    db,
-    `SELECT provider_reference FROM payments
-     WHERE provider = 'paystack' AND status = 'pending' AND created_at >= ? AND created_at <= ?
-     ORDER BY created_at LIMIT 50`,
-    new Date(Date.now() - 48 * 3600_000).toISOString(),
-    new Date(Date.now() - 30 * 60_000).toISOString(),
-  );
+  const pending = await paymentsToSweep(db);
 
   const settled: Record<string, number> = {};
-  for (const p of pending) {
+  for (const reference of pending) {
     try {
-      const outcome = await settlePaystackReference(p.provider_reference, "sweep");
+      const outcome = await settlePaystackReference(reference, "sweep");
       settled[outcome] = (settled[outcome] ?? 0) + 1;
     } catch (err) {
-      logger.error("cron.settle_failed", err, { reference: p.provider_reference });
+      logger.error("cron.settle_failed", err, { reference });
     }
   }
 
@@ -46,6 +41,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "expire failed" }, { status: 500 });
   }
   const emails = await deliverEmails({ limit: 50 });
-  logger.info("cron.housekeeping", { checked: pending.length, settled, expired, emails });
-  return NextResponse.json({ checked: pending.length, settled, expired, emails });
+
+  // Self-check (rules section 4): one alert per run listing what's new, each problem at most once a day.
+  let problems = 0;
+  try {
+    const findings = await findingsToAlert(db);
+    problems = findings.length;
+    if (findings.length === 1) await alert("self_check", findings[0]!.message, { check: findings[0]!.check });
+    else if (findings.length > 1) {
+      const urgent = findings.filter((f) => f.urgent).length;
+      await alert("self_check", `${findings.length} things need attention${urgent ? ` (${urgent} urgent)` : ""}:\n${findings.slice(0, 15).map((f) => `• ${f.message}`).join("\n")}${findings.length > 15 ? `\n…and ${findings.length - 15} more on the Dashboard.` : ""}`, { checks: [...new Set(findings.map((f) => f.check))] });
+    }
+  } catch (err) {
+    logger.error("cron.self_check_failed", err);
+  }
+
+  logger.info("cron.housekeeping", { checked: pending.length, settled, expired, emails, problems });
+  return NextResponse.json({ checked: pending.length, settled, expired, emails, problems });
 }

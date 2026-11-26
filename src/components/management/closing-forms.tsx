@@ -2,18 +2,41 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { NumPad } from "@/components/ui/num-pad";
 import { safeAction } from "@/lib/safe-action";
 import { FormMessage, Input, Textarea } from "@/components/ui/form";
 import { formatNaira } from "@/lib/format";
-import { cn } from "@/lib/utils/cn";
 import { closeMyDay, signOffClosing } from "@/server/pos";
 
-export function CloseDayForm({ expectedCashKobo, openOrders }: { expectedCashKobo: number; openOrders: number }) {
+/**
+ * Blind count: the expected cash isn't shown until the count is in. The first count is final;
+ * if it doesn't match, the salesperson says what happened and the day closes.
+ */
+export function CloseDayForm({ openOrders }: { openOrders: number }) {
   const [counted, setCounted] = useState("");
   const [state, action, pending] = useActionState(safeAction(closeMyDay), null);
-  const countedKobo = counted === "" ? null : Math.round(Number(counted) * 100);
-  const diff = countedKobo == null ? null : countedKobo - expectedCashKobo;
-  if (state?.ok) return <FormMessage tone="success">Your day is closed. A manager will check and sign it off.</FormMessage>;
+  const result = state?.ok ? state.data : null;
+  if (result?.closed) return <FormMessage tone="success">Your day is closed. A manager will check and sign it off.</FormMessage>;
+  if (result && !result.closed) {
+    const diff = result.countedKobo - result.expectedKobo;
+    return (
+      <form action={action} className="space-y-4">
+        <input type="hidden" name="counted" value={String(result.countedKobo / 100)} />
+        <dl className="grid max-w-md grid-cols-3 gap-3 text-sm">
+          <div><dt className="text-ink-500">You counted</dt><dd className="text-lg font-semibold tabular-nums">{formatNaira(result.countedKobo)}</dd></div>
+          <div><dt className="text-ink-500">Expected</dt><dd className="text-lg font-semibold tabular-nums">{formatNaira(result.expectedKobo)}</dd></div>
+          <div><dt className="text-ink-500">{diff < 0 ? "Short" : "Over"}</dt><dd className="text-lg font-semibold tabular-nums text-danger-700">{formatNaira(Math.abs(diff))}</dd></div>
+        </dl>
+        <p className="text-sm text-ink-600">Your count is saved and can&apos;t be changed. Say what happened, then close your day.</p>
+        <label className="block">
+          <span className="mb-1 block text-[13px] text-ink-700">What happened?</span>
+          <Textarea name="explanation" rows={2} maxLength={500} minLength={3} placeholder="e.g. Gave ₦500 too much change to a customer" required />
+        </label>
+        {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
+        <Button type="submit" size="lg" pending={pending}>Close my day</Button>
+      </form>
+    );
+  }
   return (
     <form action={action} className="space-y-4">
       {openOrders ? (
@@ -21,21 +44,12 @@ export function CloseDayForm({ expectedCashKobo, openOrders }: { expectedCashKob
       ) : null}
       <label className="block max-w-xs">
         <span className="mb-1 block text-[13px] text-ink-700">Cash you counted (₦)</span>
-        <Input name="counted" inputMode="decimal" value={counted} onChange={(e) => setCounted(e.target.value.replace(/[^\d.]/g, ""))} placeholder={String(expectedCashKobo / 100)} className="text-lg tabular-nums" required />
+        <Input name="counted" inputMode="none" value={counted} onChange={(e) => setCounted(e.target.value.replace(/[^\d.]/g, ""))} className="text-lg tabular-nums" autoComplete="off" required />
       </label>
-      {diff != null ? (
-        <p className={cn("text-lg font-semibold tabular-nums", diff === 0 ? "text-success-700" : "text-danger-700")}>
-          {diff === 0 ? "Cash matches the till." : `${formatNaira(Math.abs(diff))} ${diff < 0 ? "short" : "over"}`}
-        </p>
-      ) : null}
-      {diff != null && diff !== 0 ? (
-        <label className="block">
-          <span className="mb-1 block text-[13px] text-ink-700">What happened?</span>
-          <Textarea name="explanation" rows={2} maxLength={500} placeholder="e.g. Gave ₦500 too much change to a customer" required />
-        </label>
-      ) : null}
+      <NumPad onChange={setCounted} decimal maxLength={10} label="the cash you counted" className="max-w-xs" />
+      <p className="text-sm text-ink-600">Count everything in your drawer first. The till&apos;s figure is shown after you submit, and your first count is the one that&apos;s kept.</p>
       {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}
-      <Button type="submit" size="lg" pending={pending} disabled={!!openOrders || countedKobo == null}>Close my day</Button>
+      <Button type="submit" size="lg" pending={pending} disabled={!!openOrders || counted === ""}>Submit my count</Button>
     </form>
   );
 }

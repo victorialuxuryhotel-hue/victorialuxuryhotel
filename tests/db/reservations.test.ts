@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { freeNights, searchAvailability } from "@/server/domain/inventory";
+import { freeNights, roomChoices, roomStays, searchAvailability } from "@/server/domain/inventory";
 import {
   assignRoom,
   cancelReservation,
@@ -143,11 +143,71 @@ describe("creating reservations", () => {
   });
 });
 
+describe("a room is occupied from check-in until check-out", () => {
+  /** A guest checked in to the category's first room whose check-out date passed two days ago. */
+  async function overstay(rooms: number) {
+    const c = await makeCategory(rooms);
+    const stay = await insertReservation({ categoryId: c.id, checkIn: day(-4), checkOut: day(-2), roomId: c.roomIds[0], status: "confirmed" });
+    await exec("UPDATE reservations SET status = 'checked_in' WHERE id = ?", stay);
+    return { c, stay, room: c.roomIds[0]! };
+  }
+  const free = async (categoryId: string, from: string, to: string) =>
+    (await searchAvailability(db, from, to, 1)).find((r) => r.category_id === categoryId)?.is_available;
+
+  it("the room board shows the overstayed room as occupied", async () => {
+    const { stay, room } = await overstay(2);
+    expect((await roomStays(db, day(0))).find((s) => s.room_id === room)).toMatchObject({ id: stay, status: "checked_in" });
+  });
+
+  it("the room picker never offers it: it's greyed with who is in it", async () => {
+    const { c, room } = await overstay(2);
+    const b = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2), status: "confirmed" });
+    const choices = await roomChoices(db, b, day(0), day(2), day(0));
+    expect(choices.find((r) => r.id === room)?.blocked).toMatch(/^Occupied · /);
+    expect(choices.find((r) => r.id === c.roomIds[1])?.blocked).toBeNull();
+  });
+
+  it("the picker greys rooms out of order, booked, or not clean for a guest arriving today", async () => {
+    const c = await makeCategory(3);
+    await exec("UPDATE rooms SET service_status = 'maintenance' WHERE id = ?", c.roomIds[0]);
+    await exec("UPDATE rooms SET readiness = 'needs_cleaning' WHERE id = ?", c.roomIds[1]);
+    const other = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
+    await exec("UPDATE reservations SET room_id = ? WHERE id = ?", c.roomIds[2], other);
+    const b = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
+    const why = async (checkIn: string, checkOut: string) => Object.fromEntries((await roomChoices(db, b, checkIn, checkOut, day(0))).filter((r) => c.roomIds.includes(r.id)).map((r) => [r.id, r.blocked]));
+    expect(await why(day(0), day(1))).toEqual({ [c.roomIds[0]!]: "Out of order", [c.roomIds[1]!]: "To clean", [c.roomIds[2]!]: expect.stringMatching(/^Booked · /) });
+    // For a later arrival, today's cleaning doesn't matter.
+    expect((await why(day(5), day(6)))[c.roomIds[1]!]).toBeNull();
+  });
+
+  it("assigning it fails with a clear message, and works once the guest is checked out", async () => {
+    const { c, stay, room } = await overstay(2);
+    const b = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(2), status: "confirmed" });
+    await rejects(assignRoom(db, desk, b, room), /is occupied: .* is checked in, due out .* Check them out first/, "CONFLICT");
+    await exec("UPDATE reservations SET status = 'checked_out' WHERE id = ?", stay);
+    await assignRoom(db, desk, b, room);
+  });
+
+  it("the website has one room fewer of that type for tonight", async () => {
+    const { c } = await overstay(1);
+    expect(await free(c.id, day(0), day(1))).toBe(false);
+    expect(await free(c.id, day(1), day(2))).toBe(true);
+  });
+});
+
 describe("room assignment", () => {
+  const paidBooking = async (categoryId: string, checkIn: string, checkOut: string) => ({ id: await insertReservation({ categoryId, checkIn, checkOut, status: "confirmed" }) });
+
+  it("refuses a room for a booking that isn't paid yet (I4), with what to do", async () => {
+    const c = await makeCategory(1);
+    const r = await staffBooking(c.id, day(40), day(41));
+    await rejects(assignRoom(db, desk, r.id, c.roomIds[0]!), /isn't paid yet\. Take the payment first: a room is given automatically/, "VALIDATION");
+  });
+
   it("assigns a room, and refuses a second overlapping assignment with a clear message", async () => {
     const c = await makeCategory(2);
-    const a = await staffBooking(c.id, day(40), day(42));
-    const b = await staffBooking(c.id, day(41), day(43));
+    const a = await paidBooking(c.id, day(40), day(42));
+    const b = await paidBooking(c.id, day(41), day(43));
     await assignRoom(db, desk, a.id, c.roomIds[0]!);
     await rejects(assignRoom(db, desk, b.id, c.roomIds[0]!), /is already booked for some of these nights/, "CONFLICT");
   });
@@ -155,19 +215,19 @@ describe("room assignment", () => {
   it("refuses rooms under maintenance", async () => {
     const c = await makeCategory(1);
     const broken = await makeRoom(c.id, { serviceStatus: "maintenance" });
-    const r = await staffBooking(c.id, day(40), day(41));
+    const r = await paidBooking(c.id, day(40), day(41));
     await rejects(assignRoom(db, desk, r.id, broken), /under maintenance/);
   });
 
   it("allows an upgrade only when the better room type has capacity", async () => {
     const std = await makeCategory(1);
     const suite = await makeCategory(1);
-    const r = await staffBooking(std.id, day(40), day(41));
+    const r = await paidBooking(std.id, day(40), day(41));
     await assignRoom(db, desk, r.id, suite.roomIds[0]!);
-    const r2 = await staffBooking(std.id, day(40), day(41)); // standard is free again after the upgrade
+    const r2 = await paidBooking(std.id, day(40), day(41)); // standard is free again after the upgrade
     const extraSuiteRoom = await makeRoom(suite.id);
     await exec("UPDATE rooms SET service_status = 'maintenance' WHERE id = ?", extraSuiteRoom);
-    await rejects(assignRoom(db, desk, r2.id, suite.roomIds[0]!), /capacity left|already booked/);
+    await rejects(assignRoom(db, desk, r2.id, suite.roomIds[0]!), /are free on all of these nights|already booked/);
   });
 });
 
@@ -190,7 +250,7 @@ describe("front desk lifecycle", () => {
   it("will not check in before arrival, without a room, unpaid, or into an unready room", async () => {
     const c = await makeCategory(2);
     const future = await insertReservation({ categoryId: c.id, checkIn: day(3), checkOut: day(4), status: "confirmed" });
-    await rejects(checkInReservation(db, desk, future), /Arrival is not until/);
+    await rejects(checkInReservation(db, desk, future), /arrives on .*Check-in opens that day/);
     const noRoom = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1), status: "confirmed" });
     await rejects(checkInReservation(db, desk, noRoom), /Assign a room/);
     const unpaid = await insertReservation({ categoryId: c.id, checkIn: day(0), checkOut: day(1) });
@@ -205,7 +265,7 @@ describe("front desk lifecycle", () => {
     const r = await staffBooking(c.id, day(40), day(41));
     await rejects(cancelReservation(db, desk, r.id, " "), /Give a reason/);
     await cancelReservation(db, desk, r.id, "Guest changed plans");
-    await rejects(cancelReservation(db, desk, r.id, "again"), /Only upcoming/);
+    await rejects(cancelReservation(db, desk, r.id, "again"), /hasn't started can be cancelled/);
     const h = await q1<{ reason: string; changed_by: string }>("SELECT reason, changed_by FROM reservation_status_history WHERE reservation_id = ? AND to_status = 'cancelled'", r.id);
     expect(h).toEqual({ reason: "Guest changed plans", changed_by: desk!.id });
   });
@@ -239,7 +299,7 @@ describe("payment override (managers only, reason required, audited)", () => {
   it("front desk cannot override", async () => {
     const c = await makeCategory(1);
     const r = await staffBooking(c.id, day(40), day(41));
-    await rejects(overridePaymentRequirement(db, desk, r.id, "confirm", "Trusted corporate guest"), /role does not allow/, "FORBIDDEN");
+    await rejects(overridePaymentRequirement(db, desk, r.id, "confirm", "Trusted corporate guest"), /role can't do this/, "FORBIDDEN");
   });
 
   it("nobody can confirm a booking without full payment, not even a manager", async () => {
@@ -266,7 +326,7 @@ describe("date changes", () => {
     await changeReservationDates(db, desk, r.id, day(40), day(43));
     expect((await q1<{ total_amount_kobo: number }>("SELECT total_amount_kobo FROM reservations WHERE id = ?", r.id)).total_amount_kobo).toBe(12_000_000);
     await staffBooking(c.id, day(45), day(46));
-    await rejects(changeReservationDates(db, desk, r.id, day(44), day(46)), /No availability for the new dates/);
+    await rejects(changeReservationDates(db, desk, r.id, day(44), day(46)), /No availability for .* in this room type/);
   });
 });
 
@@ -305,7 +365,7 @@ describe("concurrent staff actions", () => {
     expect(results.filter((x) => x.status === "fulfilled")).toHaveLength(1);
     expect(await status(r.id)).toBe("cancelled");
     const rejected = results.find((x) => x.status === "rejected") as PromiseRejectedResult;
-    expect(rejected.reason.message).toMatch(/Only upcoming|Only reservations awaiting payment|just changed by someone else/);
+    expect(rejected.reason.message).toMatch(/hasn't started can be cancelled|Only a booking awaiting payment|just changed by someone else/);
   });
 });
 

@@ -118,9 +118,9 @@ export async function rawPayment(reservationId: string, amountKobo: number, opts
   const id = crypto.randomUUID();
   const at = opts.paidAt ?? new Date().toISOString();
   await exec(
-    `INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, status, paid_at, verified_at, recorded_by, created_at)
-     VALUES (?, ?, ?, 'offline', ?, 'successful', ?, ?, ?, ?)`,
-    id, reservationId, amountKobo, opts.method ?? "cash", at, at, opts.recordedBy ?? desk!.id, at,
+    `INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, provider_reference, status, paid_at, verified_at, recorded_by, created_at)
+     VALUES (?, ?, ?, 'offline', ?, ?, 'successful', ?, ?, ?, ?)`,
+    id, reservationId, amountKobo, opts.method ?? "cash", opts.method === "bank_transfer" ? `TRF ${id.slice(0, 8)}` : null, at, at, opts.recordedBy ?? desk!.id, at,
   );
   return id;
 }

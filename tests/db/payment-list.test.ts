@@ -33,6 +33,18 @@ const amounts = async (actor: typeof desk, reservationId: string, view?: string)
 };
 
 describe("payments the front desk can see", () => {
+  it("lists money received only: online attempts that didn't complete stay on the booking", async () => {
+    const b = await booking();
+    for (const status of ["pending", "failed", "abandoned"]) {
+      await exec(
+        "INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, provider_reference, status) VALUES (?, ?, 30000000, 'paystack', 'card', ?, ?)",
+        crypto.randomUUID(), b.id, `att-${crypto.randomUUID().slice(0, 8)}`, status,
+      );
+    }
+    await pay(gm, b.id, day(0), 2_000_000);
+    expect((await amounts(gm, b.id, "all")).amounts).toEqual([2_000_000]);
+  });
+
   it("today's payments and their own; never an older payment someone else recorded, whatever they ask for", async () => {
     const b = await booking();
     await pay(gm, b.id, day(-3), 1_000_000); // older, by the manager: hidden from front desk

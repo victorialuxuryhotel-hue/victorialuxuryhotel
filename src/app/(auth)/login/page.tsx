@@ -6,6 +6,7 @@ import { Logo } from "@/components/brand/logo";
 import { hotel } from "@/config/hotel";
 import { auth } from "@clerk/nextjs/server";
 import { AccessDenied, SignInPanel } from "./sign-in-panel";
+import { BrowserBanner } from "@/components/management/browser-check";
 
 export const metadata: Metadata = { title: "Staff sign-in", robots: { index: false, follow: false } };
 
@@ -17,6 +18,8 @@ async function FormWithNext({ searchParams }: { searchParams: Promise<Record<str
 
 export default function LoginPage(props: PageProps<"/login">) {
   return (
+    <>
+    <BrowserBanner />
     <main className="grid min-h-screen flex-1 lg:grid-cols-2">
       <div className="relative hidden overflow-hidden bg-navy-950 lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgb(4_48_160/0.6),transparent_60%)]" />
@@ -24,7 +27,7 @@ export default function LoginPage(props: PageProps<"/login">) {
         <Logo className="relative w-20" />
         <div className="relative">
           <p className="font-display text-5xl leading-tight text-ivory-50">Hotel management</p>
-          <p className="mt-3 max-w-sm text-ivory-200/70">Reservations, rooms, guests and payments for {hotel.name}.</p>
+          <p className="mt-3 max-w-sm text-ivory-200/70">Bookings, rooms, guests and payments for {hotel.name}.</p>
         </div>
       </div>
 
@@ -43,5 +46,6 @@ export default function LoginPage(props: PageProps<"/login">) {
         </div>
       </div>
     </main>
+    </>
   );
 }

@@ -4,7 +4,7 @@ Business decisions that shape behaviour. Date: 17 Nov 2026 unless noted.
 
 | Decision | Source | Where it lives |
 | --- | --- | --- |
-| Room split across categories and nightly rates are **configurable**; current figures are test data only | Client (awaiting hotel) | `room_categories`, `rooms`; `supabase/seed.sql` is local only |
+| Room split across categories and nightly rates are **configurable**; current figures are test data only | Client (awaiting hotel) | `room_categories`, `rooms`; `db/seed.sql` is local only; `db/starter.sql` is the production starting point |
 | Cancellation policy wording is **configurable** until the hotel clarifies the 24–48 h window | Client | `hotel_settings.cancellation_policy` (empty = not shown as a promise) |
 | Unpaid website bookings hold inventory for **30 minutes** (configurable) | Default | `hotel_settings.website_hold_minutes` |
 | Unpaid direct bookings (phone, WhatsApp) hold for **24 hours** (configurable) | Client | `hotel_settings.staff_hold_hours` |
@@ -14,4 +14,4 @@ Business decisions that shape behaviour. Date: 17 Nov 2026 unless noted.
 | Out of scope for now: guest accounts, SMS, promo codes, add-on services, online self-cancellation | Client | Not built |
 | One reservation = one room; a guest booking two rooms makes two reservations | Default | Reservation model |
 | Maintenance is a current room status, not a dated block | Default (brief) | `rooms.service_status` |
-| Minimum staff password length **10** | Default | `supabase/config.toml`, password form |
+| Minimum staff password length **10** | Default | Clerk password policy (Configure → Password) |

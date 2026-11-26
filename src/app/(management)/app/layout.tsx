@@ -3,7 +3,13 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { DeskTabs, MobileBar, Sidebar } from "@/components/management/nav";
 import { managementNav } from "@/components/management/nav-items";
+import { BrowserBanner, NoteBrowser } from "@/components/management/browser-check";
+import { ConnectionBanner } from "@/components/management/connection";
+import { IdleLock } from "@/components/management/idle-lock";
+import { Shortcuts } from "@/components/management/shortcuts";
 import { StaffCard } from "@/components/management/staff-card";
+import { policy } from "@/config/policy";
+import { staffRole } from "@/domain/status";
 import { LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
 import { Eye } from "lucide-react";
@@ -30,7 +36,12 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
   );
   return (
     <>
+      <ConnectionBanner />
+      <Shortcuts />
+      <BrowserBanner />
+      <NoteBrowser sessionKey={staff.id} />
       {staff.viewAs ? <ViewAsBanner /> : null}
+      <IdleLock name={staff.fullName} roleLabel={staffRole[staff.role]} minutes={policy.idleLockMinutes} />
       <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
         <Sidebar allowed={allowed} footer={footer} />
         <MobileBar allowed={allowed} footer={footer} />

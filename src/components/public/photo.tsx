@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { fromPhotoStore } from "@/lib/media";
 import { cn } from "@/lib/utils/cn";
 import type { Photo as PhotoContent } from "@/content/site";
 
@@ -20,7 +21,7 @@ export function Photo({
   if (photo.image) {
     return (
       <div className={cn("overflow-hidden bg-ivory-200", !/\babsolute\b/.test(className ?? "") && "relative", className)}>
-        <Image src={photo.image} alt={photo.alt} fill sizes={sizes} priority={priority} className="object-cover" />
+        <Image src={photo.image} alt={photo.alt} fill sizes={sizes} priority={priority} unoptimized={fromPhotoStore(photo.image)} className="object-cover" />
       </div>
     );
   }

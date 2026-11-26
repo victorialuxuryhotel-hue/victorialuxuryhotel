@@ -78,7 +78,7 @@ export function RoomResults({ options, stay, selectHref }: { options: Availabili
   return (
     <div className="space-y-6">
       <p className="text-sm text-ink-600">
-        {available.length} of {options.length} room types free for your dates
+        {available.length === 1 ? "1 room type" : `${available.length} room types`} available for your dates
       </p>
       {fitting.length ? (
         <section aria-labelledby={tooSmall.length ? "fits" : undefined} className="space-y-4">

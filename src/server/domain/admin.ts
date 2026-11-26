@@ -44,14 +44,14 @@ export async function saveCategory(db: Db, actor: Actor, v: CategoryInput): Prom
     ]);
     if (!result?.meta.changes) throw new AppError("NOT_FOUND", "Room type not found.");
   } catch (err) {
-    conflictOnUnique(err, "A category with this name or web address already exists.");
+    conflictOnUnique(err, "A room type with this name or web address already exists.");
   }
   return id;
 }
 
 export async function createRoom(db: Db, actor: Actor, v: { roomNumber: string; categoryId: string; floor: string | null }): Promise<void> {
   requireRole(actor, MANAGERS);
-  if (!(await first(db, "SELECT 1 FROM room_categories WHERE id = ?", v.categoryId))) throw new AppError("VALIDATION", "Choose a category");
+  if (!(await first(db, "SELECT 1 FROM room_categories WHERE id = ?", v.categoryId))) throw new AppError("VALIDATION", "Choose a room type");
   try {
     await writeBatch(db, actor, [
       db.prepare("INSERT INTO rooms (id, room_number, category_id, floor) VALUES (?, ?, ?, ?)").bind(uuid(), v.roomNumber.trim(), v.categoryId, v.floor?.trim() || null),
@@ -160,19 +160,20 @@ export async function updateBookingRules(
   actor: Actor,
   v: {
     checkInTime: string; checkOutTime: string; websiteHoldMinutes: number; staffHoldHours: number; cancellationPolicy: string | null;
-    freeCancelHours: number; lateCancelFeePct: number; vatRatePct: number;
+    freeCancelHours: number; lateCancelFeePct: number; vatRatePct: number; vatOnReceipts?: boolean; taxId?: string | null;
   },
 ): Promise<void> {
   requireRole(actor, MANAGERS);
+  if (v.vatOnReceipts && !v.taxId) throw new AppError("VALIDATION", "VAT can't be shown on receipts without the hotel's Tax ID (TIN). Enter the TIN first.", { fieldErrors: { taxId: ["Needed to show VAT on receipts"] } });
   const hhmm = (t: string) => t.slice(0, 5);
   await writeBatch(db, actor, [
     db
       .prepare(
         `UPDATE hotel_settings SET check_in_time = ?, check_out_time = ?, website_hold_minutes = ?, staff_hold_hours = ?, cancellation_policy = ?,
-           free_cancel_hours = ?, late_cancel_fee_pct = ?, vat_rate_bp = ?
+           free_cancel_hours = ?, late_cancel_fee_pct = ?, vat_rate_bp = ?, vat_on_receipts = ?, tax_id = ?
          WHERE id = 1`,
       )
-      .bind(hhmm(v.checkInTime), hhmm(v.checkOutTime), v.websiteHoldMinutes, v.staffHoldHours, v.cancellationPolicy, v.freeCancelHours, v.lateCancelFeePct, v.vatRatePct),
+      .bind(hhmm(v.checkInTime), hhmm(v.checkOutTime), v.websiteHoldMinutes, v.staffHoldHours, v.cancellationPolicy, v.freeCancelHours, v.lateCancelFeePct, v.vatRatePct, v.vatOnReceipts ? 1 : 0, v.taxId ?? null),
   ]);
 }
 

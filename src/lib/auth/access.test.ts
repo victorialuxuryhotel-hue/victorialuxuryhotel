@@ -26,7 +26,8 @@ describe("staff access", () => {
     const pages = files("src/app/(management)/app").filter((f) => f.endsWith("page.tsx"));
     const open = pages.filter((f) => {
       const s = readFileSync(f, "utf8");
-      return !/can(Any)?\(staff\.role/.test(s) && !/redirect\(/.test(s) && !f.includes("/account/");
+      // Account and This station are for every signed-in staff member (the staff layout requires sign-in).
+      return !/can(Any)?\(staff\.role/.test(s) && !/redirect\(/.test(s) && !f.includes("/account/") && !f.includes("/station/");
     });
     expect(open).toEqual([]);
   });

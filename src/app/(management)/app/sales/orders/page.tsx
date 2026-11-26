@@ -64,7 +64,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           </Select>
         </label>
         {viewer ? (
-          <label className="text-[13px] text-ink-700">Attendant
+          <label className="text-[13px] text-ink-700">Sold by
             <Select name="staff" defaultValue={f.staffId ?? ""} className="mt-1">
               <option value="">Everyone</option>
               {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -90,7 +90,10 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           </p>
         ) : null}
         {viewer ? (
-          <a href={`/app/sales/orders/csv?${query}`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Download (CSV)</a>
+          <>
+            <a href={`/app/sales/orders/csv?${query}&format=xlsx`} className={buttonStyles({ variant: "secondary", size: "sm" })}><Download className="size-4" aria-hidden /> Download (Excel)</a>
+            <a href={`/app/sales/orders/csv?${query}`} className={buttonStyles({ variant: "ghost", size: "sm" })}>CSV</a>
+          </>
         ) : null}
       </div>
 
@@ -106,7 +109,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
                       {o.receipt_number ? <span className="ml-2 font-mono text-xs text-ink-500">{o.receipt_number}</span> : null}
                     </p>
                     <p className="truncate text-xs text-ink-500">
-                      {formatDateTime(o.paid_at ?? o.created_at)} · {o.items}{o.method ? ` · ${PAY_METHODS[o.method]}` : ""} · {o.taken_by ?? o.created_by_name ?? "staff"}
+                      {formatDateTime(o.paid_at ?? o.created_at)} · {o.items}{o.method ? ` · ${PAY_METHODS[o.method]}${o.payment_reference ? (o.method === "pos_terminal" ? ` …${o.payment_reference}` : ` (${o.payment_reference})`) : ""}` : ""} · {o.taken_by ?? o.created_by_name ?? "staff"}
                     </p>
                   </div>
                   <Badge tone={tone[o.status]}>{ORDER_STATUS[o.status]}</Badge>
