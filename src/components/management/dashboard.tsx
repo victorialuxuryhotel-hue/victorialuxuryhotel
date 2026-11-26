@@ -70,12 +70,15 @@ export type Task = {
 };
 
 /** Everything waiting on a member of staff, written as tasks, most urgent first. */
-export function dashboardTasks({ attention, arrivals, inHouse, rooms, assign }: {
+export function dashboardTasks({ attention, arrivals, inHouse, rooms, assign, canAct, canSeeRooms }: {
   attention: ReservationRow[];
   arrivals: ReservationRow[];
   inHouse: ReservationRow[];
   rooms: RoomTile[];
   assign?: (r: ReservationRow) => React.ReactNode;
+  /** Read-only roles can open a booking but are not asked to act on it. */
+  canAct: boolean;
+  canSeeRooms: boolean;
 }): Task[] {
   const flagged = new Set(attention.map((r) => r.id));
   const waiting = arrivals.filter((r) => !flagged.has(r.id));
@@ -86,10 +89,10 @@ export function dashboardTasks({ attention, arrivals, inHouse, rooms, assign }: 
     ...waiting.filter((r) => !r.roomNumber).map((r): Task => ({ key: `r-${r.id}`, title: `Assign a room to ${r.guestName}`, detail: `${r.category} · arrives today`, action: "Assign room", href: href(r), urgency: "medium", inline: assign?.(r) })),
     ...inHouse.filter((r) => !flagged.has(r.id) && balanceOf(r) > 0).map((r): Task => ({ key: `b-${r.id}`, title: `Collect ${formatNaira(balanceOf(r))} from ${r.guestName}`, detail: `${roomText(r)} · staying now`, action: "Add payment", href: href(r), urgency: "medium" })),
   ];
-  if (out.length) {
+  if (out.length && canSeeRooms) {
     tasks.push({ key: "out-of-service", title: `Fix ${plural(out.length, "room")} out of service`, detail: out.map((r) => r.number).join(", "), action: "View rooms", href: "/app/rooms?state=maintenance", urgency: "low" });
   }
-  return tasks;
+  return canAct ? tasks : tasks.map((t) => (t.key === "out-of-service" ? t : { ...t, action: "View" }));
 }
 
 const urgencyDot = { high: "bg-danger-600", medium: "bg-warning-600", low: "bg-ink-400" };

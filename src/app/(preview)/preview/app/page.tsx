@@ -23,7 +23,7 @@ export default function Page() {
       <div className="space-y-5 px-4 py-5 lg:px-8 lg:py-7">
         <NextUp arrivals={arrivals} departures={departures} today={today} canAct />
         <div className="grid items-start gap-5 xl:grid-cols-[1.4fr_1fr]">
-          <ToDo tasks={dashboardTasks({ attention, arrivals, inHouse, rooms })} />
+          <ToDo tasks={dashboardTasks({ attention, arrivals, inHouse, rooms, canAct: true, canSeeRooms: true })} />
           <Card>
             <CardHeader title="Rooms right now" action={<Link href="/preview/app/rooms" className="text-[13px] font-medium text-navy-800">Room board</Link>} />
             <div className="px-[18px] py-4">

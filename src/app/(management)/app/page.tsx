@@ -21,7 +21,7 @@ import type { ReservationRow } from "@/domain/views";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
-async function Departments() {
+async function Departments({ canOpenHall }: { canOpenHall: boolean }) {
   const d = await departmentsOverview();
   const cell = "px-4 py-3 text-right tabular-nums whitespace-nowrap";
   return (
@@ -40,7 +40,11 @@ async function Departments() {
             {d.rows.map((r) => (
               <tr key={r.key}>
                 <th scope="row" className="px-5 py-3 text-left font-normal">
-                  <Link href={r.href} className="font-medium text-ink-900 hover:underline">{r.label}</Link>
+                  {r.key === "hall" && !canOpenHall ? (
+                    <span className="font-medium text-ink-900">{r.label}</span>
+                  ) : (
+                    <Link href={r.href} className="font-medium text-ink-900 hover:underline">{r.label}</Link>
+                  )}
                   <span className="block text-xs text-ink-500">{r.note}</span>
                 </th>
                 <td className={cell}>{formatNaira(r.today)}</td>
@@ -131,9 +135,9 @@ async function Content() {
       </ul>
 
       <div className="grid items-start gap-5 xl:grid-cols-[1.4fr_1fr]">
-        <ToDo tasks={dashboardTasks({ attention, arrivals: m.arrivals, inHouse: m.inHouse, rooms, assign })} />
+        <ToDo tasks={dashboardTasks({ attention, arrivals: m.arrivals, inHouse: m.inHouse, rooms, assign, canAct, canSeeRooms: can(staff.role, "rooms.status") })} />
         <Card>
-          <CardHeader title="Rooms right now" action={<Link href="/app/rooms" className="text-[13px] font-medium text-navy-800">Room board</Link>} />
+          <CardHeader title="Rooms right now" action={can(staff.role, "rooms.status") ? <Link href="/app/rooms" className="text-[13px] font-medium text-navy-800">Room board</Link> : undefined} />
           <div className="px-[18px] py-4">
             <div className="flex h-2.5 overflow-hidden rounded-full bg-ivory-200">
               {(["occupied", "arriving", "available", "dirty", "maintenance"] as const).map((s) => {
@@ -151,11 +155,17 @@ async function Content() {
       {can(staff.role, "reports.view") ? (
         <>
           <Suspense fallback={<LoadingState label="Loading revenue…" />}><Revenue /></Suspense>
-          <Suspense fallback={<LoadingState label="Loading departments…" />}><Departments /></Suspense>
+          <Suspense fallback={<LoadingState label="Loading departments…" />}><Departments canOpenHall={can(staff.role, "events.manage")} /></Suspense>
         </>
       ) : null}
     </div>
   );
+}
+
+async function NewReservationButton() {
+  const staff = await requireStaff();
+  if (!can(staff.role, "reservations.manage")) return null;
+  return <Link href="/app/reservations/new" className={buttonStyles({ className: "size-11 px-0 sm:size-auto sm:px-4" })} aria-label="New reservation"><CalendarPlus className="size-4" aria-hidden /><span className="hidden sm:inline">New reservation</span></Link>;
 }
 
 export default function DashboardPage() {
@@ -163,7 +173,7 @@ export default function DashboardPage() {
     <>
       <PageHeader
         title="Dashboard"
-        actions={<Link href="/app/reservations/new" className={buttonStyles({ className: "size-11 px-0 sm:size-auto sm:px-4" })} aria-label="New reservation"><CalendarPlus className="size-4" aria-hidden /><span className="hidden sm:inline">New reservation</span></Link>}
+        actions={<Suspense fallback={null}><NewReservationButton /></Suspense>}
       />
       <Suspense fallback={<DashboardSkeleton />}><Content /></Suspense>
     </>

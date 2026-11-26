@@ -39,7 +39,7 @@ async function SettingsContent({ searchParams }: { searchParams: PageProps<"/app
     ...sections.map((s) => ({ label: s.label, href: `/app/settings?section=${s.key}`, current: s.key === active })),
     ...(can(staff.role, "staff.manage") ? [{ label: "Staff & access", href: "/app/staff", current: false }] : []),
     ...(can(staff.role, "categories.manage") ? [{ label: "Website photos", href: "/app/rooms/categories/photos", current: false }] : []),
-    ...(can(staff.role, "reports.view") ? [{ label: "Activity", href: "/app/reports?tab=activity", current: false }] : []),
+    ...(can(staff.role, "activity.view") ? [{ label: "Activity", href: "/app/reports?tab=activity", current: false }] : []),
   ];
   return (
     <div className="flex flex-col gap-5 px-4 py-5 md:flex-row md:items-start lg:px-8 lg:py-7">
