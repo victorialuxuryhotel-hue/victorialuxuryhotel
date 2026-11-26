@@ -119,6 +119,12 @@ Each invariant gets a DB test in `tests/db` that tries to break it and expects t
 
 Run from the existing cron. Never changes money; only alerts (email to GM/Owner + shows on the Dashboard "Anything wrong?").
 
+**Built (26 Nov):** `src/server/domain/self-check.ts`, run by the scheduled job; alerts go to `ALERT_WEBHOOK_URL`, at most once a day per problem
+(migration 0027), and the Dashboard shows the live list. Built: in house and owing, online payment pending over an hour, paid with no room,
+overpaid, two guests checked in to one room, unpaid with a room (every 10 minutes); overdue check-out, not arrived, closing not verified after
+24 h, room out of order over 3 days, transfer/POS payments unconfirmed after 3 days (daily, after 06:00). Cash over/short alerts on submit (closings).
+**Not yet:** the Paystack daily reconcile (needs their transaction list API) and refund outcomes (no refund workflow yet).
+
 | Check | When | Alert text (example) |
 |---|---|---|
 | Booking checked in with balance > 0 | 10 min | "Ibrahim Musa (Room 402) is in house and owes ₦1,080,000." |

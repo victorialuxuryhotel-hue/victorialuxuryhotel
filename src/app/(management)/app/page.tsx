@@ -1,4 +1,5 @@
 import { toConfirmSummary } from "@/server/domain/payment-checks";
+import { currentFindings } from "@/server/domain/self-check";
 import { actorOf, authorizeRead } from "@/server/auth";
 import { getDb } from "@/server/db";
 import type { Metadata } from "next";
@@ -86,12 +87,14 @@ async function Content() {
   const staff = await requireStaff();
   if (staff.role === "front_desk" || staff.role === "hotel_manager") redirect("/app/today");
   if (staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager") redirect("/app/sales");
-  const [m, rooms, awaiting, recent, toConfirm] = await Promise.all([
+  const [m, rooms, awaiting, recent, toConfirm, findings] = await Promise.all([
     movements(),
     roomBoard(),
     awaitingPaymentCount(),
     listReservations({ tab: "all" }),
     can(staff.role, "reports.view") ? authorizeRead("reports.view").then(async (r) => toConfirmSummary(await getDb(), actorOf(r))) : Promise.resolve({ count: 0, kobo: 0 }),
+    // The self-check (rules section 4), live: the same list the alerts come from.
+    can(staff.role, "reports.view") ? authorizeRead("reports.view").then(async () => currentFindings(await getDb())) : Promise.resolve([]),
   ]);
   const noRoom = m.arrivals.filter((a) => !a.roomNumber).length;
   const owing = m.departures.filter((d) => owedOf(d) > 0).length;
@@ -111,6 +114,20 @@ async function Content() {
           <span><b>Needs attention</b> · {toConfirm.count} payment{toConfirm.count === 1 ? "" : "s"} ({formatNaira(toConfirm.kobo)}) to confirm against the bank or the terminal</span>
           <ArrowRight className="size-4 shrink-0" aria-hidden />
         </Link>
+      ) : null}
+      {findings.length ? (
+        <section aria-labelledby="anything-wrong" className="rounded-card border border-hairline bg-ivory-50" data-self-check="">
+          <h2 id="anything-wrong" className="border-b border-hairline px-5 py-3 text-sm font-semibold text-ink-900">Anything wrong? · {findings.length}</h2>
+          <ul className="divide-y divide-hairline text-sm">
+            {findings.slice(0, 12).map((f) => (
+              <li key={f.key} className="flex gap-3 px-5 py-2.5">
+                <span aria-hidden className={f.urgent ? "mt-1.5 size-2 shrink-0 rounded-full bg-danger-600" : "mt-1.5 size-2 shrink-0 rounded-full bg-gold-500"} />
+                <span className={f.urgent ? "text-danger-700" : "text-ink-700"}>{f.message}</span>
+              </li>
+            ))}
+          </ul>
+          {findings.length > 12 ? <p className="border-t border-hairline px-5 py-2 text-xs text-ink-500">And {findings.length - 12} more.</p> : null}
+        </section>
       ) : null}
       <StatGrid>
         <Stat label="Arrivals today" value={m.arrivals.length} caption={noRoom ? `${noRoom} still need a room` : "All have rooms assigned"} />

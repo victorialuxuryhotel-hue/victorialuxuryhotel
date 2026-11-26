@@ -2,7 +2,20 @@
 import { default as handler } from "./.open-next/worker.js";
 import { withSecurityHeaders } from "./src/lib/security-headers";
 
-type Env = { CRON_SECRET?: string } & Record<string, unknown>;
+type Env = { CRON_SECRET?: string; HEARTBEAT_URL?: string } & Record<string, unknown>;
+
+/**
+ * Heartbeat (Healthchecks.io / Better Stack style): ping on every good run, ".../fail" on a bad one.
+ * If the scheduled job stops running altogether, the missed pings raise the alarm.
+ */
+async function heartbeat(env: Env, ok: boolean) {
+  if (!env.HEARTBEAT_URL) return;
+  try {
+    await fetch(ok ? env.HEARTBEAT_URL : `${env.HEARTBEAT_URL.replace(/\/$/, "")}/fail`, { method: "POST", signal: AbortSignal.timeout(5_000) });
+  } catch {
+    console.error(JSON.stringify({ level: "error", event: "cron.heartbeat_failed" }));
+  }
+}
 type Ctx = { waitUntil(p: Promise<unknown>): void; passThroughOnException(): void };
 type NextHandler = { fetch(req: Request, env: Env, ctx: Ctx): Promise<Response> };
 
@@ -19,11 +32,18 @@ const worker = {
       headers: { authorization: `Bearer ${env.CRON_SECRET ?? ""}` },
     });
     ctx.waitUntil(
-      next.fetch(request, env, ctx).then(async (res) => {
-        const body = await res.text();
-        if (!res.ok) console.error(JSON.stringify({ level: "error", event: "cron.run_failed", status: res.status, body: body.slice(0, 500) }));
-        else console.log(JSON.stringify({ level: "info", event: "cron.run", body: body.slice(0, 500) }));
-      }),
+      next
+        .fetch(request, env, ctx)
+        .then(async (res) => {
+          const body = await res.text();
+          if (!res.ok) console.error(JSON.stringify({ level: "error", event: "cron.run_failed", status: res.status, body: body.slice(0, 500) }));
+          else console.log(JSON.stringify({ level: "info", event: "cron.run", body: body.slice(0, 500) }));
+          await heartbeat(env, res.ok);
+        })
+        .catch(async (err) => {
+          console.error(JSON.stringify({ level: "error", event: "cron.run_failed", error: String(err).slice(0, 300) }));
+          await heartbeat(env, false);
+        }),
     );
   },
 };

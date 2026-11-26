@@ -5,6 +5,7 @@ import { alert } from "@/lib/alert";
 import { logger } from "@/lib/logger";
 import { getDb } from "@/server/db";
 import { paymentsToSweep } from "@/server/domain/payments";
+import { findingsToAlert } from "@/server/domain/self-check";
 import { expireUnpaidReservations } from "@/server/domain/reservations";
 import { deliverEmails } from "@/server/notifications";
 import { settlePaystackReference } from "@/server/payment-flow";
@@ -38,6 +39,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "expire failed" }, { status: 500 });
   }
   const emails = await deliverEmails({ limit: 50 });
-  logger.info("cron.housekeeping", { checked: pending.length, settled, expired, emails });
-  return NextResponse.json({ checked: pending.length, settled, expired, emails });
+
+  // Self-check (rules section 4): one alert per run listing what's new, each problem at most once a day.
+  let problems = 0;
+  try {
+    const findings = await findingsToAlert(db);
+    problems = findings.length;
+    if (findings.length === 1) await alert("self_check", findings[0]!.message, { check: findings[0]!.check });
+    else if (findings.length > 1) {
+      const urgent = findings.filter((f) => f.urgent).length;
+      await alert("self_check", `${findings.length} things need attention${urgent ? ` (${urgent} urgent)` : ""}:\n${findings.slice(0, 15).map((f) => `• ${f.message}`).join("\n")}${findings.length > 15 ? `\n…and ${findings.length - 15} more on the Dashboard.` : ""}`, { checks: [...new Set(findings.map((f) => f.check))] });
+    }
+  } catch (err) {
+    logger.error("cron.self_check_failed", err);
+  }
+
+  logger.info("cron.housekeeping", { checked: pending.length, settled, expired, emails, problems });
+  return NextResponse.json({ checked: pending.length, settled, expired, emails, problems });
 }
