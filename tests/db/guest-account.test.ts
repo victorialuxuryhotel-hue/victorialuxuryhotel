@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { recordOfflinePayment } from "@/server/domain/payments";
 import { createWebsiteReservation } from "@/server/domain/reservations";
 import { cancellationFee, checkGuestCode, guestBookings, guestCancel, guestChangeDates, issueGuestCode } from "@/server/domain/guest-account";
-import { day, db, desk, makeCategory, q1, rejects, status } from "./helpers";
+import { day, db, desk, exec, makeCategory, q1, rejects, status } from "./helpers";
 
 const mail = () => `g-${crypto.randomUUID().slice(0, 8)}@example.com`;
 
@@ -12,6 +12,17 @@ async function book(email: string, inDays: number) {
 }
 
 describe("guest accounts", () => {
+  // "Tomorrow" must always fall inside the late-fee window. With the hotel's 24
+  // hours it only does after check-in time today; with 48 it does all day.
+  let freeHours: number;
+  beforeAll(async () => {
+    freeHours = (await q1<{ free_cancel_hours: number }>("SELECT free_cancel_hours FROM hotel_settings WHERE id = 1")).free_cancel_hours;
+    await exec("UPDATE hotel_settings SET free_cancel_hours = 48 WHERE id = 1");
+  });
+  afterAll(async () => {
+    await exec("UPDATE hotel_settings SET free_cancel_hours = ? WHERE id = 1", freeHours);
+  });
+
   it("issues a single-use code only to emails with bookings, and locks after five wrong tries", async () => {
     expect(await issueGuestCode(db, mail())).toBeNull();
     const e = mail();
