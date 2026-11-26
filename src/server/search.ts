@@ -8,7 +8,7 @@ import { globalSearch, type SearchResults } from "./domain/search";
 /** The header search (I9). Only the groups this role can open; nothing at all on error. */
 export async function searchEverything(q: string): Promise<SearchResults> {
   try {
-    const staff = await authorizeRead();
+    const staff = await authorizeRead(["guests.manage", "reservations.manage", "reports.view", "rooms.status"]);
     const scopes = {
       guests: can(staff.role, "guests.manage"),
       bookings: can(staff.role, "reservations.manage") || can(staff.role, "reports.view"),
