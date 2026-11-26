@@ -13,6 +13,7 @@ import { ReservationBadge, SourceBadge } from "./badges";
 import { PanelShell } from "./panel-shell";
 import { AssignRoomForm, ChangeDatesForm } from "./reservation-actions";
 import { NextAction } from "./reservation-guide";
+import { GuestAvatar } from "./guest-avatar";
 
 /**
  * The booking side panel (interface brief I7): money line, stay, the one next action (the same
@@ -43,7 +44,10 @@ async function PanelBody({ reference }: { reference: string }) {
     <ActionFeedbackProvider>
       <div className="space-y-0 divide-y divide-hairline" data-panel-reference={r.reference}>
         <header className="space-y-2 px-5 pt-5 pb-4 pr-14">
-          <h2 className="text-2xl leading-tight text-ink-900">{r.guestName}</h2>
+          <div className="flex items-center gap-3">
+            <GuestAvatar name={r.guestName} size="lg" />
+            <h2 className="text-2xl leading-tight text-ink-900">{r.guestName}</h2>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-xs text-ink-500">{r.reference}</span>
             <ReservationBadge status={r.status} />

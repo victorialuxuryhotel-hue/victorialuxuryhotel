@@ -83,7 +83,8 @@ for (let n = 1; n <= 60; n++) {
     await p.waitForFunction((k) => location.search.includes(`page=${k}`), {}, n);
     await p.waitForFunction(() => document.querySelectorAll("table tbody tr").length > 0);
   };
-  const firstCells = () => p.evaluate(() => [...document.querySelectorAll("table tbody tr")].map((r) => r.innerText.split("\n")[0]));
+  // The guest's name (skipping the initials avatar in front of it).
+  const firstCells = () => p.evaluate(() => [...document.querySelectorAll("table tbody tr")].map((r) => r.innerText.split("\n").map((l) => l.trim()).find((l) => l.length > 2)));
 
   await go(p, `/app/guests?q=${q}`);
   check("guests page 1 shows 20", (await rowsMatching()) === 20, String(await rowsMatching()));
@@ -251,11 +252,9 @@ for (const id of pagingIds) {
   const bar = await p.$("[data-bar]");
   if (bar) {
     const barRef = await bar.evaluate((b) => b.getAttribute("data-reference"));
-    await until(async () => {
-      await p.evaluate((r) => document.querySelector(`[data-bar][data-reference='${r}']`)?.click(), barRef);
-      return (await panelRef()) === barRef;
-    }, "calendar panel");
-    check("a calendar bar opens the panel", p.url().includes(`booking=${barRef}`), p.url());
+    const barHref = await bar.evaluate((b) => b.getAttribute("href"));
+    await go(p, barHref);
+    check("a calendar bar opens the panel", barHref.startsWith("/app/calendar") && barHref.includes(`booking=${barRef}`) && (await until(panelRef, "calendar panel")) === barRef, barHref);
   }
 
   await go(p, "/app/reservations?tab=all");
@@ -325,6 +324,22 @@ for (const id of pagingIds) {
   await until(async () => (await val("SELECT count(*) FROM staff_first_day WHERE item = 'walk_in'")) > 0, "tick saved");
   await go(p, "/app/account");
   check("a tick is kept", await p.$eval("#fd-walk_in", (c) => c.checked));
+  await ctx.close();
+}
+
+{
+  // I11: initials beside guest names on Today, Bookings and the side panel.
+  const { ctx, p } = await as("front_desk");
+  await p.setViewport({ width: 1366, height: 768 });
+  await go(p, "/app/today");
+  const rows = await p.$$eval(".rounded-card ul > li:has(a[href*='booking=']):not([data-kind])", (l) => l.filter((x) => x.offsetParent).map((x) => Boolean(x.querySelector("[data-avatar]"))));
+  check("Today's arriving and leaving rows show the guest's initials", rows.length > 0 && rows.every(Boolean), JSON.stringify(rows));
+  await go(p, "/app/reservations?tab=all");
+  check("so does every Bookings row", await p.$$eval("table tbody tr", (r) => r.filter((x) => x.offsetParent).every((x) => x.querySelector("[data-avatar]"))));
+  const ref = await val("SELECT reference FROM reservations ORDER BY created_at DESC LIMIT 1");
+  await go(p, `/app/reservations?tab=all&booking=${ref}`);
+  await p.waitForSelector("[data-panel-reference] [data-avatar]");
+  check("and the side panel", true);
   await ctx.close();
 }
 

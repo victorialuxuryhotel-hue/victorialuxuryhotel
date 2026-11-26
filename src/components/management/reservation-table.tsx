@@ -6,6 +6,7 @@ import type { ReservationRow } from "@/domain/views";
 import { formatDate, formatNaira, nightsBetween, plural } from "@/lib/format";
 import { opensPanel } from "@/lib/panel";
 import { PaidProgress, ReservationBadge, SourceBadge } from "./badges";
+import { GuestAvatar } from "./guest-avatar";
 
 /** today: the hotel date from the page, so dates in another year show their year. */
 /** inHouse: the compact Today version: guest, room, check-out, what's owed, status (no source or payment bars). */
@@ -18,9 +19,12 @@ export function ReservationTable({ rows, hrefFor, today, inHouse = false }: { ro
           <li key={r.id}>
             <Link href={hrefFor(r)} scroll={!opensPanel(hrefFor(r))} className="block px-4 py-4 hover:bg-ivory-50">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="flex min-w-0 items-start gap-3">
+                  <GuestAvatar name={r.guestName} size="sm" />
+                  <div className="min-w-0">
                   <p className="font-medium text-ink-900">{r.guestName}</p>
                   <p className="mt-0.5 font-mono text-xs text-ink-500">{r.reference}</p>
+                  </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <ReservationBadge status={r.status} />
@@ -57,8 +61,13 @@ export function ReservationTable({ rows, hrefFor, today, inHouse = false }: { ro
             {rows.map((r) => (
               <TR key={r.id} className="cursor-pointer">
                 <TD>
-                  <Link href={hrefFor(r)} scroll={!opensPanel(hrefFor(r))} className="font-medium text-ink-900 hover:text-navy-700">{r.guestName}</Link>
-                  <p className="font-mono text-xs text-ink-500">{r.reference}</p>
+                  <div className="flex items-center gap-2.5">
+                    <GuestAvatar name={r.guestName} size="sm" />
+                    <div className="min-w-0">
+                      <Link href={hrefFor(r)} scroll={!opensPanel(hrefFor(r))} className="font-medium text-ink-900 hover:text-navy-700">{r.guestName}</Link>
+                      <p className="font-mono text-xs text-ink-500">{r.reference}</p>
+                    </div>
+                  </div>
                 </TD>
                 {inHouse ? (
                   <TD>

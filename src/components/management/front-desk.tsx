@@ -10,6 +10,7 @@ import { movementProgress } from "@/domain/today";
 import { cn } from "@/lib/utils/cn";
 import { opensPanel } from "@/lib/panel";
 import { CheckInButton, CheckOutButton, TakePaymentLink } from "./reservation-actions";
+import { GuestAvatar } from "./guest-avatar";
 
 export function MovementList({
   kind,
@@ -67,7 +68,8 @@ export function MovementList({
             const overdue = !arrivals && r.checkOut < today;
             return (
               <li key={r.id} className={cn("flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5 sm:py-4", overdue && "bg-danger-50")}>
-                <div className="min-w-0">
+                <GuestAvatar name={r.guestName} className="self-start" />
+                <div className="mr-auto min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link href={hrefFor(r)} scroll={!opensPanel(hrefFor(r))} className="font-medium text-ink-900 hover:text-navy-700">{r.guestName}</Link>
                     <ReservationBadge status={r.status} />
