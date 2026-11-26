@@ -35,10 +35,10 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     first(db, "SELECT 1 FROM pos_closings WHERE staff_id = ? AND business_date = ?", staff.id, businessDate()),
     topSellers(db, actor),
   ]);
-  const low = can(staff.role, "inventory.manage") ? menu.filter((m) => m.stock_left != null && m.stock_left <= 5) : [];
+  const low = can(staff.role, "inventory.manage") ? menu.filter((m) => m.low && m.stock_left != null) : [];
   return (
     // Laptops: fill the window under the page header; the till's columns scroll inside (see Till).
-    <div className="space-y-6 px-4 py-6 lg:flex lg:h-[calc(100dvh-6.375rem)] lg:flex-col lg:space-y-0 lg:gap-4 lg:px-8 lg:pb-4">
+    <div className="space-y-6 px-4 py-6 lg:flex lg:h-[calc(100dvh-6.375rem)] lg:flex-col lg:[html[data-till-full]_&]:h-dvh lg:space-y-0 lg:gap-4 lg:px-8 lg:pb-4">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-600">
         <BusinessDay className="text-sm font-medium text-ink-700" />
         <span>Your sales today: <b className="tabular-nums text-ink-900">{mine.sales}</b> · <b className="tabular-nums text-ink-900">{formatNaira(mine.salesKobo)}</b></span>
@@ -58,7 +58,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         </p>
       ) : (
         <div className="lg:min-h-0 lg:flex-1">
-          <Till menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} taxId={settings?.tax_id ?? null} resume={resume} favourites={favourites} staffId={staff.id} />
+          <Till menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} taxId={settings?.tax_id ?? null} resume={resume} favourites={favourites} staffId={staff.id} fullScreenRole={staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager"} />
         </div>
       )}
     </div>
@@ -68,7 +68,8 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
 export default function TillPage(props: PageProps<"/app/sales">) {
   return (
     <>
-      <PageHeader title="Till" description="Restaurant & bar orders and payments." />
+      {/* Full-screen till (I8): the strip below has everything, so the page title goes too. */}
+      <div data-app-nav=""><PageHeader title="Till" description="Restaurant & bar orders and payments." /></div>
       <Suspense fallback={<LoadingState />}><Content searchParams={props.searchParams} /></Suspense>
     </>
   );

@@ -73,7 +73,7 @@ await ctx.close();
     await p.click("section[aria-label=Menu] li button:not([disabled])").catch(() => {});
     return false;
   }, "item added", 10000);
-  const payDisabled = () => p.$$eval("button", (bs) => bs.find((b) => b.innerText.trim() === "Take payment")?.disabled);
+  const payDisabled = () => p.$eval("[data-pay]", (b) => b.disabled);
   await p.setOfflineMode(true);
   await waitForText(p, /No internet connection\. Your last action may not have saved/);
   check("offline: the banner says don't take payment", /Don't take payment until this clears/.test(await text(p)));
@@ -120,16 +120,16 @@ await ctx.close();
   const { ctx, p } = await as("restaurant_bar");
   await go(p, "/app/sales");
   check("the till shows who is signed in, with Switch user", /Signed in as .+ \(.+\)\s*Switch user/.test(await text(p)));
-  await p.evaluate(() => localStorage.setItem("victoria-idle-lock-ms", "4000"));
+  // 8 seconds: long enough to add the item on a busy dev server (no waiting for the network to settle), short enough for a test.
+  await p.evaluate(() => localStorage.setItem("victoria-idle-lock-ms", "8000"));
   await p.reload({ waitUntil: "load" });
-  await settle(p);
   // Tap until the item is in the order (a tap before the page has finished loading does nothing).
   await until(async () => {
     if (/Total · 1 item/.test(await text(p))) return true;
     await p.click("section[aria-label=Menu] li button:not([disabled])").catch(() => {});
     return false;
   }, "item added", 10000);
-  await waitForText(p, /Locked/, 15000);
+  await waitForText(p, /Locked/, 20000);
   check("after the idle time the screen locks", Boolean(await p.$("[role=dialog][aria-modal=true]")));
   // Back to the normal idle time before continuing, so the lock doesn't come straight back.
   await p.evaluate(() => localStorage.removeItem("victoria-idle-lock-ms"));
@@ -162,4 +162,67 @@ await ctx.close();
   check("the manager sees it under Transfers to check, with the reference", /Transfers and POS payments to check[\s\S]*4821/.test(await text(p)));
   await ctx.close();
 }
+// I8: till improvements, on the bar terminal (1280×720) as a restaurant & bar attendant.
+{
+  const { ctx: c8, p: t } = await as("restaurant_bar");
+  await t.setViewport({ width: 1280, height: 720 });
+  await t.evaluate(() => localStorage.setItem("victoria-station", JSON.stringify({ counter: "bar", printLayout: "none", autoPrint: false })));
+  await go(t, "/app/sales");
+  await t.waitForSelector("[data-pay]");
+  check("full-screen till: no sidebar for restaurant & bar staff", await t.$$eval("[data-app-nav]", (n) => n.every((x) => !x.offsetParent)));
+  check("the strip keeps Orders & receipts and Close my day", /Orders & receipts[\s\S]*Close my day/.test(await text(t)));
+  const pay = await t.$eval("[data-pay]", (b) => {
+    const cs = getComputedStyle(b.parentElement);
+    return { h: b.getBoundingClientRect().height, w: b.getBoundingClientRect().width, parent: b.parentElement.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) };
+  });
+  check("Pay is full width and at least 56px tall", pay.h >= 56 && pay.w >= pay.parent - 1, JSON.stringify(pay));
+
+  // A bar item without stock tracking says "Made to order"; search finds it.
+  const plain = await val("SELECT m.name FROM menu_items m WHERE m.outlet = 'bar' AND m.is_active = 1 AND m.is_available = 1 AND NOT EXISTS (SELECT 1 FROM menu_item_stock l WHERE l.menu_item_id = m.id) LIMIT 1");
+  const tracked = await val("SELECT m.name FROM menu_items m WHERE m.outlet = 'bar' AND m.is_active = 1 AND EXISTS (SELECT 1 FROM menu_item_stock l WHERE l.menu_item_id = m.id) LIMIT 1");
+  const tileText = (name) => t.$$eval("section[aria-label=Menu] li button", (bs, n) => bs.find((b) => b.innerText.startsWith(n))?.innerText ?? null, name);
+  if (plain) check("an item without stock says Made to order", /Made to order/.test((await tileText(plain)) ?? ""), plain);
+  if (tracked) check("a stocked item doesn't", !/Made to order/.test((await tileText(tracked)) ?? "Made to order"), tracked);
+  const item = plain ?? tracked;
+  await t.type("[data-till-search]", item.slice(0, 4));
+  const names = await t.$$eval("section[aria-label=Menu] ul.grid > li > button", (bs) => bs.map((b) => b.innerText.split("\n")[0]));
+  check("search shows only matching items", names.length > 0 && names.every((n) => n.toLowerCase().includes(item.slice(0, 4).toLowerCase())), names.join(", "));
+
+  // A note on a line, saved, then Same again.
+  await t.evaluate((n) => [...document.querySelectorAll("section[aria-label=Menu] li button")].find((b) => b.innerText.startsWith(n))?.click(), item);
+  await t.click(`[data-line="${item}"] button[aria-expanded]`);
+  await clickText(t, "[data-note-editor] button", "No ice");
+  await clickText(t, "[data-note-editor] button", "Done");
+  check("the line shows its note", /No ice/.test(await t.$eval(`[data-line="${item}"]`, (l) => l.innerText)));
+  const before = await val("SELECT count(*) FROM pos_orders WHERE status = 'open'");
+  await clickText(t, "button", "Save as unpaid order");
+  await until(async () => (await val("SELECT count(*) FROM pos_orders WHERE status = 'open'")) === before + 1, "order saved");
+  const orderId = await val("SELECT id FROM pos_orders WHERE status = 'open' ORDER BY created_at DESC LIMIT 1");
+  check("the note is saved on the line", (await val("SELECT note FROM pos_order_items WHERE order_id = ?", orderId)) === "No ice");
+  await go(t, `/app/sales?order=${orderId}`);
+  await t.waitForSelector("[data-same-again]");
+  await t.click("[data-same-again]");
+  const qty = await t.$eval(`[data-line="${item}"] [aria-live]`, (s) => s.textContent);
+  check("Same again adds the last round again (with its note)", qty === "2", qty);
+
+  // Pay it in cash; the receipt prints the note under the item.
+  await t.click("[data-pay]");
+  await clickText(t, "button", "Exact");
+  await clickText(t, "button", "Confirm");
+  await waitForText(t, /RB-\d{4}-\d{6}/);
+  check("the receipt prints the note under the item", await t.$$eval(".pos-receipt", (r) => r.some((x) => /– No ice/.test(x.textContent))));
+  check("the paid order has 2 on the noted line", (await val("SELECT quantity FROM pos_order_items WHERE order_id = ? AND note = 'No ice'", orderId)) === 2);
+
+  // Dark till: a station setting, off by default.
+  check("the till isn't dark unless the station says so", !(await t.evaluate(() => "tillDark" in document.documentElement.dataset)));
+  await t.evaluate(() => localStorage.setItem("victoria-station", JSON.stringify({ counter: "bar", printLayout: "none", autoPrint: false, tillDark: true })));
+  await go(t, "/app/sales");
+  await t.waitForSelector("[data-pay]");
+  check("dark till when the station says so", await t.evaluate(() => "tillDark" in document.documentElement.dataset));
+  await go(t, "/app/sales/orders");
+  check("and only on the till", !(await t.evaluate(() => "tillDark" in document.documentElement.dataset || "tillFull" in document.documentElement.dataset)));
+  await t.evaluate(() => localStorage.removeItem("victoria-station"));
+  await c8.close();
+}
+
 await finish();

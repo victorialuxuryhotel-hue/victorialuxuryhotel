@@ -9,12 +9,14 @@ export type StationSettings = {
   printLayout: PrintLayout;
   /** Print the receipt as soon as a payment is recorded (once per receipt). */
   autoPrint: boolean;
+  /** Till in dark colours, for a dim bar at night (interface brief I8). Off unless chosen. */
+  tillDark: boolean;
 };
 
 export const STATION_KEY = "victoria-station";
 
 /** Defaults: A4 and no automatic printing (front desk, laptops). The bar sets 80mm, which turns auto-print on. */
-export const stationDefaults: StationSettings = { counter: null, printLayout: "a4", autoPrint: false };
+export const stationDefaults: StationSettings = { counter: null, printLayout: "a4", autoPrint: false, tillDark: false };
 
 /** Reads saved settings, ignoring anything unrecognised. Auto-print defaults to on for 80mm unless it was switched off. */
 export function parseStation(raw: string | null): StationSettings {
@@ -26,6 +28,7 @@ export function parseStation(raw: string | null): StationSettings {
       counter: v.counter === "restaurant" || v.counter === "bar" ? v.counter : null,
       printLayout,
       autoPrint: printLayout === "none" ? false : typeof v.autoPrint === "boolean" ? v.autoPrint : printLayout === "80mm",
+      tillDark: v.tillDark === true,
     };
   } catch {
     return stationDefaults;

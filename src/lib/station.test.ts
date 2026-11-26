@@ -3,7 +3,9 @@ import { parseStation, shouldAutoPrint, stationDefaults } from "./station";
 
 describe("station settings", () => {
   it("defaults to A4 with no automatic printing", () => {
-    expect(parseStation(null)).toEqual({ counter: null, printLayout: "a4", autoPrint: false });
+    expect(parseStation(null)).toEqual({ counter: null, printLayout: "a4", autoPrint: false, tillDark: false });
+    expect(parseStation(JSON.stringify({ tillDark: true })).tillDark).toBe(true);
+    expect(parseStation(JSON.stringify({ tillDark: "yes" })).tillDark).toBe(false);
     expect(parseStation("not json")).toEqual(stationDefaults);
     expect(parseStation(JSON.stringify({ printLayout: "letter", counter: "kitchen" }))).toEqual(stationDefaults);
   });

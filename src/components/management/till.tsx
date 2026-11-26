@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { CheckCircle2, Minus, Plus, Printer, Trash2 } from "lucide-react";
+import { CheckCircle2, MessageSquare, Minus, Plus, Printer, Repeat2, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormMessage, Input } from "@/components/ui/form";
 import { formatNaira } from "@/lib/format";
@@ -24,6 +24,20 @@ const chip = (on: boolean) =>
 const toKobo = (naira: string) => Math.round(Number(naira.replace(/[^\d.]/g, "")) * 100);
 
 type Step = "order" | "pay" | "done";
+
+// The cart is keyed by item and note: "Chapman" and "Chapman · No ice" are separate lines (I8).
+const SEP = "\u0001";
+const keyOf = (id: string, note = "") => `${id}${SEP}${note}`;
+const splitKey = (k: string) => {
+  const i = k.indexOf(SEP);
+  return i < 0 ? { id: k, note: "" } : { id: k.slice(0, i), note: k.slice(i + 1) };
+};
+const NOTE_CHIPS = ["No ice", "Cold", "Well done", "No pepper"];
+const toggleChip = (note: string, chip: string) => {
+  const parts = note.split(",").map((p) => p.trim()).filter(Boolean);
+  const next = parts.includes(chip) ? parts.filter((p) => p !== chip) : [...parts, chip];
+  return next.join(", ").slice(0, 60);
+};
 
 /** Quick table chips (configurable later). */
 const CANCEL_REASONS = ["Customer left", "Wrong item", "Duplicate order"];
@@ -68,19 +82,21 @@ function parseDraft(raw: string | null, menu: MenuItem[]) {
   try {
     const d = JSON.parse(raw) as Draft;
     if (Date.now() - d.at > 12 * 3_600_000) return null;
-    const cart = Object.fromEntries(Object.entries(d.cart).filter(([id, q]) => q > 0 && menu.some((m) => m.id === id)));
-    const ids = Object.keys(cart);
-    if (!ids.length) return null;
-    const count = ids.reduce((n, id) => n + cart[id]!, 0);
-    const totalKobo = ids.reduce((t, id) => t + cart[id]! * (menu.find((m) => m.id === id)?.price_kobo ?? 0), 0);
+    const cart = Object.fromEntries(Object.entries(d.cart).filter(([k, q]) => q > 0 && menu.some((m) => m.id === splitKey(k).id)));
+    const keys = Object.keys(cart);
+    if (!keys.length) return null;
+    const count = keys.reduce((n, k) => n + cart[k]!, 0);
+    const totalKobo = keys.reduce((t, k) => t + cart[k]! * (menu.find((m) => m.id === splitKey(k).id)?.price_kobo ?? 0), 0);
     return { ...d, cart, count, totalKobo };
   } catch {
     return null;
   }
 }
 
-export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] }, staffId = "" }: {
+export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] }, staffId = "", fullScreenRole = false }: {
   menu: MenuItem[]; open: OpenOrder[]; attendant: string; vatRateBp: number; taxId?: string | null; startOutlet?: Outlet; resume?: string;
+  /** Restaurant & bar staff get the full-screen till on any computer; others on a station set to a counter (I8). */
+  fullScreenRole?: boolean;
   /** Each counter's best sellers, shown as a quick row above the menu. */
   favourites?: Record<Outlet, string[]>;
   /** Drafts are kept per staff member: the next person to sign in doesn't see someone else's order. */
@@ -94,7 +110,10 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   const [outletChoice, setOutlet] = useState<Outlet | null>(resumeOrder?.outlet ?? null);
   const outlet: Outlet = outletChoice ?? station.counter ?? startOutlet;
   const [category, setCategory] = useState<MenuCategory | "all">("all");
-  const [cart, setCart] = useState<Record<string, number>>(() => Object.fromEntries((resumeOrder?.lines ?? []).map((l) => [l.menuItemId, l.quantity])));
+  const [cart, setCart] = useState<Record<string, number>>(() => Object.fromEntries((resumeOrder?.lines ?? []).map((l) => [keyOf(l.menuItemId, l.note ?? ""), l.quantity])));
+  const [noteFor, setNoteFor] = useState<string | null>(null);
+  const [find, setFind] = useState("");
+  const [skipped, setSkipped] = useState<string | null>(null);
   const [note, setNote] = useState(resumeOrder?.note ?? "");
   const [editing, setEditing] = useState<{ id: string; number: number } | null>(resumeOrder ? { id: resumeOrder.id, number: resumeOrder.number } : null);
   const [step, setStep] = useState<Step>("order");
@@ -117,11 +136,20 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
 
   const items = menu.filter((m) => m.outlet === outlet && m.is_active);
   const categories = [...new Set(items.map((m) => m.category))];
-  const shown = items.filter((m) => category === "all" || m.category === category);
+  const finding = find.trim().toLowerCase();
+  const shown = finding ? items.filter((m) => m.name.toLowerCase().includes(finding)) : items.filter((m) => category === "all" || m.category === category);
   const lines = useMemo(
-    () => Object.entries(cart).map(([id, q]) => ({ item: menu.find((m) => m.id === id)!, q })).filter((l) => l.item && l.q > 0),
+    () =>
+      Object.entries(cart)
+        .map(([key, q]) => {
+          const { id, note } = splitKey(key);
+          return { key, item: menu.find((m) => m.id === id)!, note, q };
+        })
+        .filter((l) => l.item && l.q > 0),
     [cart, menu],
   );
+  /** How many of an item are in the order, across its lines (one stock limit for all of them). */
+  const itemQty = (c: Record<string, number>, id: string) => Object.entries(c).reduce((n, [k, q]) => (splitKey(k).id === id ? n + q : n), 0);
   const total = lines.reduce((s, l) => s + l.item.price_kobo * l.q, 0);
   const count = lines.reduce((s, l) => s + l.q, 0);
   const givenKobo = given ? toKobo(given) : null;
@@ -132,6 +160,8 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
     orderId.current = "";
     setCart({});
     setNote("");
+    setNoteFor(null);
+    setSkipped(null);
     setEditing(null);
     setGiven("");
     setMethod("cash");
@@ -145,15 +175,55 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
     if (step === "done") {
       setReceipt(null);
       reset();
-      setCart({ [m.id]: Math.max(0, Math.min(maxFor(m), d)) });
+      setCart({ [keyOf(m.id)]: Math.max(0, Math.min(maxFor(m), d)) });
       return;
     }
-    setCart((c) => ({ ...c, [m.id]: Math.max(0, Math.min(maxFor(m), (c[m.id] ?? 0) + d)) }));
+    changeLine(keyOf(m.id), m, d);
+  };
+  /** Change one line by d, within the item's stock across all its lines. */
+  const changeLine = (key: string, m: MenuItem, d: number) =>
+    setCart((c) => {
+      const cur = c[key] ?? 0;
+      const room = maxFor(m) - (itemQty(c, m.id) - cur);
+      return { ...c, [key]: Math.max(0, Math.min(room, cur + d)) };
+    });
+  /** Move a line to a new note (merging with a line that already has it). */
+  const setLineNote = (key: string, note: string) => {
+    const { id } = splitKey(key);
+    const next = keyOf(id, note.slice(0, 60));
+    if (next === key) return;
+    setCart((c) => {
+      const { [key]: q = 0, ...rest } = c;
+      return { ...rest, [next]: (rest[next] ?? 0) + q };
+    });
+    setNoteFor(next);
+  };
+  const editingOrder = editing ? open.find((o) => o.id === editing.id) : undefined;
+  /** "Same again": the lines added at the order's last save, again, at today's menu prices. */
+  const sameAgain = () => {
+    if (!editingOrder) return;
+    const missed: string[] = [];
+    setCart((c) => {
+      const next = { ...c };
+      for (const l of editingOrder.lastRound) {
+        const m = menu.find((x) => x.id === l.menuItemId && x.is_active && x.is_available && x.stock_left !== 0);
+        if (!m) {
+          missed.push(menu.find((x) => x.id === l.menuItemId)?.name ?? "An item");
+          continue;
+        }
+        const k = keyOf(m.id, l.note ?? "");
+        const room = maxFor(m) - itemQty(next, m.id);
+        if (room < l.quantity) missed.push(m.name);
+        next[k] = (next[k] ?? 0) + Math.max(0, Math.min(room, l.quantity));
+      }
+      return next;
+    });
+    setSkipped(missed.length ? `Not added (unavailable or not enough stock): ${[...new Set(missed)].join(", ")}.` : null);
   };
   const favs = (favourites[outlet] ?? []).map((id) => items.find((m) => m.id === id)).filter((m): m is MenuItem => Boolean(m));
   const q = search.trim().toLowerCase();
   const openShown = q ? open.filter((o) => `#${o.number} ${o.note ?? ""} ${o.items}`.toLowerCase().includes(q)) : open;
-  const linesJson = JSON.stringify(lines.map((l) => ({ menuItemId: l.item.id, quantity: l.q })));
+  const linesJson = JSON.stringify(lines.map((l) => ({ menuItemId: l.item.id, quantity: l.q, note: l.note || null })));
 
   // A refresh, a UPS changeover or a power cut mustn't lose the order being taken: a copy of the
   // current order is kept in this browser, and after a reload the till offers to bring it back.
@@ -180,6 +250,19 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
     setEditing(draft.editing && open.some((o) => o.id === draft.editing!.id) ? draft.editing : null);
     orderId.current = draft.orderId;
   };
+
+  // Full-screen till on the bar station or for restaurant & bar staff; dark colours if the station says so (I8).
+  const fullScreen = fullScreenRole || station.counter != null;
+  const dark = fullScreen && station.tillDark;
+  useEffect(() => {
+    const html = document.documentElement;
+    if (fullScreen) html.dataset.tillFull = "";
+    if (dark) html.dataset.tillDark = "";
+    return () => {
+      delete html.dataset.tillFull;
+      delete html.dataset.tillDark;
+    };
+  }, [fullScreen, dark]);
 
   // Auto-print (station setting): once per receipt, after the print copy is on the page.
   const printed = useRef(new Set<string>());
@@ -211,7 +294,9 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   const resumeOpen = (o: OpenOrder) => {
     setOutlet(o.outlet);
     setCategory("all");
-    setCart(Object.fromEntries(o.lines.map((l) => [l.menuItemId, l.quantity])));
+    setCart(Object.fromEntries(o.lines.map((l) => [keyOf(l.menuItemId, l.note ?? ""), l.quantity])));
+    setNoteFor(null);
+    setSkipped(null);
     setNote(o.note ?? "");
     setEditing({ id: o.id, number: o.number });
     orderId.current = o.id;
@@ -258,7 +343,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               stampId(e);
               snapshot.current = {
                 outlet, receiptNumber: "", orderNumber: 0, paidAt: "", attendant, vatRateBp, taxId,
-                lines: lines.map((l) => ({ name: l.item.name, quantity: l.q, unitKobo: l.item.price_kobo })),
+                lines: lines.map((l) => ({ name: l.item.name, quantity: l.q, unitKobo: l.item.price_kobo, note: l.note || null })),
                 totalKobo: total, method, cashReceivedKobo: method === "cash" ? givenKobo : null, reference: method === "cash" ? null : transferRef.trim() || null,
               };
             }}
@@ -367,12 +452,18 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               </button>
             ))}
           </div>
-          {favs.length && category === "all" ? (
+          <label className="relative block">
+            <span className="sr-only">Find an item</span>
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+            {/* type=search: the touch keyboard opens on the bar terminal. */}
+            <Input type="search" inputMode="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find an item" data-till-search="" className="h-11 pl-9" />
+          </label>
+          {favs.length && category === "all" && !finding ? (
             <div>
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-ink-500">Best sellers</p>
               <div className="flex flex-wrap gap-2">
                 {favs.map((m) => {
-                  const off = !m.is_available || m.stock_left === 0 || (cart[m.id] ?? 0) >= maxFor(m);
+                  const off = !m.is_available || m.stock_left === 0 || itemQty(cart, m.id) >= maxFor(m);
                   return (
                     <button key={m.id} type="button" disabled={off} onClick={() => add(m, 1)} className={cn(chip(false), "gap-2 rounded-md px-3 disabled:opacity-40")}>
                       {m.name} <span className="tabular-nums text-ink-500">{formatNaira(m.price_kobo)}</span>
@@ -382,7 +473,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               </div>
             </div>
           ) : null}
-          {categories.length > 1 ? (
+          {categories.length > 1 && !finding ? (
             <nav aria-label="Category" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
               <button type="button" aria-pressed={category === "all"} onClick={() => setCategory("all")} className={chip(category === "all")}>All</button>
               {categories.map((c) => (
@@ -395,7 +486,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               {shown.map((m) => {
                 const out = m.stock_left === 0;
                 const off = !m.is_available || out;
-                const inCart = cart[m.id] ?? 0;
+                const inCart = itemQty(cart, m.id);
                 const full = inCart >= maxFor(m);
                 return (
                   <li key={m.id}>
@@ -418,8 +509,10 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
                         <span className="mt-1 text-xs font-medium text-ink-600">Unavailable today</span>
                       ) : out ? (
                         <span className="mt-1 text-xs font-medium text-danger-700">Out of stock</span>
-                      ) : m.stock_left != null && m.stock_left <= 5 ? (
-                        <span className="mt-1 text-xs text-warning-700">{m.stock_left} left</span>
+                      ) : m.stock_left == null ? (
+                        <span className="mt-1 text-xs text-ink-500">Made to order</span>
+                      ) : m.low ? (
+                        <span className="mt-1 text-xs font-medium text-warning-700">{m.stock_left} left</span>
                       ) : null}
                     </button>
                   </li>
@@ -427,7 +520,9 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               })}
             </ul>
           ) : (
-            <p className="rounded-md border border-dashed border-hairline p-6 text-sm text-ink-500">No {OUTLETS[outlet].toLowerCase()} items on the menu yet. A manager adds them under Menu.</p>
+            <p className="rounded-md border border-dashed border-hairline p-6 text-sm text-ink-500">
+              {finding ? `Nothing on the ${OUTLETS[outlet].toLowerCase()} menu matches “${find.trim()}”.` : `No ${OUTLETS[outlet].toLowerCase()} items on the menu yet. A manager adds them under Menu.`}
+            </p>
           )}
           {open.length ? (
             // Below 1280px the unpaid orders sit under the menu, so the menu comes first.
@@ -487,21 +582,54 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
           {payState && !payState.ok ? <FormMessage>{payState.message}</FormMessage> : null}
           {saveState?.ok && !lines.length ? <FormMessage tone="success">Order #{saveState.data.number} saved as unpaid.</FormMessage> : null}
 
+          {editingOrder?.lastRound.length && step === "order" ? (
+            <Button variant="secondary" size="sm" onClick={sameAgain} className="w-full" data-same-again="">
+              <Repeat2 className="size-4" aria-hidden /> Same again ({editingOrder.lastRound.map((l) => `${l.quantity} × ${menu.find((m) => m.id === l.menuItemId)?.name ?? "item"}`).join(", ")})
+            </Button>
+          ) : null}
+          {skipped ? <FormMessage>{skipped}</FormMessage> : null}
           {lines.length ? (
             <ul className="divide-y divide-hairline">
               {lines.map((l) => (
-                <li key={l.item.id} className="py-2">
+                <li key={l.key} className="py-2" data-line={l.item.name}>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="min-w-0 text-[15px] text-ink-900">{l.item.name}</span>
+                    {/* Tap the name for a note ("No ice"), printed under the item on the receipt. */}
+                    <button type="button" onClick={() => setNoteFor(noteFor === l.key ? null : l.key)} aria-expanded={noteFor === l.key} className="min-w-0 text-left text-[15px] text-ink-900">
+                      {l.item.name}
+                      {l.note ? <span className="block text-xs text-gold-700 italic">{l.note}</span> : null}
+                    </button>
                     <span className="shrink-0 text-[15px] tabular-nums text-ink-900">{formatNaira(l.item.price_kobo * l.q)}</span>
                   </div>
                   <div className="mt-1 flex items-center gap-1">
-                    <span className="mr-auto text-xs tabular-nums text-ink-500">{formatNaira(l.item.price_kobo)} each</span>
-                    <button type="button" aria-label={`Remove ${l.item.name}`} onClick={() => add(l.item, -l.q)} className="flex size-10 items-center justify-center rounded pointer-coarse:size-12 text-ink-500 hover:bg-ink-900/5"><Trash2 className="size-4" /></button>
-                    <button type="button" aria-label={`One less ${l.item.name}`} onClick={() => add(l.item, -1)} className="flex size-10 items-center justify-center rounded pointer-coarse:size-12 border border-hairline text-navy-700"><Minus className="size-4" /></button>
+                    <button type="button" onClick={() => setNoteFor(noteFor === l.key ? null : l.key)} className="mr-auto inline-flex min-h-10 items-center gap-1 text-xs text-ink-500 hover:text-ink-900">
+                      <MessageSquare className="size-3.5" aria-hidden /> {l.note ? "Note" : "Add note"} · {formatNaira(l.item.price_kobo)} each
+                    </button>
+                    <button type="button" aria-label={`Remove ${l.item.name}`} onClick={() => changeLine(l.key, l.item, -l.q)} className="flex size-10 items-center justify-center rounded pointer-coarse:size-12 text-ink-500 hover:bg-ink-900/5"><Trash2 className="size-4" /></button>
+                    <button type="button" aria-label={`One less ${l.item.name}`} onClick={() => changeLine(l.key, l.item, -1)} className="flex size-10 items-center justify-center rounded pointer-coarse:size-12 border border-hairline text-navy-700"><Minus className="size-4" /></button>
                     <span className="w-8 text-center text-base font-semibold tabular-nums" aria-live="polite">{l.q}</span>
-                    <button type="button" aria-label={`One more ${l.item.name}`} disabled={l.q >= maxFor(l.item)} onClick={() => add(l.item, 1)} className="flex size-10 items-center justify-center rounded pointer-coarse:size-12 border border-hairline text-navy-700 disabled:opacity-40"><Plus className="size-4" /></button>
+                    <button type="button" aria-label={`One more ${l.item.name}`} disabled={itemQty(cart, l.item.id) >= maxFor(l.item)} onClick={() => changeLine(l.key, l.item, 1)} className="flex size-10 items-center justify-center rounded pointer-coarse:size-12 border border-hairline text-navy-700 disabled:opacity-40"><Plus className="size-4" /></button>
                   </div>
+                  {noteFor === l.key ? (
+                    <div className="mt-2 space-y-2 rounded-md bg-ivory-100 p-2" data-note-editor="">
+                      <div className="flex flex-wrap gap-1.5">
+                        {NOTE_CHIPS.map((c) => {
+                          const on = l.note.split(",").map((p) => p.trim()).includes(c);
+                          return <button key={c} type="button" aria-pressed={on} onClick={() => setLineNote(l.key, toggleChip(l.note, c))} className={cn(chip(on), "min-h-10 px-3 text-xs pointer-coarse:min-h-11")}>{c}</button>;
+                        })}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={l.note}
+                          onChange={(e) => setLineNote(l.key, e.target.value.replace(/\s+/g, " ").trimStart())}
+                          placeholder="Or type a note"
+                          aria-label={`Note for ${l.item.name}`}
+                          maxLength={60}
+                          className="h-10 min-w-0 flex-1 text-sm"
+                        />
+                        <Button size="sm" variant="secondary" onClick={() => setNoteFor(null)}>Done</Button>
+                      </div>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -526,8 +654,13 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
                 </div>
                 <Input value={note} onChange={(e) => setNote(e.target.value.slice(0, 120))} placeholder="Or a name" aria-label="Table or customer" />
               </div>
-              <div className="grid gap-2">
-                <Button size="lg" disabled={!lines.length || !online} title={online ? undefined : OFFLINE_REASON} onClick={() => setStep("pay")}>Take payment</Button>
+              {/* Pinned to the bottom of the order panel, so Pay is always on screen however long the order is. */}
+              <div className="sticky bottom-0 -mx-5 -mb-5 grid gap-2 border-t border-hairline bg-ivory-50 px-5 pt-3 pb-5">
+                {/* The biggest thing on the till (I8): full width, 56px+, total in large type. */}
+                <Button size="lg" disabled={!lines.length || !online} title={online ? undefined : OFFLINE_REASON} onClick={() => setStep("pay")} className="h-16 w-full justify-between px-5 text-lg" data-pay="">
+                  <span>Take payment</span>
+                  <span className="font-display text-2xl tabular-nums">{formatNaira(total)}</span>
+                </Button>
                 <form action={saveAction} onSubmit={stampId}>
                   <input type="hidden" name="id" defaultValue="" />
                   <input type="hidden" name="outlet" value={outlet} />
@@ -543,7 +676,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               <div className="grid grid-cols-[auto_1fr] gap-2">
                 {/* Back and Confirm stay with the order; the payment details are in the wide column (form="till-pay"). */}
                 <Button type="button" variant="secondary" size="lg" onClick={() => setStep("order")}>Back</Button>
-                <Button type="submit" form="till-pay" size="lg" pending={paying} title={online ? undefined : OFFLINE_REASON} disabled={!online || !lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && (transferRef.trim().length < 3 || !transferChecked)) || (method === "pos_terminal" && !/^\d{4}$/.test(transferRef))}>
+                <Button type="submit" form="till-pay" size="lg" className="h-16 text-lg" pending={paying} title={online ? undefined : OFFLINE_REASON} disabled={!online || !lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && (transferRef.trim().length < 3 || !transferChecked)) || (method === "pos_terminal" && !/^\d{4}$/.test(transferRef))}>
                   Confirm {formatNaira(total)} paid
                 </Button>
               </div>

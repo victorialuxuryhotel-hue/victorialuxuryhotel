@@ -63,6 +63,13 @@ export function StationSettingsForm() {
           <span className="block text-xs text-ink-500">Once per receipt. With Chrome&apos;s kiosk printing it prints without a dialog.</span>
         </span>
       </label>
+      <label className={choice(s.tillDark)}>
+        <input type="checkbox" checked={s.tillDark} onChange={(e) => set({ tillDark: e.target.checked })} className="mt-0.5 size-5 shrink-0 accent-navy-800" />
+        <span>
+          <span className="block text-[15px] text-ink-900">Dark till</span>
+          <span className="block text-xs text-ink-500">Light text on a dark screen, for a dim bar at night. Pay stays the brightest button.</span>
+        </span>
+      </label>
       <p className="text-xs text-ink-500">These settings are for this computer only, saved in this browser. Each computer is set up once.</p>
     </div>
   );

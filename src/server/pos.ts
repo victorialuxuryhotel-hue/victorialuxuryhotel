@@ -11,7 +11,7 @@ import * as pos from "./domain/pos";
 
 const outlet = z.enum(["restaurant", "bar"]);
 const method = z.enum(["cash", "bank_transfer", "pos_terminal"], "Choose how the customer paid");
-const lines = z.array(z.object({ menuItemId: recordId(), quantity: z.number().int().min(1).max(99) })).min(1, "Add at least one item").max(50);
+const lines = z.array(z.object({ menuItemId: recordId(), quantity: z.number().int().min(1).max(99), note: z.string().max(60).nullish() })).min(1, "Add at least one item").max(50);
 const naira = z.coerce.number().min(0).max(100_000_000).transform((n) => Math.round(n * 100));
 const fail = (err: unknown, event: string) => {
   if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error(event, err);

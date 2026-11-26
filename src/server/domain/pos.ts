@@ -40,7 +40,11 @@ const dayStart = (d: string) => businessDayStart(d);
 
 export type MenuItem = {
   id: string; name: string; outlet: Outlet; category: MenuCategory; price_kobo: number; is_active: number; is_available: number;
-  stock_left: number | null; links: { stockItemId: string; name: string; unit: string; quantity: number }[];
+  /** How many can be sold from stock; null = made to order (no stock tracked). */
+  stock_left: number | null;
+  /** A stock item behind it is at or below its reorder level (the till shows "N left"). */
+  low: boolean;
+  links: { stockItemId: string; name: string; unit: string; quantity: number }[];
 };
 
 export async function listMenu(db: Db, actor: Actor, opts: { includeInactive?: boolean } = {}): Promise<MenuItem[]> {
@@ -51,9 +55,9 @@ export async function listMenu(db: Db, actor: Actor, opts: { includeInactive?: b
       `SELECT id, name, outlet, category, price_kobo, is_active, is_available FROM menu_items
        ${opts.includeInactive ? "" : "WHERE is_active = 1"} ORDER BY outlet, is_active DESC, sort_order, name`,
     ),
-    all<{ menu_item_id: string; stock_item_id: string; name: string; unit: string; quantity: number; on_hand: number }>(
+    all<{ menu_item_id: string; stock_item_id: string; name: string; unit: string; quantity: number; on_hand: number; min_quantity: number }>(
       db,
-      `SELECT l.menu_item_id, l.stock_item_id, s.name, s.unit, l.quantity, s.quantity AS on_hand
+      `SELECT l.menu_item_id, l.stock_item_id, s.name, s.unit, l.quantity, s.quantity AS on_hand, s.min_quantity
        FROM menu_item_stock l JOIN stock_items s ON s.id = l.stock_item_id ORDER BY s.name`,
     ),
   ]);
@@ -63,6 +67,7 @@ export async function listMenu(db: Db, actor: Actor, opts: { includeInactive?: b
       ...m,
       links: mine.map((l) => ({ stockItemId: l.stock_item_id, name: l.name, unit: l.unit, quantity: l.quantity })),
       stock_left: mine.length ? Math.min(...mine.map((l) => Math.floor(l.on_hand / l.quantity))) : null,
+      low: mine.some((l) => l.on_hand <= l.min_quantity),
     };
   });
 }
@@ -132,32 +137,44 @@ export async function setMenuItemStock(db: Db, actor: Actor, menuItemId: string,
 // Orders
 // ---------------------------------------------------------------------------
 
-export type OrderLine = { menuItemId: string; quantity: number };
+/** One line of an order. The same item with a different note ("No ice") is a separate line. */
+export type OrderLine = { menuItemId: string; quantity: number; note?: string | null };
 
-type Priced = { menuItemId: string; name: string; category: MenuCategory; unitKobo: number; quantity: number };
+type Priced = { menuItemId: string; name: string; category: MenuCategory; unitKobo: number; quantity: number; note: string | null };
+
+const cleanNote = (n: string | null | undefined) => n?.trim().replace(/\s+/g, " ").slice(0, 60) || null;
+const lineKey = (l: { menuItemId: string; note?: string | null }) => `${l.menuItemId}\u0001${cleanNote(l.note) ?? ""}`;
 
 async function price(db: Db, outlet: Outlet, lines: OrderLine[]): Promise<{ priced: Priced[]; totalKobo: number }> {
   if (!lines.length) throw new AppError("VALIDATION", "Add at least one item.");
   if (lines.length > 50) throw new AppError("VALIDATION", "That's too many lines for one order.");
-  const merged = new Map<string, number>();
+  // Same item and same note: one line. Same item, different notes: separate lines.
+  const merged = new Map<string, { menuItemId: string; note: string | null; quantity: number }>();
+  const perItem = new Map<string, number>();
   for (const l of lines) {
     if (!Number.isInteger(l.quantity) || l.quantity < 1) throw new AppError("VALIDATION", "Quantities must be whole numbers from 1.");
-    merged.set(l.menuItemId, (merged.get(l.menuItemId) ?? 0) + l.quantity);
+    const k = lineKey(l);
+    const m = merged.get(k) ?? { menuItemId: l.menuItemId, note: cleanNote(l.note), quantity: 0 };
+    m.quantity += l.quantity;
+    merged.set(k, m);
+    perItem.set(l.menuItemId, (perItem.get(l.menuItemId) ?? 0) + l.quantity);
   }
-  const ids = [...merged.keys()];
+  const ids = [...perItem.keys()];
   const menu = await all<{ id: string; name: string; outlet: Outlet; category: MenuCategory; price_kobo: number; is_active: number; is_available: number }>(
     db,
     `SELECT id, name, outlet, category, price_kobo, is_active, is_available FROM menu_items WHERE id IN (${ids.map(() => "?").join(",")})`,
     ...ids,
   );
-  const priced = ids.map((id) => {
+  for (const id of ids) {
     const m = menu.find((x) => x.id === id);
     if (!m || !m.is_active) throw new AppError("VALIDATION", "An item is no longer on the menu. Remove it and try again.");
     if (!m.is_available) throw new AppError("VALIDATION", `${m.name} is unavailable today.`);
     if (m.outlet !== outlet) throw new AppError("VALIDATION", `${m.name} is on the ${OUTLETS[m.outlet].toLowerCase()} menu.`);
-    const quantity = merged.get(id)!;
-    if (quantity > 99) throw new AppError("VALIDATION", `At most 99 × ${m.name} in one order.`);
-    return { menuItemId: id, name: m.name, category: m.category, unitKobo: m.price_kobo, quantity };
+    if (perItem.get(id)! > 99) throw new AppError("VALIDATION", `At most 99 × ${m.name} in one order.`);
+  }
+  const priced = [...merged.values()].map((l) => {
+    const m = menu.find((x) => x.id === l.menuItemId)!;
+    return { menuItemId: l.menuItemId, name: m.name, category: m.category, unitKobo: m.price_kobo, quantity: l.quantity, note: l.note };
   });
   return { priced, totalKobo: priced.reduce((s, p) => s + p.unitKobo * p.quantity, 0) };
 }
@@ -172,8 +189,11 @@ async function checkStock(db: Db, lines: { menuItemId: string; quantity: number 
     ...lines.map((l) => l.menuItemId),
   );
   const total = new Map<string, { name: string; unit: string; on_hand: number; need: number }>();
+  // An item can be on several lines (different notes): count them all.
+  const qtyOf = new Map<string, number>();
+  for (const l of lines) qtyOf.set(l.menuItemId, (qtyOf.get(l.menuItemId) ?? 0) + l.quantity);
   for (const n of need) {
-    const qty = lines.find((l) => l.menuItemId === n.menu_item_id)!.quantity;
+    const qty = qtyOf.get(n.menu_item_id)!;
     const t = total.get(n.stock_item_id) ?? { name: n.name, unit: n.unit, on_hand: n.on_hand, need: 0 };
     t.need += n.per * qty;
     total.set(n.stock_item_id, t);
@@ -199,8 +219,8 @@ const orderInsert = (db: Db, id: string, outlet: Outlet, totalKobo: number, note
 const lineInserts = (db: Db, id: string, priced: Priced[]) =>
   priced.map((p, i) =>
     db
-      .prepare("INSERT INTO pos_order_items (order_id, line, menu_item_id, name, category, unit_price_kobo, quantity) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .bind(id, i + 1, p.menuItemId, p.name, p.category, p.unitKobo, p.quantity),
+      .prepare("INSERT INTO pos_order_items (order_id, line, menu_item_id, name, category, unit_price_kobo, quantity, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(id, i + 1, p.menuItemId, p.name, p.category, p.unitKobo, p.quantity, p.note),
   );
 
 function payStatements(db: Db, id: string, staffId: string, method: PayMethod, totalKobo: number, cashReceivedKobo: number | null, paymentReference: string | null) {
@@ -248,6 +268,20 @@ async function orderState(db: Db, id: string) {
   return first<{ status: OrderStatus; outlet: Outlet; total_kobo: number }>(db, "SELECT status, outlet, total_kobo FROM pos_orders WHERE id = ?", id);
 }
 
+/** The lines added since the order was last saved: "Same again" repeats them. */
+export function addedLines(before: OrderLine[], after: OrderLine[]): OrderLine[] {
+  const had = new Map<string, number>();
+  for (const l of before) had.set(lineKey(l), (had.get(lineKey(l)) ?? 0) + l.quantity);
+  const out: OrderLine[] = [];
+  for (const l of after) {
+    const k = lineKey(l);
+    const extra = l.quantity - (had.get(k) ?? 0);
+    had.set(k, Math.max(0, (had.get(k) ?? 0) - l.quantity));
+    if (extra > 0) out.push({ menuItemId: l.menuItemId, quantity: extra, note: cleanNote(l.note) });
+  }
+  return out;
+}
+
 const replaceLines = (db: Db, id: string, priced: Priced[], totalKobo: number, note: string | null) => [
   db.prepare("DELETE FROM pos_order_items WHERE order_id = ?").bind(id),
   ...lineInserts(db, id, priced),
@@ -275,7 +309,12 @@ export async function saveOrder(
     if (cur.status === "paid") throw new AppError("CONFLICT", "This order is already paid.");
     if (cur.status !== "open") throw new AppError("INVALID_TRANSITION", "This order was cancelled.");
     if (cur.outlet !== v.outlet) throw new AppError("VALIDATION", "An order stays with the counter it was opened at.");
-    await writeBatch(db, actor, replaceLines(db, v.id, priced, totalKobo, note)).catch((err) => payFailed(db, err, priced));
+    const before = await all<OrderLine>(db, "SELECT menu_item_id AS menuItemId, quantity, note FROM pos_order_items WHERE order_id = ?", v.id);
+    const round = addedLines(before, priced);
+    await writeBatch(db, actor, [
+      ...replaceLines(db, v.id, priced, totalKobo, note),
+      ...(round.length ? [db.prepare("UPDATE pos_orders SET last_round = ? WHERE id = ? AND status = 'open'").bind(JSON.stringify(round), v.id)] : []),
+    ]).catch((err) => payFailed(db, err, priced));
   };
   if (await orderState(db, v.id)) await update();
   else {
@@ -283,6 +322,7 @@ export async function saveOrder(
       await writeBatch(db, actor, [
         ...orderInsert(db, v.id, v.outlet, totalKobo, note, actor.id),
         ...lineInserts(db, v.id, priced),
+        db.prepare("UPDATE pos_orders SET last_round = ? WHERE id = ?").bind(JSON.stringify(addedLines([], priced)), v.id),
         activity(db, "pos.order_opened", "pos_order", v.id, `${OUTLETS[v.outlet]} order opened: ${naira(totalKobo)} (unpaid)`),
       ]);
     } catch (err) {
@@ -423,7 +463,7 @@ export type OrderRow = {
 
 const ORDER_SELECT = `SELECT o.id, o.number, o.outlet, o.status, o.total_kobo, o.method, o.payment_reference, o.receipt_number, o.note, o.created_at, o.paid_at,
   p.full_name AS taken_by, c.full_name AS created_by_name,
-  (SELECT group_concat(i.quantity || ' × ' || i.name, ', ') FROM pos_order_items i WHERE i.order_id = o.id) AS items
+  (SELECT group_concat(i.quantity || ' × ' || i.name || coalesce(' (' || i.note || ')', ''), ', ') FROM pos_order_items i WHERE i.order_id = o.id) AS items
   FROM pos_orders o LEFT JOIN staff_profiles p ON p.id = o.paid_by LEFT JOIN staff_profiles c ON c.id = o.created_by`;
 
 const sees = (actor: NonNullable<Actor>) => (POS_VIEWERS as readonly StaffRole[]).includes(actor.role);
@@ -448,18 +488,29 @@ export async function topSellers(db: Db, actor: Actor, days = 30, limit = 8): Pr
   return out;
 }
 
-export type OpenOrder = OrderRow & { lines: OrderLine[] };
+export type OpenOrder = OrderRow & { lines: OrderLine[]; lastRound: OrderLine[] };
 
 export async function openOrders(db: Db, actor: Actor): Promise<OpenOrder[]> {
   requireRole(actor, POS_SELLERS);
   const [orders, lines] = await Promise.all([
-    all<OrderRow>(db, `${ORDER_SELECT} WHERE o.status = 'open' ORDER BY o.created_at`),
-    all<{ order_id: string; menuItemId: string; quantity: number }>(
+    all<OrderRow & { last_round: string | null }>(db, `${ORDER_SELECT.replace("o.note, o.created_at", "o.note, o.last_round, o.created_at")} WHERE o.status = 'open' ORDER BY o.created_at`),
+    all<{ order_id: string; menuItemId: string; quantity: number; note: string | null }>(
       db,
-      "SELECT i.order_id, i.menu_item_id AS menuItemId, i.quantity FROM pos_order_items i JOIN pos_orders o ON o.id = i.order_id WHERE o.status = 'open' ORDER BY i.line",
+      "SELECT i.order_id, i.menu_item_id AS menuItemId, i.quantity, i.note FROM pos_order_items i JOIN pos_orders o ON o.id = i.order_id WHERE o.status = 'open' ORDER BY i.line",
     ),
   ]);
-  return orders.map((o) => ({ ...o, lines: lines.filter((l) => l.order_id === o.id).map(({ menuItemId, quantity }) => ({ menuItemId, quantity })) }));
+  const round = (json: string | null): OrderLine[] => {
+    try {
+      return json ? (JSON.parse(json) as OrderLine[]) : [];
+    } catch {
+      return [];
+    }
+  };
+  return orders.map(({ last_round, ...o }) => ({
+    ...o,
+    lines: lines.filter((l) => l.order_id === o.id).map(({ menuItemId, quantity, note }) => ({ menuItemId, quantity, note })),
+    lastRound: round(last_round),
+  }));
 }
 
 export type OrderFilter = { from: string; to: string; method?: PayMethod; status?: OrderStatus; staffId?: string; outlet?: Outlet; q?: string };
@@ -486,7 +537,7 @@ export async function listOrders(db: Db, actor: Actor, f: OrderFilter, limit = 2
 }
 
 export type OrderDetail = OrderRow & {
-  lines: { line: number; name: string; category: MenuCategory; unit_price_kobo: number; quantity: number }[];
+  lines: { line: number; name: string; category: MenuCategory; unit_price_kobo: number; quantity: number; note: string | null }[];
   cash_received_kobo: number | null; closed_by_name: string | null; closed_at: string | null; close_reason: string | null;
 };
 
@@ -503,7 +554,7 @@ export async function getOrder(db: Db, actor: Actor, id: string): Promise<OrderD
   );
   if (!o) return null;
   if (!sees(actor) && o.paid_by !== actor.id && o.created_by !== actor.id && o.status !== "open") return null;
-  const lines = await all<OrderDetail["lines"][number]>(db, "SELECT line, name, category, unit_price_kobo, quantity FROM pos_order_items WHERE order_id = ? ORDER BY line", id);
+  const lines = await all<OrderDetail["lines"][number]>(db, "SELECT line, name, category, unit_price_kobo, quantity, note FROM pos_order_items WHERE order_id = ? ORDER BY line", id);
   return { ...o, lines };
 }
 

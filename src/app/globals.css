@@ -111,6 +111,44 @@
 @media (prefers-reduced-motion: reduce) { .delayed-show { animation-duration: 1ms; } }
 
 /*
+ * The till (interface brief I8).
+ * - Full screen (bar station or restaurant & bar staff): no sidebar or bottom bars while the till
+ *   is open; the till page's own strip has the business day, who's signed in, Orders and Closing.
+ * - Dark till (station setting): the palette re-pointed while the till is open. Pay (navy-800 with
+ *   white text) becomes the brightest thing on the screen. Never applies to printing.
+ */
+html[data-till-full] [data-app-nav] { display: none !important; }
+@media screen {
+  html[data-till-dark] {
+    color-scheme: dark;
+    --color-ivory-50: #131b2f;
+    --color-ivory-100: #19233b;
+    --color-ivory-200: #233050;
+    --color-ink-300: #4b5672;
+    --color-ink-400: #8a93a8;
+    --color-ink-500: #a3abbd;
+    --color-ink-600: #bcc3d2;
+    --color-ink-700: #d6dbe5;
+    --color-ink-900: #f4f2ec;
+    --color-navy-50: #1f2f5c;
+    --color-navy-700: #9db2ff;
+    --color-navy-800: #3d6bff;
+    --color-navy-950: #f4f2ec;
+    --color-hairline: rgb(244 242 236 / 0.16);
+    --color-gold-50: #3a3016;
+    --color-gold-300: #8a6d22;
+    --color-success-50: #10301f;
+    --color-success-700: #6fdc9a;
+    --color-warning-50: #3a2a0c;
+    --color-warning-700: #f5b84a;
+    --color-danger-50: #3b1414;
+    --color-danger-700: #ff8a8a;
+  }
+  html[data-till-dark] body { background: var(--color-ivory-100); }
+  html[data-till-dark] .bg-white { background-color: var(--color-ivory-50); }
+}
+
+/*
  * Printing. Two printers in the hotel: an 80mm thermal roll (bar receipts) and A4 (guest bills,
  * room receipts, reports). docs/printing-and-kiosk.md has the Chrome and printer settings.
  * - Default pages are A4 with a small margin.

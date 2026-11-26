@@ -72,7 +72,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
               r={{
                 outlet: o.outlet, receiptNumber: o.receipt_number!, orderNumber: o.number, paidAt: o.paid_at!, totalKobo: o.total_kobo, method: o.method!,
                 cashReceivedKobo: o.cash_received_kobo, reference: o.payment_reference, attendant: o.taken_by ?? "staff", vatRateBp: settings?.vat_rate_bp ?? 0, taxId: settings?.tax_id ?? null,
-                lines: o.lines.map((l) => ({ name: l.name, quantity: l.quantity, unitKobo: l.unit_price_kobo })),
+                lines: o.lines.map((l) => ({ name: l.name, quantity: l.quantity, unitKobo: l.unit_price_kobo, note: l.note })),
                 voided: o.status === "void" ? { reason: o.close_reason ?? "", at: o.closed_at } : null,
                 copy: isReprint(o.paid_at, nowIso()),
               }}
@@ -84,7 +84,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
             <p className="text-sm font-medium text-ink-900">Items</p>
             <ul className="mt-2 divide-y divide-hairline text-sm">
               {o.lines.map((l) => (
-                <li key={l.line} className="flex justify-between gap-3 py-2"><span>{l.quantity} × {l.name}</span><span className="tabular-nums">{formatNaira(l.quantity * l.unit_price_kobo)}</span></li>
+                <li key={l.line} className="flex justify-between gap-3 py-2"><span>{l.quantity} × {l.name}{l.note ? <span className="block text-xs text-ink-500 italic">{l.note}</span> : null}</span><span className="tabular-nums">{formatNaira(l.quantity * l.unit_price_kobo)}</span></li>
               ))}
             </ul>
             <p className="mt-3 text-xs text-ink-500">A receipt is made when the order is paid.</p>

@@ -8,7 +8,7 @@ export type PosReceiptData = {
   receiptNumber: string;
   orderNumber: number;
   paidAt: string;
-  lines: { name: string; quantity: number; unitKobo: number }[];
+  lines: { name: string; quantity: number; unitKobo: number; note?: string | null }[];
   totalKobo: number;
   method: "cash" | "bank_transfer" | "pos_terminal";
   /** Transfer reference, or the last 4 digits of the POS slip. */
@@ -47,6 +47,7 @@ export function PosReceipt({ r, className, printable = true }: { r: PosReceiptDa
         {r.lines.map((l, i) => (
           <li key={i}>
             <p>{l.name}</p>
+            {l.note ? <p className="pl-2 text-xs italic">– {l.note}</p> : null}
             <p className={cn(row, "text-ink-700")}>
               <span>{l.quantity} × {formatNaira(l.unitKobo)}</span>
               <span className="tabular-nums text-ink-900">{formatNaira(l.quantity * l.unitKobo)}</span>

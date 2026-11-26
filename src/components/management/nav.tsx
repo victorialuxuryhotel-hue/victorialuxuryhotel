@@ -69,7 +69,7 @@ function Brand({ base }: { base: string }) {
 
 export function Sidebar({ footer, base = "/app", allowed }: NavProps) {
   return (
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-navy-950 py-6 lg:flex print:hidden">
+    <aside data-app-nav="" className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-navy-950 py-6 lg:flex print:hidden">
       <Brand base={base} />
       <div className="mt-8 min-h-0 flex-1 overflow-y-auto pb-4">
         <NavLinks base={base} allowed={allowed} />
@@ -90,7 +90,7 @@ export function MobileBar({ footer, base = "/app", allowed }: NavProps) {
   useDialog(open, close, panel, toggle);
 
   return (
-    <div className="sticky top-0 z-50 lg:hidden print:hidden">
+    <div data-app-nav="" className="sticky top-0 z-50 lg:hidden print:hidden">
       <div className="flex h-14 items-center justify-between bg-navy-950 pr-1.5">
         <Brand base={base} />
         <button

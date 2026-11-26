@@ -8,6 +8,7 @@ import {
   getOrder,
   listMenu,
   listOrders,
+  openOrders,
   payOrder,
   saveMenuItem,
   saveOrder,
@@ -141,6 +142,49 @@ describe("selling", () => {
     expect(await getOrder(db, a1, s2.id)).toBeNull();
     const all = await listOrders(db, mgr, { from: today, to: today, q: s2.receiptNumber });
     expect(all.map((o) => o.id)).toEqual([s2.id]);
+  });
+});
+
+describe("till improvements (I8)", () => {
+  it("a note keeps its own line, is stored and shows on the order; stock counts every line of the item", async () => {
+    const mgr = await staff("restaurant_bar_manager");
+    const bar = await staff("restaurant_bar");
+    const { itemId } = await drink(mgr, 3);
+    const id = crypto.randomUUID();
+    await saveOrder(db, bar, { id, outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }, { menuItemId: itemId, quantity: 1, note: " No  ice " }, { menuItemId: itemId, quantity: 1, note: "No ice" }] });
+    const lines = await q<{ quantity: number; note: string | null }>("SELECT quantity, note FROM pos_order_items WHERE order_id = ? ORDER BY line", id);
+    expect(lines).toEqual([{ quantity: 1, note: null }, { quantity: 2, note: "No ice" }]);
+    expect((await getOrder(db, bar, id))!.lines.map((l) => l.note)).toEqual([null, "No ice"]);
+    expect((await openOrders(db, bar)).find((o) => o.id === id)!.items).toMatch(/2 × Malt \w+ \(No ice\)/);
+    // 3 in stock: one more, on any line, is one too many.
+    await rejects(saveOrder(db, bar, { id, outlet: "bar", lines: [{ menuItemId: itemId, quantity: 2 }, { menuItemId: itemId, quantity: 2, note: "Cold" }] }), /Not enough Malt/);
+  });
+
+  it("remembers the last round: what each save added, for Same again", async () => {
+    const mgr = await staff("restaurant_bar_manager");
+    const bar = await staff("restaurant_bar");
+    const a = await drink(mgr, 50);
+    const b = await drink(mgr, 50);
+    const id = crypto.randomUUID();
+    const round = async () => (await openOrders(db, bar)).find((o) => o.id === id)!.lastRound;
+    await saveOrder(db, bar, { id, outlet: "bar", lines: [{ menuItemId: a.itemId, quantity: 2 }] });
+    expect(await round()).toEqual([{ menuItemId: a.itemId, quantity: 2, note: null }]);
+    await saveOrder(db, bar, { id, outlet: "bar", lines: [{ menuItemId: a.itemId, quantity: 2 }, { menuItemId: b.itemId, quantity: 1, note: "Cold" }] });
+    expect(await round()).toEqual([{ menuItemId: b.itemId, quantity: 1, note: "Cold" }]);
+    await saveOrder(db, bar, { id, outlet: "bar", lines: [{ menuItemId: a.itemId, quantity: 3 }, { menuItemId: b.itemId, quantity: 1, note: "Cold" }] });
+    expect(await round()).toEqual([{ menuItemId: a.itemId, quantity: 1, note: null }]);
+    // Saving with nothing added (only a table change) keeps the last round.
+    await saveOrder(db, bar, { id, outlet: "bar", note: "T4", lines: [{ menuItemId: a.itemId, quantity: 3 }, { menuItemId: b.itemId, quantity: 1, note: "Cold" }] });
+    expect(await round()).toEqual([{ menuItemId: a.itemId, quantity: 1, note: null }]);
+  });
+
+  it("the menu says low at the reorder level, and made to order without stock", async () => {
+    const mgr = await staff("restaurant_bar_manager");
+    const { itemId } = await drink(mgr, 2); // reorder level is 2
+    const plain = await saveMenuItem(db, mgr, { name: `Pepper soup ${rand()}`, outlet: "restaurant", category: "meals", priceKobo: 300_000, available: true, active: true });
+    const menu = await listMenu(db, mgr);
+    expect(menu.find((m) => m.id === itemId)).toMatchObject({ stock_left: 2, low: true });
+    expect(menu.find((m) => m.id === plain)).toMatchObject({ stock_left: null, low: false });
   });
 });
 
