@@ -4,6 +4,7 @@ import { BedDouble, CheckCircle2, ChevronRight, Plus, Search } from "lucide-reac
 import { buttonStyles } from "@/components/ui/button";
 import { Input } from "@/components/ui/form";
 import { SlashHint } from "./shortcuts";
+import { HelpButton, HelpPurpose } from "./screen-help";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import type { NeedsYou, RoomCounts, tonightView } from "@/domain/today";
@@ -126,8 +127,12 @@ export function TodayView({
       <div className="space-y-6 px-4 py-6 lg:px-8">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-[1.75rem] leading-tight font-semibold text-ink-900">{greeting}, {firstName}</h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-[1.75rem] leading-tight font-semibold text-ink-900">{greeting}, {firstName}</h1>
+              <HelpButton />
+            </div>
             <p className="mt-1 text-sm text-ink-500">{formatDate(today)}</p>
+            <HelpPurpose className="mt-0.5 max-w-xl text-sm text-ink-500" />
           </div>
           <div className="flex flex-col items-end gap-2">
             {signedIn}

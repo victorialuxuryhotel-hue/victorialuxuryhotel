@@ -294,11 +294,7 @@ for (const id of pagingIds) {
 
   const { ctx: c2, p: f } = await as("finance");
   await go(f, "/app/payments");
-  await f.click("[data-global-search]");
-  await f.type("[role=dialog][aria-label=Search] input", "an");
-  await new Promise((r) => setTimeout(r, 1200));
-  const groups = await f.$eval("#global-search-results", (l) => l.textContent);
-  check("finance gets no Guests or Rooms results", !/Guests|Rooms/.test(groups), groups.slice(0, 80));
+  check("finance has no global search (it can't open guests, bookings or rooms from its menu)", !(await f.$("[data-global-search]")));
   await c2.close();
 
   const { ctx: c3, p: b } = await as("restaurant_bar");
@@ -307,6 +303,29 @@ for (const id of pagingIds) {
   await b.keyboard.down("Control"); await b.keyboard.press("k"); await b.keyboard.up("Control");
   check("no global search on the till", !(await b.$("[data-global-search]")) && !(await b.$("[role=dialog][aria-label=Search]")));
   await c3.close();
+}
+
+{
+  // I10: help on each screen, and "Your first day" on the account page.
+  const { ctx, p } = await as("front_desk");
+  await go(p, "/app/rooms");
+  check("each screen says what it's for, under the title", await p.$eval("h1", (h) => (h.closest("div.min-w-0")?.querySelector(":scope > p")?.textContent ?? "").length > 20));
+  await p.click("[data-help] summary");
+  check("? opens the steps for the main task", /Mark a room clean[\s\S]*housekeeping/.test(await p.$eval("[data-help]", (d) => d.innerText)));
+  await p.keyboard.press("Escape");
+  check("Esc closes the help", !(await p.$eval("[data-help]", (d) => d.open)));
+  await go(p, "/app/today");
+  check("Today has help too", Boolean(await p.$("[data-help]")));
+
+  await run("DELETE FROM staff_first_day WHERE staff_id IN (SELECT id FROM staff_profiles WHERE email LIKE '%frontdesk%' OR full_name LIKE 'E2E frontdesk%')").catch(() => {});
+  await go(p, "/app/account");
+  await p.waitForSelector("[data-first-day]");
+  check("the front desk sees Your first day", /Take a walk-in[\s\S]*Mark a room clean/.test(await p.$eval("[data-first-day]", (c) => c.innerText)));
+  await p.click("#fd-walk_in");
+  await until(async () => (await val("SELECT count(*) FROM staff_first_day WHERE item = 'walk_in'")) > 0, "tick saved");
+  await go(p, "/app/account");
+  check("a tick is kept", await p.$eval("#fd-walk_in", (c) => c.checked));
+  await ctx.close();
 }
 
 {
