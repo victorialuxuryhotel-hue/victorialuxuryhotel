@@ -1,0 +1,149 @@
+# Deploy: every push to main goes to staging, then (after someone approves the "production"
+# environment in GitHub) to the live site. Production takes a database restore point first, applies
+# migrations, uploads and deploys the new version, smoke-tests it and rolls the Worker back if the
+# smoke test fails. Migrations must be backward compatible (expand, then contract in a later release),
+# so the previous version keeps working on the migrated database.
+#
+# Needs (Settings → Environments, "staging" and "production"; production with required reviewers):
+#   secrets: CLOUDFLARE_API_TOKEN (Workers Scripts, D1 and R2 edit for this account only)
+#   vars:    CLOUDFLARE_ACCOUNT_ID, SITE_URL, CLERK_PUBLISHABLE_KEY, EMAIL_FROM, HOTEL_NOTIFY_EMAIL,
+#            RATE_LIMIT_HOLDS_PER_HOUR, RATE_LIMIT_PAYMENTS_PER_HOUR
+# The Worker's own secrets (Clerk, Paystack, Resend...) stay in Cloudflare, set with `wrangler secret put`.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  staging:
+    name: Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: ${{ vars.SITE_URL }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-migrations.mjs
+      - name: Build
+        run: pnpm cf:build
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          HOTEL_NOTIFY_EMAIL: ${{ vars.HOTEL_NOTIFY_EMAIL }}
+          RATE_LIMIT_HOLDS_PER_HOUR: ${{ vars.RATE_LIMIT_HOLDS_PER_HOUR }}
+          RATE_LIMIT_PAYMENTS_PER_HOUR: ${{ vars.RATE_LIMIT_PAYMENTS_PER_HOUR }}
+      - name: Migrate the staging database
+        run: pnpm exec wrangler d1 migrations apply victoria-hotel-db-staging --env staging --remote
+      - name: Deploy to staging
+        run: pnpm exec opennextjs-cloudflare deploy --env staging
+      - name: Smoke test
+        run: node scripts/smoke.mjs "${{ vars.SITE_URL }}" test
+
+  production:
+    name: Production
+    needs: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: production
+      url: ${{ vars.SITE_URL }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-migrations.mjs
+      - name: Build
+        run: pnpm cf:build
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          HOTEL_NOTIFY_EMAIL: ${{ vars.HOTEL_NOTIFY_EMAIL }}
+          RATE_LIMIT_HOLDS_PER_HOUR: ${{ vars.RATE_LIMIT_HOLDS_PER_HOUR }}
+          RATE_LIMIT_PAYMENTS_PER_HOUR: ${{ vars.RATE_LIMIT_PAYMENTS_PER_HOUR }}
+
+      - name: Version live now (for rollback)
+        id: before
+        run: |
+          v=$(pnpm exec wrangler deployments status --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).versions[0].version_id))')
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Live before this deploy: \`$v\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pending migrations
+        id: pending
+        run: |
+          out=$(pnpm exec wrangler d1 migrations list victoria-hotel-db --remote 2>&1)
+          echo "$out"
+          if echo "$out" | grep -q "No migrations to apply"; then echo "any=false" >> "$GITHUB_OUTPUT"; else echo "any=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Database restore point
+        if: steps.pending.outputs.any == 'true'
+        run: |
+          out=$(pnpm exec wrangler d1 time-travel info victoria-hotel-db 2>&1)
+          echo "$out"
+          bookmark=$(echo "$out" | grep -oE "bookmark is '[^']+'" | cut -d"'" -f2)
+          test -n "$bookmark"
+          {
+            echo "### Database restore point"
+            echo "Bookmark \`$bookmark\` (before migrations). To undo:"
+            echo '```'
+            echo "npx wrangler d1 time-travel restore victoria-hotel-db --bookmark=$bookmark"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Migrate the live database
+        if: steps.pending.outputs.any == 'true'
+        run: pnpm exec wrangler d1 migrations apply victoria-hotel-db --remote
+
+      - name: Upload the new version
+        id: upload
+        run: |
+          out=$(pnpm exec opennextjs-cloudflare upload 2>&1) || { echo "$out"; exit 1; }
+          echo "$out"
+          v=$(echo "$out" | grep -oE "Worker Version ID: [0-9a-f-]+" | awk '{print $4}')
+          test -n "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy
+        run: pnpm exec wrangler versions deploy "${{ steps.upload.outputs.version }}@100%" --yes
+
+      - name: Smoke test
+        run: node scripts/smoke.mjs "${{ vars.SITE_URL }}" live
+
+      - name: Roll back the Worker if anything above failed after deploying
+        if: failure() && steps.upload.outputs.version != '' && steps.before.outputs.version != ''
+        run: |
+          pnpm exec wrangler versions deploy "${{ steps.before.outputs.version }}@100%" --yes
+          echo "⚠️ Rolled back to \`${{ steps.before.outputs.version }}\`. The database was not rolled back (see the restore point above if needed)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "✅ Live: \`${{ steps.upload.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"

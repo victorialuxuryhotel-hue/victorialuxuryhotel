@@ -1,0 +1,97 @@
+# Backups outside Cloudflare. Every Monday 04:00 Lagos: export the live database, encrypt it
+# (AES-256, passphrase in BACKUP_PASSPHRASE, kept by the hotel owner too), keep it as a GitHub
+# artifact for 90 days. On the first Monday of the month (or on demand) it also proves the backup
+# restores: imports it into a throwaway D1 database, compares row counts with live, deletes it.
+#
+# The export holds guest names and phone numbers: it is never written unencrypted outside the job,
+# and wrangler's output (which includes a one-hour download link) is never printed.
+#
+# Needs: secrets CLOUDFLARE_API_TOKEN (D1 edit), BACKUP_PASSPHRASE; var CLOUDFLARE_ACCOUNT_ID.
+# Restore a backup by hand:
+#   openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE -in backup.sql.gz.enc | gunzip > backup.sql
+#   npx wrangler d1 execute <empty database> --remote --file backup.sql
+name: Backup
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      drill:
+        description: Also test-restore the backup into a throwaway database
+        type: boolean
+        default: true
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: backup
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Export the live database (output hidden)
+        run: |
+          test -n "$BACKUP_PASSPHRASE"
+          mkdir -p "$RUNNER_TEMP/backup"
+          pnpm exec wrangler d1 export victoria-hotel-db --remote --output "$RUNNER_TEMP/backup/backup.sql" > /dev/null 2>&1
+          test -s "$RUNNER_TEMP/backup/backup.sql"
+          echo "Exported $(wc -c < "$RUNNER_TEMP/backup/backup.sql") bytes" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Encrypt
+        run: |
+          stamp=$(date -u +%Y-%m-%d)
+          echo "STAMP=$stamp" >> "$GITHUB_ENV"
+          gzip -9 -c "$RUNNER_TEMP/backup/backup.sql" | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:BACKUP_PASSPHRASE -out "$RUNNER_TEMP/victoria-db-$stamp.sql.gz.enc"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: victoria-db-${{ env.STAMP }}
+          path: ${{ runner.temp }}/victoria-db-${{ env.STAMP }}.sql.gz.enc
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Decide whether to test the restore
+        id: drill
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "run=${{ inputs.drill }}" >> "$GITHUB_OUTPUT";
+          elif [ "$(date -u +%d)" -le 7 ]; then echo "run=true" >> "$GITHUB_OUTPUT";
+          else echo "run=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Restore drill (throwaway database, row counts compared with live)
+        if: steps.drill.outputs.run == 'true'
+        run: |
+          DRILL="victoria-hotel-db-drill-${{ github.run_id }}"
+          Q="SELECT (SELECT count(*) FROM reservations) r, (SELECT count(*) FROM payments) p, (SELECT count(*) FROM guests) g, (SELECT count(*) FROM pos_orders) o, (SELECT count(*) FROM activity_log) a, (SELECT count(*) FROM d1_migrations) m"
+          counts() { pnpm exec wrangler d1 execute "$1" --remote --command "$Q" --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.stringify(JSON.parse(s)[0].results[0])))'; }
+          trap 'pnpm exec wrangler d1 delete "$DRILL" --skip-confirmation > /dev/null 2>&1 || true' EXIT
+          # Decrypt the file just uploaded, as a restore would.
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE -in "$RUNNER_TEMP/victoria-db-$STAMP.sql.gz.enc" | gunzip > "$RUNNER_TEMP/backup/restore.sql"
+          pnpm exec wrangler d1 create "$DRILL" > /dev/null 2>&1
+          pnpm exec wrangler d1 execute "$DRILL" --remote --file "$RUNNER_TEMP/backup/restore.sql" --yes > /dev/null 2>&1
+          live=$(counts victoria-hotel-db); restored=$(counts "$DRILL")
+          echo "Live: $live / Restored: $restored" >> "$GITHUB_STEP_SUMMARY"
+          # Rows written between the export and now make live slightly ahead; the restore must not be behind by more than that.
+          node -e 'const [l,r]=process.argv.slice(1).map(JSON.parse); const bad=Object.keys(l).filter(k=>r[k]>l[k]||(k==="m"&&r[k]!==l[k])||l[k]-r[k]>50); if(bad.length){console.error("Restore differs:",bad.join(","));process.exit(1)} console.log("Restore matches live.")' "$live" "$restored"
+          echo "✅ Restore drill passed" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the plain export from the runner
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/backup"
