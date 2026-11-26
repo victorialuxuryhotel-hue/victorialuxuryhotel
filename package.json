@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "test:db": "vitest run --config vitest.db.config.ts",
     "test:e2e": "tests/e2e/run.sh",
-    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "check": "node scripts/check-migrations.mjs && pnpm typecheck && pnpm lint && pnpm test",
     "db:migrate": "wrangler d1 migrations apply victoria-hotel-db --local --persist-to \"$HOME/.cache/victoria-hotel/wrangler\"",
     "db:seed": "wrangler d1 execute victoria-hotel-db --local --persist-to \"$HOME/.cache/victoria-hotel/wrangler\" --file db/seed.sql",
     "db:demo": "wrangler d1 execute victoria-hotel-db --local --persist-to \"$HOME/.cache/victoria-hotel/wrangler\" --file db/demo.sql",
