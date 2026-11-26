@@ -5,6 +5,7 @@ import { dbErrorToken, StaleStateError } from "../db-errors";
 import {
   assertNetPaid,
   activity,
+  all,
   ALL_STAFF,
   assertVersion,
   first,
@@ -21,6 +22,28 @@ import {
 import { applyChangeStatements, pendingChange, rethrowChangeError } from "./changes";
 import { autoAssignRoomStatements, freeUnits } from "./inventory";
 import { dueOf, loadReservation, netPaid, RES_COLUMNS, type ReservationRow } from "./reservations";
+
+/** Marker on a Paystack payment whose amount or currency didn't match: it waits for a person (alerted once). */
+export const MISMATCH_FLAG = "Amount/currency mismatch";
+
+/**
+ * Pending Paystack payments the scheduled job should ask Paystack about: 30 minutes to 48 hours old,
+ * oldest first. Payments already flagged for a mismatch are left for a person, so they never take
+ * the batch's places and starve newer payments.
+ */
+export async function paymentsToSweep(db: Db, now = Date.now(), limit = 50): Promise<string[]> {
+  const rows = await all<{ provider_reference: string }>(
+    db,
+    `SELECT provider_reference FROM payments
+     WHERE provider = 'paystack' AND status = 'pending' AND created_at >= ? AND created_at <= ?
+       AND coalesce(gateway_response, '') NOT LIKE '${MISMATCH_FLAG}%'
+     ORDER BY created_at LIMIT ?`,
+    new Date(now - 48 * 3600_000).toISOString(),
+    new Date(now - 30 * 60_000).toISOString(),
+    limit,
+  );
+  return rows.map((r) => r.provider_reference);
+}
 
 export type SettleOutcome =
   | "confirmed" | "part_paid" | "paid_unavailable" | "paid_closed" | "already_settled" | "already_processed"
@@ -139,12 +162,12 @@ export async function applyPaystackResult(
 
     if (r.status === "success") {
       if (r.currency.toUpperCase() !== "NGN" || r.amountKobo !== pay.amount_kobo) {
-        if (pay.gateway_response?.startsWith("Amount/currency mismatch")) return "already_flagged";
+        if (pay.gateway_response?.startsWith(MISMATCH_FLAG)) return "already_flagged";
         await writeBatch(db, null, [
           ...guard,
           db
             .prepare("UPDATE payments SET gateway_response = ? WHERE id = ?")
-            .bind(`Amount/currency mismatch: expected ${pay.amount_kobo} NGN, Paystack reported ${r.amountKobo} ${r.currency}`, pay.id),
+            .bind(`${MISMATCH_FLAG}: expected ${pay.amount_kobo} NGN, Paystack reported ${r.amountKobo} ${r.currency}`, pay.id),
           db
             .prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?")
             .bind("Paystack reported a payment that does not match the amount owed. Check the Paystack dashboard before confirming.", res.id),
