@@ -3,6 +3,7 @@
 // output is scanned for any secret value or key pattern. Exits non-zero on a find.
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const PUBLIC = new Set(["EMAIL_FROM", "HOTEL_NOTIFY_EMAIL", "PAYSTACK_BASE_URL", "RESEND_BASE_URL", "RATE_LIMIT_HOLDS_PER_HOUR", "RATE_LIMIT_PAYMENTS_PER_HOUR"]);
 const isPublic = (key) => key.startsWith("NEXT_PUBLIC_") || PUBLIC.has(key);
@@ -12,7 +13,7 @@ if (!fs.existsSync(envFile)) {
   console.error(`${envFile} not found. Run the OpenNext build first.`);
   process.exit(1);
 }
-const mod = await import(path.resolve(envFile) + `?t=${Date.now()}`);
+const mod = await import(`${pathToFileURL(path.resolve(envFile)).href}?t=${Date.now()}`);
 const removed = new Set();
 const out = Object.entries(mod).map(([mode, vars]) => {
   const kept = Object.fromEntries(Object.entries(vars).filter(([k]) => isPublic(k) || (removed.add(k), false)));
