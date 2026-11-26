@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BusinessDay } from "./business-day";
+import { GlobalSearch } from "./global-search";
 import { BedDouble, CalendarPlus, Menu, Search, Sun, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { useDialog } from "@/lib/use-dialog";
@@ -71,7 +72,8 @@ export function Sidebar({ footer, base = "/app", allowed }: NavProps) {
   return (
     <aside data-app-nav="" className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-navy-950 py-6 lg:flex print:hidden">
       <Brand base={base} />
-      <div className="mt-8 min-h-0 flex-1 overflow-y-auto pb-4">
+      {base === "/app" ? <GlobalSearch /> : null}
+      <div className="mt-6 min-h-0 flex-1 overflow-y-auto pb-4">
         <NavLinks base={base} allowed={allowed} />
       </div>
       {footer ? <div className="border-t border-white/10 px-5 pt-5">{footer}</div> : null}
@@ -93,6 +95,7 @@ export function MobileBar({ footer, base = "/app", allowed }: NavProps) {
     <div data-app-nav="" className="sticky top-0 z-50 lg:hidden print:hidden">
       <div className="flex h-14 items-center justify-between bg-navy-950 pr-1.5">
         <Brand base={base} />
+        <span className="ml-auto">{base === "/app" ? <GlobalSearch compact /> : null}</span>
         <button
           ref={toggle}
           type="button"

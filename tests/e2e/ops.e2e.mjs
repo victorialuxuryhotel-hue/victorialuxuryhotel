@@ -266,6 +266,50 @@ for (const id of pagingIds) {
 }
 
 {
+  // I9: global search. Ctrl K; grouped results; bookings open the side panel; permissions; not on the till.
+  const { ctx, p } = await as("front_desk");
+  await p.setViewport({ width: 1366, height: 768 });
+  const ref = await val("SELECT reference FROM reservations ORDER BY created_at DESC LIMIT 1");
+  const room = await val("SELECT room_number FROM rooms WHERE is_active = 1 ORDER BY room_number LIMIT 1");
+  await go(p, "/app/guests");
+  await until(async () => {
+    await p.keyboard.down("Control"); await p.keyboard.press("k"); await p.keyboard.up("Control");
+    return Boolean(await p.$("[role=dialog][aria-label=Search] input"));
+  }, "Ctrl K opens search");
+  check("Ctrl K opens search", true);
+  await p.type("[role=dialog][aria-label=Search] input", ref);
+  await until(async () => (await p.$$eval("#global-search-results [role=option]", (o) => o.map((x) => x.textContent))).some((t) => t.includes(ref)), "booking found");
+  check("results are grouped", /Bookings/.test(await p.$eval("#global-search-results", (l) => l.textContent)));
+  await p.keyboard.press("Enter");
+  await until(async () => p.url().includes(`booking=${ref}`) && Boolean(await p.$(`[data-panel-reference="${ref}"]`)), "booking panel from search");
+  check("Enter on a booking opens its side panel", true);
+  await go(p, "/app/today");
+  await p.click("[data-global-search]");
+  await p.type("[role=dialog][aria-label=Search] input", room);
+  await until(async () => (await p.$$eval("#global-search-results [role=option]", (o) => o.map((x) => x.textContent))).some((t) => t.includes(`Room ${room}`)), "room found");
+  await p.evaluate((r) => [...document.querySelectorAll("#global-search-results [role=option]")].find((o) => o.textContent.includes(`Room ${r}`)).click(), room);
+  await until(async () => p.url().endsWith(`/app/rooms#room-${room}`), "room page");
+  check("a room opens on the Rooms board", true);
+  await ctx.close();
+
+  const { ctx: c2, p: f } = await as("finance");
+  await go(f, "/app/payments");
+  await f.click("[data-global-search]");
+  await f.type("[role=dialog][aria-label=Search] input", "an");
+  await new Promise((r) => setTimeout(r, 1200));
+  const groups = await f.$eval("#global-search-results", (l) => l.textContent);
+  check("finance gets no Guests or Rooms results", !/Guests|Rooms/.test(groups), groups.slice(0, 80));
+  await c2.close();
+
+  const { ctx: c3, p: b } = await as("restaurant_bar");
+  await go(b, "/app/sales");
+  await b.waitForSelector("[data-pay]");
+  await b.keyboard.down("Control"); await b.keyboard.press("k"); await b.keyboard.up("Control");
+  check("no global search on the till", !(await b.$("[data-global-search]")) && !(await b.$("[role=dialog][aria-label=Search]")));
+  await c3.close();
+}
+
+{
   // H10: front desk shortcuts. "/" jumps to search; Esc closes the Cancel popover.
   const { ctx, p } = await as("front_desk");
   const focusedSearch = () => p.evaluate(() => document.activeElement?.hasAttribute("data-search") ?? false);

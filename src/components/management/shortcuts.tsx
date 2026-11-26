@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { OPEN_SEARCH } from "./global-search";
 
 const typing = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
@@ -14,11 +15,15 @@ export function Shortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target)) {
+        // The page's own search box if it has one (Today, Bookings, Guests), else global search (I9).
         const search = document.querySelector<HTMLInputElement>("[data-search]");
         if (search) {
           e.preventDefault();
           search.focus();
           search.select();
+        } else if (document.querySelector("[data-global-search]")) {
+          e.preventDefault();
+          window.dispatchEvent(new Event(OPEN_SEARCH));
         }
       } else if (e.key === "Escape") {
         const open = document.querySelector<HTMLDetailsElement>("details[data-popover][open]");

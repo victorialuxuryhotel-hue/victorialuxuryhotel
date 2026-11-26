@@ -63,7 +63,7 @@ export function RoomBoard({ rooms, interactive = true }: { rooms: Array<RoomTile
             {rooms
               .filter((r) => (r.floor ?? "—") === floor)
               .map((r) => (
-                <li key={r.id}>
+                <li key={r.id} id={`room-${r.number}`} className="scroll-mt-24 rounded-md target:ring-2 target:ring-gold-500">
                   {(() => {
                     const body = (
                       <>
