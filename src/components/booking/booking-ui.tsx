@@ -24,11 +24,11 @@ export function Steps({ current }: { current: number }) {
         const active = i === current;
         return (
           <li key={s} aria-current={active ? "step" : undefined} className="flex items-center gap-2 sm:gap-3">
-            <span className={cn("flex items-center gap-2", active || done ? "text-navy-950" : "text-ink-400")}>
+            <span className={cn("flex items-center gap-2 text-[13px]", active || done ? "text-navy-950" : "text-ink-500")}>
               <span
                 className={cn(
-                  "flex size-6 items-center justify-center rounded-full border text-xs",
-                  done ? "border-gold-500 text-gold-700" : active ? "border-navy-800 text-navy-800 shadow-[inset_0_0_0_1px_var(--color-navy-800)]" : "border-ink-300 text-ink-500",
+                  "flex size-6 items-center justify-center rounded-full text-xs",
+                  done ? "bg-gold-500 text-white" : active ? "bg-navy-900 text-white" : "bg-ivory-200 text-ink-500",
                 )}
               >
                 {done ? <Check className="size-3.5" aria-hidden /> : i + 1}
@@ -44,6 +44,23 @@ export function Steps({ current }: { current: number }) {
   );
 }
 
+export function ResultsSkeleton() {
+  return (
+    <div role="status" aria-label="Checking availability" aria-busy className="space-y-3.5">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="flex flex-col overflow-hidden rounded-card border border-hairline bg-white sm:flex-row">
+          <div className="skeleton min-h-[150px] !rounded-none sm:w-56" />
+          <div className="flex-1 space-y-2.5 px-5 py-[18px]">
+            <div className="skeleton h-4.5 w-2/5" />
+            <div className="skeleton h-3 w-4/5" />
+            <div className="skeleton h-3 w-1/2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export type StaySearch = { checkIn: string; checkOut: string; guests: number };
 
 /** Extras the guest has ticked, with what each costs for this stay. */
@@ -53,10 +70,10 @@ export function CompactSummary({
   option, search, holdMinutes, extras = [], totalKobo = option.totalKobo,
 }: { option: AvailabilityOption; search: StaySearch; holdMinutes?: number; extras?: ExtraLine[]; totalKobo?: number }) {
   return (
-    <details open className="group rounded-card border border-hairline bg-ivory-50 lg:hidden">
+    <details open className="group self-start rounded-card border border-hairline bg-white lg:hidden">
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
         <span className="min-w-0">
-          <span className="block font-display text-xl text-navy-950">{option.name} · {plural(option.nights, "night")}</span>
+          <span className="block font-semibold text-navy-950">{option.name} · {plural(option.nights, "night")}</span>
           <span className="block text-sm text-ink-500 tabular-nums">{formatDate(search.checkIn, { year: false })} → {formatDate(search.checkOut, { year: false })} · {plural(search.guests, "guest")}</span>
         </span>
         <span className="shrink-0 text-base font-semibold text-navy-950 tabular-nums" aria-live="polite">{formatNaira(totalKobo)}</span>
@@ -74,12 +91,12 @@ export function BookingSummary({
   option, search, children, className, extras = [], totalKobo = option.totalKobo,
 }: { option: AvailabilityOption; search: StaySearch; children?: React.ReactNode; className?: string; extras?: ExtraLine[]; totalKobo?: number }) {
   return (
-    <aside className={cn("overflow-hidden rounded-card bg-ivory-50 shadow-card lg:sticky lg:top-28", className)}>
-      <Photo photo={option.photo ?? { alt: option.name }} className="aspect-[16/9]" sizes="24rem" />
-      <div className="p-6">
+    <aside className={cn("self-start overflow-hidden rounded-card border border-hairline bg-white lg:sticky lg:top-24", className)}>
+      <Photo photo={option.photo ?? { alt: option.name }} className="aspect-[2/1]" sizes="21rem" />
+      <div className="p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-600">Your stay</p>
-        <h2 className="mt-2 font-display text-3xl text-navy-950">{option.name}</h2>
-        <dl className="mt-5 space-y-3 text-sm">
+        <h2 className="mt-1.5 font-display text-[1.75rem] text-navy-950">{option.name}</h2>
+        <dl className="mt-3.5 space-y-2 text-sm">
           <div className="flex justify-between gap-4"><dt className="text-ink-500">Check-in</dt><dd className="text-right text-ink-900">{formatDate(search.checkIn)}</dd></div>
           <div className="flex justify-between gap-4"><dt className="text-ink-500">Check-out</dt><dd className="text-right text-ink-900">{formatDate(search.checkOut)}</dd></div>
           <div className="flex justify-between gap-4"><dt className="text-ink-500">Guests</dt><dd className="text-ink-900">{search.guests}</dd></div>

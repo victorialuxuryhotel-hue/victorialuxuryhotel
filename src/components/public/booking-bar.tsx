@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { CalendarDays, Minus, Plus, Users } from "lucide-react";
+import { Minus, Plus } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
+import { formatNaira, plural } from "@/lib/format";
 import { tonight } from "@/lib/hotel-date";
 import { cn } from "@/lib/utils/cn";
 
@@ -25,8 +26,11 @@ const MAX_GUESTS = 6;
 export function BookingBar({
   variant = "floating",
   defaults,
+  nightlyKobo,
 }: {
   variant?: "floating" | "inline" | "stacked";
+  /** Show what the chosen dates cost at this nightly rate. */
+  nightlyKobo?: number;
   defaults?: { checkIn?: string; checkOut?: string; guests?: string };
 }) {
   // Lagos time with the 06:00 cut-off, whatever the visitor's own clock or time zone says.
@@ -37,10 +41,11 @@ export function BookingBar({
   const checkIn = checkInValue || today;
   const checkOut = checkOutValue || addDays(checkIn, 1);
   const row = variant !== "stacked";
+  const nights = checkIn && checkOut ? Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 864e5) : 0;
 
   const label = "text-xs font-semibold uppercase tracking-[0.16em] text-ink-500 sm:text-xs sm:tracking-[0.18em]";
   const field = "mt-0.5 block w-full min-w-0 border-0 bg-transparent p-0 text-base font-medium text-navy-950 focus:outline-none focus:ring-0 sm:mt-1";
-  const cell = "flex min-w-0 items-center gap-3 bg-ivory-50 px-3 py-2.5 sm:px-5 sm:py-4";
+  const cell = "flex min-w-0 items-center gap-3 bg-white px-3 py-2.5 sm:px-[18px] sm:py-3.5";
   const stepButton =
     "flex size-11 items-center justify-center rounded-md text-gold-600 hover:bg-ivory-100 disabled:text-ink-300 disabled:hover:bg-transparent";
 
@@ -52,11 +57,11 @@ export function BookingBar({
       className={cn(
         "grid grid-cols-2 gap-px overflow-hidden rounded-card bg-ivory-200",
         row && "sm:grid-cols-[1fr_1fr_0.8fr_auto]",
-        variant === "floating" && "sm:shadow-[0_20px_50px_-12px_rgb(1_18_72/0.35)]",
+        variant === "floating" && "sm:shadow-float",
+        variant !== "floating" && "border border-hairline",
       )}
     >
       <label className={cell}>
-        <CalendarDays className="hidden size-5 shrink-0 text-gold-500 sm:block" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className={label}>Check-in</span>
           <input
@@ -75,7 +80,6 @@ export function BookingBar({
         </span>
       </label>
       <label className={cell}>
-        <CalendarDays className="hidden size-5 shrink-0 text-gold-500 sm:block" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className={label}>Check-out</span>
           <input
@@ -89,9 +93,8 @@ export function BookingBar({
           />
         </span>
       </label>
-      <div className={cn("col-span-2 grid grid-cols-[1fr_auto] gap-px", row && "sm:col-span-1 sm:contents")}>
+      <div className={cn("col-span-2 grid gap-px", row ? "grid-cols-[1fr_auto] sm:col-span-1 sm:contents" : "grid-cols-1")}>
         <div className={cn(cell, "justify-between py-1 pr-1 sm:py-4 sm:pr-2")} role="group" aria-labelledby="guests-label">
-          <Users className="hidden size-5 shrink-0 text-gold-500 sm:block" aria-hidden />
           <span className="min-w-0 flex-1">
             <span id="guests-label" className={label}>Guests</span>
             <output className="block text-base font-medium text-navy-950" aria-live="polite">
@@ -110,12 +113,18 @@ export function BookingBar({
         </div>
         <button
           type="submit"
-          className={buttonStyles({ variant: "accent", size: "lg", className: "h-auto min-h-12 rounded-none px-5 text-base sm:px-8 sm:py-4" })}
+          className={buttonStyles({ variant: "accent", size: "lg", className: "h-auto min-h-12 rounded-none border-0 px-5 text-[15px] sm:px-6 sm:py-4" })}
         >
           <span className="sm:hidden">Search</span>
           <span className="hidden sm:inline">Check availability</span>
         </button>
       </div>
+      {nightlyKobo && nights > 0 ? (
+        <p aria-live="polite" className="col-span-2 flex justify-between gap-4 bg-white px-3 py-3 text-sm text-ink-600 tabular-nums">
+          <span>{formatNaira(nightlyKobo)} × {plural(nights, "night")}</span>
+          <span className="font-semibold text-navy-950">{formatNaira(nightlyKobo * nights)}</span>
+        </p>
+      ) : null}
     </form>
   );
 }

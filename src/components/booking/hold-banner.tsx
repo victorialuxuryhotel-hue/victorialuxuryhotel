@@ -32,9 +32,9 @@ export function HoldBanner({ category, expiresAt, againHref }: { category: strin
     );
   }
   return (
-    <div role="timer" aria-live="off" className="flex items-center justify-between gap-3 rounded-md border border-gold-500 px-4 py-2.5">
+    <div role="timer" aria-live="off" className="flex items-center justify-between gap-3 rounded-xl border border-gold-200 bg-gold-50 px-4 py-3">
       <span className="flex items-center gap-2 text-sm text-ink-900"><Clock className="size-4 text-gold-600" aria-hidden />Your {category} room is held</span>
-      <span className="text-[15px] text-gold-800 tabular-nums">{left === null ? "" : `${mmss(left)} left`}</span>
+      <span className="shrink-0 text-sm font-semibold text-gold-900 tabular-nums">{left === null ? "" : `${mmss(left)} left`}</span>
     </div>
   );
 }
