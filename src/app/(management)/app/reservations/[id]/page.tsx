@@ -22,8 +22,8 @@ async function Content({ params, searchParams }: PageProps<"/app/reservations/[i
   if (!r) notFound();
   const canOverride = can(staff.role, "payments.override");
   const [rooms, manager] = await Promise.all([
-    ["pending_payment", "confirmed", "checked_in"].includes(r.status) ? assignableRooms(r.id, r.checkIn, r.checkOut) : Promise.resolve([]),
-    canOverride ? Promise.resolve(null) : managerToAskForDesk(),
+    can(staff.role, "reservations.manage") && ["pending_payment", "confirmed", "checked_in"].includes(r.status) ? assignableRooms(r.id, r.checkIn, r.checkOut) : Promise.resolve([]),
+    canOverride || !can(staff.role, "reservations.manage") ? Promise.resolve(null) : managerToAskForDesk(),
   ]);
   const sp = await searchParams;
   return (
