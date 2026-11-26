@@ -42,5 +42,29 @@
   "observability": { "enabled": true },
   // Local preview (pnpm cf:preview) serves on the same port as `next dev`, so
   // the site URL baked into the build (NEXT_PUBLIC_SITE_URL) matches.
-  "dev": { "port": 3000 }
+  "dev": { "port": 3000 },
+
+  // Staging: same code, its own worker, database and photo bucket, on staging.victorialuxuryhotel.com.
+  // Uses Clerk's development instance and Paystack test mode. Every merge to main deploys here first
+  // (.github/workflows/deploy.yml). Bindings aren't inherited by environments, so each is repeated.
+  "env": {
+    "staging": {
+      "name": "victorialuxuryhotel-staging",
+      "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "victorialuxuryhotel-staging" }],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "victoria-hotel-db-staging",
+          "database_id": "f50fe2e3-cf53-4b9b-a098-ec5b3ade0d79",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "routes": [{ "pattern": "staging.victorialuxuryhotel.com", "custom_domain": true }],
+      "workers_dev": true,
+      "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "victorialuxuryhotel-staging" }],
+      "images": { "binding": "IMAGES" },
+      "triggers": { "crons": ["*/10 * * * *"] },
+      "observability": { "enabled": true }
+    }
+  }
 }
