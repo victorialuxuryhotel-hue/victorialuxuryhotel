@@ -257,6 +257,7 @@ These are deliberately **not final** in the app:
 - Migrations 0012–0026 applied to the live database (checksums of 0012 and 0013 matched section 1). Bookings, payments and room types intact.
 - Worker version `084478b4-9986-4fac-9af8-ac03e8be7b58` deployed at 100%. Secrets present, no `EMAIL_ALLOWLIST`, two-step on hold (no `TWO_STEP_ENFORCED`).
 - Checks: `/api/health` ok; `/`, `/rooms`, `/book`, `/gallery`, `/about` 200; `/app` redirects to sign-in with the live Clerk key; new room rates showing.
+- Hotel photos added to the live site (26 Nov, 17:3x UTC): 28 files in the R2 bucket under the app's own keys, and the matching rows (7 page photos, 12 gallery, 9 room type photos with one cover each) plus one activity entry. Worker version `bab7c30e-18c2-47a3-acb4-2bf5d1e2fee2` deployed with the fix that lets stored photos load on Cloudflare (they skip the image optimiser, which can't read R2).
 - Still to do: delete the old Clerk secret key (it was exposed); remove the two secrets named after old keys; steps 5–6 below.
 
 ## 8. Cutover order (after you've reviewed all of the above)
