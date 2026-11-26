@@ -6,7 +6,8 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const LOCK = "migrations/migrations.lock.json";
 const files = readdirSync("migrations").filter((f) => /^\d{4}_.+\.sql$/.test(f)).sort();
-const sha = (f) => createHash("sha256").update(readFileSync(`migrations/${f}`)).digest("hex");
+// Hash with LF line endings: a Windows checkout may convert them without the migration changing.
+const sha = (f) => createHash("sha256").update(readFileSync(`migrations/${f}`, "utf8").replace(/\r\n/g, "\n")).digest("hex");
 const lock = JSON.parse(readFileSync(LOCK, "utf8"));
 
 if (process.argv.includes("--add")) {
