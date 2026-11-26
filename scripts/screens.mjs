@@ -30,6 +30,26 @@ for (const [width, height] of DESK) {
   }
 }
 
+// Interface brief (I1–I11): the screens it names, at the sizes it names.
+const INTERFACE = [[1366, 768], [1920, 1080]];
+const reference = await val("SELECT reference FROM reservations WHERE status = 'checked_in' ORDER BY check_out LIMIT 1");
+for (const [width, height] of INTERFACE) {
+  for (const [name, role, path] of [
+    ["today", "front_desk", "/app/today"],
+    ["calendar", "front_desk", "/app/calendar"],
+    ["side-panel", "front_desk", `/app/calendar?booking=${reference}`],
+    ["payments-to-confirm", "general_manager", "/app/payments/confirm"],
+    ["dashboard", "general_manager", "/app"],
+  ]) {
+    const { ctx, p } = await as(role);
+    await p.setViewport({ width, height });
+    await go(p, path);
+    await settle(p);
+    await shot(p, `i-${name}`, width, height);
+    await ctx.close();
+  }
+}
+
 for (const [width, height] of BAR) {
   const { ctx, p } = await as("restaurant_bar");
   await p.setViewport({ width, height });
@@ -42,7 +62,12 @@ for (const [width, height] of BAR) {
     await p.click("section[aria-label=Menu] li button:not([disabled])").catch(() => {});
     return false;
   }, "item added", 10000);
-  await clickText(p, "button", "Take payment");
+  // I8: a note on the line ("No ice"), with the Pay button pinned.
+  await p.click("#order li button[aria-expanded]");
+  await clickText(p, "[data-note-editor] button", "No ice");
+  await shot(p, "till-note", width, height);
+  await clickText(p, "[data-note-editor] button", "Done");
+  await p.click("[data-pay]");
   await clickText(p, "button", "Exact");
   await shot(p, "till-payment", width, height);
   await clickText(p, "button", "Confirm");

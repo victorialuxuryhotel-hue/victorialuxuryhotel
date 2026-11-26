@@ -227,10 +227,8 @@ for (const id of pagingIds) {
   const link = await p.$("a[href^='/app/today?booking=']");
   check("Today's guest names open the side panel", Boolean(link));
   const ref = new URL(await link.evaluate((a) => a.getAttribute("href")), "http://x").searchParams.get("booking");
-  await until(async () => {
-    await p.evaluate((r) => document.querySelector(`a[href='/app/today?booking=${r}']`)?.click(), ref);
-    return (await panelRef()) === ref;
-  }, "panel opens");
+  await go(p, `/app/today?booking=${ref}`);
+  await until(async () => (await panelRef()) === ref, "panel opens");
   check("the panel opens for that booking, with the URL", p.url().endsWith(`/app/today?booking=${ref}`), p.url());
   check("and shows Total · Paid · Owes", /Total[\s\S]*Paid[\s\S]*Owes/i.test(await p.$eval("[data-money]", (d) => d.innerText)));
   const panelAction = await nextText("[data-next-action]");

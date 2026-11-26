@@ -96,7 +96,7 @@ Invite → active → removed. Removing access ends sessions immediately **[veri
 | I2 | A room assigned to a booking whose stay (effective end = max(check_out, tomorrow) while checked in) overlaps another active booking on that room | **[exists, extended by 0014]** |
 | I3 | Booking `checked_in` or `checked_out` with balance > 0 at the moment of the move | **[exists — DB rule added in 0015]** |
 | I4 | Booking `pending_payment` with a room assigned | **[exists — 0015]** |
-| I5 | More active bookings in a category than rooms in service for any night | **[exists: capacity, extended by 0014]** |
+| I5 | More active bookings in a category than rooms in service for any night | **[exists: capacity, extended by 0014; counts from the business date until 06:00 since 0022]** |
 | I6 | A successful payment changed or deleted | **[exists]** |
 | I7 | A payment without method, amount > 0, person (desk) or verified reference (online) | **[exists; transfer reference added in 0015]** |
 | I8 | Total paid on a booking > total + approved refunds owing (overpayment) without a refund request | **[exists: flagged for a refund, not blocked]** |
@@ -107,8 +107,9 @@ Invite → active → removed. Removing access ends sessions immediately **[veri
 | I13 | Insert into legacy `sales` (charge-to-room) | **[exists — 0015]** |
 | I14 | Zero owners | **[exists]** |
 | I15 | Bar order `paid` by POS/card without the last 4 digits of the terminal slip | **[exists — 0020]** (hardware brief H1) |
-| I17 | A payment check (Matches / Not found against the statement or terminal) changed, deleted, made twice for one payment, made by anyone but the GM/Owner, or "Not found" without a note | **[exists — 0021]** (interface brief I1) |
 | I16 | Desk payment by POS/card without the last 4 digits of the slip (from 0020 on; slips may repeat, transfers may not) | **[exists — 0020]** (H2) |
+| I17 | A payment check (Matches / Not found against the statement or terminal) changed, deleted, made twice for one payment, made by anyone but the GM/Owner, or "Not found" without a note | **[exists — 0021]** (interface brief I1) |
+| I18 | A room asked for on a booking (from the calendar, `preferred_room_id`) that isn't of the booking's room type. It is only a preference: rooms are still given on payment (I4) | **[exists — 0024]** (interface brief I6) |
 
 Each invariant gets a DB test in `tests/db` that tries to break it and expects the specific error.
 
