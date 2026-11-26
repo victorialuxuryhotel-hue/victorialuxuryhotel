@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { Minus, Plus } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
+import { formatNaira, plural } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 
 function isoDate(d: Date) {
@@ -24,8 +25,11 @@ const MAX_GUESTS = 6;
 export function BookingBar({
   variant = "floating",
   defaults,
+  nightlyKobo,
 }: {
   variant?: "floating" | "inline" | "stacked";
+  /** Show what the chosen dates cost at this nightly rate. */
+  nightlyKobo?: number;
   defaults?: { checkIn?: string; checkOut?: string; guests?: string };
 }) {
   const today = useSyncExternalStore(noopSubscribe, () => isoDate(new Date()), () => "");
@@ -35,6 +39,7 @@ export function BookingBar({
   const checkIn = checkInValue || today;
   const checkOut = checkOutValue || addDays(checkIn, 1);
   const row = variant !== "stacked";
+  const nights = checkIn && checkOut ? Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 864e5) : 0;
 
   const label = "text-xs font-semibold uppercase tracking-[0.16em] text-ink-500 sm:text-xs sm:tracking-[0.18em]";
   const field = "mt-0.5 block w-full min-w-0 border-0 bg-transparent p-0 text-base font-medium text-navy-950 focus:outline-none focus:ring-0 sm:mt-1";
@@ -112,6 +117,12 @@ export function BookingBar({
           <span className="hidden sm:inline">Check availability</span>
         </button>
       </div>
+      {nightlyKobo && nights > 0 ? (
+        <p aria-live="polite" className="col-span-2 flex justify-between gap-4 bg-white px-3 py-3 text-sm text-ink-600 tabular-nums">
+          <span>{formatNaira(nightlyKobo)} × {plural(nights, "night")}</span>
+          <span className="font-semibold text-navy-950">{formatNaira(nightlyKobo * nights)}</span>
+        </p>
+      ) : null}
     </form>
   );
 }

@@ -7,7 +7,13 @@ import { undoChange } from "@/server/reservations";
 
 const UNDO_SECONDS = 10;
 
-type Feedback = { message: string; undo?: { reservationId: string; undoId: number } };
+type Feedback = {
+  message: string;
+  /** A booking change the server recorded and can reverse. */
+  undo?: { reservationId: string; undoId: number };
+  /** Any other change: puts things back and says what happened. */
+  revert?: { run: () => Promise<ActionResult<unknown>>; message: string };
+};
 type Shown = Feedback & { at: number; key: number };
 
 const FeedbackContext = createContext<(f: Feedback) => void>(() => {});
@@ -39,27 +45,33 @@ export function ActionFeedbackProvider({ children }: { children: ReactNode }) {
 }
 
 function Banner({ shown, onClose, onReplace }: { shown: Shown; onClose: () => void; onReplace: (f: Feedback) => void }) {
-  const [left, setLeft] = useState(shown.undo ? UNDO_SECONDS : 0);
+  const undoable = Boolean(shown.undo || shown.revert);
+  const [left, setLeft] = useState(undoable ? UNDO_SECONDS : 0);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (!shown.undo) return;
+    if (!undoable) return;
     const timer = setInterval(() => {
       const remaining = UNDO_SECONDS - Math.floor((Date.now() - shown.at) / 1000);
       setLeft(Math.max(0, remaining));
       if (remaining <= 0) clearInterval(timer);
     }, 250);
     return () => clearInterval(timer);
-  }, [shown]);
+  }, [shown, undoable]);
 
   function undo() {
-    if (!shown.undo) return;
-    const { reservationId, undoId } = shown.undo;
+    const { undo: booking, revert } = shown;
     startTransition(async () => {
-      const result = await undoChange(reservationId, undoId);
-      if (result.ok) onReplace({ message: result.data.message });
-      else setError(result.message);
+      if (revert) {
+        const result = await revert.run();
+        if (result.ok) onReplace({ message: revert.message });
+        else setError(result.message);
+      } else if (booking) {
+        const result = await undoChange(booking.reservationId, booking.undoId);
+        if (result.ok) onReplace({ message: result.data.message });
+        else setError(result.message);
+      }
     });
   }
 
@@ -71,7 +83,7 @@ function Banner({ shown, onClose, onReplace }: { shown: Shown; onClose: () => vo
           <p>{shown.message}</p>
           {error ? <p role="alert" className="mt-1 text-gold-200">{error}</p> : null}
         </div>
-        {shown.undo && left > 0 && !error ? (
+        {undoable && left > 0 && !error ? (
           <button
             type="button"
             onClick={undo}

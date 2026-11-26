@@ -5,22 +5,71 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/form";
 import { updateRoomStatus } from "@/server/rooms";
 import { ActionButton } from "./action-form";
+import { useActionFeedback, withFeedback } from "./action-feedback";
 import { keepValues } from "@/lib/forms";
 
-export function RoomQuickActions({ roomId, readiness, maintenance, large = false, inline = false }: { roomId: string; readiness: string; maintenance: boolean; large?: boolean; inline?: boolean }) {
+const readinessMessage = {
+  ready: "marked ready",
+  cleaning_in_progress: "marked as being cleaned",
+  needs_cleaning: "marked for cleaning",
+} as const;
+
+export function RoomQuickActions({ roomId, number, readiness, maintenance, note, large = false, inline = false }: {
+  roomId: string;
+  number: string;
+  readiness: string;
+  maintenance: boolean;
+  note?: string;
+  large?: boolean;
+  inline?: boolean;
+}) {
   const size = large ? "lg" : "sm";
-  const [state, action, pending] = useActionState(updateRoomStatus, null);
-  const set = (value: string) => ({ roomId, readiness: value });
+  const feedback = useActionFeedback();
+  /** Announce a change, with the fields that would put the room back as it was. */
+  const changed = (what: string, previous: Record<string, string>) => () => {
+    const fields = new FormData();
+    for (const [k, v] of Object.entries({ roomId, ...previous })) fields.set(k, v);
+    feedback({
+      message: `Room ${number} ${what}.`,
+      revert: { run: () => updateRoomStatus(null, fields), message: `Room ${number} is back as it was.` },
+    });
+  };
+  const [state, action, pending] = useActionState(
+    withFeedback(updateRoomStatus, changed("taken out of service", { serviceStatus: "in_service" })),
+    null,
+  );
+  const readinessButton = (value: keyof typeof readinessMessage, label: string, variant?: "secondary") =>
+    readiness === value ? null : (
+      <ActionButton
+        action={updateRoomStatus}
+        fields={{ roomId, readiness: value }}
+        size={size}
+        variant={variant}
+        className="items-stretch [&_button]:w-full"
+        onSuccess={changed(readinessMessage[value], { readiness })}
+      >
+        {label}
+      </ActionButton>
+    );
   return (
     <div className={inline ? "flex flex-wrap items-start gap-2" : "space-y-3"}>
       <div className={inline ? "flex flex-wrap items-start gap-2" : "grid grid-cols-1 gap-2"}>
-        {readiness !== "ready" ? <ActionButton action={updateRoomStatus} fields={set("ready")} size={size} className="items-stretch [&_button]:w-full">Mark ready</ActionButton> : null}
-        {readiness !== "cleaning_in_progress" ? <ActionButton action={updateRoomStatus} fields={set("cleaning_in_progress")} size={size} variant="secondary" className="items-stretch [&_button]:w-full">Cleaning in progress</ActionButton> : null}
-        {readiness !== "needs_cleaning" ? <ActionButton action={updateRoomStatus} fields={set("needs_cleaning")} size={size} variant="secondary" className="items-stretch [&_button]:w-full">Needs cleaning</ActionButton> : null}
+        {readinessButton("ready", "Mark ready")}
+        {readinessButton("cleaning_in_progress", "Cleaning in progress", "secondary")}
+        {readinessButton("needs_cleaning", "Needs cleaning", "secondary")}
       </div>
       <div className={inline ? undefined : "border-t border-hairline pt-3"}>
         {maintenance ? (
-          <ActionButton action={updateRoomStatus} fields={{ roomId, serviceStatus: "in_service" }} size={size} variant="secondary" className="items-stretch [&_button]:w-full">Return to service</ActionButton>
+          <ActionButton
+            action={updateRoomStatus}
+            fields={{ roomId, serviceStatus: "in_service" }}
+            size={size}
+            variant="secondary"
+            className="items-stretch [&_button]:w-full"
+            onSuccess={changed("returned to service", { serviceStatus: "maintenance", note: note ?? "" })}
+          >
+            Return to service
+          </ActionButton>
         ) : (
           <form action={action} onSubmit={keepValues(action)} className={inline ? "flex flex-wrap items-center gap-2" : "space-y-2"}>
             <input type="hidden" name="roomId" value={roomId} />

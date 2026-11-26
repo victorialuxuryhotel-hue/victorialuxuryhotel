@@ -10,7 +10,7 @@ import { ReservationTable } from "@/components/management/reservation-table";
 import { FilterSelect, ListToolbar, Tabs } from "@/components/management/toolbar";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { EmptyState, LoadingState } from "@/components/ui/feedback";
+import { EmptyState, ListSkeleton } from "@/components/ui/feedback";
 import { bookingSource } from "@/domain/status";
 import { requireStaff } from "@/server/auth";
 import { hotelToday, listReservations, tabCounts, type ReservationTab } from "@/server/queries/reservations";
@@ -79,7 +79,7 @@ export default function ReservationsPage(props: PageProps<"/app/reservations">) 
         actions={<Suspense fallback={null}><NewReservationButton /></Suspense>}
       />
       <div className="px-4 py-6 lg:px-8">
-        <Suspense fallback={<LoadingState />}>
+        <Suspense fallback={<ListSkeleton label="Loading reservations" />}>
           <Content searchParams={props.searchParams} />
         </Suspense>
       </div>

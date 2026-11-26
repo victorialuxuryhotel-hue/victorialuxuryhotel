@@ -97,7 +97,7 @@ export function RoomBoard({ rooms, interactive = true }: { rooms: Array<RoomTile
                         key={`${r.state}-${r.readiness}-${r.serviceStatus ?? ""}`}
                         className={tileClass}
                         stateLabel={`${roomBoardState[r.state].label}${r.readiness !== "ready" && r.state !== "maintenance" ? ` · ${r.readiness.replace(/_/g, " ")}` : ""}`}
-                        room={{ id: r.id, number: r.number, category: r.category, readiness: r.readiness, maintenance: r.serviceStatus === "maintenance" || r.state === "maintenance" }}
+                        room={{ id: r.id, number: r.number, category: r.category, readiness: r.readiness, maintenance: r.serviceStatus === "maintenance" || r.state === "maintenance", note: r.note }}
                       >
                         {body}
                       </InteractiveTile>

@@ -30,7 +30,7 @@ export function RoomTile({
 }: {
   children: React.ReactNode;
   className?: string;
-  room: { id: string; number: string; category: string; readiness: string; maintenance: boolean };
+  room: { id: string; number: string; category: string; readiness: string; maintenance: boolean; note?: string };
   stateLabel: string;
 }) {
   const { selected, select, bar } = useContext(SelectionContext);
@@ -45,7 +45,7 @@ export function RoomTile({
     select(room.id);
   }
 
-  const actions = <RoomQuickActions roomId={room.id} readiness={room.readiness} maintenance={room.maintenance} large={sheet} inline={!sheet} />;
+  const actions = <RoomQuickActions roomId={room.id} number={room.number} readiness={room.readiness} maintenance={room.maintenance} note={room.note} large={sheet} inline={!sheet} />;
 
   return (
     <div className="relative h-full">

@@ -58,17 +58,32 @@ export function NextUp({ arrivals, departures, today, canAct }: Movements) {
   );
 }
 
-export type Task = { key: string; title: string; detail: string; action: string; href: string; urgency: "high" | "medium" | "low" };
+export type Task = {
+  key: string;
+  title: string;
+  detail: string;
+  action: string;
+  href: string;
+  urgency: "high" | "medium" | "low";
+  /** Does the task right here; the button then opens this instead of leaving the page. */
+  inline?: React.ReactNode;
+};
 
 /** Everything waiting on a member of staff, written as tasks, most urgent first. */
-export function dashboardTasks({ attention, arrivals, inHouse, rooms }: { attention: ReservationRow[]; arrivals: ReservationRow[]; inHouse: ReservationRow[]; rooms: RoomTile[] }): Task[] {
+export function dashboardTasks({ attention, arrivals, inHouse, rooms, assign }: {
+  attention: ReservationRow[];
+  arrivals: ReservationRow[];
+  inHouse: ReservationRow[];
+  rooms: RoomTile[];
+  assign?: (r: ReservationRow) => React.ReactNode;
+}): Task[] {
   const flagged = new Set(attention.map((r) => r.id));
   const waiting = arrivals.filter((r) => !flagged.has(r.id));
   const out = rooms.filter((r) => r.state === "maintenance");
   const tasks: Task[] = [
     ...attention.map((r): Task => ({ key: `a-${r.id}`, title: `Review ${r.guestName}'s booking`, detail: `${r.reference} · ${r.attention}`, action: "Review", href: href(r), urgency: "high" })),
     ...waiting.filter((r) => r.status === "pending_payment").map((r): Task => ({ key: `p-${r.id}`, title: `Take payment from ${r.guestName}`, detail: `Arrives today · ${formatNaira(balanceOf(r))} due`, action: "Take payment", href: href(r), urgency: "medium" })),
-    ...waiting.filter((r) => !r.roomNumber).map((r): Task => ({ key: `r-${r.id}`, title: `Assign a room to ${r.guestName}`, detail: `${r.category} · arrives today`, action: "Assign room", href: href(r), urgency: "medium" })),
+    ...waiting.filter((r) => !r.roomNumber).map((r): Task => ({ key: `r-${r.id}`, title: `Assign a room to ${r.guestName}`, detail: `${r.category} · arrives today`, action: "Assign room", href: href(r), urgency: "medium", inline: assign?.(r) })),
     ...inHouse.filter((r) => !flagged.has(r.id) && balanceOf(r) > 0).map((r): Task => ({ key: `b-${r.id}`, title: `Collect ${formatNaira(balanceOf(r))} from ${r.guestName}`, detail: `${roomText(r)} · staying now`, action: "Add payment", href: href(r), urgency: "medium" })),
   ];
   if (out.length) {
@@ -92,7 +107,14 @@ export function ToDo({ tasks }: { tasks: Task[] }) {
                 <p className="text-sm font-medium text-ink-900">{t.title}</p>
                 <p className="text-[13px] text-ink-500">{t.detail}</p>
               </div>
-              <Link href={t.href} className={buttonStyles({ size: "sm", className: "h-[38px] shrink-0 text-[13px] whitespace-nowrap" })}>{t.action}</Link>
+              {t.inline ? (
+                <details className="group contents">
+                  <summary className={buttonStyles({ size: "sm", className: "h-[38px] shrink-0 cursor-pointer list-none text-[13px] whitespace-nowrap [&::-webkit-details-marker]:hidden" })}>{t.action}</summary>
+                  <div className="-mx-[18px] -mb-3 basis-[calc(100%+36px)]">{t.inline}</div>
+                </details>
+              ) : (
+                <Link href={t.href} className={buttonStyles({ size: "sm", className: "h-[38px] shrink-0 text-[13px] whitespace-nowrap" })}>{t.action}</Link>
+              )}
             </li>
           ))}
         </ul>

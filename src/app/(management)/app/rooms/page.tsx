@@ -8,7 +8,7 @@ import { RoomBoard, RoomStateChips } from "@/components/management/room-board";
 import { roomBoardState, type RoomBoardState } from "@/domain/status";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
-import { EmptyState, LoadingState } from "@/components/ui/feedback";
+import { EmptyState, TileSkeleton } from "@/components/ui/feedback";
 import { can, canAny } from "@/lib/auth/permissions";
 import { requireStaff } from "@/server/auth";
 import { listCategories, roomBoard } from "@/server/queries/rooms";
@@ -55,7 +55,7 @@ export default function RoomsPage(props: PageProps<"/app/rooms">) {
         description="Live status, readiness and maintenance."
         actions={<Link href="/app/rooms/categories" className={buttonStyles({ variant: "secondary" })}>Categories & rates</Link>}
       />
-      <div className="px-4 py-6 lg:px-8"><Suspense fallback={<LoadingState />}><Content searchParams={props.searchParams} /></Suspense></div>
+      <div className="px-4 py-6 lg:px-8"><Suspense fallback={<TileSkeleton label="Loading rooms" />}><Content searchParams={props.searchParams} /></Suspense></div>
     </>
   );
 }

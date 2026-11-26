@@ -29,6 +29,29 @@ export function SkeletonRows({ rows = 4, label = "Loading" }: { rows?: number; l
   );
 }
 
+export function ListSkeleton({ label = "Loading", rows = 6 }: { label?: string; rows?: number }) {
+  return (
+    <div className="overflow-hidden rounded-card border border-hairline bg-white">
+      <div className="border-b border-hairline p-3"><div className="skeleton h-10" /></div>
+      <SkeletonRows rows={rows} label={label} />
+    </div>
+  );
+}
+
+export function TileSkeleton({ label = "Loading", tiles = 12 }: { label?: string; tiles?: number }) {
+  return (
+    <div role="status" aria-label={label} aria-busy className="delayed-show grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2.5">
+      {Array.from({ length: tiles }, (_, i) => (
+        <div key={i} className="space-y-2 rounded-xl border border-hairline bg-white p-3">
+          <div className="skeleton h-4 w-2/5" />
+          <div className="skeleton h-3 w-3/4" />
+          <div className="skeleton h-3 w-1/2" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function EmptyState({ title, description, action, icon }: { title: string; description?: string; action?: ReactNode; icon?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-card border border-hairline bg-white px-6 py-12 text-center">

@@ -93,8 +93,8 @@ async function RoomType({ params }: { params: Promise<{ slug: string }> }) {
           <aside className="lg:w-[380px] lg:shrink-0">
             <div id="availability" className="scroll-mt-24 rounded-card border border-hairline bg-white p-5 shadow-card lg:sticky lg:top-24">
               <p className="text-[13px] text-ink-500"><span className="text-[1.625rem] font-semibold text-navy-950 tabular-nums">{formatNaira(c.fromRateKobo)}</span> / night</p>
-              <div className="mt-4"><BookingBar variant="stacked" /></div>
-              <p className="mt-3 text-xs text-ink-500">See the exact total for your dates. Instant confirmation once paid. Secure payment by Paystack.</p>
+              <div className="mt-4"><BookingBar variant="stacked" nightlyKobo={c.fromRateKobo} /></div>
+              <p className="mt-3 text-xs text-ink-500">Check availability to confirm your total. Instant confirmation once paid. Secure payment by Paystack.</p>
             </div>
           </aside>
         </div>

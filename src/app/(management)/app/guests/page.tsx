@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/management/page-header";
 import { PAGE_SIZE, Pager, pageFrom } from "@/components/management/pager";
 import { ListToolbar } from "@/components/management/toolbar";
 import { Card } from "@/components/ui/card";
-import { EmptyState, LoadingState } from "@/components/ui/feedback";
+import { EmptyState, ListSkeleton } from "@/components/ui/feedback";
 import { requireStaff } from "@/server/auth";
 import { listGuests } from "@/server/queries/guests";
 
@@ -40,7 +40,7 @@ export default function GuestsPage(props: PageProps<"/app/guests">) {
   return (
     <>
       <PageHeader title="Guests" description="Contact details and booking history." />
-      <div className="px-4 py-6 lg:px-8"><Suspense fallback={<LoadingState />}><Content searchParams={props.searchParams} /></Suspense></div>
+      <div className="px-4 py-6 lg:px-8"><Suspense fallback={<ListSkeleton label="Loading guests" />}><Content searchParams={props.searchParams} /></Suspense></div>
     </>
   );
 }

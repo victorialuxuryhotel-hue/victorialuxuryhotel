@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { ArrowRight, CalendarPlus } from "lucide-react";
 import { DashboardSkeleton, NextUp, ToDo, TodayList, dashboardTasks } from "@/components/management/dashboard";
 import { PageHeader } from "@/components/management/page-header";
+import { AssignRoomForm } from "@/components/management/reservation-actions";
 import { RoomBoardLegend, roomStateColour } from "@/components/management/room-board";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -15,7 +16,8 @@ import { cn } from "@/lib/utils/cn";
 import { requireStaff } from "@/server/auth";
 import { awaitingPaymentCount, departmentsOverview, revenueSummary } from "@/server/queries/dashboard";
 import { listReservations, movements } from "@/server/queries/reservations";
-import { roomBoard } from "@/server/queries/rooms";
+import { assignableRooms, roomBoard } from "@/server/queries/rooms";
+import type { ReservationRow } from "@/domain/views";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -104,6 +106,12 @@ async function Content() {
   if (staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager") redirect("/app/sales");
   const [m, rooms, awaiting, attention] = await Promise.all([movements(), roomBoard(), awaitingPaymentCount(), listReservations({ tab: "attention" })]);
   const canAct = can(staff.role, "reservations.manage");
+  const unassigned = canAct ? m.arrivals.filter((a) => !a.roomNumber) : [];
+  const options = new Map(await Promise.all(unassigned.map(async (a) => [a.id, await assignableRooms(a.id, a.checkIn, a.checkOut)] as const)));
+  const assign = (r: ReservationRow) => {
+    const free = options.get(r.id);
+    return free ? <AssignRoomForm reservationId={r.id} rooms={free} booked={r.category} /> : undefined;
+  };
   const chips: Array<[number, string, boolean]> = [
     [m.arrivals.length, m.arrivals.length === 1 ? "arrival" : "arrivals", false],
     [m.departures.length, m.departures.length === 1 ? "departure" : "departures", false],
@@ -123,7 +131,7 @@ async function Content() {
       </ul>
 
       <div className="grid items-start gap-5 xl:grid-cols-[1.4fr_1fr]">
-        <ToDo tasks={dashboardTasks({ attention, arrivals: m.arrivals, inHouse: m.inHouse, rooms })} />
+        <ToDo tasks={dashboardTasks({ attention, arrivals: m.arrivals, inHouse: m.inHouse, rooms, assign })} />
         <Card>
           <CardHeader title="Rooms right now" action={<Link href="/app/rooms" className="text-[13px] font-medium text-navy-800">Room board</Link>} />
           <div className="px-[18px] py-4">
