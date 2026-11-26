@@ -19,7 +19,7 @@ import { recentMonths, reportRange } from "@/server/domain/reports";
 
 export const metadata: Metadata = { title: "Sales reports" };
 
-const FIXED = { today: "Today", "7d": "7 days", month: "This month" } as const;
+const FIXED = { today: "Today", "7d": "7 days", "14d": "14 days", month: "This month" } as const;
 const monthName = (m: string) => new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`));
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 const chip = (on: boolean) => cn("inline-flex min-h-10 shrink-0 items-center rounded-full border px-4 text-sm whitespace-nowrap", on ? "border-navy-800 bg-navy-800 text-white" : "border-ink-300 bg-ivory-50 text-ink-700 hover:bg-ink-900/5");
