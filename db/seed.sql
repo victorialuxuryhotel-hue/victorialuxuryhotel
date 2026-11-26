@@ -1,17 +1,17 @@
 -- =============================================================================
 -- LOCAL DEVELOPMENT SEED ONLY (`pnpm db:fresh`). Never run against production.
 --
--- PLACEHOLDER DATA: the hotel has not yet supplied room rates, the split of its
--- 29 rooms across categories, descriptions or photos. The figures below exist
--- only so the booking engine can be developed and tested. Production
+-- Nightly rates are the hotel's. The rest is PLACEHOLDER DATA: it has not yet
+-- supplied the split of its 29 rooms across categories, descriptions or photos,
+-- so those exist only for development and testing. Production
 -- categories and rooms are entered by hotel staff in the management app.
 -- =============================================================================
 
 INSERT INTO room_categories (id, slug, name, short_description, nightly_rate_kobo, max_occupancy, sort_order) VALUES
-  ('00000000-0000-4000-8000-000000000001', 'standard',  'Standard',  '[Placeholder] Awaiting description from the hotel.', 4000000, 2, 1),
-  ('00000000-0000-4000-8000-000000000002', 'deluxe',    'Deluxe',    '[Placeholder] Awaiting description from the hotel.', 5500000, 2, 2),
-  ('00000000-0000-4000-8000-000000000003', 'suite',     'Suite',     '[Placeholder] Awaiting description from the hotel.', 8500000, 3, 3),
-  ('00000000-0000-4000-8000-000000000004', 'apartment', 'Apartment', '[Placeholder] Awaiting description from the hotel.', 12000000, 4, 4);
+  ('00000000-0000-4000-8000-000000000001', 'standard',  'Standard',  '[Placeholder] Awaiting description from the hotel.', 5500000, 2, 1),
+  ('00000000-0000-4000-8000-000000000002', 'deluxe',    'Deluxe',    '[Placeholder] Awaiting description from the hotel.', 7500000, 2, 2),
+  ('00000000-0000-4000-8000-000000000003', 'suite',     'Suite',     '[Placeholder] Awaiting description from the hotel.', 10800000, 3, 3),
+  ('00000000-0000-4000-8000-000000000004', 'apartment', 'Apartment', '[Placeholder] Awaiting description from the hotel.', 23000000, 4, 4);
 
 -- 29 rooms. Placeholder split: Standard 12, Deluxe 9, Suite 5, Apartment 3.
 WITH RECURSIVE n(x) AS (SELECT 101 UNION ALL SELECT x + 1 FROM n WHERE x < 403),
