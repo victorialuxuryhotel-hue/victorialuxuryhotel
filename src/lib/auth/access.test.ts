@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { can, canAny } from "./permissions";
 
@@ -27,7 +27,7 @@ describe("staff access", () => {
     const open = pages.filter((f) => {
       const s = readFileSync(f, "utf8");
       // Account and This station are for every signed-in staff member (the staff layout requires sign-in).
-      return !/can(Any)?\(staff\.role/.test(s) && !/redirect\(/.test(s) && !f.includes("/account/") && !f.includes("/station/");
+      return !/can(Any)?\(staff\.role/.test(s) && !/redirect\(/.test(s) && !f.split(sep).some((part) => part === "account" || part === "station");
     });
     expect(open).toEqual([]);
   });
