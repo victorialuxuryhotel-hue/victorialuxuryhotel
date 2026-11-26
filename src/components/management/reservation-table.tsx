@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 import type { ReservationRow } from "@/domain/views";
 import { formatDate, formatNaira, nightsBetween, plural } from "@/lib/format";
+import { opensPanel } from "@/lib/panel";
 import { PaidProgress, ReservationBadge, SourceBadge } from "./badges";
 
 /** today: the hotel date from the page, so dates in another year show their year. */
@@ -15,7 +16,7 @@ export function ReservationTable({ rows, hrefFor, today, inHouse = false }: { ro
       <ul className="divide-y divide-hairline md:hidden">
         {rows.map((r) => (
           <li key={r.id}>
-            <Link href={hrefFor(r)} className="block px-4 py-4 hover:bg-ivory-50">
+            <Link href={hrefFor(r)} scroll={!opensPanel(hrefFor(r))} className="block px-4 py-4 hover:bg-ivory-50">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium text-ink-900">{r.guestName}</p>
@@ -56,7 +57,7 @@ export function ReservationTable({ rows, hrefFor, today, inHouse = false }: { ro
             {rows.map((r) => (
               <TR key={r.id} className="cursor-pointer">
                 <TD>
-                  <Link href={hrefFor(r)} className="font-medium text-ink-900 hover:text-navy-700">{r.guestName}</Link>
+                  <Link href={hrefFor(r)} scroll={!opensPanel(hrefFor(r))} className="font-medium text-ink-900 hover:text-navy-700">{r.guestName}</Link>
                   <p className="font-mono text-xs text-ink-500">{r.reference}</p>
                 </TD>
                 {inHouse ? (

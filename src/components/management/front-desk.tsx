@@ -8,6 +8,7 @@ import { ReservationBadge, SourceBadge } from "./badges";
 import { nextStep, owedOf } from "@/domain/next-step";
 import { movementProgress } from "@/domain/today";
 import { cn } from "@/lib/utils/cn";
+import { opensPanel } from "@/lib/panel";
 import { CheckInButton, CheckOutButton, TakePaymentLink } from "./reservation-actions";
 
 export function MovementList({
@@ -68,7 +69,7 @@ export function MovementList({
               <li key={r.id} className={cn("flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5 sm:py-4", overdue && "bg-danger-50")}>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Link href={hrefFor(r)} className="font-medium text-ink-900 hover:text-navy-700">{r.guestName}</Link>
+                    <Link href={hrefFor(r)} scroll={!opensPanel(hrefFor(r))} className="font-medium text-ink-900 hover:text-navy-700">{r.guestName}</Link>
                     <ReservationBadge status={r.status} />
                     <SourceBadge source={r.source} />
                     {overdue ? <span className="rounded-full border border-danger-600/30 bg-white px-2 py-0.5 text-xs font-semibold text-danger-700">Overdue since {formatDate(r.checkOut, { year: false })}</span> : null}

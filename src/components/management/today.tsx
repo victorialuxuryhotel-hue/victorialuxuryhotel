@@ -17,6 +17,8 @@ import { ReservationTable } from "./reservation-table";
 
 export type TodayLinks = {
   reservation: (id: string) => string;
+  /** The booking side panel (I7); falls back to the booking page. */
+  panel?: (r: { id: string; reference: string }) => string;
   pay: (id: string) => string;
   rooms: (state?: "available" | "occupied" | "dirty" | "maintenance") => string;
   /** New booking for tonight, with the room type chosen. */
@@ -117,7 +119,7 @@ export function TodayView({
   /** "Signed in as … · Switch user" for the shared front desk computer. */
   signedIn?: ReactNode;
 }) {
-  const href = (r: { id: string }) => links.reservation(r.id);
+  const href = (r: { id: string; reference: string }) => (links.panel ? links.panel(r) : links.reservation(r.id));
   const needsCount = needs.length + tonight.overbooked.length;
   return (
     <ActionFeedbackProvider>
@@ -175,7 +177,7 @@ export function TodayView({
                   return (
                     <li key={n.reservation.id} data-kind={n.kind} className="flex min-h-16 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5">
                       <span aria-hidden className={cn("size-2 shrink-0 rounded-full", d.urgent ? "bg-danger-600" : "bg-gold-500")} />
-                      <Link href={links.reservation(n.reservation.id)} className="min-w-0 flex-1 hover:text-navy-700">
+                      <Link href={href(n.reservation)} scroll={!links.panel} className="min-w-0 flex-1 hover:text-navy-700">
                         <span className="block font-medium text-ink-900">{d.title}</span>
                         <span className={cn("block text-sm", d.urgent ? "text-danger-700" : "text-ink-500")}>{d.reason}</span>
                       </Link>

@@ -134,6 +134,14 @@ export async function movements(day?: string) {
   return { today: d, arrivals: arrivals.map(toRow), departures: departures.map(toRow), inHouse: inHouse.map(toRow), missed: missed.map(toRow), progress };
 }
 
+/** The booking side panel (I7) is addressed by reference (?booking=VL-…), which staff read and say aloud. */
+export async function reservationIdByReference(reference: string): Promise<string | null> {
+  await authorizeRead(["reservations.manage", "payments.record", "reports.view"]);
+  if (!/^VL-[A-Z0-9]{4,12}$/i.test(reference)) return null;
+  const r = await first<{ id: string }>(await getDb(), "SELECT id FROM reservations WHERE reference = ? COLLATE NOCASE", reference);
+  return r?.id ?? null;
+}
+
 export async function getReservation(
   id: string,
 ): Promise<(ReservationDetail & { categoryId: string; roomId?: string; guestId: string; maxGuests: number; publicToken: string }) | null> {

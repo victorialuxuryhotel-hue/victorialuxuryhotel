@@ -8,6 +8,8 @@ import { CalendarPlus } from "lucide-react";
 import { PageHeader } from "@/components/management/page-header";
 import { PAGE_SIZE, Pager, pageFrom } from "@/components/management/pager";
 import { ReservationTable } from "@/components/management/reservation-table";
+import { BookingPanel } from "@/components/management/booking-panel";
+import { withBooking, withoutBooking } from "@/lib/panel";
 import { FilterSelect, ListToolbar, Tabs } from "@/components/management/toolbar";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -43,6 +45,8 @@ async function Content({ searchParams }: { searchParams: SP }) {
   const rows = fetched.slice(0, PAGE_SIZE);
   const href = (key: string) => `/app/reservations?tab=${key}`;
   return (
+    <>
+    {one(sp.booking) ? <BookingPanel reference={one(sp.booking)!} closeHref={withoutBooking("/app/reservations", sp)} /> : null}
     <Card>
       <Tabs items={tabs.map((t) => ({ label: t.label, href: href(t.key), active: t.key === tab, count: t.key === "all" ? undefined : counts[t.key as keyof typeof counts] }))} />
       <ListToolbar
@@ -59,13 +63,14 @@ async function Content({ searchParams }: { searchParams: SP }) {
       />
       {rows.length ? (
         <>
-          <ReservationTable rows={rows} hrefFor={(r) => `/app/reservations/${r.id}`} today={hotelToday()} />
+          <ReservationTable rows={rows} hrefFor={(r) => withBooking("/app/reservations", sp, r.reference)} today={hotelToday()} />
           <Pager basePath="/app/reservations" params={{ tab, q, status: one(sp.status), source: one(sp.source) }} page={page} hasMore={fetched.length > PAGE_SIZE} />
         </>
       ) : (
         <div className="p-5"><EmptyState title={q ? "No bookings match your search" : "No bookings here"} description={q ? "Try a reference, a guest's name or phone number." : undefined} /></div>
       )}
     </Card>
+    </>
   );
 }
 

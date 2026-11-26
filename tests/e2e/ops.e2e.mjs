@@ -168,7 +168,7 @@ for (const id of pagingIds) {
   const sourceBadges = (page) => page.$$eval("[data-source]", (b) => b.filter((x) => x.offsetParent).map((x) => x.textContent.trim()));
   const todaySources = await sourceBadges(p);
   // Arriving / leaving lists and the in-house table (Needs you now rows are actions, not bookings).
-  const todayRows = await p.$$eval(".rounded-card ul > li:not([data-kind]):has(a[href^='/app/reservations/']), .rounded-card tbody tr", (l) => l.filter((x) => x.offsetParent).length);
+  const todayRows = await p.$$eval(".rounded-card ul > li:not([data-kind]):has(a[href^='/app/reservations/'], a[href*='booking=']), .rounded-card tbody tr", (l) => l.filter((x) => x.offsetParent).length);
   check("every booking on Today shows where it came from", todayRows > 0 && todaySources.length === todayRows && todaySources.every((s) => SOURCES.test(s)), `${todaySources.length} badges, ${todayRows} rows`);
   const card = await p.$("[data-tonight]:has(a[href*='/app/reservations/new?type='])");
   check("Today shows the room types free tonight with New booking", Boolean(card) || /Fully booked tonight/.test(await text(p)));
@@ -212,6 +212,56 @@ for (const id of pagingIds) {
     asked: document.querySelector("[data-asked-room]")?.getAttribute("data-asked-room") ?? null,
   })).then((f) => (f.type && f.asked ? f : null)), "form prefilled");
   check("an empty night opens New booking with the type, date and room", form.type === q.get("type") && form.checkIn === q.get("checkIn") && form.asked === roomNumber, JSON.stringify(form));
+  await ctx.close();
+}
+
+{
+  // I7: booking side panel from Today, the calendar and Bookings. URL-backed; Esc closes; same next action as the booking page.
+  const { ctx, p } = await as("front_desk");
+  await p.setViewport({ width: 1366, height: 768 });
+  const panelRef = () => p.evaluate(() => document.querySelector("[data-panel-reference]")?.getAttribute("data-panel-reference") ?? null);
+  const nextText = (sel) => p.evaluate((s) => document.querySelector(s)?.textContent?.trim() ?? null, sel);
+
+  await go(p, "/app/today");
+  const link = await p.$("a[href^='/app/today?booking=']");
+  check("Today's guest names open the side panel", Boolean(link));
+  const ref = new URL(await link.evaluate((a) => a.getAttribute("href")), "http://x").searchParams.get("booking");
+  await until(async () => {
+    await p.evaluate((r) => document.querySelector(`a[href='/app/today?booking=${r}']`)?.click(), ref);
+    return (await panelRef()) === ref;
+  }, "panel opens");
+  check("the panel opens for that booking, with the URL", p.url().endsWith(`/app/today?booking=${ref}`), p.url());
+  check("and shows Total · Paid · Owes", /Total[\s\S]*Paid[\s\S]*Owes/i.test(await p.$eval("[data-money]", (d) => d.innerText)));
+  const panelAction = await nextText("[data-next-action]");
+  await p.keyboard.press("Escape");
+  await until(async () => !(await p.$("[data-booking-panel]")) && p.url().endsWith("/app/today"), "Esc closes");
+  check("Esc closes it and the URL goes back to Today", true);
+  await go(p, `/app/today?booking=${ref}`);
+  check("refreshing with the link opens the panel again", (await until(panelRef, "panel after refresh")) === ref);
+  const id = await val("SELECT id FROM reservations WHERE reference = ?", ref);
+  await go(p, `/app/reservations/${id}`);
+  await waitForText(p, new RegExp(ref));
+  const pageAction = await p.evaluate(() => {
+    const b = [...document.querySelectorAll("a, button")].find((x) => /^(Take payment|Assign a room|Check in|Check out)/.test(x.textContent.trim()) && x.offsetParent);
+    return b?.textContent.trim() ?? "";
+  });
+  check("the panel's next action is the booking page's", (panelAction ?? "") === "" ? pageAction === "" : panelAction.startsWith(pageAction.split(" ·")[0]), `${panelAction} | ${pageAction}`);
+
+  await go(p, "/app/calendar");
+  const bar = await p.$("[data-bar]");
+  if (bar) {
+    const barRef = await bar.evaluate((b) => b.getAttribute("data-reference"));
+    await until(async () => {
+      await p.evaluate((r) => document.querySelector(`[data-bar][data-reference='${r}']`)?.click(), barRef);
+      return (await panelRef()) === barRef;
+    }, "calendar panel");
+    check("a calendar bar opens the panel", p.url().includes(`booking=${barRef}`), p.url());
+  }
+
+  await go(p, "/app/reservations?tab=all");
+  const row = await p.$("table a[href*='booking=']");
+  const rowHref = await row.evaluate((a) => a.getAttribute("href"));
+  check("Bookings rows open the panel and keep the tab", /\/app\/reservations\?tab=all&booking=VL-/.test(rowHref), rowHref);
   await ctx.close();
 }
 

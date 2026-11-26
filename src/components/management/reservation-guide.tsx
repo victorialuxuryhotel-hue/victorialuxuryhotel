@@ -121,6 +121,30 @@ function AskManager({ manager, what, onBack }: { manager: ManagerToAsk | null; w
   );
 }
 
+const full = "w-full [&_form]:w-full [&_form]:items-stretch [&_button]:h-12 [&_button]:w-full [&_button]:text-base";
+
+/**
+ * The one next action for a booking, from domain/next-step: the booking page and the side panel (I7)
+ * both use this, so they never disagree. `assignHref` is where "Assign a room" goes.
+ */
+export function NextAction({ r, today, paymentsHref, assignHref = "#change-stay" }: { r: Pick<R, "id" | "status" | "roomNumber" | "checkIn" | "checkOut" | "totalKobo" | "paidKobo" | "pendingKobo">; today: string; paymentsHref: string; assignHref?: string }) {
+  const step = nextStep(r, today);
+  switch (step.kind) {
+    case "take_payment":
+      return <Link href={paymentsHref} className={buttonStyles({ size: "lg", className: "w-full" })}>Take payment · {formatNaira(step.owedKobo)}</Link>;
+    case "assign_room":
+      return <a href={assignHref} className={buttonStyles({ size: "lg", className: "w-full" })}>Assign a room</a>;
+    case "wait_for_arrival":
+      return <Button size="lg" disabled className="w-full">Check in · Arrives {formatDate(step.checkIn, { year: false })}</Button>;
+    case "check_in":
+      return <div className={full}><CheckInButton reservationId={r.id} roomNumber={r.roomNumber} size="lg" /></div>;
+    case "check_out":
+      return <div className={full}><CheckOutButton reservationId={r.id} balanceKobo={0} size="lg" /></div>;
+    default:
+      return null;
+  }
+}
+
 export function NextStepBar({ r, today, paymentsHref, canOverride, manager = null }: { r: R; today: string; paymentsHref: string; canOverride: boolean; manager?: ManagerToAsk | null }) {
   const [sheet, setSheet] = useState<null | "menu" | "cancel" | "noshow" | "override" | "ask">(null);
   const moreRef = useRef<HTMLButtonElement>(null);
@@ -128,26 +152,10 @@ export function NextStepBar({ r, today, paymentsHref, canOverride, manager = nul
   const open = r.status === "pending_payment" || r.status === "confirmed";
   const closed = ["cancelled", "expired", "no_show", "checked_out"].includes(r.status);
   const canPay = balance > 0 && r.status !== "cancelled" && r.status !== "expired";
-  const full = "w-full [&_form]:w-full [&_form]:items-stretch [&_button]:h-12 [&_button]:w-full [&_button]:text-base";
 
   const step = nextStep(r, today);
   const primaryIsPayment = step.kind === "take_payment";
-  const primary: React.ReactNode = (() => {
-    switch (step.kind) {
-      case "take_payment":
-        return <Link href={paymentsHref} className={buttonStyles({ size: "lg", className: "w-full" })}>Take payment · {formatNaira(step.owedKobo)}</Link>;
-      case "assign_room":
-        return <a href="#change-stay" className={buttonStyles({ size: "lg", className: "w-full" })}>Assign a room</a>;
-      case "wait_for_arrival":
-        return <Button size="lg" disabled className="w-full">Check in · Arrives {formatDate(step.checkIn, { year: false })}</Button>;
-      case "check_in":
-        return <div className={full}><CheckInButton reservationId={r.id} roomNumber={r.roomNumber} size="lg" /></div>;
-      case "check_out":
-        return <div className={full}><CheckOutButton reservationId={r.id} balanceKobo={0} size="lg" /></div>;
-      default:
-        return null;
-    }
-  })();
+  const primary = <NextAction r={r} today={today} paymentsHref={paymentsHref} />;
 
   const options: Array<{ label: string; hint: string; onSelect?: () => void; href?: string; disabled?: boolean; manager?: boolean }> = [];
   if (canPay && !primaryIsPayment) options.push({ label: "Take payment", hint: `${formatNaira(balance)} owed`, href: paymentsHref });
@@ -162,7 +170,7 @@ export function NextStepBar({ r, today, paymentsHref, canOverride, manager = nul
   }
   if (open) options.push({ label: "Cancel booking", hint: "Releases the room", onSelect: () => setSheet("cancel") });
 
-  if (!primary && options.length === 0) return null;
+  if (nextStep(r, today).kind === "none" && options.length === 0) return null;
   const subtitle = `${r.guestName} · ${r.category}${r.roomNumber ? ` · Room ${r.roomNumber}` : ""}`;
 
   return (
