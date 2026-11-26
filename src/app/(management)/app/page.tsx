@@ -3,13 +3,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ArrowRight, CalendarPlus } from "lucide-react";
-import { MovementList } from "@/components/management/front-desk";
+import { DashboardSkeleton, NextUp, ToDo, TodayList, dashboardTasks } from "@/components/management/dashboard";
 import { PageHeader } from "@/components/management/page-header";
-import { ReservationTable } from "@/components/management/reservation-table";
-import { RoomBoardLegend } from "@/components/management/room-board";
+import { RoomBoardLegend, roomStateColour } from "@/components/management/room-board";
 import { buttonStyles } from "@/components/ui/button";
-import { Card, CardHeader, Stat, StatGrid } from "@/components/ui/card";
-import { EmptyState, LoadingState } from "@/components/ui/feedback";
+import { Card, CardHeader } from "@/components/ui/card";
+import { LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
 import { formatDate, formatNaira } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
@@ -19,8 +18,6 @@ import { listReservations, movements } from "@/server/queries/reservations";
 import { roomBoard } from "@/server/queries/rooms";
 
 export const metadata: Metadata = { title: "Dashboard" };
-
-const href = (r: { id: string }) => `/app/reservations/${r.id}`;
 
 async function Departments() {
   const d = await departmentsOverview();
@@ -62,19 +59,42 @@ async function Departments() {
 
 async function Revenue() {
   const r = await revenueSummary();
+  const max = Math.max(1, ...r.daily.map((d) => d.kobo));
+  const figures: Array<[string, number, string]> = [
+    ["Received today", r.receivedToday, "Verified payments only"],
+    ["Received this month", r.receivedMonth, "Verified money in, minus refunds"],
+    ["Booked value", r.bookedValue, "Stays this month. Not cash"],
+    ["Outstanding", r.outstanding, "Unpaid on confirmed stays"],
+  ];
   return (
-    <section aria-labelledby="money">
-      <h2 id="money" className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">This month</h2>
-      <StatGrid>
-        <Stat label="Received today" value={formatNaira(r.receivedToday)} caption="Verified payments only" />
-        <Stat label="Received this month" value={formatNaira(r.receivedMonth)} caption="Verified money in: Paystack + offline, minus refunds" />
-        <Stat label="Booked value" value={formatNaira(r.bookedValue)} caption="Stays arriving this month. Not cash received" />
-        <Stat label="Outstanding" value={formatNaira(r.outstanding)} caption="Unpaid balances on confirmed stays" />
-      </StatGrid>
+    <Card className="px-[18px] py-4">
+      <h2 className="sr-only">Money this month</h2>
+      <div className="flex flex-wrap items-end justify-between gap-x-9 gap-y-4">
+        <dl className="flex flex-wrap gap-x-9 gap-y-4">
+          {figures.map(([label, kobo, caption]) => (
+            <div key={label}>
+              <dt className="text-xs text-ink-500">{label}</dt>
+              <dd className="mt-0.5 text-xl font-semibold tabular-nums text-ink-900">{formatNaira(kobo)}</dd>
+              <dd className="text-[11px] text-ink-500">{caption}</dd>
+            </div>
+          ))}
+        </dl>
+        <span className="text-xs text-ink-500">Verified payments, last 14 days</span>
+      </div>
+      <div className="mt-4 flex h-24 items-end gap-[5px]" role="img" aria-label="Bar chart of daily payments received over the last 14 days">
+        {r.daily.map((d) => (
+          <div
+            key={d.day}
+            title={`${formatDate(d.day, { year: false })}: ${formatNaira(d.kobo)}`}
+            className={cn("flex-1 rounded-t-[3px]", d.day === r.today ? "bg-gold-500" : "bg-navy-700")}
+            style={{ height: `${Math.max(3, (Math.max(0, d.kobo) / max) * 96)}px` }}
+          />
+        ))}
+      </div>
       <Link href="/app/reports" className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-navy-800 hover:text-gold-600">
         Daily figures, cash-up and occupancy in Reports <ArrowRight className="size-4" aria-hidden />
       </Link>
-    </section>
+    </Card>
   );
 }
 
@@ -82,47 +102,50 @@ async function Content() {
   const staff = await requireStaff();
   if (staff.role === "front_desk" || staff.role === "hotel_manager") redirect("/app/today");
   if (staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager") redirect("/app/sales");
-  const [m, rooms, awaiting, recent] = await Promise.all([movements(), roomBoard(), awaitingPaymentCount(), listReservations({ tab: "all" })]);
-  const noRoom = m.arrivals.filter((a) => !a.roomNumber).length;
-  const owing = m.departures.filter((d) => d.totalKobo > d.paidKobo).length;
+  const [m, rooms, awaiting, attention] = await Promise.all([movements(), roomBoard(), awaitingPaymentCount(), listReservations({ tab: "attention" })]);
+  const canAct = can(staff.role, "reservations.manage");
+  const chips: Array<[number, string, boolean]> = [
+    [m.arrivals.length, m.arrivals.length === 1 ? "arrival" : "arrivals", false],
+    [m.departures.length, m.departures.length === 1 ? "departure" : "departures", false],
+    [m.inHouse.length, "staying now", false],
+    [awaiting, "awaiting payment", awaiting > 0],
+  ];
   return (
-    <div className="space-y-8 px-4 py-6 lg:px-8">
-      <p className="-mt-2 text-sm text-ink-500">{formatDate(m.today)}</p>
-      <StatGrid>
-        <Stat label="Arrivals today" value={m.arrivals.length} caption={noRoom ? `${noRoom} still need a room` : "All have rooms assigned"} />
-        <Stat label="Departures due" value={m.departures.length} caption={owing ? `${owing} with a balance outstanding` : "No balances outstanding"} />
-        <Stat label="In house" value={m.inHouse.length} caption="Guests checked in now" />
-        <Stat label="Awaiting payment" value={awaiting} caption="Held, not yet paid" />
-      </StatGrid>
+    <div className="space-y-5 px-4 py-5 lg:px-8 lg:py-7">
+      <p className="text-[13px] text-ink-500">{formatDate(m.today)}</p>
+      <NextUp arrivals={m.arrivals} departures={m.departures} today={m.today} canAct={canAct} />
+      <ul className="flex flex-wrap gap-2">
+        {chips.map(([n, label, warn]) => (
+          <li key={label} className={cn("rounded-full border px-3 py-1.5 text-[13px] whitespace-nowrap", warn ? "border-gold-200 bg-warning-50 text-warning-700" : "border-hairline bg-white text-ink-900")}>
+            <strong className="font-bold tabular-nums">{n}</strong> {label}
+          </li>
+        ))}
+      </ul>
 
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <MovementList kind="arrivals" rows={m.arrivals} hrefFor={href} />
+      <div className="grid items-start gap-5 xl:grid-cols-[1.4fr_1fr]">
+        <ToDo tasks={dashboardTasks({ attention, arrivals: m.arrivals, inHouse: m.inHouse, rooms })} />
         <Card>
-          <CardHeader title="Rooms right now" action={<Link href="/app/rooms" className="text-sm font-medium text-navy-800">Room board</Link>} />
-          <div className="p-5">
-            <div className="flex h-3 overflow-hidden rounded-full bg-ivory-200">
+          <CardHeader title="Rooms right now" action={<Link href="/app/rooms" className="text-[13px] font-medium text-navy-800">Room board</Link>} />
+          <div className="px-[18px] py-4">
+            <div className="flex h-2.5 overflow-hidden rounded-full bg-ivory-200">
               {(["occupied", "arriving", "available", "dirty", "maintenance"] as const).map((s) => {
-                const colours = { occupied: "bg-navy-700", arriving: "bg-info-700", available: "bg-success-600", dirty: "bg-warning-600", maintenance: "bg-danger-600" };
                 const n = rooms.filter((r) => r.state === s).length;
-                return n ? <div key={s} className={colours[s]} style={{ width: `${(n / rooms.length) * 100}%` }} /> : null;
+                return n ? <div key={s} className={roomStateColour[s]} style={{ width: `${(n / rooms.length) * 100}%` }} /> : null;
               })}
             </div>
-            <div className="mt-5"><RoomBoardLegend rooms={rooms} /></div>
+            <div className="mt-3.5"><RoomBoardLegend rooms={rooms} stacked /></div>
           </div>
         </Card>
       </div>
 
+      <TodayList arrivals={m.arrivals} departures={m.departures} today={m.today} canAct={canAct} />
+
       {can(staff.role, "reports.view") ? (
         <>
-          <Suspense fallback={<LoadingState label="Loading departments…" />}><Departments /></Suspense>
           <Suspense fallback={<LoadingState label="Loading revenue…" />}><Revenue /></Suspense>
+          <Suspense fallback={<LoadingState label="Loading departments…" />}><Departments /></Suspense>
         </>
       ) : null}
-
-      <Card>
-        <CardHeader title="Recent bookings" action={<Link href="/app/reservations?tab=all" className="text-sm font-medium text-navy-800">All reservations</Link>} />
-        {recent.length ? <ReservationTable rows={recent.slice(0, 8)} hrefFor={href} /> : <div className="p-5"><EmptyState title="No bookings yet" /></div>}
-      </Card>
     </div>
   );
 }
@@ -134,7 +157,7 @@ export default function DashboardPage() {
         title="Dashboard"
         actions={<Link href="/app/reservations/new" className={buttonStyles({ className: "size-11 px-0 sm:size-auto sm:px-4" })} aria-label="New reservation"><CalendarPlus className="size-4" aria-hidden /><span className="hidden sm:inline">New reservation</span></Link>}
       />
-      <Suspense fallback={<LoadingState />}><Content /></Suspense>
+      <Suspense fallback={<DashboardSkeleton />}><Content /></Suspense>
     </>
   );
 }

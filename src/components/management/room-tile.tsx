@@ -1,9 +1,26 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { cn } from "@/lib/utils/cn";
 import { RoomQuickActions } from "./room-actions";
+
+type Selection = { selected: string | null; select: (id: string | null) => void; bar: HTMLElement | null };
+
+const SelectionContext = createContext<Selection>({ selected: null, select: () => {}, bar: null });
+
+/** One room is selected at a time; on wider screens its actions appear in a bar above the board. */
+export function RoomSelection({ children }: { children: React.ReactNode }) {
+  const [selected, select] = useState<string | null>(null);
+  const [bar, setBar] = useState<HTMLDivElement | null>(null);
+  return (
+    <SelectionContext value={{ selected, select, bar }}>
+      <div ref={setBar} className="sticky top-16 z-20 mb-5 empty:hidden lg:top-3" />
+      {children}
+    </SelectionContext>
+  );
+}
 
 export function RoomTile({
   children,
@@ -16,18 +33,19 @@ export function RoomTile({
   room: { id: string; number: string; category: string; readiness: string; maintenance: boolean };
   stateLabel: string;
 }) {
-  const [open, setOpen] = useState<null | "sheet" | "left" | "right">(null);
+  const { selected, select, bar } = useContext(SelectionContext);
+  const [sheet, setSheet] = useState(false);
   const tile = useRef<HTMLButtonElement>(null);
-  const close = () => setOpen(null);
+  const open = selected === room.id;
+  const close = () => select(null);
 
   function toggle() {
     if (open) return close();
-    if (window.matchMedia("(max-width: 767px)").matches) return setOpen("sheet");
-    const r = tile.current!.getBoundingClientRect();
-    setOpen(r.left + 260 > window.innerWidth ? "right" : "left");
+    setSheet(window.matchMedia("(max-width: 767px)").matches);
+    select(room.id);
   }
 
-  const actions = <RoomQuickActions roomId={room.id} readiness={room.readiness} maintenance={room.maintenance} large={open === "sheet"} />;
+  const actions = <RoomQuickActions roomId={room.id} readiness={room.readiness} maintenance={room.maintenance} large={sheet} inline={!sheet} />;
 
   return (
     <div className="relative h-full">
@@ -35,19 +53,25 @@ export function RoomTile({
         ref={tile}
         type="button"
         onClick={toggle}
-        aria-expanded={open !== null}
-        aria-haspopup="dialog"
-        className={cn(className, open && open !== "sheet" && "ring-2 ring-navy-600/30")}
+        aria-expanded={open}
+        className={cn(className, open && "border-navy-400 ring-3 ring-navy-600/15")}
       >
         {children}
       </button>
-      {open === "left" || open === "right" ? (
-        <div className={cn("absolute top-full z-20 mt-1 w-60 rounded-card border border-hairline bg-ivory-50 p-3 shadow-lg", open === "left" ? "left-0" : "right-0")}>
-          <p className="mb-2 text-xs font-semibold text-ink-500">Room {room.number}</p>
-          {actions}
-        </div>
-      ) : null}
-      <BottomSheet open={open === "sheet"} onClose={close} title={`Room ${room.number} · ${room.category}`} subtitle={stateLabel} trigger={tile}>
+      {open && !sheet && bar
+        ? createPortal(
+            <div role="group" aria-label={`Room ${room.number} actions`} className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-card border border-navy-200 bg-white px-4 py-3 shadow-card">
+              <div className="flex-[1_1_12rem]">
+                <p className="text-[15px] font-semibold text-ink-900">Room {room.number} · {room.category}</p>
+                <p className="text-[13px] text-ink-500">{stateLabel}</p>
+              </div>
+              {actions}
+              <button type="button" onClick={close} className="h-9 rounded-md px-3 text-[13px] text-ink-500 hover:bg-ivory-100">Close</button>
+            </div>,
+            bar,
+          )
+        : null}
+      <BottomSheet open={open && sheet} onClose={close} title={`Room ${room.number} · ${room.category}`} subtitle={stateLabel} trigger={tile}>
         {actions}
       </BottomSheet>
     </div>

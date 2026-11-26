@@ -50,37 +50,33 @@ async function Review({ params }: { params: Promise<{ token: string }> }) {
   return (
     <>
       <Steps current={3} />
-      <div className="mt-5 grid gap-6 sm:mt-10 lg:grid-cols-[1fr_24rem] lg:gap-16">
-        <div className="space-y-6">
-          <HoldBanner category={b.category.name} expiresAt={b.hold_expires_at!} againHref={`/book?checkIn=${b.check_in}&checkOut=${b.check_out}&guests=${b.guest_count}`} />
-          <div>
-            <h1 className="font-display text-[1.875rem] leading-tight text-navy-950 sm:text-5xl">Review and pay</h1>
-            <dl className="mt-4 grid grid-cols-[auto_1fr] border-t border-hairline text-sm">
+      <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_21rem] lg:gap-10">
+        <div className="min-w-0">
+          <h1 className="font-display text-[2rem] leading-tight text-navy-950">Review and pay</h1>
+          <div className="mt-3.5">
+            <HoldBanner category={b.category.name} expiresAt={b.hold_expires_at!} againHref={`/book?checkIn=${b.check_in}&checkOut=${b.check_out}&guests=${b.guest_count}`} />
+          </div>
+          <section aria-labelledby="summary" className="mt-5 overflow-hidden rounded-card border border-hairline bg-white">
+            <h2 id="summary" className="border-b border-hairline px-[18px] py-3.5 font-sans text-sm">Booking details</h2>
+            <dl className="divide-y divide-ivory-100 text-sm">
               {rows.map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt className="border-b border-hairline py-2.5 pr-4 text-ink-500">{k}</dt>
-                  <dd className="border-b border-hairline py-2.5 text-right break-all text-ink-900 tabular-nums">{v}</dd>
+                <div key={k} className="flex justify-between gap-4 px-[18px] py-3">
+                  <dt className="text-ink-500">{k}</dt>
+                  <dd className="text-right break-words text-ink-900 tabular-nums [overflow-wrap:anywhere]">{v}</dd>
                 </div>
               ))}
             </dl>
-            <div className="flex items-baseline justify-between py-3.5 tabular-nums">
-              <span className="text-[15px] text-ink-900">Total to pay</span>
-              <span className="font-display text-3xl text-navy-950">{formatNaira(b.due_kobo)}</span>
+            <div className="flex items-baseline justify-between border-t border-hairline px-[18px] py-3.5 font-semibold text-navy-950 tabular-nums">
+              <span>Total to pay</span>
+              <span className="text-2xl">{formatNaira(b.due_kobo)}</span>
             </div>
-            {rules.cancellationPolicy ? <p className="text-sm leading-relaxed text-ink-700">{rules.cancellationPolicy}</p> : null}
-          </div>
-
-          <div className="rounded-md border border-hairline p-4">
-            <p className="text-sm text-ink-900">Pay securely with Paystack</p>
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {["Card", "Bank transfer", "USSD"].map((m) => <span key={m} className="rounded-[3px] bg-ivory-200 px-2.5 py-0.5 text-xs text-ink-700">{m}</span>)}
-            </div>
-            <p className="mt-2.5 text-xs leading-relaxed text-ink-500">You&apos;ll be taken to Paystack and back. We never see your card details.</p>
-          </div>
+          </section>
+          {rules.cancellationPolicy ? <p className="mt-4 text-sm leading-relaxed text-ink-600">{rules.cancellationPolicy}</p> : null}
 
           <PayButton token={token} total={formatNaira(b.due_kobo)} />
-          <p className="text-sm text-ink-500">
-            Prefer to pay another way? Call {hotel.phoneDisplay} and quote <span className="tabular-nums">{b.reference}</span>.
+          <p className="mt-3 text-[13px] text-ink-600">Card, bank transfer or USSD via Paystack. We never see your card details.</p>
+          <p className="mt-1.5 text-[13px] text-ink-500">
+            Prefer another way? Call {hotel.phoneDisplay} and quote <span className="font-mono">{b.reference}</span>.
           </p>
         </div>
         <BookingSummary option={option} search={stay} className="hidden lg:block" />
@@ -91,8 +87,8 @@ async function Review({ params }: { params: Promise<{ token: string }> }) {
 
 export default function ReviewPage(props: PageProps<"/book/review/[token]">) {
   return (
-    <Container className="py-10 sm:py-14">
-      <Suspense fallback={<div className="h-96 animate-pulse rounded-card bg-ivory-200" />}>
+    <Container className="max-w-[65rem] pt-7 pb-16">
+      <Suspense fallback={<div className="skeleton h-96 !rounded-card" />}>
         <Review params={props.params} />
       </Suspense>
     </Container>

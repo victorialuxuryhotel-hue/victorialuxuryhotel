@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { ArrowLeft, Check, Users } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import { BookingBar } from "@/components/public/booking-bar";
-import { CtaBand } from "@/components/public/cta-band";
 import { Photo } from "@/components/public/photo";
 import { PhotoStrip } from "@/components/public/photo-strip";
 import { RoomPriceBar } from "@/components/public/room-price-bar";
-import { Container, Eyebrow, Section } from "@/components/public/section";
+import { Container, Section } from "@/components/public/section";
 import { hotel } from "@/config/hotel";
 import { formatNaira } from "@/lib/format";
 import { getPublicCategories, getPublicCategory } from "@/server/queries/catalogue";
@@ -48,84 +47,78 @@ async function RoomType({ params }: { params: Promise<{ slug: string }> }) {
   const others = (await getPublicCategories()).filter((o) => o.slug !== c.slug);
   const [cover, ...rest] = c.photos;
 
+  const amenities = [...new Set([...c.amenities, ...included])];
+
   return (
     <>
-      <Container className="pt-8 sm:pt-12">
-        <Link href="/rooms" className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-navy-800">
+      <Container className="pt-6">
+        <Link href="/rooms" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-ink-500 hover:text-navy-800">
           <ArrowLeft className="size-4" aria-hidden /> All rooms
         </Link>
-        <div className="mt-4">
+        <div className="mt-2">
           <PhotoStrip label={`Photos of ${c.name}`}>
             {(c.photos.length ? c.photos : [{ alt: c.name }]).map((p, i) => (
               <Photo key={i} photo={p} priority={i === 0} sizes="88vw" className="aspect-[4/3] rounded-card" />
             ))}
           </PhotoStrip>
         </div>
-        <div className="mt-6 hidden gap-3 sm:grid sm:grid-cols-4 sm:grid-rows-2">
-          <Photo photo={cover ?? { alt: c.name }} priority sizes="50vw" className="col-span-2 row-span-2 h-full rounded-card" />
-          {[0, 1, 2, 3].map((i) => (
-            <Photo key={i} photo={rest[i] ?? { alt: `${c.name}, detail` }} sizes="25vw" className="aspect-[4/3] rounded-card" />
+        <div className="hidden grid-cols-[2fr_1fr] grid-rows-2 gap-2.5 sm:grid">
+          <Photo photo={cover ?? { alt: c.name }} priority sizes="66vw" className="row-span-2 aspect-[4/3] rounded-card" />
+          {[0, 1].map((i) => (
+            <Photo key={i} photo={rest[i] ?? { alt: `${c.name}, detail` }} sizes="33vw" className="h-full rounded-card" />
           ))}
         </div>
       </Container>
 
-      <Section className="pt-6 sm:pt-16">
-        <div className="grid gap-12 lg:grid-cols-[1.5fr_1fr] lg:gap-20">
-          <div>
-            <Eyebrow>Accommodation</Eyebrow>
-            <h1 className="mt-3 font-display text-[2.5rem] leading-tight text-navy-950 sm:mt-4 sm:text-6xl">{c.name}</h1>
-            <p className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-600 sm:mt-4 sm:text-base">
-              <span className="flex items-center gap-2"><Users className="size-4 text-gold-600" aria-hidden /> Sleeps up to {c.maxOccupancy}</span>
-              <span>From <span className="font-semibold text-navy-950">{formatNaira(c.fromRateKobo)}</span> per night</span>
+      <Section className="pt-6 pb-16 sm:pt-9 sm:pb-16">
+        <div className="flex flex-col gap-10 lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1">
+            <h1 className="font-display text-4xl leading-[1.05] text-navy-950">{c.name}</h1>
+            <p className="mt-2.5 text-sm text-ink-600">
+              Sleeps up to {c.maxOccupancy} · from <span className="font-semibold text-navy-950 tabular-nums">{formatNaira(c.fromRateKobo)}</span> per night
             </p>
-            {c.summary ? <p className="mt-5 text-base leading-relaxed text-ink-700 sm:mt-8 sm:text-xl">{c.summary}</p> : null}
-            {c.description ? <div className="mt-6 space-y-4 leading-relaxed whitespace-pre-line text-ink-600">{c.description}</div> : null}
+            {c.summary ? <p className="mt-6 text-lg leading-relaxed text-ink-700">{c.summary}</p> : null}
+            {c.description ? <div className="mt-4 space-y-4 leading-relaxed whitespace-pre-line text-ink-600">{c.description}</div> : null}
 
-            {c.amenities.length ? (
-              <section className="mt-10 sm:mt-12">
-                <h2 className="font-display text-2xl text-navy-950 sm:text-3xl">In the room</h2>
-                <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2.5 text-sm sm:mt-6 sm:gap-3 sm:text-base">
-                  {c.amenities.map((a) => <li key={a} className="flex items-start gap-2 text-ink-700 sm:items-center sm:gap-3"><Check className="mt-0.5 size-4 shrink-0 text-gold-500 sm:mt-0" aria-hidden /> {a}</li>)}
-                </ul>
-              </section>
-            ) : null}
-
-            <section className="mt-10 sm:mt-12">
-              <h2 className="font-display text-2xl text-navy-950 sm:text-3xl">With every stay</h2>
-              <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2.5 text-sm sm:mt-6 sm:gap-3 sm:text-base">
-                {included.map((a) => <li key={a} className="flex items-start gap-2 text-ink-700 sm:items-center sm:gap-3"><Check className="mt-0.5 size-4 shrink-0 text-gold-500 sm:mt-0" aria-hidden /> {a}</li>)}
+            <section className="mt-9">
+              <h2 className="font-display text-[1.625rem] text-navy-950">What&apos;s included</h2>
+              <ul className="mt-3.5 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-6 gap-y-2.5 text-sm">
+                {amenities.map((a) => (
+                  <li key={a} className="flex items-center gap-2.5 text-ink-700"><Check className="size-4 shrink-0 text-gold-500" aria-hidden /> {a}</li>
+                ))}
               </ul>
             </section>
           </div>
 
-          <aside className="lg:pt-10">
-            <div id="availability" className="scroll-mt-24 rounded-card bg-ivory-50 p-5 shadow-card sm:p-6 lg:sticky lg:top-28">
-              <p className="font-display text-2xl text-navy-950">Check availability</p>
-              <p className="mt-1 text-sm text-ink-500">See the exact total for your dates. Instant confirmation once paid.</p>
-              <div className="mt-5"><BookingBar variant="stacked" /></div>
+          <aside className="lg:w-[380px] lg:shrink-0">
+            <div id="availability" className="scroll-mt-24 rounded-card border border-hairline bg-white p-5 shadow-card lg:sticky lg:top-24">
+              <p className="text-[13px] text-ink-500"><span className="text-[1.625rem] font-semibold text-navy-950 tabular-nums">{formatNaira(c.fromRateKobo)}</span> / night</p>
+              <div className="mt-4"><BookingBar variant="stacked" /></div>
+              <p className="mt-3 text-xs text-ink-500">See the exact total for your dates. Instant confirmation once paid. Secure payment by Paystack.</p>
             </div>
           </aside>
         </div>
       </Section>
 
       {others.length ? (
-        <Section tone="ivory">
-          <h2 className="font-display text-4xl text-navy-950">Other ways to stay</h2>
-          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <Section tone="ivory" className="py-14 sm:py-14">
+          <h2 className="font-display text-[2rem] font-medium text-navy-950">Other ways to stay</h2>
+          <ul className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
             {others.map((o) => (
-              <Link key={o.slug} href={`/rooms/${o.slug}`} className="group">
-                <div className="overflow-hidden rounded-card">
-                  <Photo photo={o.photos[0] ?? { alt: o.name }} sizes="(min-width: 1024px) 33vw, 50vw" className="aspect-[4/3] transition-transform duration-700 group-hover:scale-[1.04]" />
-                </div>
-                <h3 className="mt-4 font-display text-2xl text-navy-950">{o.name}</h3>
-                <p className="text-sm text-ink-500">From {formatNaira(o.fromRateKobo)} per night</p>
-              </Link>
+              <li key={o.slug}>
+                <Link href={`/rooms/${o.slug}`} className="flex h-full items-center gap-3.5 rounded-card border border-hairline bg-white p-2.5 transition-shadow hover:shadow-lift">
+                  <Photo photo={o.photos[0] ?? { alt: o.name }} sizes="72px" className="h-14 w-18 shrink-0 rounded-lg [&>span]:hidden" />
+                  <span>
+                    <span className="block font-display text-xl font-semibold text-navy-950">{o.name}</span>
+                    <span className="block text-[13px] text-ink-500">from {formatNaira(o.fromRateKobo)}/night</span>
+                  </span>
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         </Section>
       ) : null}
 
-      <CtaBand />
       <RoomPriceBar price={formatNaira(c.fromRateKobo)} targetId="availability" />
     </>
   );

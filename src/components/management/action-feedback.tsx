@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, useTransition, type ReactNode } from "react";
-import { CheckCircle2, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import type { ActionResult } from "@/lib/errors";
 import { undoChange } from "@/server/reservations";
 
@@ -64,24 +64,24 @@ function Banner({ shown, onClose, onReplace }: { shown: Shown; onClose: () => vo
   }
 
   return (
-    <div className="sticky top-14 z-30 px-4 pt-3 lg:top-0 lg:px-8">
-      <div role="status" className="flex items-start gap-3 rounded-md border border-success-600/25 bg-success-50 px-3 py-2.5 text-sm text-success-700 shadow-sm">
-        <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />
+    <div className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex justify-center px-4 md:bottom-6 print:hidden">
+      <div role="status" className="toast-in pointer-events-auto flex max-w-xl items-center gap-3 rounded-xl bg-navy-950 py-2.5 pr-2.5 pl-3.5 text-sm text-ivory-50 shadow-float">
+        <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-gold-400 text-navy-950"><Check className="size-3.5" strokeWidth={3} aria-hidden /></span>
         <div className="min-w-0 flex-1">
-          <p className="text-ink-900">{shown.message}</p>
-          {error ? <p role="alert" className="mt-1 text-danger-700">{error}</p> : null}
+          <p>{shown.message}</p>
+          {error ? <p role="alert" className="mt-1 text-gold-200">{error}</p> : null}
         </div>
         {shown.undo && left > 0 && !error ? (
           <button
             type="button"
             onClick={undo}
             disabled={pending}
-            className="-my-1 inline-flex h-9 shrink-0 items-center rounded-md border border-success-600/30 bg-ivory-50 px-3 font-medium text-navy-800 tabular-nums hover:bg-ivory-50 disabled:opacity-60"
+            className="inline-flex h-9 shrink-0 items-center rounded-md border border-white/25 px-3.5 font-semibold text-gold-300 tabular-nums hover:bg-white/10 disabled:opacity-60"
           >
             {pending ? "Undoing…" : `Undo · ${left}s`}
           </button>
         ) : null}
-        <button type="button" onClick={onClose} aria-label="Dismiss" className="-my-1 -mr-1 inline-flex size-9 shrink-0 items-center justify-center rounded-md text-ink-500 hover:bg-success-600/10">
+        <button type="button" onClick={onClose} aria-label="Dismiss" className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-ivory-200/70 hover:bg-white/10">
           <X className="size-4" aria-hidden />
         </button>
       </div>

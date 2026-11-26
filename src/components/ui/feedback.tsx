@@ -21,8 +21,8 @@ export function SkeletonRows({ rows = 4, label = "Loading" }: { rows?: number; l
     <div role="status" aria-label={label} aria-busy className="delayed-show divide-y divide-hairline">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="space-y-2 px-4 py-3.5">
-          <div className="h-3.5 w-3/5 animate-pulse rounded bg-ivory-200" />
-          <div className="h-3 w-4/5 animate-pulse rounded bg-ivory-200" />
+          <div className="skeleton h-3.5 w-3/5" />
+          <div className="skeleton h-3 w-4/5" />
         </div>
       ))}
     </div>
@@ -31,9 +31,9 @@ export function SkeletonRows({ rows = 4, label = "Loading" }: { rows?: number; l
 
 export function EmptyState({ title, description, action, icon }: { title: string; description?: string; action?: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-card border border-hairline px-6 py-12 text-center">
+    <div className="flex flex-col items-center justify-center rounded-card border border-hairline bg-white px-6 py-12 text-center">
       {icon ? <div aria-hidden className="mb-2 text-gold-600 [&_svg]:size-7">{icon}</div> : null}
-      <p className="font-display text-[21px] font-semibold text-ink-900">{title}</p>
+      <p className="text-base font-semibold text-navy-950">{title}</p>
       {description ? <p className="mt-1 max-w-sm text-sm text-ink-500">{description}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>

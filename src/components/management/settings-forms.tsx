@@ -25,7 +25,7 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
   const [state, action, pending] = useActionState(updateBookingRules, null);
   const err = (n: string) => fieldError(state, n);
   return (
-    <form action={action} onSubmit={keepValues(action)} className="grid gap-6 p-5 md:grid-cols-2">
+    <form action={action} onSubmit={keepValues(action)} className="grid gap-4 px-[18px] pt-[18px] md:grid-cols-2">
       {state?.ok ? <div className="md:col-span-2"><FormMessage tone="success">Booking rules saved.</FormMessage></div> : null}
       {state && !state.ok ? <div className="md:col-span-2"><FormMessage>{state.message}</FormMessage></div> : null}
       <Field label="Check-in from" htmlFor="cin" error={err("checkInTime")}><Input id="cin" name="checkInTime" type="time" defaultValue={rules.checkInTime.slice(0, 5)} /></Field>
@@ -49,7 +49,7 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
       <Field label="Cancellation policy wording" optional htmlFor="cpol" hint="Leave empty to use the rule above." error={err("cancellationPolicy")} className="md:col-span-2">
         <Textarea id="cpol" name="cancellationPolicy" rows={3} maxLength={2000} defaultValue={rules.cancellationPolicy ?? ""} />
       </Field>
-      <div className="flex justify-end md:col-span-2"><Button type="submit" pending={pending}>Save rules</Button></div>
+      <div className="-mx-[18px] flex justify-end border-t border-hairline bg-ivory-50 px-[18px] py-3 md:col-span-2"><Button type="submit" pending={pending}>Save rules</Button></div>
     </form>
   );
 }

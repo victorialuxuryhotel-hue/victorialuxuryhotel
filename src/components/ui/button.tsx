@@ -6,11 +6,11 @@ type Variant = "primary" | "accent" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
-  primary: "border border-navy-800 text-navy-800 hover:bg-navy-800/12 active:bg-navy-800/22",
-  accent: "border border-gold-500 text-gold-800 hover:bg-gold-500/12 active:bg-gold-500/22",
-  secondary: "border border-hairline text-ink-900 hover:bg-ink-900/7 active:bg-ink-900/14",
-  ghost: "text-navy-800 hover:bg-navy-800/10 active:bg-navy-800/18",
-  danger: "border border-danger-600 text-danger-700 hover:bg-danger-600/10 active:bg-danger-600/20",
+  primary: "border border-navy-800 bg-navy-800 font-medium text-white hover:border-navy-700 hover:bg-navy-700",
+  accent: "border border-gold-400 bg-gold-400 font-semibold text-navy-950 hover:border-gold-300 hover:bg-gold-300",
+  secondary: "border border-ink-300 bg-white font-medium text-ink-900 hover:bg-ivory-100",
+  ghost: "bg-transparent font-medium text-navy-800 hover:bg-navy-800/10",
+  danger: "border border-danger-600 bg-white font-medium text-danger-700 hover:bg-danger-50",
 };
 
 const sizes: Record<Size, string> = {
@@ -21,7 +21,7 @@ const sizes: Record<Size, string> = {
 
 export function buttonStyles({ variant = "primary", size = "md", className }: { variant?: Variant; size?: Size; className?: string } = {}) {
   return cn(
-    "inline-flex items-center justify-center gap-2 rounded-md bg-transparent font-normal transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+    "inline-flex items-center justify-center gap-2 rounded-md transition-[background-color,border-color,color,transform] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100",
     variants[variant],
     sizes[size],
     className,

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { Suspense } from "react";
 import { BookingSummary, CompactSummary, Steps } from "@/components/booking/booking-ui";
 import { GuestDetailsForm } from "@/components/booking/guest-details-form";
@@ -36,7 +37,10 @@ async function Details({ searchParams }: { searchParams: SP }) {
   return (
     <>
       <Steps current={2} />
-      <div className="mt-5 grid gap-6 sm:mt-10 lg:grid-cols-[1fr_24rem] lg:gap-16">
+      <Link href={`/book?${new URLSearchParams({ checkIn: parsed.data.checkIn, checkOut: parsed.data.checkOut, guests: String(parsed.data.guests) })}`} className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm text-ink-500 hover:text-navy-800">
+        <ArrowLeft className="size-4" aria-hidden /> Change room
+      </Link>
+      <div className="mt-2 grid gap-6 lg:grid-cols-[1fr_21rem] lg:gap-10">
         <CompactSummary option={option} search={parsed.data} holdMinutes={rules.holdMinutes} />
         <GuestDetailsForm
           total={formatNaira(option.totalKobo)}
@@ -56,8 +60,8 @@ async function Details({ searchParams }: { searchParams: SP }) {
 
 export default function DetailsPage(props: PageProps<"/book/details">) {
   return (
-    <Container className="py-10 sm:py-14">
-      <Suspense fallback={<div className="h-96 animate-pulse rounded-card bg-ivory-200" />}>
+    <Container className="max-w-[65rem] pt-7 pb-16">
+      <Suspense fallback={<div className="skeleton h-96 !rounded-card" />}>
         <Details searchParams={props.searchParams} />
       </Suspense>
     </Container>

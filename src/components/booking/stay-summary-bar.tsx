@@ -7,7 +7,7 @@ import { formatDate, plural } from "@/lib/format";
 export function StaySummaryBar({ checkIn, checkOut, guests, nights }: { checkIn: string; checkOut: string; guests: number; nights: number }) {
   const [editing, setEditing] = useState(false);
   return (
-    <div className="sticky top-16 z-30 -mx-4 border-b border-hairline bg-ivory-50/95 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6 md:top-20">
+    <div className="rounded-xl border border-hairline bg-white px-4 py-1">
       <div className="flex items-center justify-between gap-3">
         <p className="min-w-0 text-sm text-ink-800 tabular-nums">
           <span className="font-medium">{formatDate(checkIn, { year: false })} → {formatDate(checkOut, { year: false })}</span>
@@ -20,7 +20,7 @@ export function StaySummaryBar({ checkIn, checkOut, guests, nights }: { checkIn:
           aria-controls="edit-stay"
           className="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-navy-800 hover:text-gold-600"
         >
-          {editing ? "Close" : "Edit"}
+          {editing ? "Close" : "Change"}
         </button>
       </div>
       {editing ? (

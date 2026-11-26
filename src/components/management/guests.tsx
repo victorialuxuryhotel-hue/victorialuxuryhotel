@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Mail, Phone } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 import type { GuestRow, ReservationRow } from "@/domain/views";
@@ -13,16 +13,19 @@ export function GuestTable({ rows, hrefFor }: { rows: GuestRow[]; hrefFor: (g: G
       <ul className="divide-y divide-hairline md:hidden">
         {rows.map((g) => (
           <li key={g.id}>
-            <Link href={hrefFor(g)} className="flex items-center gap-3 px-4 py-3.5 hover:bg-ivory-50">
+            <Link href={hrefFor(g)} className="flex items-center gap-3 px-4 py-3 hover:bg-ivory-50">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-navy-50 text-xs font-semibold text-navy-800">
+                {g.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
+              </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-base text-ink-900">{g.name}</span>
+                <span className="block font-medium text-ink-900">{g.name}</span>
                 <span className="block text-sm text-ink-500 tabular-nums">{g.phone ?? g.email ?? "No contact details"}</span>
-                <span className="mt-1.5 block text-xs text-ink-500 tabular-nums">
+                <span className="block text-xs text-ink-500 tabular-nums">
                   {plural(g.stays, "stay")}
                   {g.lastStay ? ` · last ${formatDate(g.lastStay, { weekday: false })}` : ""}
                 </span>
               </span>
-              <ChevronRight className="size-5 shrink-0 text-ink-400" aria-hidden />
+              <span className="shrink-0 text-[13px] font-medium tabular-nums text-ink-900">{formatNaira(g.totalPaidKobo)}</span>
             </Link>
           </li>
         ))}
@@ -45,7 +48,7 @@ export function GuestTable({ rows, hrefFor }: { rows: GuestRow[]; hrefFor: (g: G
             </TD>
             <TD>
               <p>{g.phone ?? "—"}</p>
-              <p className="text-xs text-ink-500">{g.email ?? "No email"}</p>
+              <p className={g.email ? "text-xs text-ink-500" : "text-xs text-ink-400"}>{g.email ?? "No email"}</p>
             </TD>
             <TD className="tabular-nums">{g.stays}</TD>
             <TD>{g.lastStay ? formatDate(g.lastStay) : "—"}</TD>

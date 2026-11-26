@@ -1,8 +1,10 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import type { ActivityRow } from "@/domain/views";
 import { formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils/cn";
 
 export function ActivityList({ rows }: { rows: ActivityRow[] }) {
   if (rows.length === 0) return <div className="p-5"><EmptyState title="No activity yet" /></div>;
@@ -18,6 +20,23 @@ export function ActivityList({ rows }: { rows: ActivityRow[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+export function SettingsNav({ links }: { links: Array<{ label: string; href: string; current: boolean }> }) {
+  return (
+    <nav aria-label="Settings sections" className="flex gap-0.5 overflow-x-auto [scrollbar-width:none] md:w-48 md:shrink-0 md:flex-col">
+      {links.map((l) => (
+        <Link
+          key={l.href}
+          href={l.href}
+          aria-current={l.current ? "page" : undefined}
+          className={cn("flex min-h-10 items-center rounded-md px-3 text-sm font-medium whitespace-nowrap", l.current ? "bg-white text-navy-950" : "text-ink-600 hover:bg-white/60")}
+        >
+          {l.label}
+        </Link>
+      ))}
+    </nav>
   );
 }
 

@@ -11,7 +11,7 @@ import {
 } from "@/domain/status";
 
 export const ReservationBadge = ({ status }: { status: ReservationStatus }) => (
-  <Badge tone={reservationStatus[status].tone}>{reservationStatus[status].label}</Badge>
+  <Badge tone={reservationStatus[status].tone}>{status === "checked_in" ? "Staying now" : reservationStatus[status].label}</Badge>
 );
 
 export const PaymentBadge = ({ status }: { status: PaymentStatus }) => (
@@ -34,7 +34,7 @@ export function PaidProgress({ paidKobo, totalKobo, format }: { paidKobo: number
       <div className="h-1.5 overflow-hidden rounded-full bg-ivory-200">
         <div className={pct === 100 ? "h-full bg-success-600" : "h-full bg-gold-500"} style={{ width: `${pct}%` }} />
       </div>
-      <p className="mt-1 text-xs text-ink-500">{balance > 0 ? `${format(balance)} due` : "Paid in full"}</p>
+      <p className={`mt-1 text-xs ${balance > 0 ? "text-warning-700" : "text-success-700"}`}>{balance <= 0 ? "Paid in full" : paidKobo === 0 ? "Nothing paid" : `${format(balance)} due`}</p>
     </div>
   );
 }

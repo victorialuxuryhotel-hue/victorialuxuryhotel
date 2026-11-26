@@ -7,16 +7,16 @@ import { publicNav } from "./site-header";
 export function SiteFooter() {
   return (
     <footer className="mt-auto bg-navy-950 text-ivory-100">
-      <div className="mx-auto grid max-w-6xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 pt-11 pb-7 sm:px-5 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-3">
-            <Logo className="w-12" />
+            <Logo className="w-[34px]" />
             <span className="leading-none">
               <span className="block font-display text-2xl text-ivory-50">Victoria Luxury</span>
               <span className="mt-1 block text-xs uppercase tracking-[0.3em] text-gold-300">Hotel &amp; Apartment</span>
             </span>
           </div>
-          <p className="mt-6 max-w-sm text-sm leading-relaxed text-ivory-200/70">
+          <p className="mt-3.5 max-w-sm text-[13px] leading-relaxed text-ivory-200/70">
             Where every guest is treated as royalty. Rooms, suites and apartments in Alagbaka GRA, Akure.
           </p>
         </div>

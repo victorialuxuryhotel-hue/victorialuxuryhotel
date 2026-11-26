@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { ActionFeedbackProvider } from "@/components/management/action-feedback";
 import { DeskTabs, MobileBar, Sidebar } from "@/components/management/nav";
 import { managementNav } from "@/components/management/nav-items";
 import { StaffCard } from "@/components/management/staff-card";
@@ -34,7 +35,9 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
         <Sidebar allowed={allowed} footer={footer} />
         <MobileBar allowed={allowed} footer={footer} />
-        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <ActionFeedbackProvider>{children}</ActionFeedbackProvider>
+        </div>
         {staff.role === "front_desk" ? <DeskTabs /> : null}
       </div>
     </>

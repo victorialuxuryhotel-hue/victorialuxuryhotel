@@ -87,7 +87,7 @@ async function Outcome({ params }: { params: Promise<{ token: string }> }) {
 
 export default function ConfirmationPage(props: PageProps<"/book/confirmation/[token]">) {
   return (
-    <Container className="py-16 sm:py-24">
+    <Container className="py-12 sm:pb-18">
       <Suspense fallback={<PaymentPending reference="" />}>
         <Outcome params={props.params} />
       </Suspense>

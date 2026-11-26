@@ -10,7 +10,7 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
 }
 
 export function THead(props: HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className="border-b border-hairline bg-ivory-50 text-xs uppercase tracking-wide text-ink-500" {...props} />;
+  return <thead className="border-b border-hairline bg-ivory-50 text-[11px] uppercase tracking-[0.08em] text-ink-500" {...props} />;
 }
 
 export function TBody(props: HTMLAttributes<HTMLTableSectionElement>) {

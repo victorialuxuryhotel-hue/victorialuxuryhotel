@@ -1,18 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Lora } from "next/font/google";
+import { Cormorant_Garamond, Inter } from "next/font/google";
 import { hotel } from "@/config/hotel";
 import "./globals.css";
 
 const display = Cormorant_Garamond({
   variable: "--font-display-base",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["500", "600", "700"],
 });
 
-const sans = Lora({
+const sans = Inter({
   variable: "--font-sans-base",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };

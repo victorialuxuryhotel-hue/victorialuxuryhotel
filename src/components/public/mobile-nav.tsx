@@ -40,7 +40,7 @@ export function MobileNav({ items }: { items: ReadonlyArray<{ href: string; labe
           role="dialog"
           aria-modal="true"
           aria-label="Menu"
-          className="fixed inset-x-0 top-16 bottom-0 z-50 flex-col overflow-y-auto bg-ivory-50 [&:not([hidden])]:flex"
+          className="fixed inset-x-0 top-17 bottom-0 z-50 flex-col overflow-y-auto bg-ivory-50 [&:not([hidden])]:flex"
         >
           <nav aria-label="Mobile" className="flex flex-1 flex-col px-4 pt-2">
             {[{ href: "/", label: "Home" }, ...items].map((item) => (

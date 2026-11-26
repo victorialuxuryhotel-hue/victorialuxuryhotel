@@ -61,6 +61,6 @@ export const roomBoardState = {
   arriving: { label: "Arriving", tone: "info" },
   available: { label: "Available", tone: "success" },
   dirty: { label: "Needs cleaning", tone: "warning" },
-  maintenance: { label: "Maintenance", tone: "danger" },
+  maintenance: { label: "Out of service", tone: "danger" },
 } as const satisfies Record<string, { label: string; tone: Tone }>;
 export type RoomBoardState = keyof typeof roomBoardState;
