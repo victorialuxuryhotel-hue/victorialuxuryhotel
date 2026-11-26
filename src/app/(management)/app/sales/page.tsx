@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AccessDenied } from "@/components/management/access-denied";
 import { PageHeader } from "@/components/management/page-header";
+import { BusinessDay } from "@/components/management/business-day";
 import { Till } from "@/components/management/till";
 import { LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
@@ -39,6 +40,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
     // Laptops: fill the window under the page header; the till's columns scroll inside (see Till).
     <div className="space-y-6 px-4 py-6 lg:flex lg:h-[calc(100dvh-6.375rem)] lg:flex-col lg:space-y-0 lg:gap-4 lg:px-8 lg:pb-4">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-600">
+        <BusinessDay className="text-sm font-medium text-ink-700" />
         <span>Your sales today: <b className="tabular-nums text-ink-900">{mine.sales}</b> · <b className="tabular-nums text-ink-900">{formatNaira(mine.salesKobo)}</b></span>
         <span>Cash to hand in: <b className="tabular-nums text-ink-900">{formatNaira(mine.byMethod.cash)}</b></span>
         <Link href="/app/sales/orders" className="font-medium text-navy-800 hover:underline">Orders & receipts</Link>

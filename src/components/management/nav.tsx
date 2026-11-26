@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BusinessDay } from "./business-day";
 import { BedDouble, CalendarPlus, Menu, Search, Sun, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { useDialog } from "@/lib/use-dialog";
@@ -74,6 +75,7 @@ export function Sidebar({ footer, base = "/app", allowed }: NavProps) {
         <NavLinks base={base} allowed={allowed} />
       </div>
       {footer ? <div className="border-t border-white/10 px-5 pt-5">{footer}</div> : null}
+      <BusinessDay className="px-7 pt-3 text-ivory-200/60" />
     </aside>
   );
 }
@@ -114,6 +116,7 @@ export function MobileBar({ footer, base = "/app", allowed }: NavProps) {
         >
           <NavLinks base={base} allowed={allowed} onNavigate={close} />
           {footer ? <div className="mt-auto border-t border-white/10 px-5 pt-5">{footer}</div> : null}
+          <BusinessDay className="px-7 pt-3 text-ivory-200/60" />
         </div>
       ) : null}
     </div>

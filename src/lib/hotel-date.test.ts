@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { businessDate, businessDayLabel, businessDayStart, businessDaySql, hotelToday, tonight } from "./hotel-date";
+import { businessDate, businessDayLabel, businessDayStart, businessDayNow, businessDaySql, hotelToday, tonight } from "./hotel-date";
 
 describe("business day", () => {
   it("runs 06:00 to 06:00 Lagos time, so late-night sales belong to the night before", () => {
@@ -26,3 +26,13 @@ describe("tonight (the first night a booking can start)", () => {
     expect(tonight(new Date("2026-11-25T22:59:00Z"))).toBe("2026-11-25"); // 23:59 the night before
   });
 });
+
+describe("business day now (sidebar and till)", () => {
+  it("shows the date; after midnight the previous one, until 06:00", () => {
+    expect(businessDayNow(new Date("2026-11-24T14:00:00Z"))).toBe("Business day · Tue 24 Nov");
+    expect(businessDayNow(new Date("2026-11-24T23:30:00Z"))).toBe("Business day · Tue 24 Nov (until 06:00)"); // 00:30 on the 25th
+    expect(businessDayNow(new Date("2026-11-25T04:59:00Z"))).toBe("Business day · Tue 24 Nov (until 06:00)");
+    expect(businessDayNow(new Date("2026-11-25T05:00:00Z"))).toBe("Business day · Wed 25 Nov");
+  });
+});
+

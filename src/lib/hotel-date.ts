@@ -57,3 +57,15 @@ export function businessDayLabel(date: string): string {
   const day = d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "");
   return `Business day ${day} (ends ${String(BUSINESS_DAY_START_HOUR).padStart(2, "0")}:00)`;
 }
+
+/**
+ * "Business day · Tue 24 Nov" for the sidebar and the till (interface brief I5). After midnight,
+ * until the cut-off, it's still the previous day: "Business day · Tue 24 Nov (until 06:00)".
+ */
+export function businessDayNow(at: Date = new Date()): string {
+  const date = businessDate(at);
+  const day = new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "");
+  const late = date !== hotelToday(at) ? ` (until ${String(BUSINESS_DAY_START_HOUR).padStart(2, "0")}:00)` : "";
+  return `Business day · ${day}${late}`;
+}
+

@@ -5,6 +5,12 @@ const { ctx, p } = await as("restaurant_bar");
 // The bar terminal: 1280×720 in Chrome kiosk (no toolbars), hardware brief H7. The till must work without scrolling the page.
 await p.setViewport({ width: 1280, height: 720 });
 await go(p, "/app/sales");
+// I5: the business day in the till's top strip ("(until 06:00)" after midnight).
+{
+  const label = await until(() => p.evaluate(() => document.querySelector("main [data-business-day], [data-business-day]")?.textContent ?? null), "business day shown");
+  const want = await val("SELECT strftime('%d', date('now', '-5 hours'))");
+  check("the till shows the business day", /^Business day · \w{3} \d{1,2} \w{3}( \(until 06:00\))?$/.test(label) && label.includes(` ${Number(want)} `), label);
+}
 await settle(p);
 // The first menu item that can be sold.
 const tile = await p.$("section[aria-label=Menu] li button:not([disabled])");

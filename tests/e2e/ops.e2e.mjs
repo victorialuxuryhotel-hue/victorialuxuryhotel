@@ -153,6 +153,9 @@ for (const id of pagingIds) {
   // I2: Available tonight on Today. New booking opens the form for tonight with the room type chosen.
   const { ctx, p } = await as("front_desk");
   await go(p, "/app/today");
+  // I5: the business day at the bottom of the sidebar.
+  const day = await until(() => p.evaluate(() => document.querySelector("aside [data-business-day]")?.textContent ?? null), "business day in the sidebar");
+  check("the sidebar shows the business day", /^Business day · \w{3} \d{1,2} \w{3}/.test(day), day);
   await waitForText(p, /Available tonight/i);
   // I3: "Arriving today · 1 of 3 arrived": the still-to-come part is the list on screen.
   const progress = await p.$$eval("[role=progressbar]", (bars) =>
