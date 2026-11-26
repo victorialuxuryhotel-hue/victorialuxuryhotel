@@ -16,6 +16,7 @@ import {
   updateReservationDetails,
   updateRoomStatus,
 } from "@/server/domain/reservations";
+import { addDays, tonight } from "@/lib/hotel-date";
 import { day, db, desk, exec, gm, insertReservation, lapseHold, makeCategory, makeRoom, owner, q, q1, rejects, status } from "./helpers";
 
 const website = (slug: string, checkIn: string, checkOut: string, extra: Partial<Parameters<typeof createWebsiteReservation>[1]> = {}) =>
@@ -44,7 +45,8 @@ describe("availability search (public)", () => {
   });
 
   it("validates the stay", async () => {
-    await rejects(searchAvailability(db, day(-1), day(1), 1), /can't be in the past/);
+    // Until the 06:00 cut-off, yesterday is still "tonight" and bookable.
+    await rejects(searchAvailability(db, addDays(tonight(), -1), day(1), 1), /can't be in the past/);
     await rejects(searchAvailability(db, day(5), day(5), 1), /must be after check-in/);
     await rejects(searchAvailability(db, day(5), day(100), 1), /longer than 90 nights/);
     await rejects(searchAvailability(db, day(800), day(801), 1), /two years ahead/);
