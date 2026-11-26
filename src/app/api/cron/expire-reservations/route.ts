@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { NextResponse, type NextRequest } from "next/server";
+import { connection, NextResponse, type NextRequest } from "next/server";
 import { serverEnv } from "@/lib/env.server";
 import { alert } from "@/lib/alert";
 import { logger } from "@/lib/logger";
@@ -11,6 +11,8 @@ import { deliverEmails } from "@/server/notifications";
 import { settlePaystackReference } from "@/server/payment-flow";
 
 export async function GET(request: NextRequest) {
+  // Never run while building: there is no request, and the build has no secrets.
+  await connection();
   const expected = Buffer.from(`Bearer ${serverEnv.cronSecret()}`);
   const given = Buffer.from(request.headers.get("authorization") ?? "");
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
