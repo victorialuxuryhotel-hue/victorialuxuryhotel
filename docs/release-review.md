@@ -249,6 +249,16 @@ These are deliberately **not final** in the app:
 - **No-show:** the booking closes and the room is released. The payment is neither kept nor refunded automatically; the booking is flagged for the General Manager to decide. The guest-facing policy no longer says a no-show forfeits the booking.
 - **Late cancellation:** the 24-hour window is a setting (Booking rules). The share charged inside the window (`late_cancel_fee_pct`) is also a setting. Any refund is flagged for the General Manager, never paid automatically. Confirm the percentage with management before treating it as final.
 
+## Go-live record (26 Nov 2026)
+
+- Time Travel bookmark before the migrations, 16:32 UTC: `000003d8-00000000-0000512f-76939b9dbf2eaf0541e7add39142c7f8`.
+  To undo the migrations: `npx wrangler d1 time-travel restore victoria-hotel-db --bookmark=000003d8-00000000-0000512f-76939b9dbf2eaf0541e7add39142c7f8`
+  (and redeploy the previous Worker version, `17869f3d-54ed-42e0-963b-e9e3ea8fd655`).
+- Migrations 0012–0026 applied to the live database (checksums of 0012 and 0013 matched section 1). Bookings, payments and room types intact.
+- Worker version `084478b4-9986-4fac-9af8-ac03e8be7b58` deployed at 100%. Secrets present, no `EMAIL_ALLOWLIST`, two-step on hold (no `TWO_STEP_ENFORCED`).
+- Checks: `/api/health` ok; `/`, `/rooms`, `/book`, `/gallery`, `/about` 200; `/app` redirects to sign-in with the live Clerk key; new room rates showing.
+- Still to do: delete the old Clerk secret key (it was exposed); remove the two secrets named after old keys; steps 5–6 below.
+
 ## 8. Cutover order (after you've reviewed all of the above)
 
 1. Rotate keys and set the Cloudflare secrets (section 2).
