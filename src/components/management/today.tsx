@@ -68,12 +68,12 @@ export function TodayView({
     <ActionFeedbackProvider>
       <div className="space-y-6 px-4 py-6 lg:px-8">
         <header>
-          <h1 className="text-[1.75rem] leading-tight font-semibold text-ink-900">{greeting}, {firstName}</h1>
+          <h1 className="font-sans text-xl text-ink-900">{greeting}, {firstName}</h1>
           <p className="mt-1 text-sm text-ink-500">{formatDate(today)}</p>
         </header>
 
         <section aria-labelledby="needs">
-          <h2 id="needs" className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">
+          <h2 id="needs" className="mb-3 font-sans text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">
             Needs you now{needs.length ? ` · ${needs.length}` : ""}
           </h2>
           <Card>
@@ -117,7 +117,7 @@ export function TodayView({
 
         <Card>
           <CardHeader
-            title="In house"
+            title="Staying now"
             description="Guests checked in now."
             action={<span className="rounded-full bg-ivory-200 px-2.5 py-0.5 text-sm font-semibold tabular-nums">{inHouse.length}</span>}
           />

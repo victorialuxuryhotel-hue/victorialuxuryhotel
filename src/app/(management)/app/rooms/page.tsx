@@ -35,7 +35,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
             <EmptyState title="No rooms yet" description="Add rooms below, or ask a manager to." />
           )}
         </div>
-        <p className="border-t border-hairline px-5 py-3 text-xs text-ink-500">Tap a room to update cleaning status or mark it under maintenance.</p>
+        <p className="border-t border-hairline px-5 py-3 text-xs text-ink-500">Tap a room to update cleaning status or take it out of service.</p>
       </Card>
       {configure ? (
         <Card>

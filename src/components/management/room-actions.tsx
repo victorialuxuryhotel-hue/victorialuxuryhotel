@@ -27,7 +27,7 @@ export function RoomQuickActions({ roomId, readiness, maintenance, large = false
             <input type="hidden" name="serviceStatus" value="maintenance" />
             <label className="sr-only" htmlFor={`note-${roomId}`}>Maintenance note</label>
             <Input id={`note-${roomId}`} name="note" placeholder="What needs fixing?" className={large ? undefined : "h-8 w-48 text-xs md:h-8 md:text-xs"} />
-            <Button type="submit" size={size} variant="ghost" pending={pending} className={`text-danger-700 hover:bg-danger-50 ${inline ? "" : "w-full"}`}>Mark under maintenance</Button>
+            <Button type="submit" size={size} variant="ghost" pending={pending} className={`text-danger-700 hover:bg-danger-50 ${inline ? "" : "w-full"}`}>Mark out of service</Button>
             {state && !state.ok ? <p role="alert" className="text-xs text-danger-700">{state.message}</p> : null}
           </form>
         )}
