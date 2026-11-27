@@ -275,3 +275,12 @@ These are deliberately **not final** in the app:
 5. In the app: deactivate the 3 demo staff (they're linked to development Clerk users). Create the first owner with `scripts/create-owner.mts`. Sign in and set up the authenticator app. Then invite the real staff.
 6. Remove the demo data from the live site: `npx wrangler d1 execute victoria-hotel-db --remote --file db/demo-live-undo.sql` (switches off the demo extras, the WELCOME10 promo code, demo menu and stock items, and clears the demo room descriptions). Check it first: it only switches things off, it deletes nothing.
 7. Run the checks in `docs/deployment-cloudflare.md` → "Checks after each deploy".
+
+## Release 2026-11-27: DevOps, guest website v3, finance access
+
+- Includes: self-check alerts and heartbeat, robots on staging, migration 0027, and contributor PRs #4–#7
+  (Windows test/build fixes, cron route kept out of the build, finance read-only booking page, guest website v3).
+- Staging first: version `5a647cbc-dd5b-493a-899e-a9fc8cd50d51`, smoke test passed.
+- Production database restore point (before 0027): `00000472-00000000-00005130-22d23cd14b6c082df2ad3730285741b5`.
+- Previous live version: `bab7c30e-18c2-47a3-acb4-2bf5d1e2fee2`. New live version: `53359e80-7972-4d0d-90de-c1e3550feaf3`.
+- Smoke test passed; photos, robots.txt and booking rates checked on the live site.
