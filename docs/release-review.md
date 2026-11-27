@@ -284,3 +284,11 @@ These are deliberately **not final** in the app:
 - Production database restore point (before 0027): `00000472-00000000-00005130-22d23cd14b6c082df2ad3730285741b5`.
 - Previous live version: `bab7c30e-18c2-47a3-acb4-2bf5d1e2fee2`. New live version: `53359e80-7972-4d0d-90de-c1e3550feaf3`.
 - Smoke test passed; photos, robots.txt and booking rates checked on the live site.
+
+## Release 2026-11-27 (2): screen help by role
+
+- Every staff page was opened as each of the seven roles: no errors, and no links to a page the role can't open.
+  The only gap: Confirm payments, Stock and Daily closing showed finance and the general manager help for a job
+  they have no button for. Fixed with a view-only version of that help (no database change).
+- Staging `2639c2cf-9894-4f82-8280-c27b62f8375f`, smoke test passed.
+- Previous live version: `53359e80-7972-4d0d-90de-c1e3550feaf3`. New live version: `e0129ea1-d506-4cb6-9564-7d011d86c194`. Smoke test passed.
