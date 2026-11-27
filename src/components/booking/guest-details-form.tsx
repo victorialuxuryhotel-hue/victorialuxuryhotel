@@ -48,11 +48,11 @@ export function GuestDetailsForm({
     if (target instanceof HTMLInputElement) target.focus({ preventScroll: true });
   }, [state]);
   return (
-    <form ref={form} action={formAction} onSubmit={keepValues(formAction)} onChange={onEdit} className="space-y-8" noValidate>
+    <form ref={form} action={formAction} onSubmit={keepValues(formAction)} onChange={onEdit} className="space-y-6" noValidate>
       {Object.entries(hidden).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       {state && !state.ok && !state.fieldErrors ? <div role="alert"><FormMessage>{state.message}</FormMessage></div> : null}
       <section>
-        <h2 className="font-display text-[1.875rem] text-navy-950 sm:text-3xl">Your details</h2>
+        <h1 className="font-display text-[2rem] leading-tight text-navy-950">Your details</h1>
         <p className="mt-1 text-sm text-ink-500">We&apos;ll send your confirmation to this email.</p>
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <Field label="Full name" htmlFor="name" error={err("fullName")} className="sm:col-span-2">
@@ -96,19 +96,17 @@ export function GuestDetailsForm({
       <Field label="Special requests" optional htmlFor="requests" hint="Arrival time or anything we should know.">
         <Textarea id="requests" name="specialRequests" rows={3} maxLength={1000} />
       </Field>
-      <section className="rounded-card bg-ivory-100 p-5 text-sm text-ink-700">
-        <p className="font-medium text-ink-900">Cancellation policy</p>
-        <p className="mt-1 whitespace-pre-line">
+      <section className="rounded-xl bg-ivory-100 px-[18px] py-4 text-sm text-ink-700">
+        <p className="font-semibold text-ink-900">Cancellation policy</p>
+        <p className="mt-1 leading-relaxed whitespace-pre-line">
           {cancellationPolicy ?? "Please contact the hotel for cancellation terms before you book."}
         </p>
-      </section>
-      <div>
-        <label className="flex min-h-11 cursor-pointer items-center gap-3 py-1 text-sm text-ink-700">
+        <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2.5 py-1">
           <input type="checkbox" name="acceptTerms" required className="size-5 shrink-0 accent-navy-800" aria-invalid={Boolean(err("acceptTerms"))} />
           I agree to the cancellation policy.
         </label>
-        {err("acceptTerms") ? <p data-error className="mt-1 text-sm text-danger-700">{err("acceptTerms")}</p> : null}
-      </div>
+        {err("acceptTerms") ? <p data-error className="mt-1 text-danger-700">{err("acceptTerms")}</p> : null}
+      </section>
       <Button type="submit" size="lg" pending={pending} className={total ? "hidden md:inline-flex" : "w-full sm:w-auto"}>Continue to payment</Button>
       {total ? (
         <MobileActionBar label="Total" amount={total}>

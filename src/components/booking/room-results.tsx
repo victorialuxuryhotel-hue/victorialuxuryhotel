@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, MessageCircle, Phone, Users } from "lucide-react";
+import { ChevronRight, MessageCircle, Phone } from "lucide-react";
 import { Photo } from "@/components/public/photo";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
@@ -17,39 +17,34 @@ function OptionCard({ o, stay, selectHref }: { o: AvailabilityOption; stay: Stay
     ? `/book?${new URLSearchParams({ checkIn: o.freeFrom, checkOut: addDays(o.freeFrom, o.nights), guests: String(stay.guests) })}`
     : null;
   return (
-    <li
-      className={cn(
-        "grid overflow-hidden rounded-card sm:grid-cols-[minmax(0,16rem)_1fr]",
-        full ? "border-2 border-dashed border-ivory-300 bg-ivory-50" : "bg-ivory-50 shadow-card",
-      )}
-    >
-      <Photo photo={o.photo ?? { alt: o.name }} className={cn("aspect-video sm:aspect-auto sm:h-full", full && "opacity-60")} sizes="(min-width: 640px) 16rem, 100vw" />
-      <div className="flex flex-col gap-4 p-5 sm:p-6 md:flex-row md:items-end md:justify-between">
-        <div className="min-w-0">
-          <h3 className={cn("font-display text-3xl", full ? "text-ink-500" : "text-navy-950")}>{o.name}</h3>
+    <li className={cn("flex flex-col overflow-hidden rounded-card border border-hairline bg-white sm:flex-row", full && "bg-ivory-50")}>
+      <Photo photo={o.photo ?? { alt: o.name }} className={cn("aspect-video sm:aspect-auto sm:min-h-[150px] sm:w-56 sm:shrink-0", full && "opacity-60")} sizes="(min-width: 640px) 14rem, 100vw" />
+      <div className="flex flex-1 flex-wrap items-center justify-between gap-3.5 px-5 py-[18px]">
+        <div className="min-w-0 flex-[1_1_13rem]">
+          <h3 className={cn("font-sans text-[19px]", full ? "text-ink-500" : "text-navy-950")}>{o.name}</h3>
           {o.summary ? <p className="mt-1 text-sm text-ink-600">{o.summary}</p> : null}
-          <p className="mt-2 flex items-center gap-2 text-sm text-ink-500"><Users className="size-4" aria-hidden /> Sleeps {o.maxOccupancy}</p>
-          <Link href={`/rooms/${o.slug}`} className="-ml-1 mt-1 inline-flex min-h-11 items-center gap-1 px-1 text-sm text-navy-800 underline-offset-2 hover:underline">
-            Room details, photos and amenities <ChevronRight className="size-4" aria-hidden />
+          <p className="mt-1.5 text-[13px] text-ink-500">Sleeps up to {o.maxOccupancy}</p>
+          <Link href={`/rooms/${o.slug}`} className="mt-0.5 inline-flex min-h-11 items-center gap-1 text-[13px] font-medium text-navy-800 hover:text-gold-600">
+            Photos &amp; details <span className="sr-only">of {o.name}</span> <ChevronRight className="size-3.5" aria-hidden />
           </Link>
         </div>
         {full ? (
-          <div className="shrink-0 md:text-right">
-            <p className="text-sm font-medium text-ink-700">Full for these dates</p>
+          <div className="flex shrink-0 flex-col items-start gap-2.5 sm:items-end">
+            <p className="rounded-full bg-ivory-200 px-3 py-1.5 text-[13px] font-medium text-ink-600">Fully booked for these dates</p>
             {switchHref ? (
-              <Link href={switchHref} className={buttonStyles({ variant: "secondary", className: "mt-3 h-11.5 w-full md:w-auto" })}>
+              <Link href={switchHref} className={buttonStyles({ variant: "secondary", className: "h-11" })}>
                 Free from {formatDate(o.freeFrom!, { year: false })} · switch dates
               </Link>
             ) : null}
           </div>
         ) : (
-          <div className="flex shrink-0 items-end justify-between gap-4 md:block md:text-right">
-            <div>
+          <div className="flex w-full items-end justify-between gap-4 sm:w-auto sm:flex-col sm:gap-2.5">
+            <div className="sm:text-right">
               <p className="text-2xl font-semibold tabular-nums text-navy-950">{formatNaira(o.totalKobo)}</p>
-              <p className="text-sm text-ink-500 tabular-nums">{formatNaira(o.nightlyRateKobo)} a night</p>
+              <p className="text-xs text-ink-500 tabular-nums">{formatNaira(o.nightlyRateKobo)} × {plural(o.nights, "night")}</p>
             </div>
-            <Link href={selectHref(o)} className={buttonStyles({ variant: "accent", className: "h-11.5 min-w-[104px] md:mt-3" })}>
-              Choose
+            <Link href={selectHref(o)} className={buttonStyles({ className: "h-11 min-w-[104px] px-5" })}>
+              Select <span className="sr-only">{o.name}</span>
             </Link>
           </div>
         )}
@@ -83,7 +78,7 @@ export function RoomResults({ options, stay, selectHref }: { options: Availabili
       {fitting.length ? (
         <section aria-labelledby={tooSmall.length ? "fits" : undefined} className="space-y-4">
           {tooSmall.length ? <h2 id="fits" className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">Fits {plural(stay.guests, "guest")} in one room</h2> : null}
-          <ul className="space-y-5">
+          <ul className="space-y-3.5">
             {fitting.map((o) => <OptionCard key={o.slug} o={o} stay={stay} selectHref={selectHref} />)}
           </ul>
         </section>

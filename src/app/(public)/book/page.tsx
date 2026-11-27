@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { MessageCircle, Phone } from "lucide-react";
-import { Steps } from "@/components/booking/booking-ui";
+import { ResultsSkeleton, Steps } from "@/components/booking/booking-ui";
 import { RoomResults } from "@/components/booking/room-results";
 import { StaySummaryBar } from "@/components/booking/stay-summary-bar";
 import { BookingBar } from "@/components/public/booking-bar";
@@ -29,7 +29,7 @@ async function Results({ searchParams }: { searchParams: SP }) {
     return (
       <>
         <Steps current={0} />
-        <h1 className="mt-8 font-display text-4xl text-navy-950 sm:text-5xl">When would you like to stay?</h1>
+        <h1 className="mt-5 font-display text-[2rem] leading-tight text-navy-950">When would you like to stay?</h1>
         <p className="mt-3 max-w-xl text-ink-600">Choose your dates and number of guests to see available rooms and the total for your stay.</p>
         <div className="mt-8"><BookingBar variant="inline" defaults={{ guests: raw.guests }} /></div>
       </>
@@ -53,7 +53,7 @@ async function Results({ searchParams }: { searchParams: SP }) {
   return (
     <>
       <Steps current={1} />
-      <h1 className="mt-8 font-display text-4xl text-navy-950 sm:text-5xl">Choose your room</h1>
+      <h1 className="mt-5 font-display text-[2rem] leading-tight text-navy-950">Choose your room</h1>
       <div className="mt-4">
         <StaySummaryBar checkIn={stay.checkIn} checkOut={stay.checkOut} guests={stay.guests} nights={result.options[0]?.nights ?? 1} />
       </div>
@@ -74,8 +74,8 @@ async function Results({ searchParams }: { searchParams: SP }) {
 
 export default function BookPage(props: PageProps<"/book">) {
   return (
-    <Container className="py-10 sm:py-14">
-      <Suspense fallback={<div className="h-64 animate-pulse rounded-card bg-ivory-200" />}>
+    <Container className="max-w-[65rem] pt-7 pb-16">
+      <Suspense fallback={<ResultsSkeleton />}>
         <Results searchParams={props.searchParams} />
       </Suspense>
     </Container>

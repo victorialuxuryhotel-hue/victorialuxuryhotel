@@ -13,6 +13,15 @@ const variants: Record<Variant, string> = {
   danger: "border border-danger-600 text-danger-700 hover:bg-danger-600/10 active:bg-danger-600/20",
 };
 
+/** The guest website uses filled buttons; these only apply inside `.guest`. */
+const guestVariants: Record<Variant, string> = {
+  primary: "guest:bg-navy-800 guest:font-medium guest:text-white guest:hover:border-navy-700 guest:hover:bg-navy-700",
+  accent: "guest:border-gold-400 guest:bg-gold-400 guest:font-semibold guest:text-navy-950 guest:hover:border-gold-300 guest:hover:bg-gold-300",
+  secondary: "guest:border-ink-300 guest:bg-white guest:font-medium guest:hover:bg-ivory-100",
+  ghost: "guest:font-medium",
+  danger: "guest:bg-white guest:font-medium guest:hover:bg-danger-50",
+};
+
 const sizes: Record<Size, string> = {
   // Touch screens (the bar POS is touch at laptop width) get at least 44px, whatever the width.
   sm: "h-8 px-3 text-sm pointer-coarse:h-11 pointer-coarse:px-4",
@@ -24,6 +33,7 @@ export function buttonStyles({ variant = "primary", size = "md", className }: { 
   return cn(
     "inline-flex items-center justify-center gap-2 rounded-md bg-transparent font-normal transition-colors disabled:cursor-not-allowed disabled:opacity-45",
     variants[variant],
+    guestVariants[variant],
     sizes[size],
     className,
   );

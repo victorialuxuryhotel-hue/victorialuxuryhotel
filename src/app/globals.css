@@ -6,6 +6,9 @@
  * wordmark #00186c ≈ navy-900, swash #0030a8 ≈ navy-700, V #cc8400 ≈ gold-500. Neutrals are warm
  * ("ivory"/"ink") so the site reads as hospitality, not a SaaS dashboard.
  */
+/* Styles for the guest website only: anything inside an element with the "guest" class. */
+@custom-variant guest (&:where(.guest, .guest *));
+
 @theme {
   --font-display: var(--font-display-base), "Cormorant Garamond", Georgia, serif;
   --font-sans: var(--font-sans-base), "Lora", Georgia, serif;
@@ -64,7 +67,9 @@
   --radius-2xl: 7px;
   --radius-3xl: 7px;
   --radius-card: 4px;
-  --shadow-card: none;
+  --shadow-card: var(--card-shadow, none);
+  --shadow-lift: 0 14px 34px -16px rgb(1 18 72 / 0.3);
+  --shadow-float: 0 20px 50px -12px rgb(1 18 72 / 0.35);
   --color-hairline: rgb(23 27 36 / 0.16);
 }
 
@@ -94,6 +99,38 @@
     outline-offset: 2px;
   }
 }
+
+/*
+ * The guest website: Inter body text, 6px controls, 12px cards and soft shadows.
+ * It re-points the theme variables, so the same utilities look different here.
+ */
+.guest {
+  --font-sans: var(--font-guest), "Inter", system-ui, sans-serif;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 16px;
+  --radius-card: 12px;
+  --card-shadow: 0 1px 2px rgb(20 32 66 / 0.06), 0 4px 16px rgb(20 32 66 / 0.06);
+  --color-hairline: #e8e2d4;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Skeleton blocks shimmer while content loads. */
+@utility skeleton {
+  background-image: linear-gradient(90deg, #efe9dc 0, #f7f3ea 40%, #efe9dc 80%);
+  background-size: 800px 100%;
+  border-radius: var(--radius-md);
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer {
+  from { background-position: -400px 0; }
+  to { background-position: 400px 0; }
+}
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 
 /* Bottom sheets (src/components/ui/bottom-sheet.tsx). */
 @keyframes sheet-up {

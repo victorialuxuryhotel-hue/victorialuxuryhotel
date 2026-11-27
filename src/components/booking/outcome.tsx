@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarPlus, Check, Clock, MapPin, Share2, XCircle } from "lucide-react";
+import { CalendarPlus, Check, Clock, MapPin, MessageCircle, Phone, Share2, XCircle } from "lucide-react";
 import { CopyButton } from "./copy-button";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
@@ -26,70 +26,56 @@ export type ConfirmedStay = {
 export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
   const share = `https://wa.me/?text=${encodeURIComponent(`I'm staying at ${hotel.name}, ${formatDate(stay.checkIn)} to ${formatDate(stay.checkOut)}. ${stay.siteUrl}`)}`;
   const rows: Array<[string, string]> = [
-    ["Room", `${stay.room ? `${stay.room} · ` : ""}${stay.category} · ${plural(stay.guests, "guest")}`],
+    ["Room", `${stay.room ? `${stay.room} · ` : ""}${stay.category}`],
+    ["Guests", String(stay.guests)],
     ["Check-in", `${formatDate(stay.checkIn)}, ${stay.checkInTime}`],
     ["Check-out", `${formatDate(stay.checkOut)}, ${stay.checkOutTime}`],
-    ["Paid", formatNaira(stay.paidKobo)],
+    ["Paid", `${formatNaira(stay.paidKobo)} · ${plural(stay.nights, "night")}`],
   ];
-  const action = "flex min-h-14 flex-col items-center justify-center gap-1 rounded-md border border-hairline px-2 text-xs text-ink-900 hover:bg-ink-900/7";
+  const contact = "inline-flex min-h-11 items-center gap-1.5 font-medium text-navy-800 hover:text-gold-600";
   return (
-    <div className="mx-auto max-w-xl">
-      <div className="border-b border-hairline pb-6 text-center">
-        <span className="mx-auto flex size-12 items-center justify-center rounded-full border border-gold-500 text-gold-700"><Check className="size-6" aria-hidden /></span>
-        <h1 className="mt-4 font-display text-[2.25rem] leading-[1.05] text-navy-950 sm:text-5xl">You&apos;re booked, {stay.guestName.split(" ")[0]}</h1>
-        <p className="mt-3 text-ink-700">
-          Payment received.{stay.email ? <> A confirmation is on its way to <span className="break-all text-ink-900">{stay.email}</span>.</> : null}
-        </p>
-        <div className="mt-5 inline-flex items-center gap-3 rounded-md border border-hairline py-1.5 pr-1.5 pl-4 text-left">
-          <span>
-            <span className="block text-xs tracking-[0.16em] text-ink-500 uppercase">Reference</span>
-            <span className="block text-lg tracking-[0.06em] text-navy-950 tabular-nums">{stay.reference}</span>
+    <div className="mx-auto max-w-[37.5rem] text-center">
+      <span className="mx-auto flex size-13 items-center justify-center rounded-full bg-success-50 text-success-600"><Check className="size-6" strokeWidth={3} aria-hidden /></span>
+      <h1 className="mt-[18px] font-display text-[2.25rem] leading-[1.05] font-medium text-navy-950 sm:text-[2.75rem]">You&apos;re booked, {stay.guestName.split(" ")[0]}</h1>
+      <p className="mt-2 text-[15px] text-ink-600">
+        Payment received and your reservation is confirmed.{stay.email ? <> Details sent to <span className="font-medium text-ink-900 [overflow-wrap:anywhere]">{stay.email}</span>.</> : null}
+      </p>
+
+      <div className="mt-7 overflow-hidden rounded-card border border-hairline bg-white text-left">
+        <div className="flex items-center justify-between gap-3 bg-navy-950 py-2.5 pr-2.5 pl-5 text-ivory-50">
+          <span className="text-[11px] tracking-[0.2em] text-gold-300 uppercase">Booking reference</span>
+          <span className="flex items-center gap-2">
+            <span className="font-mono text-[17px] tracking-[0.06em]">{stay.reference}</span>
+            <span className="[&_button]:text-ivory-50"><CopyButton text={stay.reference} /></span>
           </span>
-          <CopyButton text={stay.reference} />
+        </div>
+        <dl className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 p-5 text-sm">
+          {rows.map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-ink-500">{k}</dt>
+              <dd className="mt-0.5 font-medium text-ink-900 tabular-nums">{v}</dd>
+            </div>
+          ))}
+          {stay.receiptNumber ? (
+            <div>
+              <dt className="text-ink-500">Receipt</dt>
+              <dd className="mt-0.5 font-medium"><Link href={`/book/receipt/${stay.token}/${stay.receiptNumber}`} className="text-navy-800 underline underline-offset-2">{stay.receiptNumber}</Link></dd>
+            </div>
+          ) : null}
+        </dl>
+        <div className="flex flex-wrap gap-x-6 border-t border-hairline bg-ivory-50 px-5 py-1.5 text-sm">
+          <a href={hotel.mapsUrl} target="_blank" rel="noreferrer" className={contact}><MapPin className="size-4" aria-hidden />Directions</a>
+          <a href={`tel:${hotel.phone}`} className={contact}><Phone className="size-4" aria-hidden />Call the hotel</a>
+          <a href={`https://wa.me/${hotel.whatsapp}`} className={contact}><MessageCircle className="size-4" aria-hidden />WhatsApp</a>
+          <a href={`/book/confirmation/${stay.token}/calendar`} className={contact}><CalendarPlus className="size-4" aria-hidden />Calendar</a>
+          <a href={share} target="_blank" rel="noreferrer" className={contact}><Share2 className="size-4" aria-hidden />Share</a>
         </div>
       </div>
 
-      <dl className="grid grid-cols-[auto_1fr] text-sm">
-        {rows.map(([k, v]) => (
-          <div key={k} className="contents">
-            <dt className="border-b border-hairline py-2.5 text-ink-500">{k}</dt>
-            <dd className="border-b border-hairline py-2.5 text-right text-ink-900 tabular-nums">{v}</dd>
-          </div>
-        ))}
-      </dl>
-
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <a href={`/book/confirmation/${stay.token}/calendar`} className={action}><CalendarPlus className="size-4" aria-hidden />Calendar</a>
-        <a href={hotel.mapsUrl} target="_blank" rel="noreferrer" className={action}><MapPin className="size-4" aria-hidden />Directions</a>
-        <a href={share} target="_blank" rel="noreferrer" className={action}><Share2 className="size-4" aria-hidden />Share</a>
-      </div>
-
-      <section aria-labelledby="next-steps" className="mt-8">
-        <h2 id="next-steps" className="font-sans text-xs font-normal tracking-[0.2em] text-ink-500 uppercase">What happens next</h2>
-        <ol className="mt-1.5">
-          {[
-            stay.email ? "Your confirmation and receipt are in your email." : "Keep your booking reference; you'll need it at the front desk.",
-            `Arrive ${stay.checkInTime === "any time" ? "any time that day" : stay.checkInTime}. Your room key is waiting at the front desk.`,
-            "Running late? Message us on WhatsApp.",
-          ].map((t, i) => (
-            <li key={t} className="grid grid-cols-[22px_1fr] gap-2.5 border-t border-hairline py-2.5 text-sm">
-              <span className="text-gold-700 tabular-nums">{i + 1}</span>
-              <span className="text-ink-800">{t}</span>
-            </li>
-          ))}
-        </ol>
-        <p className="mt-3 text-sm text-ink-700">
-          Questions? <a href={`https://wa.me/${hotel.whatsapp}`} className="text-navy-800 underline underline-offset-2">WhatsApp us</a> or <a href={`tel:${hotel.phone}`} className="text-navy-800 underline underline-offset-2">call the front desk</a>.
-        </p>
-        <p className="mt-2 text-sm text-ink-700">
-          Need to change dates or cancel? <Link href="/account" className="text-navy-800 underline underline-offset-2">Manage your booking</Link>
-        </p>
-        {stay.receiptNumber ? (
-          <p className="mt-2 text-sm text-ink-500">
-            Receipt <Link href={`/book/receipt/${stay.token}/${stay.receiptNumber}`} className="text-navy-800 underline underline-offset-2">{stay.receiptNumber}</Link>
-          </p>
-        ) : null}
-      </section>
+      <p className="mt-4 text-sm text-ink-600">
+        Arrive {stay.checkInTime === "any time" ? "any time that day" : stay.checkInTime}. Need to change dates or cancel? <Link href="/account" className="text-navy-800 underline underline-offset-2">Manage your booking</Link>
+      </p>
+      <Link href="/" className={buttonStyles({ variant: "secondary", className: "mt-6" })}>Back to the website</Link>
     </div>
   );
 }
