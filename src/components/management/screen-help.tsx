@@ -3,10 +3,11 @@
 import { usePathname } from "next/navigation";
 import { CircleHelp } from "lucide-react";
 import { helpFor } from "@/content/help";
+import { useStaffRole } from "./staff-role";
 
 /** "?" next to a page title: the 3–5 steps of the screen's main task (interface brief I10). Esc closes it. */
 export function HelpButton() {
-  const help = helpFor(usePathname());
+  const help = helpFor(usePathname(), useStaffRole());
   if (!help) return null;
   return (
     <details data-popover="" data-help="" className="group relative inline-block align-middle print:hidden">
@@ -28,6 +29,6 @@ export function HelpButton() {
 
 /** The one line under a title saying what the screen is for, when the page doesn't give its own. */
 export function HelpPurpose({ className }: { className?: string }) {
-  const help = helpFor(usePathname());
+  const help = helpFor(usePathname(), useStaffRole());
   return help ? <p className={className}>{help.purpose}</p> : null;
 }

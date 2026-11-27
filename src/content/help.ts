@@ -3,8 +3,14 @@
 // follow docs/glossary.md (the unit test checks the words it says not to use).
 
 import type { StaffRole } from "@/domain/status";
+import { can, type Permission } from "@/lib/auth/permissions";
 
-export type ScreenHelp = { purpose: string; task: string; steps: string[] };
+type HelpText = { purpose: string; task: string; steps: string[] };
+/**
+ * `viewOnly` is shown instead to roles without `unless`, the permission the page itself checks before
+ * showing its forms, so help never describes a job the reader has no button for.
+ */
+export type ScreenHelp = HelpText & { viewOnly?: HelpText & { unless: Permission } };
 
 /** By path; a [id] segment matches any value. */
 export const screenHelp: Record<string, ScreenHelp> = {
@@ -77,6 +83,12 @@ export const screenHelp: Record<string, ScreenHelp> = {
     purpose: "Transfer and POS payments for the general manager or owner to check against the bank and the terminal.",
     task: "Confirm payments",
     steps: ["Open the bank statement and the terminal's report for the same days.", "Matches: tick it off.", "Not found: say what you checked. The booking is flagged for a correction."],
+    viewOnly: {
+      unless: "payments.approve",
+      purpose: "Transfer and POS payments waiting for the general manager or owner to check against the bank and the terminal.",
+      task: "See what's waiting to be confirmed",
+      steps: ["See which transfer and POS payments are still to be confirmed, and since when.", "Compare them with the bank statement and the terminal's report.", "Tell the general manager about anything you can't find: they confirm it or flag it."],
+    },
   },
   "/app/events": {
     purpose: "Hall bookings: enquiries, confirmed events and what's owed.",
@@ -102,6 +114,12 @@ export const screenHelp: Record<string, ScreenHelp> = {
     purpose: "Close your day: count your cash before you see what's expected.",
     task: "Close the day",
     steps: ["Count the cash in your drawer.", "Type the total and submit your count.", "If it doesn't match, say what happened. The manager checks every closing."],
+    viewOnly: {
+      unless: "pos.sell",
+      purpose: "Each cashier's daily closing: the cash they counted against what was expected.",
+      task: "Check the closings",
+      steps: ["Compare each closing's counted cash with what was expected.", "Read the reason given for any difference.", "The restaurant and bar manager or the owner signs each closing off."],
+    },
   },
   "/app/sales/menu": {
     purpose: "What the restaurant and bar sell, at what price, and what's available today.",
@@ -117,6 +135,12 @@ export const screenHelp: Record<string, ScreenHelp> = {
     purpose: "Drinks and supplies in stock, with every delivery and count.",
     task: "Record a delivery",
     steps: ["Find the item.", "Record the delivery with the quantity.", "Count regularly; a difference is recorded with a reason."],
+    viewOnly: {
+      unless: "inventory.manage",
+      purpose: "Drinks and supplies in stock, with every delivery and count.",
+      task: "Check stock",
+      steps: ["Find the item to see how many are in stock.", "Its history shows every delivery and count, with the reason for any difference.", "Deliveries and counts are recorded by the restaurant and bar manager."],
+    },
   },
   "/app": {
     purpose: "How the hotel is doing today, and what needs a manager.",
@@ -145,7 +169,7 @@ export const screenHelp: Record<string, ScreenHelp> = {
   },
 };
 
-export function helpFor(pathname: string): ScreenHelp | null {
+function screenFor(pathname: string): ScreenHelp | null {
   if (screenHelp[pathname]) return screenHelp[pathname]!;
   for (const [pattern, help] of Object.entries(screenHelp)) {
     if (!pattern.includes("[")) continue;
@@ -153,6 +177,17 @@ export function helpFor(pathname: string): ScreenHelp | null {
     if (re.test(pathname)) return help;
   }
   return null;
+}
+
+/** The help for a screen, as the given role can use it (without a role: the full task). */
+export function helpFor(pathname: string, role?: StaffRole): HelpText | null {
+  const help = screenFor(pathname);
+  if (!help) return null;
+  const { viewOnly, ...full } = help;
+  if (role && viewOnly && !can(role, viewOnly.unless)) {
+    return { purpose: viewOnly.purpose, task: viewOnly.task, steps: viewOnly.steps };
+  }
+  return full;
 }
 
 /** "Your first day" on the account page: the main jobs for the role, ticked off as each is done once. */

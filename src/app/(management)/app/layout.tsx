@@ -8,6 +8,7 @@ import { ConnectionBanner } from "@/components/management/connection";
 import { IdleLock } from "@/components/management/idle-lock";
 import { Shortcuts } from "@/components/management/shortcuts";
 import { StaffCard } from "@/components/management/staff-card";
+import { StaffRoleProvider } from "@/components/management/staff-role";
 import { policy } from "@/config/policy";
 import { staffRole } from "@/domain/status";
 import { LoadingState } from "@/components/ui/feedback";
@@ -35,7 +36,7 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
     </StaffCard>
   );
   return (
-    <>
+    <StaffRoleProvider role={staff.role}>
       <ConnectionBanner />
       <Shortcuts />
       <BrowserBanner />
@@ -48,7 +49,7 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col">{children}</div>
         {staff.role === "front_desk" ? <DeskTabs /> : null}
       </div>
-    </>
+    </StaffRoleProvider>
   );
 }
 
