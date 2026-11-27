@@ -7,7 +7,7 @@ import { RatesTabs } from "@/components/management/rates-tabs";
 import { GalleryManager, SitePhotoSlot } from "@/components/management/photo-manager";
 import { Card, CardHeader } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/feedback";
-import { galleryGroups, photoSlots } from "@/content/photo-slots";
+import { CARD_PHOTOS, galleryGroups, isCardSlot, photoSlots } from "@/content/photo-slots";
 import { can } from "@/lib/auth/permissions";
 import { requireStaff } from "@/server/auth";
 import { listSitePhotos } from "@/server/queries/site-photos";
@@ -23,10 +23,10 @@ async function Content() {
       <Card>
         <CardHeader
           title="Photo places"
-          description="One photo for each place on the website."
+          description="One photo for each place on the website. The homepage On site cards (pool, lounge, restaurant, club) take up to 4 each, shown together."
         />
         {photoSlots.map((s) => (
-          <SitePhotoSlot key={s.slot} slot={s.slot} label={s.label} where={s.where} shape={s.shape} shot={s.shot} photo={bySlot[s.slot]} />
+          <SitePhotoSlot key={s.slot} slot={s.slot} label={s.label} where={s.where} shape={s.shape} shot={s.shot} photos={bySlot[s.slot] ?? []} max={isCardSlot(s.slot) ? CARD_PHOTOS : 1} />
         ))}
       </Card>
       <Card>

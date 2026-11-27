@@ -51,7 +51,10 @@ export async function getPublicCategory(slug: string): Promise<PublicCategory | 
 }
 
 export type SitePhotos = {
+  /** The first photo of each place. */
   slots: Partial<Record<string, PublicPhoto>>;
+  /** Every photo of each place, in order (the On site card places hold up to 4). */
+  all: Partial<Record<string, PublicPhoto[]>>;
   gallery: Array<PublicPhoto & { group: string }>;
 };
 
@@ -62,13 +65,17 @@ export const getSitePhotos = cache(async (): Promise<SitePhotos> => {
     "SELECT slot, gallery_group, storage_path, alt_text FROM site_photos ORDER BY sort_order, created_at",
   );
   const slots: SitePhotos["slots"] = {};
+  const byPlace: SitePhotos["all"] = {};
   const gallery: SitePhotos["gallery"] = [];
   for (const p of rows) {
     const photo = { image: mediaUrl(p.storage_path), alt: p.alt_text };
     if (p.slot === "gallery") gallery.push({ ...photo, group: p.gallery_group! });
-    else slots[p.slot] = photo;
+    else {
+      slots[p.slot] ??= photo;
+      (byPlace[p.slot] ??= []).push(photo);
+    }
   }
-  return { slots, gallery };
+  return { slots, all: byPlace, gallery };
 });
 
 export async function coverPhotos(db: Db): Promise<Map<string, PublicPhoto>> {

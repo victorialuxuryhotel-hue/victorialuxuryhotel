@@ -37,6 +37,7 @@ const tokens: Record<string, [ErrorCode, string]> = {
   payment_check_forbidden: ["FORBIDDEN", "Only the General Manager or the Owner can confirm payments."],
   room_before_payment: ["VALIDATION", "This booking isn't paid yet. Take the payment first: a room is given automatically once it's paid."],
   change_immutable: ["CONFLICT", "That change has already been paid for or cancelled. Reload to see where it is now."],
+  card_photos_full: ["CONFLICT", "This place holds up to 4 photos. Remove one first."],
   change_needs_approval: ["FORBIDDEN", "Only the General Manager or the Owner can apply a change before it's paid, and they must give a reason."],
 };
 

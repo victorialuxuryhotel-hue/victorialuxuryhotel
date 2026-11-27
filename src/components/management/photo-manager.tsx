@@ -148,42 +148,58 @@ export function SitePhotoSlot({
   where,
   shape,
   shot,
-  photo,
+  photos,
+  max = 1,
 }: {
   slot: string;
   label: string;
   where: string;
   shape: string;
   shot: string;
-  photo?: ManagedPhoto;
+  photos: ManagedPhoto[];
+  /** More than 1: an On site card place, whose photos are added (up to max) rather than replaced. */
+  max?: number;
 }) {
+  const many = max > 1;
+  const full = photos.length >= max;
   return (
     <div className="grid gap-5 border-b border-hairline p-5 last:border-0 md:grid-cols-[16rem_1fr]">
-      <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-ivory-200">
-        {photo ? (
-          <Image src={photo.url} alt={photo.alt} fill sizes="16rem" unoptimized={fromPhotoStore(photo.url)} className="object-cover" />
+      <div className={many && photos.length > 1 ? "grid grid-cols-2 gap-1.5" : ""}>
+        {photos.length ? (
+          photos.map((photo) => (
+            <div key={photo.id} className="relative aspect-[4/3] overflow-hidden rounded-md bg-ivory-200">
+              <Image src={photo.url} alt={photo.alt} fill sizes="16rem" unoptimized={fromPhotoStore(photo.url)} className="object-cover" />
+            </div>
+          ))
         ) : (
-          <span className="absolute inset-0 flex items-center justify-center text-xs text-ink-500">No photo yet</span>
+          <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-ivory-200">
+            <span className="absolute inset-0 flex items-center justify-center text-xs text-ink-500">No photo yet</span>
+          </div>
         )}
       </div>
       <div className="space-y-3">
         <div>
           <h3 className="font-medium text-ink-900">{label}</h3>
-          <p className="text-xs text-ink-500">{where} · {shape}</p>
+          <p className="text-xs text-ink-500">{where} · {shape}{many ? ` · ${photos.length} of ${max} photos` : ""}</p>
           <p className="mt-2 rounded-md bg-gold-50 px-3 py-2 text-sm text-ink-700"><span className="font-medium">The shot: </span>{shot}</p>
         </div>
-        {photo ? (
-          <div className="flex flex-wrap items-center gap-2">
+        {photos.map((photo, i) => (
+          <div key={photo.id} className="flex flex-wrap items-center gap-2">
+            {many ? <span className="w-5 text-xs text-ink-500 tabular-nums">{i + 1}.</span> : null}
             <div className="min-w-64 flex-1"><AltEditor photo={photo} kind="site" /></div>
             <ActionButton action={deleteSitePhoto} fields={{ photoId: photo.id }} size="sm" variant="ghost" confirm="Remove this photo from the website?">
               <Trash2 className="size-3.5 text-danger-700" aria-hidden /> Remove
             </ActionButton>
           </div>
-        ) : null}
-        <details>
-          <summary className="cursor-pointer text-sm font-medium text-navy-800">{photo ? "Replace photo" : "Upload photo"}</summary>
-          <div className="mt-3"><UploadForm action={uploadSitePhoto} hidden={{ slot }} label={photo ? "Replace" : "Upload"} /></div>
-        </details>
+        ))}
+        {many && full ? (
+          <p className="text-sm text-ink-500">This place is full. Remove a photo to add another.</p>
+        ) : (
+          <details>
+            <summary className="cursor-pointer text-sm font-medium text-navy-800">{many ? "Add photo" : photos.length ? "Replace photo" : "Upload photo"}</summary>
+            <div className="mt-3"><UploadForm action={uploadSitePhoto} hidden={{ slot }} label={many ? "Add" : photos.length ? "Replace" : "Upload"} /></div>
+          </details>
+        )}
       </div>
     </div>
   );

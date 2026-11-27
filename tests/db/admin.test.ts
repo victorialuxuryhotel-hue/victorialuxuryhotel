@@ -103,6 +103,18 @@ describe("photo records", () => {
     expect(await deleteSitePhoto(db, gm, spa.id)).toBe("site/spa/2.jpg");
   });
 
+  it("the On site card places (pool, lounge, restaurant, club) hold up to 4 photos each, added not replaced", async () => {
+    for (const n of [1, 2, 3, 4]) expect(await addSitePhoto(db, gm, { slot: "lounge", galleryGroup: null, storagePath: `site/lounge/${n}.jpg`, altText: `Lounge ${n}` })).toBeNull();
+    expect(await q("SELECT 1 FROM site_photos WHERE slot = 'lounge'")).toHaveLength(4);
+    await rejects(addSitePhoto(db, gm, { slot: "lounge", galleryGroup: null, storagePath: "site/lounge/5.jpg", altText: "Lounge 5" }), /up to 4 photos/);
+    await addSitePhoto(db, gm, { slot: "club", galleryGroup: null, storagePath: "site/club/1.jpg", altText: "The club" });
+    await addSitePhoto(db, gm, { slot: "club", galleryGroup: null, storagePath: "site/club/2.jpg", altText: "The club at night" });
+    expect(await q("SELECT 1 FROM site_photos WHERE slot = 'club'")).toHaveLength(2);
+    // Other places still hold one.
+    await rejects(exec("INSERT INTO site_photos (id, slot, storage_path, alt_text) VALUES ('x1', 'hero', 'h/1.jpg', 'Hero one'), ('x2', 'hero', 'h/2.jpg', 'Hero two')"), /exists|UNIQUE/);
+    await exec("DELETE FROM site_photos WHERE slot IN ('lounge', 'club')");
+  });
+
   it("photos need a description for screen readers, and changes are audited with the manager's name", async () => {
     const c = await makeCategory(0);
     await rejects(addCategoryPhoto(db, gm, { categoryId: c.id, storagePath: `rooms/${c.id}/x.jpg`, altText: "  " }), /aren't valid/);

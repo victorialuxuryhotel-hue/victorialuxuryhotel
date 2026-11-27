@@ -7,11 +7,12 @@ import { MapCard } from "@/components/public/map-card";
 import { ScrollRail } from "@/components/public/scroll-rail";
 import { PageSkeleton } from "@/components/public/page-skeleton";
 import { Photo } from "@/components/public/photo";
+import { PhotoSplit } from "@/components/public/photo-split";
 import { Container, Section, SectionHeading } from "@/components/public/section";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
 import { sitePhoto } from "@/components/public/site-photo";
-import { facilities, highlights, home } from "@/content/site";
+import { facilities, home, onSite } from "@/content/site";
 import { formatNaira } from "@/lib/format";
 import { getPublicCategories, getSitePhotos } from "@/server/queries/catalogue";
 
@@ -22,7 +23,6 @@ export const metadata: Metadata = {
 
 async function HomePageContent() {
   const [categories, photos] = await Promise.all([getPublicCategories(), getSitePhotos()]);
-  const experienceSlots = ["pool", "spa", "bar"];
   return (
     <>
       <section className="relative isolate overflow-hidden bg-navy-950 text-ivory-50">
@@ -77,10 +77,10 @@ async function HomePageContent() {
 
       <Section tone="navy" className="py-12 sm:py-18">
         <SectionHeading invert eyebrow="On site" title="Unwind without leaving the hotel" />
-        <ScrollRail label="On site" tone="dark" className="mt-8 sm:grid-cols-3 sm:gap-5">
-          {highlights.map((h, i) => (
-            <article key={h.title}>
-              <Photo photo={sitePhoto(photos, experienceSlots[i]!, h)} tone="dark" className="aspect-[3/2] rounded-card ring-1 ring-white/10" sizes="(min-width: 640px) 33vw, 80vw" />
+        <ScrollRail label="On site" tone="dark" className="mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+          {onSite.map((h) => (
+            <article key={h.slot}>
+              <PhotoSplit photos={photos.all[h.slot] ?? []} fallback={{ alt: h.alt }} tone="dark" className="aspect-[4/3] rounded-card ring-1 ring-white/10" sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 80vw" />
               <h3 className="mt-4 font-display text-2xl font-medium">{h.title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-ivory-200/75">{h.text}</p>
             </article>

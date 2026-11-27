@@ -292,3 +292,13 @@ These are deliberately **not final** in the app:
   they have no button for. Fixed with a view-only version of that help (no database change).
 - Staging `2639c2cf-9894-4f82-8280-c27b62f8375f`, smoke test passed.
 - Previous live version: `53359e80-7972-4d0d-90de-c1e3550feaf3`. New live version: `e0129ea1-d506-4cb6-9564-7d011d86c194`. Smoke test passed.
+
+## 0028_card_photos
+
+- **What:** the home page's On site cards become Pool, Lounge, Restaurant and Club (client, 2026-11-27). Adds the
+  Lounge and Club photo places; Pool, Lounge, Restaurant and Club hold up to 4 photos each (trigger
+  `site_photos_card_limit`), shown split in one frame. Every other place still holds one.
+- **How:** `site_photos` is rebuilt (SQLite can't change a CHECK) with every row copied; indexes and the two audit
+  triggers are recreated as in 0004.
+- **Existing rows:** unchanged. **Previous Worker:** keeps working; uploading to a card place replaces its photos with
+  one, as before.

@@ -51,6 +51,14 @@ export const highlights: Array<{ title: string; text: string; icon: LucideIcon }
   },
 ];
 
+/** The home page's On site cards (client, 2026-11-27). Photos come from the place of the same name in Website photos. */
+export const onSite: Array<{ slot: "pool" | "lounge" | "restaurant" | "club"; title: string; text: string; alt: string }> = [
+  { slot: "pool", title: "Exclusive indoor pool", text: "Swim in comfort, rain or shine, in a pool reserved for our guests.", alt: "Indoor swimming pool" },
+  { slot: "lounge", title: "Lounge", text: "An evening drink, an easy meeting, or a quiet moment to yourself.", alt: "The lounge" },
+  { slot: "restaurant", title: "Restaurant", text: "Dining on site for breakfast, lunch and dinner.", alt: "The restaurant" },
+  { slot: "club", title: "Club", text: "Indoor and outdoor lounge for the evening.", alt: "The club" },
+];
+
 export const facilities: Array<{ name: string; text: string; icon: LucideIcon }> = [
   { name: "Restaurant", text: "Dining on site for breakfast, lunch and dinner.", icon: UtensilsCrossed },
   { name: "Lounge & bar", text: "Drinks and conversation in a relaxed lounge.", icon: Wine },

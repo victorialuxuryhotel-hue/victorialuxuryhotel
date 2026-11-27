@@ -115,7 +115,7 @@ export async function updatePhotoAlt(_prev: ActionResult | null, formData: FormD
   });
 }
 
-const SINGLE_SLOTS = ["hero", "welcome", "pool", "spa", "bar", "restaurant", "conference", "exterior", "reception", "about"] as const;
+const SINGLE_SLOTS = ["hero", "welcome", "pool", "spa", "bar", "restaurant", "conference", "exterior", "reception", "about", "lounge", "club"] as const;
 const GROUPS = ["Rooms", "Pool & spa", "Dining", "The hotel"] as const;
 
 export async function uploadSitePhoto(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {

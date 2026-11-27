@@ -1,3 +1,4 @@
+import { isCardSlot } from "@/content/photo-slots";
 import { AppError } from "@/lib/errors";
 import { dbErrorToken } from "../db-errors";
 import { hotelDateOf } from "@/lib/hotel-date";
@@ -134,9 +135,11 @@ export async function addSitePhoto(
   v: { slot: string; galleryGroup: string | null; storagePath: string; altText: string },
 ): Promise<string | null> {
   requireRole(actor, MANAGERS);
-  const previous = v.slot === "gallery" ? null : await first<{ storage_path: string }>(db, "SELECT storage_path FROM site_photos WHERE slot = ?", v.slot);
+  // The gallery and the On site card places add photos (cards up to 4, checked by the database); other places replace.
+  const adds = v.slot === "gallery" || isCardSlot(v.slot);
+  const previous = adds ? null : await first<{ storage_path: string }>(db, "SELECT storage_path FROM site_photos WHERE slot = ?", v.slot);
   await writeBatch(db, actor, [
-    ...(v.slot === "gallery" ? [] : [db.prepare("DELETE FROM site_photos WHERE slot = ?").bind(v.slot)]),
+    ...(adds ? [] : [db.prepare("DELETE FROM site_photos WHERE slot = ?").bind(v.slot)]),
     db
       .prepare(
         `INSERT INTO site_photos (id, slot, gallery_group, storage_path, alt_text, sort_order)
