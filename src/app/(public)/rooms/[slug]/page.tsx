@@ -62,10 +62,11 @@ async function RoomType({ params }: { params: Promise<{ slug: string }> }) {
             ))}
           </PhotoStrip>
         </div>
-        <div className="hidden grid-cols-[2fr_1fr] grid-rows-2 gap-2.5 sm:grid">
-          <Photo photo={cover ?? { alt: c.name }} priority sizes="66vw" className="row-span-2 aspect-[4/3] rounded-card" />
-          {[0, 1].map((i) => (
-            <Photo key={i} photo={rest[i] ?? { alt: `${c.name}, detail` }} sizes="33vw" className="h-full rounded-card" />
+        {/* Up to 4 frames: the cover, and up to 3 more beside it (only photos the room type has). */}
+        <div className={`hidden gap-2.5 sm:grid ${rest.length ? "grid-cols-[2fr_1fr]" : ""}`} style={rest.length ? { gridTemplateRows: `repeat(${Math.min(rest.length, 3)}, minmax(0, 1fr))` } : undefined}>
+          <Photo photo={cover ?? { alt: c.name }} priority sizes="66vw" className="row-span-full aspect-[4/3] rounded-card" />
+          {rest.slice(0, 3).map((p, i) => (
+            <Photo key={i} photo={p} sizes="33vw" className="h-full rounded-card" />
           ))}
         </div>
       </Container>
