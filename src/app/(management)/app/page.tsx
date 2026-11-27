@@ -1,5 +1,5 @@
 import { toConfirmSummary } from "@/server/domain/payment-checks";
-import { currentFindings, forHotel } from "@/server/domain/self-check";
+import { currentFindings, forRole } from "@/server/domain/self-check";
 import { actorOf, authorizeRead } from "@/server/auth";
 import { getDb } from "@/server/db";
 import type { Metadata } from "next";
@@ -98,20 +98,12 @@ async function Content() {
     listReservations({ tab: "all" }),
     can(staff.role, "reports.view") ? authorizeRead("reports.view").then(async (r) => toConfirmSummary(await getDb(), actorOf(r))) : Promise.resolve({ count: 0, kobo: 0 }),
     // The self-check (rules section 4), live: the same list the alerts come from.
-    can(staff.role, "reports.view") ? authorizeRead("reports.view").then(async () => forHotel(await currentFindings(await getDb()))) : Promise.resolve([]),
+    can(staff.role, "reports.view") ? authorizeRead("reports.view").then(async () => forRole(await currentFindings(await getDb()), staff.role)) : Promise.resolve([]),
   ]);
   const noRoom = m.arrivals.filter((a) => !a.roomNumber).length;
   const owing = m.departures.filter((d) => owedOf(d) > 0).length;
-  // Two-step sign-in is on hold for testing; the owner and GM see this until it's enforced before go-live.
-  const twoStepOnHold = (staff.role === "owner" || staff.role === "general_manager") && process.env.TWO_STEP_ENFORCED !== "1";
   return (
     <div className="space-y-8 px-4 py-6 lg:px-8">
-      {twoStepOnHold ? (
-        <p role="status" className="rounded-md border border-warning-600/30 bg-warning-50 px-4 py-3 text-sm text-warning-700">
-          <b>Two-step sign-in is on hold for testing.</b> The owner, managers and finance sign in with a password only. Switch it on before go-live (set
-          TWO_STEP_ENFORCED=1; see the release review).
-        </p>
-      ) : null}
       <p className="-mt-2 text-sm text-ink-500">{formatDate(m.today)}</p>
       {toConfirm.count ? (
         <Link href="/app/payments/confirm" className="flex items-center justify-between gap-3 rounded-card border border-warning-600/30 bg-warning-50 px-5 py-3 text-sm text-warning-700 hover:bg-warning-50/70">

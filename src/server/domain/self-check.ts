@@ -1,3 +1,4 @@
+import type { StaffRole } from "@/domain/status";
 // The self-check (rules-and-edge-cases.md section 4). Runs with the scheduled job: the urgent checks
 // every 10 minutes, the rest once a day after the 06:00 business-day cut-off. It never changes money
 // or bookings; it only reports. Each problem alerts at most once a day (self_check_state), and the
@@ -15,10 +16,29 @@ import { MISMATCH_FLAG } from "./payments";
 export type Finding = { key: string; check: string; urgent: boolean; message: string };
 
 /**
- * What the Dashboard shows the hotel: everything except the data checks, which mean a bug or a
- * database problem and go only to the maintainer's alert channel (the GM gets no technical updates).
+ * Who acts on each check: each role sees only what matters to its job. Money goes to finance as well as
+ * the owner and GM; the desk's matters (rooms, arrivals, departures) to the owner and GM. The data
+ * checks (invariant_*) mean a bug or a database problem: no hotel role sees them, they go only to the
+ * maintainer's alert channel. A check missing here is shown to nobody, so the test lists them all.
  */
-export const forHotel = (findings: Finding[]) => findings.filter((f) => !f.check.startsWith("invariant_"));
+const MANAGE: StaffRole[] = ["owner", "general_manager"];
+const MONEY: StaffRole[] = ["owner", "general_manager", "finance"];
+export const AUDIENCE: Record<string, StaffRole[]> = {
+  in_house_owes: MONEY,
+  online_payment_pending: MONEY,
+  overpaid: MONEY,
+  payments_to_confirm: MONEY,
+  closing_unverified: MONEY,
+  paid_no_room: MANAGE,
+  overdue_checkout: MANAGE,
+  not_arrived: MANAGE,
+  room_out_of_order: MANAGE,
+  invariant_two_in_room: [],
+  invariant_unpaid_with_room: [],
+};
+
+/** The Dashboard's "Anything wrong?" for one role. */
+export const forRole = (findings: Finding[], role: StaffRole) => findings.filter((f) => AUDIENCE[f.check]?.includes(role));
 
 const PAID = `(SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
   FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful')`;

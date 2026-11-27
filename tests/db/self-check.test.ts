@@ -1,7 +1,7 @@
 // The self-check (rules section 4): finds problems, alerts each at most once a day, runs the daily
 // checks once per business day. Never changes bookings or money.
 import { describe, expect, it } from "vitest";
-import { currentFindings, dailyChecks, findingsToAlert, forHotel, urgentChecks } from "@/server/domain/self-check";
+import { currentFindings, dailyChecks, findingsToAlert, AUDIENCE, forRole, urgentChecks } from "@/server/domain/self-check";
 import { day, db, exec, insertReservation, makeCategory, q1 } from "./helpers";
 
 async function inHouseOwing() {
@@ -28,9 +28,22 @@ describe("self-check", () => {
     expect((await currentFindings(db)).some((x) => x.key === `overdue:${r}`)).toBe(true);
   });
 
-  it("the Dashboard shows the hotel's problems but not the data checks, which are for the maintainer", () => {
+  it("each role sees only the problems it acts on; the data checks reach no hotel role", () => {
     const f = (check: string) => ({ key: check, check, urgent: true, message: check });
-    expect(forHotel([f("in_house_owes"), f("invariant_two_in_room"), f("invariant_unpaid_with_room"), f("overdue_checkout")]).map((x) => x.check)).toEqual(["in_house_owes", "overdue_checkout"]);
+    const all = Object.keys(AUDIENCE).map(f);
+    const seen = (role: Parameters<typeof forRole>[1]) => forRole(all, role).map((x) => x.check);
+    expect(seen("finance")).toEqual(["in_house_owes", "online_payment_pending", "overpaid", "payments_to_confirm", "closing_unverified"]);
+    expect(seen("general_manager")).toEqual(seen("owner"));
+    expect(seen("owner")).not.toContain("invariant_two_in_room");
+    expect(seen("owner")).not.toContain("invariant_unpaid_with_room");
+    expect(seen("front_desk")).toEqual([]);
+  });
+
+  it("every check the self-check can raise has an audience, so none is shown to nobody by mistake", async () => {
+    const src = (await import("node:fs")).readFileSync("src/server/domain/self-check.ts", "utf8");
+    const raised = [...src.matchAll(/check: "([a-z_]+)"/g)].map((m) => m[1]!);
+    expect(raised.length).toBeGreaterThan(5);
+    expect(raised.filter((c) => !(c in AUDIENCE))).toEqual([]);
   });
 
   it("alerts each problem at most once a day, and again after a day if it's still there", async () => {
