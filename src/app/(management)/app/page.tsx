@@ -27,7 +27,7 @@ export const metadata: Metadata = { title: "Dashboard" };
 
 const href = (r: { id: string }) => `/app/reservations/${r.id}`;
 
-async function Departments() {
+async function Departments({ canOpenHall }: { canOpenHall: boolean }) {
   const d = await departmentsOverview();
   const cell = "px-3 py-3 text-right tabular-nums whitespace-nowrap sm:px-4";
   return (
@@ -46,7 +46,11 @@ async function Departments() {
             {d.rows.map((r) => (
               <tr key={r.key}>
                 <th scope="row" className="py-3 pr-2 pl-4 text-left font-normal sm:px-5">
-                  <Link href={r.href} className="font-medium text-ink-900 hover:underline">{r.label}</Link>
+                  {r.key === "hall" && !canOpenHall ? (
+                    <span className="font-medium text-ink-900">{r.label}</span>
+                  ) : (
+                    <Link href={r.href} className="font-medium text-ink-900 hover:underline">{r.label}</Link>
+                  )}
                   <span className="block text-xs text-ink-500">{r.note}</span>
                 </th>
                 <td className={cell}>{formatNaira(r.today)}</td>
@@ -155,7 +159,7 @@ async function Content() {
 
       {can(staff.role, "reports.view") ? (
         <>
-          <Suspense fallback={<LoadingState label="Loading departments…" />}><Departments /></Suspense>
+          <Suspense fallback={<LoadingState label="Loading departments…" />}><Departments canOpenHall={can(staff.role, "events.manage")} /></Suspense>
           <Suspense fallback={<LoadingState label="Loading revenue…" />}><Revenue /></Suspense>
         </>
       ) : null}
@@ -168,12 +172,18 @@ async function Content() {
   );
 }
 
+async function NewBookingButton() {
+  const staff = await requireStaff();
+  if (!can(staff.role, "reservations.manage")) return null;
+  return <Link href="/app/reservations/new" className={buttonStyles({ className: "size-11 px-0 sm:size-auto sm:px-4" })} aria-label="New booking"><CalendarPlus className="size-4" aria-hidden /><span className="hidden sm:inline">New booking</span></Link>;
+}
+
 export default function DashboardPage() {
   return (
     <>
       <PageHeader
         title="Dashboard"
-        actions={<Link href="/app/reservations/new" className={buttonStyles({ className: "size-11 px-0 sm:size-auto sm:px-4" })} aria-label="New booking"><CalendarPlus className="size-4" aria-hidden /><span className="hidden sm:inline">New booking</span></Link>}
+        actions={<Suspense fallback={null}><NewBookingButton /></Suspense>}
       />
       <Suspense fallback={<LoadingState />}><Content /></Suspense>
     </>
