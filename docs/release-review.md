@@ -302,3 +302,11 @@ These are deliberately **not final** in the app:
   triggers are recreated as in 0004.
 - **Existing rows:** unchanged. **Previous Worker:** keeps working; uploading to a card place replaces its photos with
   one, as before.
+
+## Release 2026-11-27 (3): client website changes, GM without technical alerts
+
+- Migration 0028 (On site card places). Restore point before it: `000004e2-00000002-00005130-3c21650b772d6ce409cf150a7493689f`.
+- Data (by hand, after 0028): 6 photos copied to the Pool (2nd), Lounge (4) and Club (1) places; Standard and Deluxe
+  bedroom photos swapped (covers kept); Apartment rate ₦230,000 → ₦280,000 (bookings already made keep their price).
+- Staging `82cfe0ac-7f52-442a-8edf-cf400d1c28dc`. Previous live `e0129ea1-d506-4cb6-9564-7d011d86c194`,
+  new live `5b426b23-7b33-4bb5-8e10-dde7cb30ad91`. Smoke test passed; home cards, room photos and rates checked live.
