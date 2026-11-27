@@ -14,6 +14,12 @@ import { MISMATCH_FLAG } from "./payments";
 
 export type Finding = { key: string; check: string; urgent: boolean; message: string };
 
+/**
+ * What the Dashboard shows the hotel: everything except the data checks, which mean a bug or a
+ * database problem and go only to the maintainer's alert channel (the GM gets no technical updates).
+ */
+export const forHotel = (findings: Finding[]) => findings.filter((f) => !f.check.startsWith("invariant_"));
+
 const PAID = `(SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
   FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful')`;
 const DUE = "(r.total_amount_kobo + r.extras_kobo + r.room_change_kobo - r.discount_kobo)";

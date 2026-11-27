@@ -1,5 +1,5 @@
 import { toConfirmSummary } from "@/server/domain/payment-checks";
-import { currentFindings } from "@/server/domain/self-check";
+import { currentFindings, forHotel } from "@/server/domain/self-check";
 import { actorOf, authorizeRead } from "@/server/auth";
 import { getDb } from "@/server/db";
 import type { Metadata } from "next";
@@ -98,7 +98,7 @@ async function Content() {
     listReservations({ tab: "all" }),
     can(staff.role, "reports.view") ? authorizeRead("reports.view").then(async (r) => toConfirmSummary(await getDb(), actorOf(r))) : Promise.resolve({ count: 0, kobo: 0 }),
     // The self-check (rules section 4), live: the same list the alerts come from.
-    can(staff.role, "reports.view") ? authorizeRead("reports.view").then(async () => currentFindings(await getDb())) : Promise.resolve([]),
+    can(staff.role, "reports.view") ? authorizeRead("reports.view").then(async () => forHotel(await currentFindings(await getDb()))) : Promise.resolve([]),
   ]);
   const noRoom = m.arrivals.filter((a) => !a.roomNumber).length;
   const owing = m.departures.filter((d) => owedOf(d) > 0).length;

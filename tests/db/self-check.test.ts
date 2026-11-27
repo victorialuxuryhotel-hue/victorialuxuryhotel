@@ -1,7 +1,7 @@
 // The self-check (rules section 4): finds problems, alerts each at most once a day, runs the daily
 // checks once per business day. Never changes bookings or money.
 import { describe, expect, it } from "vitest";
-import { currentFindings, dailyChecks, findingsToAlert, urgentChecks } from "@/server/domain/self-check";
+import { currentFindings, dailyChecks, findingsToAlert, forHotel, urgentChecks } from "@/server/domain/self-check";
 import { day, db, exec, insertReservation, makeCategory, q1 } from "./helpers";
 
 async function inHouseOwing() {
@@ -26,6 +26,11 @@ describe("self-check", () => {
     await exec("UPDATE reservations SET status = 'checked_in' WHERE id = ?", r);
     expect((await dailyChecks(db)).find((x) => x.key === `overdue:${r}`)?.message).toMatch(/should have left Room/);
     expect((await currentFindings(db)).some((x) => x.key === `overdue:${r}`)).toBe(true);
+  });
+
+  it("the Dashboard shows the hotel's problems but not the data checks, which are for the maintainer", () => {
+    const f = (check: string) => ({ key: check, check, urgent: true, message: check });
+    expect(forHotel([f("in_house_owes"), f("invariant_two_in_room"), f("invariant_unpaid_with_room"), f("overdue_checkout")]).map((x) => x.check)).toEqual(["in_house_owes", "overdue_checkout"]);
   });
 
   it("alerts each problem at most once a day, and again after a day if it's still there", async () => {

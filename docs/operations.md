@@ -22,7 +22,8 @@ Paystack, Resend, GitHub, the domain registrar.
 
 ## 2. Routine
 
-**Daily, General Manager (about 10 minutes):** Dashboard → *Anything wrong?* and *Needs attention*;
+**Daily, General Manager (about 10 minutes):** Dashboard → *Anything wrong?* (hotel matters only: guests owing,
+overdue check-outs, closings to sign off) and *Needs attention*;
 Payments → *To confirm* against the bank statement and the card terminal's report; sign off closings.
 
 **Weekly, maintainer (15 minutes):**
@@ -40,9 +41,9 @@ review the compatibility date in `wrangler.jsonc`.
 
 | What | How | Where it goes |
 |---|---|---|
-| Site down | External uptime check on `https://victorialuxuryhotel.com/api/health` every 1–5 min | SMS/email to maintainer and GM |
+| Site down | External uptime check on `https://victorialuxuryhotel.com/api/health` every 1–5 min | SMS/email to the maintainer |
 | Scheduled job stopped or failing | Heartbeat: the Worker pings `HEARTBEAT_URL` after every run (`/fail` on errors) | The heartbeat service alerts after a missed ping (set the period to 10 min, grace 20 min) |
-| Problems in the hotel's data | Self-check (`src/server/domain/self-check.ts`, rules §4): urgent checks every 10 min, daily ones after 06:00, each problem at most once a day | `ALERT_WEBHOOK_URL` (Slack, Discord or a Telegram bot URL with `chat_id`), and Dashboard → *Anything wrong?* |
+| Problems in the hotel's data | Self-check (`src/server/domain/self-check.ts`, rules §4): urgent checks every 10 min, daily ones after 06:00, each problem at most once a day | `ALERT_WEBHOOK_URL` (Slack, Discord or a Telegram bot URL with `chat_id`), and Dashboard → *Anything wrong?* (without the "Data check failed" ones, which are for the maintainer only) |
 | Payment mismatches, payments not found, job failures | `alert()` in the code | `ALERT_WEBHOOK_URL` |
 | Errors in the Worker | Workers Logs (`observability: true`) | Cloudflare dashboard; add Notifications → *Workers error rate* |
 
@@ -121,7 +122,7 @@ node scripts/smoke.mjs https://victorialuxuryhotel.com live
 ## 8. Incidents
 
 1. **Is it us?** Uptime alert or a report → open the site; check cloudflarestatus.com, Clerk and Paystack status pages.
-2. **Tell the hotel** (GM on WhatsApp): what's affected, and to use the paper procedures
+2. **Tell the hotel what to do**, not the technical detail (GM on WhatsApp): which part of the system to avoid, and to use the paper procedures
    (`docs/restaurant-bar-offline.md`, rules §6 downtime plan) until it's fixed.
 3. **Stop the bleeding:** if it started with a deploy, roll the Worker back (section 5). Only restore the database
    if data is wrong, after exporting what's there.
@@ -131,7 +132,7 @@ node scripts/smoke.mjs https://victorialuxuryhotel.com live
 
 ## 9. One-time setup still to do
 
-- [ ] Uptime monitor on `/api/health` (UptimeRobot or Better Stack), alerting the maintainer and the GM.
+- [ ] Uptime monitor on `/api/health` (UptimeRobot or Better Stack), alerting the maintainer (the GM gets no monitoring or technical alerts).
 - [ ] Heartbeat check (Healthchecks.io or Better Stack): period 10 min, grace 20 min; `npx wrangler secret put HEARTBEAT_URL`.
 - [ ] Alert channel: `npx wrangler secret put ALERT_WEBHOOK_URL` (Slack/Discord webhook, or `https://api.telegram.org/bot<token>/sendMessage?chat_id=<id>`).
 - [ ] GitHub: environments *staging*, *production* (required reviewer: you) and *backup*, with the secrets and variables
