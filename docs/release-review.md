@@ -310,3 +310,10 @@ These are deliberately **not final** in the app:
   bedroom photos swapped (covers kept); Apartment rate ₦230,000 → ₦280,000 (bookings already made keep their price).
 - Staging `82cfe0ac-7f52-442a-8edf-cf400d1c28dc`. Previous live `e0129ea1-d506-4cb6-9564-7d011d86c194`,
   new live `5b426b23-7b33-4bb5-8e10-dde7cb30ad91`. Smoke test passed; home cards, room photos and rates checked live.
+
+## Release 2026-11-27 (4): each role sees only what it acts on
+
+- Dashboard *Anything wrong?* filtered per role (`AUDIENCE` in `self-check.ts`): finance gets money problems, owner and
+  GM also the desk's; the data checks go only to the maintainer's alert channel. Two-step testing banner removed.
+- No database change. Staging `24751070-47b4-46bd-b7ec-a10dbe609d2c`. Previous live `5b426b23-7b33-4bb5-8e10-dde7cb30ad91`,
+  new live `7063df50-a51c-46fe-91dd-23c192dce6e5`. Smoke test passed.
