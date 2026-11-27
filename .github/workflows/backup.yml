@@ -61,7 +61,7 @@ jobs:
           echo "STAMP=$stamp" >> "$GITHUB_ENV"
           gzip -9 -c "$RUNNER_TEMP/backup/backup.sql" | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:BACKUP_PASSPHRASE -out "$RUNNER_TEMP/victoria-db-$stamp.sql.gz.enc"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: victoria-db-${{ env.STAMP }}
           path: ${{ runner.temp }}/victoria-db-${{ env.STAMP }}.sql.gz.enc
