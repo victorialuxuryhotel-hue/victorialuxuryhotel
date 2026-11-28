@@ -45,7 +45,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         <span>Cash to hand in: <b className="tabular-nums text-ink-900">{formatNaira(mine.byMethod.cash)}</b></span>
         <Link href="/app/sales/orders" className="font-medium text-navy-800 hover:underline">Orders & receipts</Link>
         <Link href="/app/sales/closing" className="font-medium text-navy-800 hover:underline">Close my day</Link>
-        <div className="ml-auto"><SignedInStrip name={staff.fullName} roleLabel={staffRole[staff.role]} /></div>
+        <div className="ml-auto"><SignedInStrip name={staff.fullName} roleLabel={staffRole[staff.role]} onStation={Boolean(staff.station)} /></div>
       </div>
       {low.length ? (
         <p role="status" className="rounded-md border border-warning-600/30 bg-warning-50 px-4 py-3 text-sm text-warning-700">

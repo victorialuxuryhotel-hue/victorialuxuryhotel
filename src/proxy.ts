@@ -22,7 +22,9 @@ export const proxy = clerkMiddleware(async (auth, request) => {
   if (impossibleLink(path)) return NextResponse.rewrite(new URL("/_not-found", request.url), { status: 404 });
   if (path === "/app" || path.startsWith("/app/") || path.startsWith("/two-step")) {
     const { userId } = await auth();
-    if (!userId) {
+    // A shared station runs without a Clerk session: the server checks its token and the PIN session (server/auth.ts).
+    const station = path.startsWith("/app") && request.cookies.has("vl_station");
+    if (!userId && !station) {
       const url = new URL("/login", request.url);
       url.searchParams.set("next", request.nextUrl.pathname);
       return NextResponse.redirect(url);
@@ -31,5 +33,5 @@ export const proxy = clerkMiddleware(async (auth, request) => {
 });
 
 export const config = {
-  matcher: ["/app/:path*", "/login", "/auth/:path*", "/two-step/:path*", "/rooms/:slug", "/book/review/:path*", "/book/confirmation/:path*"],
+  matcher: ["/app/:path*", "/station", "/login", "/auth/:path*", "/two-step/:path*", "/rooms/:slug", "/book/review/:path*", "/book/confirmation/:path*"],
 };

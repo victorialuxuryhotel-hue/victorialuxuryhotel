@@ -19,9 +19,14 @@ export type Permission =
   | "pos.manage"
   | "inventory.view"
   | "inventory.manage"
-  | "events.manage";
+  | "events.manage"
+  | "pos.void.approve"
+  | "refunds.request"
+  | "stations.manage"
+  | "paylinks.create"
+  | "bills.manage";
 
-const frontDesk: Permission[] = ["reservations.manage", "guests.manage", "payments.record", "rooms.status", "events.manage"];
+const frontDesk: Permission[] = ["reservations.manage", "guests.manage", "payments.record", "rooms.status", "events.manage", "refunds.request", "paylinks.create", "bills.manage"];
 const manager: Permission[] = [
   ...frontDesk,
   "payments.override",
@@ -33,6 +38,8 @@ const manager: Permission[] = [
   "activity.view",
   "pos.view",
   "inventory.view",
+  "pos.void.approve",
+  "stations.manage",
 ];
 
 const hotelManager: Permission[] = [
@@ -52,7 +59,7 @@ const matrix: Record<StaffRole, ReadonlySet<Permission>> = {
   owner: new Set<Permission>([...manager, "staff.manage", "pos.sell", "pos.manage", "inventory.manage"]),
   finance: new Set<Permission>(["reports.view", "pos.view", "inventory.view"]),
   restaurant_bar: new Set<Permission>(["pos.sell"]),
-  restaurant_bar_manager: new Set<Permission>(["pos.sell", "pos.view", "pos.manage", "inventory.view", "inventory.manage"]),
+  restaurant_bar_manager: new Set<Permission>(["pos.sell", "pos.view", "pos.manage", "inventory.view", "inventory.manage", "pos.void.approve"]),
 };
 
 export function can(role: StaffRole, permission: Permission): boolean {

@@ -40,6 +40,7 @@ export default function LoginPage(props: PageProps<"/login">) {
               <FormWithNext searchParams={props.searchParams} />
             </Suspense>
           </div>
+          <p className="mt-6 text-sm text-ink-600">Staff on a shared counter: tap your name on the counter screen and use your PIN.</p>
           <Link href="/" className="mt-10 inline-flex items-center gap-2 text-sm text-ink-500 hover:text-navy-800">
             <ArrowLeft className="size-4" aria-hidden /> Back to the website
           </Link>

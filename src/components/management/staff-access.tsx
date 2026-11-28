@@ -13,6 +13,7 @@ import { keepValues } from "@/lib/forms";
 import { hotelDateOf } from "@/lib/hotel-date";
 import { cn } from "@/lib/utils/cn";
 import { inviteStaff, makeOwner, resendInvite, updateStaff } from "@/server/staff";
+import { setPin } from "@/server/station";
 
 const fieldError = (state: ActionResult<unknown> | null, name: string) => (state && !state.ok ? state.fieldErrors?.[name]?.[0] : undefined);
 
@@ -110,6 +111,35 @@ function ResendInvite({ staffId }: { staffId: string }) {
   );
 }
 
+/** The owner sets or resets a PIN for the counter and desk stations. The person chooses their own at their next sign-in. */
+function PinForm({ s, isSelf }: { s: StaffRow; isSelf: boolean }) {
+  const [pin, setPinValue] = useState("");
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, setPending] = useState(false);
+  const save = async () => {
+    setPending(true);
+    const r = await setPin({ staffId: s.id, pin });
+    setPending(false);
+    setPinValue("");
+    setMessage(r.ok ? { ok: true, text: isSelf ? "Your PIN is changed." : `PIN set. Tell ${s.name.split(" ")[0]} in person; they choose their own the first time they sign in.` } : { ok: false, text: r.message });
+  };
+  return (
+    <div className="space-y-3 border-t border-hairline pt-5">
+      <p className="text-[15px] font-medium text-ink-900">PIN for shared stations</p>
+      <p className="text-sm text-ink-600">
+        {s.hasPin ? (s.pinMustChange ? "PIN set; they haven't chosen their own yet." : "Has a PIN.") : "No PIN yet: they can't sign in at the counter or desk stations."}
+      </p>
+      {message ? <FormMessage tone={message.ok ? "success" : "error"}>{message.text}</FormMessage> : null}
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label={s.hasPin ? "New PIN" : "PIN"} hint="4 to 6 digits" htmlFor={`pin-${s.id}`}>
+          <Input id={`pin-${s.id}`} type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={pin} onChange={(e) => setPinValue(e.target.value.replace(/\D/g, ""))} className="w-32 tabular-nums" />
+        </Field>
+        <Button variant="secondary" pending={pending} disabled={pin.length < 4} onClick={save}>{s.hasPin ? "Reset PIN" : "Set PIN"}</Button>
+      </div>
+    </div>
+  );
+}
+
 function ManageForm({ s, isSelf, onDone }: { s: StaffRow; isSelf: boolean; onDone: () => void }) {
   const [state, action, pending] = useActionState(updateStaff, null);
   const [ownerState, ownerAction, ownerPending] = useActionState(makeOwner, null);
@@ -141,6 +171,8 @@ function ManageForm({ s, isSelf, onDone }: { s: StaffRow; isSelf: boolean; onDon
           <Button type="submit" pending={pending} className="w-full">Save changes</Button>
         </form>
       ) : null}
+
+      {s.isActive ? <PinForm s={s} isSelf={isSelf} /> : null}
 
       {s.isActive && s.role !== "owner" ? (
         <div className="border-t border-hairline pt-5">

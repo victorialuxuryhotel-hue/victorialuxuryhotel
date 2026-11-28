@@ -36,7 +36,7 @@ async function Content({ searchParams }: { searchParams: Search }) {
       counts={roomCounts(rooms)}
       tonight={tonightView(tonight)}
       progress={m.progress}
-      signedIn={<SignedInStrip name={staff.fullName} roleLabel={staffRole[staff.role]} />}
+      signedIn={<SignedInStrip name={staff.fullName} roleLabel={staffRole[staff.role]} onStation={Boolean(staff.station)} />}
       links={{
         reservation: (id) => `/app/reservations/${id}`,
         panel: (r) => withBooking("/app/today", {}, r.reference),

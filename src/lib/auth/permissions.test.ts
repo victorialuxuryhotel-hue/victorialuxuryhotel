@@ -38,10 +38,11 @@ describe("payments list scope", () => {
 const ALL: Permission[] = [
   "reservations.manage", "guests.manage", "payments.record", "payments.override", "payments.approve", "rooms.status", "rooms.configure",
   "categories.manage", "settings.manage", "reports.view", "reports.hotel", "activity.view", "staff.manage", "pos.sell", "pos.view",
-  "pos.manage", "inventory.view", "inventory.manage", "events.manage",
+  "pos.manage", "inventory.view", "inventory.manage", "events.manage", "pos.void.approve", "refunds.request", "stations.manage", "paylinks.create",
+  "bills.manage",
 ];
-const desk: Permission[] = ["reservations.manage", "guests.manage", "payments.record", "rooms.status", "events.manage"];
-const gmSet: Permission[] = [...desk, "payments.override", "payments.approve", "rooms.configure", "categories.manage", "settings.manage", "reports.view", "activity.view", "pos.view", "inventory.view"];
+const desk: Permission[] = ["reservations.manage", "guests.manage", "payments.record", "rooms.status", "events.manage", "refunds.request", "paylinks.create", "bills.manage"];
+const gmSet: Permission[] = [...desk, "payments.override", "payments.approve", "rooms.configure", "categories.manage", "settings.manage", "reports.view", "activity.view", "pos.view", "inventory.view", "pos.void.approve", "stations.manage"];
 const expected: Record<StaffRole, Permission[]> = {
   owner: [...gmSet, "staff.manage", "pos.sell", "pos.manage", "inventory.manage"],
   general_manager: gmSet,
@@ -49,7 +50,7 @@ const expected: Record<StaffRole, Permission[]> = {
   front_desk: desk,
   finance: ["reports.view", "pos.view", "inventory.view"],
   restaurant_bar: ["pos.sell"],
-  restaurant_bar_manager: ["pos.sell", "pos.view", "pos.manage", "inventory.view", "inventory.manage"],
+  restaurant_bar_manager: ["pos.sell", "pos.view", "pos.manage", "inventory.view", "inventory.manage", "pos.void.approve"],
 };
 
 describe("permission matrix for all seven roles", () => {
@@ -58,6 +59,15 @@ describe("permission matrix for all seven roles", () => {
       expect(ALL.filter((p) => can(role, p))).toEqual(ALL.filter((p) => allowed.includes(p)));
     });
   }
+
+  it("FUNCTIONALITY.md section 14: who holds each new permission", () => {
+    const holders = (p: Permission) => (Object.keys(expected) as StaffRole[]).filter((r) => can(r, p));
+    expect(holders("pos.void.approve")).toEqual(["owner", "general_manager", "restaurant_bar_manager"]);
+    expect(holders("refunds.request")).toEqual(["owner", "general_manager", "hotel_manager", "front_desk"]);
+    expect(holders("stations.manage")).toEqual(["owner", "general_manager"]);
+    expect(holders("paylinks.create")).toEqual(holders("payments.record"));
+    expect(holders("bills.manage")).toEqual(holders("payments.record"));
+  });
 
   it("only the owner manages staff; only the owner and general manager approve corrections and refunds", () => {
     expect((Object.keys(expected) as StaffRole[]).filter((r) => can(r, "staff.manage"))).toEqual(["owner"]);

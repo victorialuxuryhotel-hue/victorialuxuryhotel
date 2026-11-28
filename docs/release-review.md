@@ -317,3 +317,29 @@ These are deliberately **not final** in the app:
   GM also the desk's; the data checks go only to the maintainer's alert channel. Two-step testing banner removed.
 - No database change. Staging `24751070-47b4-46bd-b7ec-a10dbe609d2c`. Previous live `5b426b23-7b33-4bb5-8e10-dde7cb30ad91`,
   new live `7063df50-a51c-46fe-91dd-23c192dce6e5`. Smoke test passed.
+
+## 0029_stations_pins
+
+- **What:** staff sign-in by name and PIN on a shared station (FUNCTIONALITY.md section 1; agreement, Schedule A).
+  New tables `stations`, `staff_sessions` and `pin_attempts`; `staff_profiles.pin_hash` and `pin_must_change`;
+  `hotel_settings.idle_lock_till_minutes` (5) and `idle_lock_desk_minutes` (10).
+- **Rules in the database:** deactivating someone ends their sessions; revoking a station ends every session on it;
+  a station's token and type never change, a revoked station stays revoked, an ended session never restarts; none of
+  these rows can be deleted.
+- **Secrets:** `PIN_PEPPER` (random, set with `wrangler secret put PIN_PEPPER`) is mixed into every PIN hash. Set it
+  before any PIN is created; changing it later makes every PIN invalid (the owner then resets them).
+- **Existing rows:** unchanged; nobody has a PIN until the owner sets one. **Previous Worker:** unaffected.
+
+## Step 1a: sign-in by name and PIN (S1, S2, S3)
+
+- The owner or GM sets a computer up as a station in *This station* (desk, bar, restaurant or office). Their own
+  Clerk sign-in on it then ends. Staff whose role fits the station tap their name and enter their PIN; the session
+  carries their name on everything they do.
+- Lock (button or idle: 5 minutes on tills, 10 at the desk) ends the session on the server and shows the name grid
+  over the page, so an open order stays. The next person to sign in carries on with it under their own name.
+- Only the owner sets or resets PINs (Staff & access → the person → PIN). The person chooses their own at their
+  first sign-in. 5 wrong PINs lock that person on that station for 15 minutes; a station pauses after 15 wrong PINs
+  in 15 minutes. Lockouts and revoked stations appear in the owner's and GM's *Anything wrong?*.
+- Owner, GM and finance keep signing in with Clerk on their own devices; that idle lock is unchanged.
+- New permissions (section 14): `pos.void.approve`, `refunds.request`, `stations.manage`, `paylinks.create`,
+  `bills.manage`.

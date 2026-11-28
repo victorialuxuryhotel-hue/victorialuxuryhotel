@@ -12,12 +12,36 @@ import { TWO_STEP_ROLES, twoStepRequired, twoStepState, type TwoStepState } from
 import { verifyViewAs } from "@/lib/auth/view-as-token";
 import { first, getDb, VIEW_AS_READ_ONLY, type Actor } from "./db";
 import { LAST_SEEN_EVERY_MS, linkClerkUser, ROLE, touchLastSeen, type StaffRecord } from "./domain/admin";
+import { sessionByToken, stationByToken, type Station } from "./domain/stations";
 
 /** Two-step sign-in is on hold until TWO_STEP_ENFORCED=1 (see lib/auth/two-step.ts). */
 export const twoStepRequiredHere = () =>
   twoStepRequired({ enforced: process.env.TWO_STEP_ENFORCED, optional: process.env.TWO_STEP_OPTIONAL, siteUrl: process.env.NEXT_PUBLIC_SITE_URL });
 
-export type Staff = { id: string; fullName: string; email: string; role: StaffRole; viewAs?: boolean; twoStep?: TwoStepState };
+export type Staff = {
+  id: string; fullName: string; email: string; role: StaffRole; viewAs?: boolean; twoStep?: TwoStepState;
+  /** Set when this person signed in with their PIN on a shared station (FUNCTIONALITY.md section 1). */
+  station?: Station;
+};
+
+/** The station token (set when the owner or GM sets the computer up) and the PIN session on it. */
+export const STATION_COOKIE = "vl_station";
+export const STAFF_SESSION_COOKIE = "vl_staff";
+
+/** The station this computer was set up as, or null. */
+export const getStation = cache(async (): Promise<Station | null> => {
+  await connection();
+  const token = (await cookies()).get(STATION_COOKIE)?.value;
+  return token ? stationByToken(await getDb(), token) : null;
+});
+
+/** The person signed in with their PIN on this station, if any. Wins over a Clerk session on the same computer. */
+async function stationStaff(): Promise<Staff | null> {
+  const station = await getStation();
+  if (!station) return null;
+  const s = await sessionByToken(await getDb(), station, (await cookies()).get(STAFF_SESSION_COOKIE)?.value);
+  return s ? { id: s.staff.id, fullName: s.staff.fullName, email: s.staff.email, role: s.staff.role, station } : null;
+}
 
 async function currentTwoStep(role: StaffRole, secondFactorAge: number | undefined, claims: Record<string, unknown> | null): Promise<TwoStepState | undefined> {
   if (!TWO_STEP_ROLES.includes(role) || !twoStepRequiredHere()) return undefined;
@@ -37,6 +61,8 @@ async function viewingAsFrontDesk(staffId: string, sessionId: string | null): Pr
 
 export const getCurrentStaff = cache(async (): Promise<Staff | null> => {
   await connection();
+  const onStation = await stationStaff();
+  if (onStation) return onStation;
   const { userId, sessionId, factorVerificationAge, sessionClaims } = await auth();
   if (!userId) return null;
 
@@ -67,7 +93,7 @@ export const getCurrentStaff = cache(async (): Promise<Staff | null> => {
 
 export async function requireStaff(): Promise<Staff> {
   const staff = await getCurrentStaff();
-  if (!staff) redirect("/login?denied=1");
+  if (!staff) redirect((await getStation()) ? "/station" : "/login?denied=1");
   if (staff.twoStep) redirect("/two-step/security");
   return staff;
 }
@@ -80,7 +106,7 @@ export async function authorize(permission?: Permission): Promise<Staff> {
 
 export async function authorizeRead(permission?: Permission | readonly Permission[]): Promise<Staff> {
   const staff = await getCurrentStaff();
-  if (!staff) throw new AppError("UNAUTHENTICATED", "Your session has ended. Please sign in again.");
+  if (!staff) throw new AppError("UNAUTHENTICATED", (await getStation()) ? "This screen is locked. Tap your name and enter your PIN." : "Your session has ended. Please sign in again.");
   if (staff.twoStep) throw new AppError("FORBIDDEN", "Set up two-step sign-in first.");
   if (permission && !canAny(staff.role, permission)) {
     throw new AppError("FORBIDDEN", "Your role can't do this. Ask the General Manager or the Owner.");

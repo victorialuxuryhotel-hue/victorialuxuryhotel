@@ -48,9 +48,9 @@ export async function getCatalogueSettings() {
 
 export async function listStaff(): Promise<StaffRow[]> {
   await authorizeRead("staff.manage");
-  const staff = await all<StaffRecord & { phone: string | null }>(
+  const staff = await all<StaffRecord & { phone: string | null; has_pin: number; pin_must_change: number }>(
     await getDb(),
-    `SELECT id, clerk_user_id, full_name, email, ${ROLE} AS role, is_active, phone, last_seen_at FROM staff_profiles ORDER BY is_active DESC, full_name`,
+    `SELECT id, clerk_user_id, full_name, email, ${ROLE} AS role, is_active, phone, last_seen_at, pin_hash IS NOT NULL AS has_pin, pin_must_change FROM staff_profiles ORDER BY is_active DESC, full_name`,
   );
   const linked = staff.map((s) => s.clerk_user_id).filter((id): id is string => Boolean(id));
   const lastSignIn = new Map<string, string | undefined>();
@@ -72,6 +72,8 @@ export async function listStaff(): Promise<StaffRow[]> {
     lastSignIn: s.clerk_user_id ? lastSignIn.get(s.clerk_user_id) : undefined,
     lastSeen: latest(s.last_seen_at ?? undefined, s.clerk_user_id ? lastSignIn.get(s.clerk_user_id) : undefined),
     invited: !s.clerk_user_id,
+    hasPin: s.has_pin === 1,
+    pinMustChange: s.pin_must_change === 1,
   }));
 }
 

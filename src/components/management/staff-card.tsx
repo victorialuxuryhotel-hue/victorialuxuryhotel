@@ -2,8 +2,10 @@ import Link from "next/link";
 import { KeyRound, LogOut, Monitor } from "lucide-react";
 import { SignOutButton } from "@clerk/nextjs";
 import { staffRole, type StaffRole } from "@/domain/status";
+import { LockButton } from "./idle-lock";
 
-export function StaffCard({ fullName, role, children }: { fullName: string; role: StaffRole; children?: React.ReactNode }) {
+/** On a shared station (PIN sign-in) the menu offers Lock instead of the Clerk account and sign-out. */
+export function StaffCard({ fullName, role, children, onStation = false }: { fullName: string; role: StaffRole; children?: React.ReactNode; onStation?: boolean }) {
   const initials = fullName.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
   const row = "flex min-h-10 items-center gap-2.5 rounded-md px-2 text-sm text-ivory-200/80 hover:bg-ivory-50/10 hover:text-white";
   return (
@@ -17,6 +19,10 @@ export function StaffCard({ fullName, role, children }: { fullName: string; role
       </div>
       <div className="-mx-2 flex flex-col">
         {children}
+        {onStation ? (
+          <LockButton className={`${row} w-full text-left`} />
+        ) : (
+          <>
         <Link href="/app/account" className={row}>
           <KeyRound className="size-4" aria-hidden /> Manage sign-in
         </Link>
@@ -28,6 +34,13 @@ export function StaffCard({ fullName, role, children }: { fullName: string; role
             <LogOut className="size-4" aria-hidden /> Sign out
           </button>
         </SignOutButton>
+          </>
+        )}
+        {onStation ? (
+          <Link href="/app/station" className={row}>
+            <Monitor className="size-4" aria-hidden /> This station
+          </Link>
+        ) : null}
       </div>
     </div>
   );

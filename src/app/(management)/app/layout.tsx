@@ -5,7 +5,7 @@ import { DeskTabs, MobileBar, Sidebar } from "@/components/management/nav";
 import { managementNav } from "@/components/management/nav-items";
 import { BrowserBanner, NoteBrowser } from "@/components/management/browser-check";
 import { ConnectionBanner } from "@/components/management/connection";
-import { IdleLock } from "@/components/management/idle-lock";
+import { IdleLock, StationLock } from "@/components/management/idle-lock";
 import { Shortcuts } from "@/components/management/shortcuts";
 import { StaffCard } from "@/components/management/staff-card";
 import { StaffRoleProvider } from "@/components/management/staff-role";
@@ -15,6 +15,8 @@ import { LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
 import { Eye } from "lucide-react";
 import { requireStaff } from "@/server/auth";
+import { getDb } from "@/server/db";
+import { idleMinutes } from "@/server/domain/stations";
 import { exitViewAs, startViewAsFrontDesk } from "@/server/view-as";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -25,8 +27,8 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
   const staff = await requireStaff();
   const allowed = managementNav.filter((item) => !item.permission || item.permission.some((p) => can(staff.role, p))).map((item) => item.href);
   const footer = (
-    <StaffCard fullName={staff.fullName} role={staff.viewAs ? "owner" : staff.role}>
-      {staff.role === "owner" && !staff.viewAs ? (
+    <StaffCard fullName={staff.fullName} role={staff.viewAs ? "owner" : staff.role} onStation={Boolean(staff.station)}>
+      {staff.role === "owner" && !staff.viewAs && !staff.station ? (
         <form action={startViewAsFrontDesk}>
           <button type="submit" className="flex min-h-10 w-full items-center gap-2.5 rounded-md px-2 text-left text-sm text-ivory-200/80 hover:bg-ivory-50/10 hover:text-white">
             <Eye className="size-4" aria-hidden /> View as front desk
@@ -42,7 +44,11 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
       <BrowserBanner />
       <NoteBrowser sessionKey={staff.id} />
       {staff.viewAs ? <ViewAsBanner /> : null}
-      <IdleLock name={staff.fullName} roleLabel={staffRole[staff.role]} minutes={policy.idleLockMinutes} />
+      {staff.station ? (
+        <StationLock stationName={staff.station.name} minutes={await idleMinutes(await getDb(), staff.station.type)} />
+      ) : (
+        <IdleLock name={staff.fullName} roleLabel={staffRole[staff.role]} minutes={policy.idleLockMinutes} />
+      )}
       <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
         <Sidebar allowed={allowed} footer={footer} />
         <MobileBar allowed={allowed} footer={footer} />

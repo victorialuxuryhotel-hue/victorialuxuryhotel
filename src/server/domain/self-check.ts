@@ -29,6 +29,7 @@ export const AUDIENCE: Record<string, StaffRole[]> = {
   overpaid: MONEY,
   payments_to_confirm: MONEY,
   closing_unverified: MONEY,
+  pin_lockout: MANAGE,
   paid_no_room: MANAGE,
   overdue_checkout: MANAGE,
   not_arrived: MANAGE,
@@ -49,7 +50,7 @@ const room = (n: string | null) => (n ? `Room ${n}` : "no room");
 
 /** Every 10 minutes: things that need someone now. */
 export async function urgentChecks(db: Db): Promise<Finding[]> {
-  const [owes, pending, noRoom, overpaid, doubleRoom, heldWithRoom] = await Promise.all([
+  const [owes, pending, noRoom, overpaid, doubleRoom, heldWithRoom, lockouts] = await Promise.all([
     all<{ id: string; reference: string; name: string; room: string | null; owed: number }>(
       db,
       `SELECT r.id, r.reference, g.full_name AS name, rm.room_number AS room, ${DUE} - ${PAID} AS owed
@@ -80,6 +81,12 @@ export async function urgentChecks(db: Db): Promise<Finding[]> {
        WHERE r.status = 'checked_in' GROUP BY r.room_id HAVING count(*) > 1`,
     ),
     all<{ reference: string }>(db, "SELECT reference FROM reservations WHERE status = 'pending_payment' AND room_id IS NOT NULL"),
+    // Station sign-in (0029): someone locked out after 5 wrong PINs, a void refused after 3, or a station revoked, in the last day.
+    all<{ id: number; summary: string }>(
+      db,
+      `SELECT id, summary FROM activity_log WHERE action IN ('staff.pin_locked', 'staff.approval_refused', 'station.revoked')
+       AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day') ORDER BY created_at DESC`,
+    ),
   ]);
   return [
     ...owes.map((o) => ({ key: `owes:${o.id}`, check: "in_house_owes", urgent: true, message: `${o.name} (${room(o.room)}) is in house and owes ${formatNaira(o.owed)}.` })),
@@ -88,6 +95,7 @@ export async function urgentChecks(db: Db): Promise<Finding[]> {
     ...overpaid.map((o) => ({ key: `overpaid:${o.reference}`, check: "overpaid", urgent: true, message: `${o.reference} has been paid ${formatNaira(o.over)} more than it costs. Raise a refund.` })),
     ...doubleRoom.map((d) => ({ key: `double:${d.room}`, check: "invariant_two_in_room", urgent: true, message: `Data check failed: ${d.n} guests are checked in to Room ${d.room}.` })),
     ...heldWithRoom.map((h) => ({ key: `heldroom:${h.reference}`, check: "invariant_unpaid_with_room", urgent: true, message: `Data check failed: ${h.reference} is unpaid but has a room.` })),
+    ...lockouts.map((l) => ({ key: `pin:${l.id}`, check: "pin_lockout", urgent: true, message: `${l.summary}.` })),
   ];
 }
 
