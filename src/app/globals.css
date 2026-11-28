@@ -263,3 +263,18 @@ html[data-till-full] [data-app-nav] { display: none !important; }
     background: transparent !important;
   }
 }
+
+/* The registration card (check-in drawer, FUNCTIONALITY.md section 5): only the card prints, on A5. */
+@page card {
+  size: A5;
+  margin: 10mm;
+}
+@media print {
+  body:has(.registration-card[data-print]) > *:not(.registration-card) {
+    display: none !important;
+  }
+  .registration-card[data-print] {
+    page: card;
+    display: block !important;
+  }
+}

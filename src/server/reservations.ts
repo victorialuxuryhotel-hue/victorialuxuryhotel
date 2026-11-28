@@ -11,6 +11,7 @@ import { actorOf, authorize, authorizeRead } from "./auth";
 import { getDb } from "./db";
 import * as changes from "./domain/changes";
 import * as engine from "./domain/reservations";
+import { checkInWithCard, checkOutGuest, last4 } from "./domain/front-desk";
 import { availabilityForStay, findGuestsByPhone, type PhoneMatch, type TypeAvailability } from "./domain/staff-booking";
 import { deliverEmails } from "./notifications";
 
@@ -83,7 +84,12 @@ export async function checkIn(_prev: ActionResult<Undoable> | null, formData: Fo
   return run("reservation.check_in", async () => {
     const staff = await authorize("reservations.manage");
     const reservationId = id.parse(formData.get("reservationId"));
-    const result = await engine.checkInReservation(await getDb(), actorOf(staff), reservationId);
+    // Check-in needs the registration card (FUNCTIONALITY.md section 5): the X2 drawer sends it.
+    const card = JSON.parse(String(formData.get("card") ?? "{}")) as Record<string, unknown>;
+    const result = await checkInWithCard(await getDb(), actorOf(staff), reservationId, {
+      idType: String(card.idType ?? ""), idLast4: last4(String(card.idLast4 ?? "")), address: String(card.address ?? ""), comingFrom: String(card.comingFrom ?? ""),
+      nationality: String(card.nationality ?? ""), purpose: String(card.purpose ?? ""), rulesAccepted: card.rulesAccepted === true,
+    });
     refresh();
     return result;
   });
@@ -93,7 +99,11 @@ export async function checkOut(_prev: ActionResult<{ balanceKobo: number } & Und
   return run("reservation.check_out", async () => {
     const staff = await authorize("reservations.manage");
     const reservationId = id.parse(formData.get("reservationId"));
-    const { balance, undoId } = await engine.checkOutReservation(await getDb(), actorOf(staff), reservationId);
+    // Check-out needs the key back (FUNCTIONALITY.md section 6): the X3 drawer sends it.
+    const { balance, undoId } = await checkOutGuest(await getDb(), actorOf(staff), reservationId, {
+      keyReturned: formData.get("keyReturned") === "on",
+      leaveOwingReason: String(formData.get("leaveOwingReason") ?? "") || null,
+    });
     refresh();
     return { balanceKobo: balance, undoId };
   });

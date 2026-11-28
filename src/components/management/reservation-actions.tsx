@@ -7,11 +7,12 @@ import { Button, buttonStyles } from "@/components/ui/button";
 import { Stepper } from "@/components/ui/stepper";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/form";
 import { formatNaira } from "@/lib/format";
-import { applyChangeUnpaid, assignRoom, cancelPendingChange, cancelReservation, changeDates, checkIn, checkOut, markNoShow, overridePayment, resolveAttention, updateReservationDetails } from "@/server/reservations";
+import { applyChangeUnpaid, assignRoom, cancelPendingChange, cancelReservation, changeDates, markNoShow, overridePayment, resolveAttention, updateReservationDetails } from "@/server/reservations";
 import { ActionButton } from "./action-form";
 import { useActionFeedback, withFeedback } from "./action-feedback";
 import { keepValues } from "@/lib/forms";
 import { OFFLINE_REASON, useOnline } from "./connection";
+import { CheckInDrawer, CheckOutDrawer } from "./check-in-out";
 
 /** blocked: why this room can't be chosen now ("Occupied · Adeyemi", "To clean", "Out of order"). */
 export type RoomOption = { id: string; number: string; category: string; ready: boolean; blocked?: string };
@@ -39,56 +40,57 @@ export function TakePaymentLink({ reservationId, balanceKobo, size = "md" }: { r
   );
 }
 
+/** Opens the check-in drawer (X2): the registration card is required, then check in and give the key. */
 export function CheckInButton({ reservationId, roomNumber, disabledReason, balanceKobo = 0, size }: { reservationId: string; roomNumber?: string; disabledReason?: string; balanceKobo?: number; size?: Size }) {
   const feedback = useActionFeedback();
   const online = useOnline();
+  const [open, setOpen] = useState(false);
   if (balanceKobo > 0) return <TakePaymentLink reservationId={reservationId} balanceKobo={balanceKobo} size={size} />;
   if (!online) disabledReason = OFFLINE_REASON;
   if (disabledReason) {
     return (
-      <Button disabled title={disabledReason}>
+      <Button disabled title={disabledReason} size={size === "lg" ? "md" : size}>
         <LogIn className="size-4" aria-hidden /> Check in
       </Button>
     );
   }
   return (
-    <ActionButton
-      action={checkIn}
-      fields={{ reservationId }}
-      onSuccess={(d) => feedback({
-        message: roomNumber ? `Checked in to Room ${roomNumber}. Hand over the key.` : "Checked in.",
-        undo: d.undoId ? { reservationId, undoId: d.undoId } : undefined,
-      })}
-    >
-      <LogIn className="size-4" aria-hidden /> Check in
-    </ActionButton>
+    <>
+      <Button size={size === "lg" ? "md" : size} onClick={() => setOpen(true)}>
+        <LogIn className="size-4" aria-hidden /> Check in
+      </Button>
+      <CheckInDrawer
+        reservationId={reservationId}
+        open={open}
+        onClose={() => setOpen(false)}
+        onDone={(room, undoId) => feedback({
+          message: room ?? roomNumber ? `Checked in to Room ${room ?? roomNumber}. Hand over the key.` : "Checked in.",
+          undo: undoId ? { reservationId, undoId } : undefined,
+        })}
+      />
+    </>
   );
 }
 
-export function CheckOutButton({ reservationId, balanceKobo, size }: { reservationId: string; balanceKobo: number; size?: Size }) {
+/** Opens the check-out drawer (X3): key returned, room to cleaning, receipt; managers can leave a balance owing. */
+export function CheckOutButton({ reservationId, balanceKobo, size, canLeaveOwing = false }: { reservationId: string; balanceKobo: number; size?: Size; canLeaveOwing?: boolean }) {
   const feedback = useActionFeedback();
   const online = useOnline();
-  if (balanceKobo > 0) return <TakePaymentLink reservationId={reservationId} balanceKobo={balanceKobo} size={size} />;
-  if (!online) {
-    return (
-      <Button disabled title={OFFLINE_REASON} size={size === "lg" ? "md" : size} variant={size === "sm" ? "secondary" : "primary"}>
+  const [open, setOpen] = useState(false);
+  if (balanceKobo > 0 && !canLeaveOwing) return <TakePaymentLink reservationId={reservationId} balanceKobo={balanceKobo} size={size} />;
+  return (
+    <>
+      <Button disabled={!online} title={online ? undefined : OFFLINE_REASON} size={size === "lg" ? "md" : size} variant={size === "sm" ? "secondary" : "primary"} onClick={() => setOpen(true)}>
         <LogOut className="size-4" aria-hidden /> Check out
       </Button>
-    );
-  }
-  return (
-    <ActionButton
-      action={checkOut}
-      fields={{ reservationId }}
-      size={size === "lg" ? "md" : size}
-      variant={size === "sm" ? "secondary" : "primary"}
-      onSuccess={(d) => feedback({
-        message: "Checked out. The room is marked for cleaning.",
-        undo: d.undoId ? { reservationId, undoId: d.undoId } : undefined,
-      })}
-    >
-      <LogOut className="size-4" aria-hidden /> Check out
-    </ActionButton>
+      <CheckOutDrawer
+        reservationId={reservationId}
+        open={open}
+        canLeaveOwing={canLeaveOwing}
+        onClose={() => setOpen(false)}
+        onDone={(undoId) => feedback({ message: "Checked out. The room is marked for cleaning.", undo: undoId ? { reservationId, undoId } : undefined })}
+      />
+    </>
   );
 }
 

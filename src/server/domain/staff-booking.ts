@@ -21,7 +21,7 @@ export async function findGuestsByPhone(db: Db, actor: Actor, typed: string): Pr
   return rows.filter((r) => phoneMatches(r.phone, typed)).slice(0, 3);
 }
 
-export type FreeRoom = { id: string; number: string; floor: string | null };
+export type FreeRoom = { id: string; number: string; floor: string | null; ready?: boolean };
 export type TypeAvailability = { categoryId: string; free: number; rooms: FreeRoom[] };
 
 export async function availabilityForStay(db: Db, actor: Actor, checkIn: string, checkOut: string): Promise<TypeAvailability[]> {
@@ -29,9 +29,9 @@ export async function availabilityForStay(db: Db, actor: Actor, checkIn: string,
   validateStay(checkIn, checkOut, 1);
   const [cats, rooms] = await Promise.all([
     all<{ id: string }>(db, "SELECT id FROM room_categories WHERE is_active = 1"),
-    all<FreeRoom & { category_id: string }>(
+    all<FreeRoom & { category_id: string; readiness: string }>(
       db,
-      `SELECT rm.id, rm.room_number AS number, rm.floor, rm.category_id FROM rooms rm
+      `SELECT rm.id, rm.room_number AS number, rm.floor, rm.category_id, rm.readiness FROM rooms rm
        -- An overstaying guest holds their room until checked out, as in the count (freeUnits).
        WHERE rm.is_active = 1 AND rm.service_status = 'in_service'
          AND NOT EXISTS (
@@ -46,7 +46,7 @@ export async function availabilityForStay(db: Db, actor: Actor, checkIn: string,
   return Promise.all(
     cats.map(async (c) => {
       const free = Math.max(0, await freeUnits(db, c.id, checkIn, checkOut));
-      return { categoryId: c.id, free, rooms: free ? rooms.filter((r) => r.category_id === c.id).map(({ id, number, floor }) => ({ id, number, floor })) : [] };
+      return { categoryId: c.id, free, rooms: free ? rooms.filter((r) => r.category_id === c.id).map(({ id, number, floor, readiness }) => ({ id, number, floor, ready: readiness === "ready" })) : [] };
     }),
   );
 }

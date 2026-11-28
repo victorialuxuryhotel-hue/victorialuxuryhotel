@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
+import { recordId } from "@/lib/ids";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize, getCurrentStaff, getStation, STAFF_SESSION_COOKIE, STATION_COOKIE } from "./auth";
 import { getDb } from "./db";
@@ -32,7 +33,7 @@ export async function setUpStation(_prev: ActionResult<{ name: string }> | null,
 export async function revokeStationAction(stationId: string): Promise<ActionResult> {
   try {
     const me = await authorize("staff.manage");
-    await revokeStation(await getDb(), actorOf(me), z.uuid().parse(stationId));
+    await revokeStation(await getDb(), actorOf(me), recordId().parse(stationId));
     refresh();
     return ok(undefined);
   } catch (err) {
@@ -45,7 +46,7 @@ export async function stationRoster(): Promise<RosterEntry[]> {
   return station ? roster(await getDb(), station) : [];
 }
 
-const signInSchema = z.object({ staffId: z.uuid(), pin: z.string().regex(/^\d{4,6}$/, "Enter your PIN"), newPin: z.string().optional() });
+const signInSchema = z.object({ staffId: recordId(), pin: z.string().regex(/^\d{4,6}$/, "Enter your PIN"), newPin: z.string().optional() });
 
 /** Tap a name and enter the PIN. Answers "choose_new" when the owner set the PIN and the person must choose their own. */
 export async function signInWithPin(input: { staffId: string; pin: string; newPin?: string }): Promise<ActionResult<{ status: "signed_in" | "choose_new"; name?: string }>> {
@@ -83,7 +84,7 @@ export async function stationHeartbeat(): Promise<{ signedIn: boolean }> {
 export async function setPin(input: { staffId: string; pin: string }): Promise<ActionResult> {
   try {
     const me = await authorize("staff.manage");
-    await setStaffPin(await getDb(), actorOf(me), z.uuid().parse(input.staffId), String(input.pin ?? ""), pepper());
+    await setStaffPin(await getDb(), actorOf(me), recordId().parse(input.staffId), String(input.pin ?? ""), pepper());
     refresh();
     return ok(undefined);
   } catch (err) {

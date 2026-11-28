@@ -136,6 +136,10 @@ export function TodayView({
           </div>
           <div className="flex flex-col items-end gap-2">
             {signedIn}
+            <div className="flex flex-wrap justify-end gap-2">
+              <Link href="/app/walk-in" className={buttonStyles({ variant: "secondary" })}>Walk-in</Link>
+              <Link href="/app/reservations/new" className={buttonStyles({ variant: "secondary" })}>New booking</Link>
+            </div>
             {/* "/" jumps here (front desk shortcut); searches all bookings. */}
             <form method="get" action="/app/reservations" className="relative w-72 max-w-full" role="search">
               <input type="hidden" name="tab" value="all" />

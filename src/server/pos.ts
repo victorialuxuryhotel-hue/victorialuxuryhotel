@@ -86,7 +86,7 @@ export async function voidSale(input: {
         reasonCode: z.enum(["rung_up_wrongly", "customer_changed_mind", "item_unavailable", "other"], "Choose a reason"),
         note: z.string().max(160).optional(),
         cashReturned: z.boolean().optional(),
-        approverId: z.uuid().optional(),
+        approverId: recordId().optional(),
         approverPin: z.string().regex(/^\d{4,6}$/).optional(),
       })
       .parse(input);

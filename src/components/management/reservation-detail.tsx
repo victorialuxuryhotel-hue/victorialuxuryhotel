@@ -158,6 +158,7 @@ export function ReservationDetailView({
             <CheckInButton reservationId={r.id} disabledReason={step.kind === "assign_room" ? "Assign a room first" : `Arrival is ${formatDate(step.checkIn)}`} />
           ) : null}
           {canManage && step.kind === "check_out" ? <CheckOutButton reservationId={r.id} balanceKobo={0} /> : null}
+          {canManage && canOverride && r.status === "checked_in" && balance > 0 ? <CheckOutButton reservationId={r.id} balanceKobo={balance} canLeaveOwing /> : null}
           {billHref && (r.status === "checked_in" || r.status === "checked_out") ? (
             <Link href={billHref} className={buttonStyles({ variant: "secondary" })}>
               <Printer className="size-4" aria-hidden /> Guest bill

@@ -389,3 +389,27 @@ These are deliberately **not final** in the app:
   is signed in. Both names go in the log and on the order. Off a station the signed-in manager approves.
 - 3 wrong manager PINs refuse the void; the manager sees it in a banner at their next sign-in, and the owner and GM
   in *Anything wrong?*. Stock comes back; the closing's expected cash drops (only paid sales count).
+
+## 0032_front_desk
+
+- **What:** `hotel_settings.walkin_hold_hours` (6); `guest_registrations` (one card per stay; `id_last4` is exactly 4
+  letters or digits, never the full number); `reservations.left_owing_by/at/reason`; `refund_requests` (decided
+  once, never by the requester, never deleted). Rule I3 (`reservations_paid_before_check_in_out`) is recreated with
+  one exception: a check-out a manager leaves owing (same update). **Existing rows:** unchanged. **Previous
+  Worker:** unaffected (it never sets the new columns).
+
+## Step 1d: walk-in (X1), check-in with a registration card (X2), check-out (X3)
+
+- **Walk-in** (Today → Walk-in): phone lookup (returning guests fill in), tonight's free room types and ready rooms,
+  the registration card, then *Take ₦X and check in*: guest, booking, payment and receipt, room, check-in and card in
+  one database write; if anything fails nothing is created, and a room taken by another desk at the same moment gets
+  "Room 103 was just taken". *Save without paying* holds the room type for 6 hours (setting `walkin_hold_hours`).
+  Phones are stored as +234…
+- **Check-in** opens a drawer with the registration card (ID type, ID number, home address, coming from,
+  nationality, purpose, house-rules tick), all required. Only the last 4 characters of the ID leave the screen and
+  are stored; a returning guest's last card is offered. *Print registration card* prints an A5 card with a
+  signature line. Still blocked while money is owed (existing rule I3).
+- **Check-out** drawer: charges, paid, balance; *Key returned* (required); the room goes to cleaning; send the receipt
+  by Print, Email (opens the staff member's mail app) or WhatsApp (a wa.me link; the server sends nothing). A balance
+  must be paid, or a manager with override leaves it owing with a reason. A guest in credit gets *Ask for a refund*
+  (limit: paid less the nights used); the GM or owner decides in Approvals (next step); nothing is paid at the desk.

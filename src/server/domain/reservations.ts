@@ -403,7 +403,8 @@ export async function assignRoom(
   });
 }
 
-export async function checkInReservation(db: Db, actor: Actor, reservationId: string): Promise<{ undoId: number | null }> {
+/** `extra`: statements written in the same batch as the check-in (the registration card, section 5). */
+export async function checkInReservation(db: Db, actor: Actor, reservationId: string, opts: { extra?: Stmt[] } = {}): Promise<{ undoId: number | null }> {
   requireRole(actor, ALL_STAFF);
   return retryOnStale(async () => {
     const res = await loadReservation(db, reservationId);
@@ -432,6 +433,7 @@ export async function checkInReservation(db: Db, actor: Actor, reservationId: st
       assertVersion(db, "reservations", res.id, res.version),
       assertVersion(db, "rooms", room.id, room.version),
       db.prepare("UPDATE reservations SET status = 'checked_in' WHERE id = ?").bind(res.id),
+      ...(opts.extra ?? []),
       activity(db, "reservation.checked_in", "reservation", res.id, `${res.reference} checked in to room ${room.room_number}`),
     ]);
     return { undoId: results.at(-1)?.meta.last_row_id ?? null };
