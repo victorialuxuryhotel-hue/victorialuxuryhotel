@@ -13,7 +13,6 @@ import { policy } from "@/config/policy";
 import { staffRole } from "@/domain/status";
 import { LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
-import { Eye } from "lucide-react";
 import { requireStaff } from "@/server/auth";
 import { getDb } from "@/server/db";
 import { idleMinutes, refusedApprovals } from "@/server/domain/stations";
@@ -28,11 +27,11 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
   const staff = await requireStaff();
   const allowed = managementNav.filter((item) => !item.permission || item.permission.some((p) => can(staff.role, p))).map((item) => item.href);
   const footer = (
-    <StaffCard fullName={staff.fullName} role={staff.viewAs ? "owner" : staff.role} onStation={Boolean(staff.station)}>
+    <StaffCard fullName={staff.fullName} role={staff.viewAs ? "owner" : staff.role} onStation={Boolean(staff.station)} signedInAt={staff.station ? staff.sessionStartedAt ?? undefined : undefined}>
       {staff.role === "owner" && !staff.viewAs && !staff.station ? (
         <form action={startViewAsFrontDesk}>
-          <button type="submit" className="flex min-h-10 w-full items-center gap-2.5 rounded-md px-2 text-left text-sm text-ivory-200/80 hover:bg-ivory-50/10 hover:text-white">
-            <Eye className="size-4" aria-hidden /> View as front desk
+          <button type="submit" role="menuitem" className="block w-full px-3.5 py-[9px] text-left text-sm font-semibold hover:bg-ivory-100">
+            View as front desk<span className="block text-xs font-normal text-[#5b6372]">Read-only, to check what the desk sees</span>
           </button>
         </form>
       ) : null}

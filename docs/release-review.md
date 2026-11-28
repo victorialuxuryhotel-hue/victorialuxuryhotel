@@ -496,3 +496,9 @@ These are deliberately **not final** in the app:
   under the row) or *Open* (the invoice), with Invoice and *Cancel booking* in a ⋯ menu. *New hall booking* is a
   four-column form (Event, Booked by, Date, Guests / From, To, Price with ₦ inside, Phone / Email, Notes) with the
   rule line and *Save hall booking* at the right. Notes is now a one-line field.
+- Staff sidebar (D1): navy #0b1f5c, the "Victoria Luxury" wordmark with MANAGEMENT in gold, group headings, plain
+  text links (no icons) with the current page in a lighter band; global search and the business day stay. At the
+  foot, one account button (initials, name, role) opens the account menu: name and role (and "signed in 09:53" on a
+  station), Manage sign-in (personal sign-in only), *This station*, then on a station *Lock screen* and *Switch user*
+  (both lock the screen; the next person taps their name), or *Sign out* in red with a personal sign-in. The owner's
+  *View as front desk* is in the same menu. The design's "Ctrl L" hint is left out: there is no such shortcut.
