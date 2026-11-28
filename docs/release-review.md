@@ -433,3 +433,13 @@ These are deliberately **not final** in the app:
   tonight* per room type and *Rooms to clean* with the room numbers.
 - Every staff screen picks up the R1 components from step 1b (Inter, filled primary buttons, badges, fields). The
   screen-by-screen layouts for R101–R109, R201–R205 and R301–R305 follow after go-live, most-used first.
+
+## Release 2026-11-28: stations and PINs, payments, void approval, front desk, till and Today
+
+- Migrations 0029–0032. Restore point before them: `00000505-00000000-00005131-ca96121db207b8096785ff354b1864d1`.
+- Secret `PIN_PEPPER` set on staging and live (random, never displayed).
+- Staging `cf271798-6c83-4f75-8d39-a6269d7ea85f`. Previous live `10fffa0a-3ad4-4fc4-91c9-7d3aed18569b` (the 27 Nov code
+  `7063df50` plus the new secret), new live `88491cb0-fba2-423a-9a24-9edf21f2e092`. Smoke test passed on both; a forged
+  station cookie is sent to sign-in.
+- Rollback: `wrangler versions deploy 10fffa0a-3ad4-4fc4-91c9-7d3aed18569b@100%`. The migrations stay (forward-only);
+  the old code ignores the new tables, but its POS payments and voids are refused by the new rules (see 0030/0031).
