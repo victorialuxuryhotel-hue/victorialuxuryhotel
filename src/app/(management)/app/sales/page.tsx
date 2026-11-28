@@ -15,7 +15,7 @@ import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { first, getDb } from "@/server/db";
 import { closingSummary, topSellers, listMenu, openOrders } from "@/server/domain/pos";
 import { paymentSettings } from "@/server/domain/payment-details";
-import { businessDate } from "@/lib/hotel-date";
+import { businessDate, businessDayLabel } from "@/lib/hotel-date";
 import { VAT_SHOWN_SQL } from "@/server/vat";
 
 export const metadata: Metadata = { title: "Till" };
@@ -41,7 +41,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   return (
     // Laptops: fill the window under the page header; the till's columns scroll inside (see Till).
     <div className="space-y-6 px-4 py-6 lg:flex lg:h-[calc(100dvh-6.375rem)] lg:flex-col lg:[html[data-till-full]_&]:h-dvh lg:space-y-0 lg:gap-4 lg:px-8 lg:pb-4">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-600">
+      <div className={`flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-600 ${closed ? "" : "hidden"}`}>
         <BusinessDay className="text-sm font-medium text-ink-700" />
         <span>Your sales today: <b className="tabular-nums text-ink-900">{mine.sales}</b> · <b className="tabular-nums text-ink-900">{formatNaira(mine.salesKobo)}</b></span>
         <span>Cash to hand in: <b className="tabular-nums text-ink-900">{formatNaira(mine.byMethod.cash)}</b></span>
@@ -60,7 +60,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         </p>
       ) : (
         <div className="lg:min-h-0 lg:flex-1">
-          <Till pay={pay} menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} taxId={settings?.tax_id ?? null} resume={resume} favourites={favourites} staffId={staff.id} fullScreenRole={staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager"} />
+          <Till bar={{ businessDay: businessDayLabel(businessDate()), sales: mine.sales, salesKobo: mine.salesKobo, onStation: Boolean(staff.station) }} pay={pay} menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} taxId={settings?.tax_id ?? null} resume={resume} favourites={favourites} staffId={staff.id} fullScreenRole={staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager"} />
         </div>
       )}
     </div>

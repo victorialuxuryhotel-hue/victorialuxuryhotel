@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { CheckCircle2, MessageSquare, Minus, Plus, Printer, Repeat2, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormMessage, Input, Select } from "@/components/ui/form";
-import { Segmented } from "@/components/ui/choice";
+import { Segmented, Tabs } from "@/components/ui/choice";
+import { requestLock } from "./idle-lock";
 import { BankLine, type PaySettings } from "./offline-payment-form";
 import { formatNaira } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
@@ -43,7 +45,7 @@ const toggleChip = (note: string, chip: string) => {
 
 /** Quick table chips (configurable later). */
 const CANCEL_REASONS = ["Customer left", "Wrong item", "Duplicate order"];
-const TABLES = ["Bar", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
+const TABLES = ["Bar counter", ...Array.from({ length: 12 }, (_, i) => `Table ${i + 1}`)];
 
 const OFFLINE = `${OFFLINE_MESSAGE} If the internet stays down, use a numbered paper slip.`;
 const saveSafe = safeAction(saveOpenOrder, OFFLINE);
@@ -95,10 +97,12 @@ function parseDraft(raw: string | null, menu: MenuItem[]) {
   }
 }
 
-export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] }, staffId = "", fullScreenRole = false, pay = { bank: { name: null, number: null, accountName: null }, terminals: [] } }: {
+export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] }, staffId = "", fullScreenRole = false, pay = { bank: { name: null, number: null, accountName: null }, terminals: [] }, bar }: {
   menu: MenuItem[]; open: OpenOrder[]; attendant: string; vatRateBp: number; taxId?: string | null; startOutlet?: Outlet; resume?: string;
   /** The hotel's bank details (shown for transfers) and POS terminals (section 2). */
   pay?: PaySettings;
+  /** The dark till bar (design R2): business day, my sales, who's signed in. */
+  bar?: { businessDay: string; sales: number; salesKobo: number; onStation: boolean };
   /** Restaurant & bar staff get the full-screen till on any computer; others on a station set to a counter (I8). */
   fullScreenRole?: boolean;
   /** Each counter's best sellers, shown as a quick row above the menu. */
@@ -132,10 +136,10 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   const dupOk = useRef<HTMLInputElement>(null);
   const defaultTerminal = pay.terminals.find((t) => t.toLowerCase().includes(outlet === "bar" ? "bar" : "restaurant")) ?? pay.terminals[0] ?? "";
   const [typeName, setTypeName] = useState(false);
+  const [calc, setCalc] = useState(false);
   const [given, setGiven] = useState("");
   const [receipt, setReceipt] = useState<PosReceiptData | null>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
-  const [search, setSearch] = useState("");
   const [saveState, saveAction, saving] = useActionState(saveSafe, null);
   const [payState, payAction, paying] = useActionState(paySafe, null);
   const orderId = useRef<string>(resumeOrder?.id ?? "");
@@ -148,7 +152,14 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   const items = menu.filter((m) => m.outlet === outlet && m.is_active);
   const categories = [...new Set(items.map((m) => m.category))];
   const finding = find.trim().toLowerCase();
-  const shown = finding ? items.filter((m) => m.name.toLowerCase().includes(finding)) : items.filter((m) => category === "all" || m.category === category);
+  // On "All", each counter's best sellers come first (the quick row of earlier tills, folded into the grid per R2).
+  const rank = (id: string) => {
+    const i = (favourites[outlet] ?? []).indexOf(id);
+    return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  const shown = finding
+    ? items.filter((m) => m.name.toLowerCase().includes(finding))
+    : items.filter((m) => category === "all" || m.category === category).sort((a, b) => (category === "all" ? rank(a.id) - rank(b.id) : 0));
   const lines = useMemo(
     () =>
       Object.entries(cart)
@@ -231,9 +242,6 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
     });
     setSkipped(missed.length ? `Not added (unavailable or not enough stock): ${[...new Set(missed)].join(", ")}.` : null);
   };
-  const favs = (favourites[outlet] ?? []).map((id) => items.find((m) => m.id === id)).filter((m): m is MenuItem => Boolean(m));
-  const q = search.trim().toLowerCase();
-  const openShown = q ? open.filter((o) => `#${o.number} ${o.note ?? ""} ${o.items}`.toLowerCase().includes(q)) : open;
   const linesJson = JSON.stringify(lines.map((l) => ({ menuItemId: l.item.id, quantity: l.q, note: l.note || null })));
 
   /** POS declined but the customer was debited: the order is kept unpaid and flagged for the manager (section 2). */
@@ -331,32 +339,25 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
     <div className="space-y-8 pb-24 lg:h-full lg:pb-0">
       {receipt ? <div className="hidden print:block"><PosReceipt r={receipt} printable={!stationConfigured || station.printLayout !== "a4"} /></div> : null}
       {/* The bar terminal (1280×720, kiosk) and wider: unpaid · menu · order. Smaller screens: menu · order, unpaid orders under the menu. */}
-      <div className="grid gap-6 lg:h-full lg:grid-cols-[1fr_21rem] print:hidden xl:grid-cols-[15rem_1fr_22rem]">
-        {/* Left: unpaid orders, searchable, with a New order button on top. */}
-        <aside aria-labelledby="unpaid" className="hidden min-w-0 flex-col rounded-card border border-hairline bg-ivory-50 xl:col-start-1 xl:row-start-1 xl:flex xl:min-h-0">
-          <div className="space-y-2 border-b border-hairline p-3">
-            <div className="flex items-center justify-between gap-2">
-              <h2 id="unpaid" className="font-display text-lg text-navy-950">Unpaid · {open.length}</h2>
-              <Button size="sm" variant="secondary" onClick={() => { setReceipt(null); reset(); }}><Plus className="size-4" aria-hidden /> New</Button>
-            </div>
-            {open.length > 3 ? (
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Table, name or #" aria-label="Find an unpaid order" className="h-10 text-sm pointer-coarse:h-11" />
-            ) : null}
-          </div>
-          {openShown.length ? (
-            <ul className="divide-y divide-hairline lg:min-h-0 lg:overflow-y-auto">
-              {openShown.map((o) => <OpenOrderRow key={o.id} o={o} onOpen={() => { setReceipt(null); resumeOpen(o); }} active={editing?.id === o.id} />)}
-            </ul>
-          ) : (
-            <p className="p-3 text-sm text-ink-500">{open.length ? "No unpaid order matches." : "No unpaid orders. Save one as unpaid to keep a tab open."}</p>
-          )}
-        </aside>
-
-        <section aria-label="Menu" className="min-w-0 space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2 lg:pb-4 xl:col-start-2 xl:row-start-1">
+      {bar ? (
+        <TillBar
+          bar={bar}
+          attendant={attendant}
+          outlet={outlet}
+          locked={!!editing}
+          onOutlet={(o) => { if (o !== outlet) { setOutlet(o); setCategory("all"); setCart({}); } }}
+        />
+      ) : null}
+      <div className="grid gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[1fr_24rem] print:hidden">
+        <section aria-label="Menu" className="min-w-0 space-y-3 lg:min-h-0 lg:overflow-y-auto lg:pr-2 lg:pb-4">
           {step === "pay" ? (
             // Taking payment: the details get the wide column (room for the keypad); Confirm stays with the order.
             <div className="mx-auto w-full max-w-md space-y-4">
-              <h2 className="font-display text-2xl text-navy-950">Take {formatNaira(total)}</h2>
+              <div>
+                <p className="text-[13px] font-semibold tracking-wide text-ink-500 uppercase">Take payment{note ? ` · ${note}` : ""}</p>
+                <p className="text-4xl font-bold tabular-nums text-ink-900">{formatNaira(total)}</p>
+                <button type="button" onClick={() => setStep("order")} className="mt-1 text-sm font-semibold text-navy-700 hover:underline">← Back to order</button>
+              </div>
           <form
             id="till-pay"
             action={payAction}
@@ -478,52 +479,53 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
             </div>
           ) : (
           <>
-          <div className="flex gap-2" role="tablist" aria-label="Counter">
-            {(Object.keys(OUTLETS) as Outlet[]).map((o) => (
+          {bar ? null : (
+            <Segmented
+              label="Counter"
+              value={outlet}
+              onChange={(o) => { if (o !== outlet && !editing) { setOutlet(o); setCategory("all"); setCart({}); } }}
+              options={(Object.keys(OUTLETS) as Outlet[]).map((o) => ({ value: o, label: OUTLETS[o], disabled: !!editing && o !== outlet }))}
+            />
+          )}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-[13px] font-semibold whitespace-nowrap text-ink-500 uppercase">Open orders · {open.length}</span>
+            {open.map((o) => (
               <button
-                key={o}
+                key={o.id}
                 type="button"
-                role="tab"
-                aria-selected={o === outlet}
-                disabled={!!editing && o !== outlet}
-                onClick={() => { if (o !== outlet) { setOutlet(o); setCategory("all"); setCart({}); } }}
-                className={cn(chip(o === outlet), "px-5 text-base disabled:opacity-40")}
+                aria-pressed={editing?.id === o.id}
+                onClick={() => { setReceipt(null); resumeOpen(o); }}
+                className={cn(
+                  "inline-flex h-9 w-fit items-center gap-2 rounded-lg border px-3 text-sm whitespace-nowrap pointer-coarse:h-11",
+                  editing?.id === o.id ? "border-navy-900 bg-[#e8eefb]" : /^(T\d+|Table \d+|Bar)$/.test(o.note ?? "") ? "border-hairline bg-white" : "border-[#f0c46a] bg-[#fff8e6]",
+                )}
               >
-                {OUTLETS[o]}
+                <b className="font-semibold text-ink-900">{o.note || `#${o.number}`}</b>
+                <span className="tabular-nums text-ink-500">{formatNaira(o.total_kobo)}</span>
               </button>
             ))}
+            {editing ? <Button size="sm" variant="ghost" onClick={() => { setReceipt(null); reset(); }}><Plus className="size-4" aria-hidden /> New order</Button> : null}
           </div>
-          <label className="relative block">
-            <span className="sr-only">Find an item</span>
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
-            {/* type=search: the touch keyboard opens on the bar terminal. */}
-            <Input type="search" inputMode="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find an item" data-till-search="" className="h-11 pl-9" />
-          </label>
-          {favs.length && category === "all" && !finding ? (
-            <div>
-              <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-ink-500">Best sellers</p>
-              <div className="flex flex-wrap gap-2">
-                {favs.map((m) => {
-                  const off = !m.is_available || m.stock_left === 0 || itemQty(cart, m.id) >= maxFor(m);
-                  return (
-                    <button key={m.id} type="button" disabled={off} onClick={() => add(m, 1)} className={cn(chip(false), "gap-2 rounded-md px-3 disabled:opacity-40")}>
-                      {m.name} <span className="tabular-nums text-ink-500">{formatNaira(m.price_kobo)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+          <div className="relative flex items-center gap-4">
+            <label className="relative block flex-1">
+              <span className="sr-only">Find an item</span>
+              <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+              {/* type=search: the touch keyboard opens on the bar terminal. */}
+              <Input type="search" inputMode="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find an item…" data-till-search="" className="h-11 pl-10" />
+            </label>
+            <Button variant="secondary" aria-expanded={calc} onClick={() => setCalc(!calc)}>Calculator</Button>
+            {calc ? <Calculator onClose={() => setCalc(false)} /> : null}
+          </div>
           {categories.length > 1 && !finding ? (
-            <nav aria-label="Category" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
-              <button type="button" aria-pressed={category === "all"} onClick={() => setCategory("all")} className={chip(category === "all")}>All</button>
-              {categories.map((c) => (
-                <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)} className={chip(category === c)}>{CATEGORIES[c]}</button>
-              ))}
-            </nav>
+            <Tabs
+              label="Category"
+              value={category}
+              onChange={setCategory}
+              options={[{ value: "all" as const, label: "All" }, ...categories.map((c) => ({ value: c, label: CATEGORIES[c] }))]}
+            />
           ) : null}
           {shown.length ? (
-            <ul className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
               {shown.map((m) => {
                 const out = m.stock_left === 0;
                 const off = !m.is_available || out;
@@ -536,14 +538,14 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
                       disabled={off || full}
                       onClick={() => add(m, 1)}
                       className={cn(
-                        "relative flex min-h-24 w-full flex-col items-start justify-between rounded-md border p-3 text-left transition-colors",
-                        inCart ? "border-navy-800 bg-navy-50" : "border-hairline bg-ivory-50 hover:bg-ink-900/4",
+                        "relative flex min-h-24 w-full flex-col items-start justify-between rounded-[10px] border px-3.5 py-3 text-left transition-colors",
+                        inCart ? "border-2 border-navy-900 bg-[#e8eefb]" : "border-hairline bg-white hover:border-ink-400",
                         off && "cursor-not-allowed opacity-50",
                       )}
                     >
-                      <span className="text-[15px] leading-snug text-ink-900">{m.name}</span>
+                      <span className="text-base leading-tight font-semibold text-ink-900">{m.name}</span>
                       <span className="mt-2 flex w-full items-end justify-between gap-2">
-                        <span className="text-sm tabular-nums text-ink-700">{formatNaira(m.price_kobo)}</span>
+                        <span className="text-[17px] font-bold tabular-nums text-ink-900">{formatNaira(m.price_kobo)}</span>
                         {inCart ? <span className="rounded-full bg-navy-800 px-2 text-sm font-semibold tabular-nums text-white">{inCart}</span> : null}
                       </span>
                       {!m.is_available ? (
@@ -565,20 +567,11 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               {finding ? `Nothing on the ${OUTLETS[outlet].toLowerCase()} menu matches “${find.trim()}”.` : `No ${OUTLETS[outlet].toLowerCase()} items on the menu yet. A manager adds them under Menu.`}
             </p>
           )}
-          {open.length ? (
-            // Below 1280px the unpaid orders sit under the menu, so the menu comes first.
-            <section aria-label="Unpaid orders" className="rounded-card border border-hairline bg-ivory-50 xl:hidden">
-              <h2 className="border-b border-hairline px-5 py-3 font-display text-lg text-navy-950">Unpaid orders · {open.length}</h2>
-              <ul className="divide-y divide-hairline">
-                {open.map((o) => <OpenOrderRow key={o.id} o={o} onOpen={() => { setReceipt(null); resumeOpen(o); }} active={editing?.id === o.id} />)}
-              </ul>
-            </section>
-          ) : null}
           </>
           )}
         </section>
 
-        <section id="order" aria-label="This order" className="h-fit space-y-4 rounded-card border border-hairline bg-ivory-50 p-5 lg:max-h-full lg:overflow-y-auto xl:col-start-3 xl:row-start-1">
+        <section id="order" aria-label="This order" className="h-fit space-y-4 rounded-xl border border-hairline bg-white p-5 lg:max-h-full lg:overflow-y-auto">
           {step === "done" && receipt ? (
             // Slim receipt: the essentials, Print and New order. The full receipt is only for printing.
             <div className="space-y-4" role="status">
@@ -680,27 +673,17 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
 
           <div className="flex items-baseline justify-between border-t border-hairline pt-3">
             <span className="text-ink-700">Total{count ? ` · ${count} item${count === 1 ? "" : "s"}` : ""}</span>
-            <span className="font-display text-3xl tabular-nums text-navy-950">{formatNaira(total)}</span>
+            <span className="text-3xl font-bold tabular-nums text-ink-900">{formatNaira(total)}</span>
           </div>
 
           {step === "order" ? (
             <>
-              <div>
-                <span className="mb-1 block text-[13px] text-ink-700">Table or customer <span className="text-ink-400">(optional)</span></span>
-                {/* Quick chips instead of typing on the touch screen; a name can still be typed. */}
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {TABLES.map((t) => (
-                    <button key={t} type="button" aria-pressed={note === t} onClick={() => setNote(note === t ? "" : t)} className={cn(chip(note === t), "min-h-10 px-3 pointer-coarse:min-h-11")}>{t}</button>
-                  ))}
-                </div>
-                <Input value={note} onChange={(e) => setNote(e.target.value.slice(0, 120))} placeholder="Or a name" aria-label="Table or customer" />
-              </div>
+              <TableOrName value={note} onChange={setNote} />
               {/* Pinned to the bottom of the order panel, so Pay is always on screen however long the order is. */}
-              <div className="sticky bottom-0 -mx-5 -mb-5 grid gap-2 border-t border-hairline bg-ivory-50 px-5 pt-3 pb-5">
-                {/* The biggest thing on the till (I8): full width, 56px+, total in large type. */}
-                <Button size="lg" disabled={!lines.length || !online} title={online ? undefined : OFFLINE_REASON} onClick={() => setStep("pay")} className="h-16 w-full justify-between px-5 text-lg" data-pay="">
-                  <span>Take payment</span>
-                  <span className="font-display text-2xl tabular-nums">{formatNaira(total)}</span>
+              <div className="sticky bottom-0 -mx-5 -mb-5 grid gap-2 border-t border-hairline bg-white px-5 pt-3 pb-5">
+                {/* The one primary button on the till (R1): full width, 60px, at the foot of the order panel. */}
+                <Button size="lg" disabled={!lines.length || !online} title={online ? undefined : OFFLINE_REASON} onClick={() => setStep("pay")} className="w-full" data-pay="">
+                  Take payment · <span className="tabular-nums">{formatNaira(total)}</span>
                 </Button>
                 <form action={saveAction} onSubmit={stampId}>
                   <input type="hidden" name="id" defaultValue="" />
@@ -708,18 +691,18 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
                   <input type="hidden" name="lines" value={linesJson} />
                   <input type="hidden" name="note" value={note} />
                   <Button type="submit" variant="secondary" className="w-full" pending={saving} disabled={!lines.length}>
-                    {editing ? "Save changes (still unpaid)" : "Save as unpaid order"}
+                    {editing ? "Keep order open (save changes)" : "Keep order open"}
                   </Button>
                 </form>
+                {editing ? <CancelOrderControl id={editing.id} /> : null}
               </div>
             </>
           ) : (
-              <div className="grid grid-cols-[auto_1fr] gap-2">
-                {/* Back and Confirm stay with the order; the payment details are in the wide column (form="till-pay"). */}
-                <Button type="button" variant="secondary" size="lg" onClick={() => setStep("order")}>Back</Button>
-                <Button type="submit" form="till-pay" size="lg" className="h-16 w-full min-w-0 text-lg" pending={paying} title={online ? undefined : OFFLINE_REASON} disabled={!online || !lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && ((transferRef.trim().length < 3 && senderName.trim().length < 2) || !transferChecked)) || (method === "pos_terminal" && (!/^\d{4}$/.test(slip) || !(terminal || defaultTerminal) || debit === "done"))}>
+              <div className="flex flex-col items-center gap-2">
+                {/* Confirm stays with the order; the payment details are in the wide column (form="till-pay"). */}<Button type="submit" form="till-pay" size="lg" className="h-16 w-full min-w-0 text-lg" pending={paying} title={online ? undefined : OFFLINE_REASON} disabled={!online || !lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && ((transferRef.trim().length < 3 && senderName.trim().length < 2) || !transferChecked)) || (method === "pos_terminal" && (!/^\d{4}$/.test(slip) || !(terminal || defaultTerminal) || debit === "done"))}>
                   Confirm {formatNaira(total)} paid
                 </Button>
+                <p className="text-center text-xs text-ink-500">{method === "cash" ? "Prints the receipt and opens the cash drawer" : "Prints the receipt"}</p>
               </div>
           )}
           </>
@@ -740,41 +723,165 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   );
 }
 
-function OpenOrderRow({ o, onOpen, active }: { o: OpenOrder; onOpen: () => void; active: boolean }) {
+/** Cancel the open order being edited (a reason is required; the manager sees it). */
+function CancelOrderControl({ id }: { id: string }) {
   const [confirm, setConfirm] = useState(false);
   const [reason, setReason] = useState("");
   const [other, setOther] = useState(false);
   const [state, action, pending] = useActionState(cancelSafe, null);
+  if (!confirm) return <Button variant="ghost" className="mx-auto text-danger-700" onClick={() => setConfirm(true)}>Cancel this order</Button>;
   return (
-    <li className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3", active && "bg-navy-50")}>
-      <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
-        <p className="text-[15px] text-ink-900">#{o.number} · {OUTLETS[o.outlet]}{o.note ? ` · ${o.note}` : ""}</p>
-        <p className="truncate text-xs text-ink-500">{o.items} · by {o.created_by_name ?? "staff"}</p>
+    <form action={action} className="space-y-2 rounded-lg border border-[#f1b8b8] p-3">
+      <input type="hidden" name="id" value={id} />
+      {/* Preset reasons for the touch screen; "Other" types one. The manager sees the reason. */}
+      <input type="hidden" name="reason" value={reason} />
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Why is this order cancelled?">
+        {CANCEL_REASONS.map((r) => (
+          <button key={r} type="button" aria-pressed={!other && reason === r} onClick={() => { setOther(false); setReason(r); }} className={cn(chip(!other && reason === r), "min-h-10 px-3 text-xs pointer-coarse:min-h-11")}>{r}</button>
+        ))}
+        <button type="button" aria-pressed={other} onClick={() => { setOther(true); setReason(""); }} className={cn(chip(other), "min-h-10 px-3 text-xs pointer-coarse:min-h-11")}>Other</button>
       </div>
-      <span className="mr-auto text-[15px] font-semibold tabular-nums sm:mr-0">{formatNaira(o.total_kobo)}</span>
-      {confirm ? (
-        <form action={action} className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <input type="hidden" name="id" value={o.id} />
-          {/* Preset reasons for the touch screen; "Other" types one. The manager sees the reason. */}
-          <input type="hidden" name="reason" value={reason} />
-          <div className="flex w-full flex-wrap gap-1.5" role="group" aria-label="Why is this order cancelled?">
-            {CANCEL_REASONS.map((r) => (
-              <button key={r} type="button" aria-pressed={!other && reason === r} onClick={() => { setOther(false); setReason(r); }} className={cn(chip(!other && reason === r), "min-h-10 px-3 text-xs pointer-coarse:min-h-11")}>{r}</button>
-            ))}
-            <button type="button" aria-pressed={other} onClick={() => { setOther(true); setReason(""); }} className={cn(chip(other), "min-h-10 px-3 text-xs pointer-coarse:min-h-11")}>Other</button>
-          </div>
-          {other ? <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What happened? (the manager sees this)" aria-label="Other reason" className="h-10 min-w-0 flex-1 text-sm" /> : null}
-          <Button type="submit" size="sm" variant="danger" pending={pending} disabled={reason.trim().length < 3}>Cancel order</Button>
-          <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Keep</Button>
-          {state && !state.ok ? <p className="w-full text-xs text-danger-700">{state.message}</p> : null}
-        </form>
-      ) : (
+      {other ? <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What happened? (the manager sees this)" aria-label="Other reason" className="h-10 text-sm" /> : null}
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" variant="danger" pending={pending} disabled={reason.trim().length < 3}>Cancel order</Button>
+        <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Keep</Button>
+      </div>
+      {state && !state.ok ? <p className="text-xs text-danger-700">{state.message}</p> : null}
+    </form>
+  );
+}
+
+/** The dark till bar (design R2): counter, business day, my sales, Orders, Close my day, who's signed in, Lock. */
+function TillBar({ bar, attendant, outlet, locked, onOutlet }: { bar: NonNullable<Parameters<typeof Till>[0]["bar"]>; attendant: string; outlet: Outlet; locked: boolean; onOutlet: (o: Outlet) => void }) {
+  const first = attendant.split(" ")[0] ?? attendant;
+  const initials = attendant.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+  const link = "inline-flex h-9 items-center rounded-lg border border-white/35 px-3 text-sm whitespace-nowrap text-white hover:bg-white/10 pointer-coarse:h-11";
+  return (
+    <header className="-mx-4 -mt-6 mb-4 flex min-h-[60px] flex-wrap items-center gap-x-4 gap-y-2 bg-[#0b1f5c] px-5 py-2 lg:-mx-8 print:hidden">
+      <span className="font-brand text-[22px] text-white">Victoria</span>
+      <div role="group" aria-label="Counter" className="flex rounded-lg bg-white/10 p-[3px]">
+        {(Object.keys(OUTLETS) as Outlet[]).map((o) => (
+          <button
+            key={o}
+            type="button"
+            aria-pressed={o === outlet}
+            disabled={locked && o !== outlet}
+            onClick={() => onOutlet(o)}
+            className={cn("h-9 rounded-md px-4 text-[15px] font-semibold disabled:opacity-40 pointer-coarse:h-11", o === outlet ? "bg-white text-[#0b1f5c]" : "text-[#cfd6f0]")}
+          >
+            {OUTLETS[o]}
+          </button>
+        ))}
+      </div>
+      <span className="text-sm text-[#cfd6f0]">{bar.businessDay}</span>
+      <span className="flex-1" />
+      <span className="text-sm text-[#cfd6f0]">My sales <b className="text-white tabular-nums">{bar.sales} · {formatNaira(bar.salesKobo)}</b></span>
+      <Link href="/app/sales/orders" className={link}>Orders</Link>
+      <Link href="/app/sales/closing" className={link}>Close my day</Link>
+      <span className="flex items-center gap-2 border-l border-white/20 pl-3">
+        <span aria-hidden className="flex size-8 items-center justify-center rounded-full bg-gold-400 text-[13px] font-bold text-[#0b1f5c]">{initials}</span>
+        <span className="text-sm text-white">{first}</span>
+      </span>
+      {bar.onStation ? (
+        <button type="button" onClick={requestLock} className="h-9 rounded-lg bg-gold-400 px-3.5 text-sm font-bold text-[#0b1f5c] pointer-coarse:h-11">Lock</button>
+      ) : null}
+    </header>
+  );
+}
+
+/** Table or name (design R2): a dropdown of tables, or type a name. */
+function TableOrName({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const isTable = TABLES.includes(value);
+  const [typing, setTyping] = useState(Boolean(value) && !isTable);
+  return (
+    <div>
+      <label htmlFor="till-table" className="mb-1.5 block text-xs font-semibold tracking-wide text-ink-500 uppercase">Table or name</label>
+      {typing ? (
         <div className="flex gap-2">
-          <Button size="sm" variant="ghost" onClick={() => setConfirm(true)}>Cancel</Button>
-          <Button size="sm" onClick={onOpen}>{active ? "Open now" : "Open"}</Button>
+          <Input id="till-table" autoFocus value={value} onChange={(e) => onChange(e.target.value.slice(0, 120))} placeholder="Customer's name" className="min-w-0 flex-1" />
+          <Button variant="ghost" onClick={() => { setTyping(false); onChange(""); }}>Tables</Button>
         </div>
+      ) : (
+        <Select
+          id="till-table"
+          value={isTable ? value : ""}
+          onChange={(e) => {
+            if (e.target.value === "__name") {
+              setTyping(true);
+              onChange("");
+            } else onChange(e.target.value);
+          }}
+          className="w-full"
+        >
+          <option value="">No table</option>
+          {TABLES.map((t) => <option key={t} value={t}>{t}</option>)}
+          <option value="__name">Type a name…</option>
+        </Select>
       )}
-    </li>
+    </div>
+  );
+}
+
+/** The till calculator (design X8): plus, minus, times, divide, clear. It saves nothing and sends nothing. */
+function Calculator({ onClose }: { onClose: () => void }) {
+  const [expr, setExpr] = useState("");
+  const [result, setResult] = useState<string | null>(null);
+  const evaluate = (e: string): number | null => {
+    // Only digits and + − × ÷, evaluated left to right with × and ÷ first. No eval().
+    const tokens = e.replace(/,/g, "").match(/\d+(?:\.\d+)?|[+\-×÷]/g);
+    if (!tokens || !/^\d/.test(tokens[0]!)) return null;
+    const nums: number[] = [Number(tokens[0])];
+    const ops: string[] = [];
+    for (let i = 1; i < tokens.length; i += 2) {
+      const op = tokens[i]!;
+      const n = Number(tokens[i + 1]);
+      if (!Number.isFinite(n)) return null;
+      if (op === "×") nums[nums.length - 1]! *= n;
+      else if (op === "÷") {
+        if (n === 0) return null;
+        nums[nums.length - 1]! /= n;
+      } else {
+        ops.push(op);
+        nums.push(n);
+      }
+    }
+    return nums.reduce((t, n, i) => (i === 0 ? n : ops[i - 1] === "+" ? t + n : t - n));
+  };
+  const press = (k: string) => {
+    if (k === "C") {
+      setExpr("");
+      setResult(null);
+    } else if (k === "=") {
+      const r = evaluate(expr);
+      setResult(r == null ? "Can't work that out" : r.toLocaleString("en-NG", { maximumFractionDigits: 2 }));
+    } else {
+      setResult(null);
+      setExpr((e) => (/[+\-×÷]$/.test(e) && /[+\-×÷]/.test(k) ? e.slice(0, -1) + k : e + k));
+    }
+  };
+  const keys = ["7", "8", "9", "÷", "4", "5", "6", "×", "1", "2", "3", "−", "C", "0", "=", "+"];
+  return (
+    <div role="dialog" aria-label="Calculator" className="absolute top-full right-0 z-40 mt-2 w-72 rounded-xl border border-hairline bg-white p-4 shadow-lg">
+      <div className="flex items-baseline justify-between">
+        <p className="font-bold text-ink-900">Calculator</p>
+        <p className="text-xs text-ink-500">Doesn&apos;t record anything</p>
+      </div>
+      <p className="mt-3 min-h-5 text-right text-sm text-ink-500 tabular-nums">{expr.replace(/−/g, "−") || " "}</p>
+      <p className="text-right text-3xl font-bold text-ink-900 tabular-nums" aria-live="polite">{result ?? (evaluate(expr)?.toLocaleString("en-NG", { maximumFractionDigits: 2 }) ?? "0")}</p>
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        {keys.map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => press(k === "−" ? "-" : k)}
+            className={cn("h-12 rounded-lg border text-lg font-semibold", k === "=" ? "border-navy-900 bg-navy-900 text-white" : /[÷×−+]/.test(k) ? "border-hairline bg-[#e8eefb] text-navy-900" : "border-hairline bg-white text-ink-900")}
+          >
+            {k}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 text-center"><Button variant="ghost" size="sm" onClick={onClose}>Close</Button></div>
+    </div>
   );
 }
 

@@ -413,3 +413,14 @@ These are deliberately **not final** in the app:
   by Print, Email (opens the staff member's mail app) or WhatsApp (a wa.me link; the server sends nothing). A balance
   must be paid, or a manager with override leaves it owing with a reason. A guest in credit gets *Ask for a refund*
   (limit: paid less the nights used); the GM or owner decides in Approvals (next step); nothing is paid at the desk.
+
+## Step 1e: the till restyled (R2, R3) and the calculator (X8)
+
+- Dark till bar: Victoria, Restaurant | Bar, business day, my sales, Orders, Close my day, who's signed in, Lock (gold,
+  on a station). Open orders are a row of chips above the menu (a name tab shows amber); Find an item… with
+  Calculator; categories are tabs; items are 4 to a row with price and stock left; best sellers come first on All.
+- Order panel: lines, Total, *Table or name* is a dropdown (Bar counter, Table 1–12, Type a name…), then the one
+  primary button *Take payment · ₦X* and *Keep order open*; *Cancel this order* (with a reason) when an open order is
+  open. Payment (R3): *Take payment · Table 4*, the amount, ← Back to order, Cash | Transfer | POS / card, and
+  *Confirm ₦X paid* with "Prints the receipt and opens the cash drawer".
+- Calculator: + − × ÷ and C on screen only; it saves nothing and sends nothing (no eval; × and ÷ first).
