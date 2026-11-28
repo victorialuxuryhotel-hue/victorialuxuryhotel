@@ -10,13 +10,13 @@ const visible = (role: StaffRole) =>
 
 describe("menu by role", () => {
   it("front desk sees only daily work, never the dashboard", () => {
-    expect(visible("front_desk")).toEqual([{ label: "Daily work", items: ["Today", "Bookings", "Calendar", "Rooms", "Guests", "Payments", "Hall bookings"] }]);
+    expect(visible("front_desk")).toEqual([{ label: "Daily work", items: ["Today", "Bookings", "Calendar", "Rooms", "Guests", "Payments", "Hall bookings", "Company bills"] }]);
   });
   it("the general manager runs the hotel and can view the restaurant & bar, but not sell or change it", () => {
     const groups = visible("general_manager");
     expect(groups.map((g) => g.label)).toEqual(["Daily work", "Restaurant & bar", "Running the hotel"]);
     expect(groups[1]!.items).toEqual(["Orders & receipts", "Daily closing", "Stock", "Sales reports"]);
-    expect(groups[2]!.items).toEqual(["Dashboard", "Rates & room types", "Reports", "Booking rules"]);
+    expect(groups[2]!.items).toEqual(["Dashboard", "Approvals", "Rates & room types", "Reports", "Booking rules"]);
   });
   it("the calendar is for the front desk, hotel manager, GM and owner (I6)", () => {
     const has = (r: StaffRole) => visible(r).some((g) => g.items.includes("Calendar"));
@@ -37,7 +37,7 @@ describe("menu by role", () => {
     ]);
   });
   it("the owner also manages staff", () => {
-    expect(visible("owner").at(-1)).toEqual({ label: "Owner", items: ["Staff & access"] });
+    expect(visible("owner").at(-1)).toEqual({ label: "Owner", items: ["Owner's view", "Staff & access"] });
   });
 });
 

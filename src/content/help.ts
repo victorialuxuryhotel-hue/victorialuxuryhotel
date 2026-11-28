@@ -95,6 +95,21 @@ export const screenHelp: Record<string, ScreenHelp> = {
     task: "Book the hall",
     steps: ["New hall booking with the customer, date and times.", "Take the deposit or full payment.", "Print the invoice for the customer."],
   },
+  "/app/bills": {
+    purpose: "Company bills: bookings a company pays for before arrival. A bill is not a receipt.",
+    task: "Bill a company",
+    steps: ["Make the bookings first; they stay unpaid.", "New company bill: the company, who it's for, valid until, and tick the bookings.", "Print the bill or send it; record the payment on the bill when it arrives."],
+  },
+  "/app/approvals": {
+    purpose: "Refunds and exceptions waiting for you: refunds, no-shows, unpaid changes, guests left owing.",
+    task: "Decide what's waiting",
+    steps: ["Open Review on an item.", "Check what was paid and used, and set the amount if it's a refund.", "Give a reason, then approve or decline."],
+  },
+  "/app/owner": {
+    purpose: "The hotel at a glance on your phone. View only.",
+    task: "Check the day",
+    steps: ["Look at tonight's rooms and today's takings.", "Open anything under Anything wrong? to see what it is.", "Ask the GM or the desk to act on it from the hotel computers."],
+  },
   "/app/sales": {
     purpose: "The till: orders and payments at the restaurant and the bar.",
     task: "Take an order",

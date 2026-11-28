@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AccessDenied } from "@/components/management/access-denied";
 import { LoadingState } from "@/components/ui/feedback";
+import { can } from "@/lib/auth/permissions";
 import { formatDate, formatNaira } from "@/lib/format";
 import { actorOf, requireStaff } from "@/server/auth";
 import { getDb } from "@/server/db";
@@ -15,7 +16,7 @@ const short = (kobo: number) => (kobo >= 100_000_000 ? `₦${(kobo / 100_000_000
 /** The owner's phone dashboard (design X13; FUNCTIONALITY.md section 12). View only: no buttons that change anything. */
 async function Content() {
   const staff = await requireStaff();
-  if (staff.role !== "owner") return <AccessDenied />;
+  if (!can(staff.role, "staff.manage")) return <AccessDenied />;
   const s = await ownerSnapshot(await getDb(), actorOf(staff));
   const max = Math.max(1, ...s.week.map((d) => d.kobo));
   const updated = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" });
