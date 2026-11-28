@@ -60,7 +60,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         </p>
       ) : (
         <div className="lg:min-h-0 lg:flex-1">
-          <Till bar={{ businessDay: businessDayLabel(businessDate()), sales: mine.sales, salesKobo: mine.salesKobo, onStation: Boolean(staff.station) }} pay={pay} menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} taxId={settings?.tax_id ?? null} resume={resume} favourites={favourites} staffId={staff.id} fullScreenRole={staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager"} />
+          <Till bar={{ businessDay: businessDayLabel(businessDate()), sales: mine.sales, salesKobo: mine.salesKobo, onStation: Boolean(staff.station), sessionStartedAt: staff.sessionStartedAt }} pay={pay} menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} taxId={settings?.tax_id ?? null} resume={resume} favourites={favourites} staffId={staff.id} fullScreenRole={staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager"} />
         </div>
       )}
     </div>

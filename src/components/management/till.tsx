@@ -6,6 +6,7 @@ import { CheckCircle2, MessageSquare, Minus, Plus, Printer, Repeat2, Search, Tra
 import { Button } from "@/components/ui/button";
 import { FormMessage, Input, Select } from "@/components/ui/form";
 import { Segmented, Tabs } from "@/components/ui/choice";
+import { Popover } from "@/components/ui/popover";
 import { requestLock } from "./idle-lock";
 import { BankLine, type PaySettings } from "./offline-payment-form";
 import { formatNaira } from "@/lib/format";
@@ -102,7 +103,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   /** The hotel's bank details (shown for transfers) and POS terminals (section 2). */
   pay?: PaySettings;
   /** The dark till bar (design R2): business day, my sales, who's signed in. */
-  bar?: { businessDay: string; sales: number; salesKobo: number; onStation: boolean };
+  bar?: { businessDay: string; sales: number; salesKobo: number; onStation: boolean; sessionStartedAt?: string };
   /** Restaurant & bar staff get the full-screen till on any computer; others on a station set to a counter (I8). */
   fullScreenRole?: boolean;
   /** Each counter's best sellers, shown as a quick row above the menu. */
@@ -678,7 +679,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
 
           {step === "order" ? (
             <>
-              <TableOrName value={note} onChange={setNote} />
+              <TableOrName value={note} onChange={setNote} open={open} outlet={outlet} />
               {/* Pinned to the bottom of the order panel, so Pay is always on screen however long the order is. */}
               <div className="sticky bottom-0 -mx-5 -mb-5 grid gap-2 border-t border-hairline bg-white px-5 pt-3 pb-5">
                 {/* The one primary button on the till (R1): full width, 60px, at the foot of the order panel. */}
@@ -778,9 +779,34 @@ function TillBar({ bar, attendant, outlet, locked, onOutlet }: { bar: NonNullabl
       <span className="text-sm text-[#cfd6f0]">My sales <b className="text-white tabular-nums">{bar.sales} · {formatNaira(bar.salesKobo)}</b></span>
       <Link href="/app/sales/orders" className={link}>Orders</Link>
       <Link href="/app/sales/closing" className={link}>Close my day</Link>
-      <span className="flex items-center gap-2 border-l border-white/20 pl-3">
-        <span aria-hidden className="flex size-8 items-center justify-center rounded-full bg-gold-400 text-[13px] font-bold text-[#0b1f5c]">{initials}</span>
-        <span className="text-sm text-white">{first}</span>
+      <span className="border-l border-white/20 pl-3">
+        <Popover
+          label={`${attendant}'s till menu`}
+          role="menu"
+          triggerClassName="flex h-9 items-center gap-2 rounded-lg px-1 text-white hover:bg-white/10 pointer-coarse:h-11"
+          trigger={<><span aria-hidden className="flex size-8 items-center justify-center rounded-full bg-gold-400 text-[13px] font-bold text-[#0b1f5c]">{initials}</span><span className="text-sm">{first}</span><span aria-hidden className="text-xs">▾</span></>}
+          panelClassName="w-64 p-1"
+        >
+          {(close) => (
+            <>
+              <div className="border-b border-hairline px-3 py-2.5">
+                <p className="font-semibold text-ink-900">{attendant}</p>
+                <p className="text-xs text-ink-500">{OUTLETS[outlet]}{bar.sessionStartedAt ? ` · since ${new Date(bar.sessionStartedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" })}` : ""}</p>
+              </div>
+              {bar.onStation ? (
+                <button type="button" role="menuitem" onClick={() => { close(); requestLock(); }} className="block w-full rounded-md px-3 py-2 text-left hover:bg-ivory-100">
+                  <span className="block text-[15px] font-medium text-ink-900">Lock</span>
+                  <span className="block text-xs text-ink-500">Back to the names screen</span>
+                </button>
+              ) : null}
+              <Link role="menuitem" href="/app/sales/closing" onClick={close} className="block rounded-md px-3 py-2 text-[15px] text-ink-900 hover:bg-ivory-100">Close my day</Link>
+              <Link role="menuitem" href="/app/sales/orders" onClick={close} className="block rounded-md px-3 py-2 text-[15px] text-ink-900 hover:bg-ivory-100">Orders &amp; receipts</Link>
+              {bar.onStation ? (
+                <button type="button" role="menuitem" onClick={() => { close(); requestLock(); }} className="block w-full rounded-md px-3 py-2 text-left text-[15px] text-ink-900 hover:bg-ivory-100">Switch user</button>
+              ) : null}
+            </>
+          )}
+        </Popover>
       </span>
       {bar.onStation ? (
         <button type="button" onClick={requestLock} className="h-9 rounded-lg bg-gold-400 px-3.5 text-sm font-bold text-[#0b1f5c] pointer-coarse:h-11">Lock</button>
@@ -789,35 +815,66 @@ function TillBar({ bar, attendant, outlet, locked, onOutlet }: { bar: NonNullabl
   );
 }
 
-/** Table or name (design R2): a dropdown of tables, or type a name. */
-function TableOrName({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const isTable = TABLES.includes(value);
-  const [typing, setTyping] = useState(Boolean(value) && !isTable);
+/**
+ * Table or name (designs R2, D3): a dropdown of the tables, each showing whether it has an open order and for how
+ * much, and "Type a name…" for a customer's name.
+ */
+function TableOrName({ value, onChange, open, outlet }: { value: string; onChange: (v: string) => void; open: OpenOrder[]; outlet: Outlet }) {
+  const [name, setName] = useState(TABLES.includes(value) ? "" : value);
+  const openFor = (t: string) => open.filter((o) => o.outlet === outlet && (o.note ?? "") === t);
   return (
     <div>
-      <label htmlFor="till-table" className="mb-1.5 block text-xs font-semibold tracking-wide text-ink-500 uppercase">Table or name</label>
-      {typing ? (
-        <div className="flex gap-2">
-          <Input id="till-table" autoFocus value={value} onChange={(e) => onChange(e.target.value.slice(0, 120))} placeholder="Customer's name" className="min-w-0 flex-1" />
-          <Button variant="ghost" onClick={() => { setTyping(false); onChange(""); }}>Tables</Button>
-        </div>
-      ) : (
-        <Select
-          id="till-table"
-          value={isTable ? value : ""}
-          onChange={(e) => {
-            if (e.target.value === "__name") {
-              setTyping(true);
-              onChange("");
-            } else onChange(e.target.value);
-          }}
-          className="w-full"
-        >
-          <option value="">No table</option>
-          {TABLES.map((t) => <option key={t} value={t}>{t}</option>)}
-          <option value="__name">Type a name…</option>
-        </Select>
-      )}
+      <span className="mb-1.5 block text-xs font-semibold tracking-wide text-ink-500 uppercase">Table or name</span>
+      <Popover
+        label="Table or name"
+        align="stretch"
+        role="menu"
+        triggerClassName="flex h-11 w-full items-center justify-between rounded-lg border border-[#bdb7a8] bg-white px-3 text-[15px] text-ink-900"
+        trigger={<><span className={value ? "" : "text-ink-500"}>{value || "No table"}</span><span aria-hidden>▾</span></>}
+        panelClassName="top-auto bottom-[calc(100%+6px)] max-h-60 overflow-y-auto p-1"
+      >
+        {(close) => (
+          <>
+            <div className="sticky top-0 z-10 -mx-1 -mt-1 mb-1 flex gap-2 border-b border-hairline bg-white p-2">
+              <Input
+                aria-label="Customer's name"
+                placeholder="Type a name… e.g. Kunle"
+                value={name}
+                onChange={(e) => setName(e.target.value.slice(0, 120))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && name.trim()) {
+                    e.preventDefault();
+                    onChange(name.trim());
+                    close();
+                  }
+                }}
+                className="h-10 min-w-0 flex-1"
+              />
+              <Button size="sm" variant="secondary" disabled={!name.trim()} onClick={() => { onChange(name.trim()); close(); }}>Use</Button>
+            </div>
+            {TABLES.map((t) => {
+              const busy = openFor(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={value === t}
+                  onClick={() => { onChange(t); close(); }}
+                  className={cn("flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 text-left text-[15px] hover:bg-ivory-100", value === t && "bg-[#e8eefb] font-semibold")}
+                >
+                  <span>{t}</span>
+                  {busy.length ? <span className="text-xs font-semibold text-[#8a4b06]">Open · {formatNaira(busy.reduce((n, o) => n + o.total_kobo, 0))}</span> : null}
+                </button>
+              );
+            })}
+
+            {value ? (
+              <button type="button" onClick={() => { onChange(""); setName(""); close(); }} className="w-full px-3 py-2 text-left text-sm text-navy-700 hover:underline">No table</button>
+            ) : null}
+          </>
+        )}
+      </Popover>
     </div>
   );
 }
