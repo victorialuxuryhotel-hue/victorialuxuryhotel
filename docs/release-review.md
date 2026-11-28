@@ -477,3 +477,8 @@ These are deliberately **not final** in the app:
   room type, a state badge, who is in it and when they leave (red when overdue), and on the tile itself *Mark clean*
   for a room to clean or *Back in use* for one out of order. Tapping a room still opens all its actions; their
   wording now matches (Mark clean, Back in use, Mark out of order in the danger style). Arriving is violet.
+- Booking side panel (R104): white 400px panel with the reference, guest and status (and phone); the stay and money
+  as facts (Arrive, Leave, Room, Source, Total, Paid, Owes, Hold ends); "Owes ₦X. The room is only held until 18:00"
+  while a hold runs; overdue, attention and notes as coloured notes; Extend stay and Change room kept; at the foot
+  the one large next action (same rule as before), then *Open booking* and *Change dates*. Initials stay beside the
+  name (the e2e suite looks for them).
