@@ -629,3 +629,22 @@ These are deliberately **not final** in the app:
 - Staging `592208ea-8e18-49f6-8474-a22467a1b834`. Previous live `88491cb0-fba2-423a-9a24-9edf21f2e092`, new live
   `557ce088-7910-4b61-bae4-0a2e7b202bd1`. Smoke test passed. Rollback: deploy `88491cb0` (0033 stays; the old code
   ignores its new tables and columns).
+
+## Step 1f/2: staff screen gaps (Reports, Bookings, Guests, Ctrl L)
+
+- Reports (R303): the period adds *This week* (Monday to today, hotel date) and *Pick dates* (from and to, at most 92
+  days, ending today at the latest; checked on the server, with the reason shown when refused). Picked dates travel
+  as one `range` (`2026-11-02_2026-11-20`), so tabs, Export to Excel and the income CSV keep them. New tiles
+  *Average rate* (ADR) and *RevPAR*, on Money and Occupancy, from nights stayed: each confirmed, checked-in or
+  checked-out booking's booked nightly rate × its nights inside the period (early check-outs end as occupancy counts
+  them), less that share of its discount; ADR ÷ room-nights sold, RevPAR ÷ (rooms in service × nights). Money
+  received stays its own tile, now labelled *Money received*; the old *Rooms received* tile is gone (rooms money
+  received is still in By department). DB tests cover a booking over each edge, a discount and an early check-out.
+- Bookings (R101): *Past* (checked out or no-show) and *Cancelled* (cancelled or expired) tabs with counts, newest
+  first, beside the existing tabs. The status filter (D2) takes several statuses (`status=confirmed,checked_in`);
+  ticking keeps the menu open and the list updates when it closes. Unknown statuses are dropped on the server.
+- Guests (R106): a sort menu in the card header, *Most recent first* (last stay, or the day added; the default) or
+  *Name A–Z*; kept in the address with the search and pages.
+- Ctrl L: the design (D1) shows it on *Lock screen* in the account menu, not on booking search. On a shared station
+  Ctrl L now locks the screen (keeps the person signed in) and the menu shows "Ctrl L ·" on keyboard computers; with
+  a personal sign-in Ctrl L is left to the browser, as there is no lock screen there.
