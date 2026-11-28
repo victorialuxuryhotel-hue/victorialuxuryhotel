@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
-import { Minus, Plus } from "lucide-react";
+import { useId, useRef, useState, useSyncExternalStore } from "react";
+import { ChevronDown } from "lucide-react";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { buttonStyles } from "@/components/ui/button";
-import { formatNaira, plural } from "@/lib/format";
+import { Popover } from "@/components/ui/popover";
+import { formatDate, formatNaira, plural } from "@/lib/format";
 import { tonight } from "@/lib/hotel-date";
 import { cn } from "@/lib/utils/cn";
+import { GuestsPicker, MAX_GUESTS, partyLabel, type Party } from "./guests-picker";
+import { RangeCalendar } from "./range-calendar";
 
 function isoDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -20,111 +24,202 @@ function addDays(iso: string, days: number) {
   return isoDate(d);
 }
 
-const MIN_GUESTS = 1;
-const MAX_GUESTS = 6;
+const short = (iso: string) => (iso ? formatDate(iso, { year: false }) : "Choose");
+/** "Sat 5 – Mon 7 Dec" (design M1). */
+function rangeLabel(a: string, b: string) {
+  if (!a || !b) return "Choose dates";
+  const sameMonth = a.slice(0, 7) === b.slice(0, 7);
+  const from = formatDate(a, { year: false });
+  return `${sameMonth ? from.replace(/ \w+$/, "") : from} – ${formatDate(b, { year: false })}`;
+}
 
+const openPicker = (e: React.MouseEvent<HTMLInputElement>) => {
+  try {
+    e.currentTarget.showPicker?.();
+  } catch {
+    // Some browsers only open the picker from the icon; the field still works by keyboard.
+  }
+};
+
+/**
+ * The date and guests search (designs G1, G2, G3, M1, D4, D5). It submits `checkIn`, `checkOut` and
+ * `guests` (adults and children together) to /book, as before.
+ * - `bar`: one row on a computer (Arrive · Leave · Guests · See rooms); stacked on a phone.
+ * - `card`: the room page's booking box, with the price for the chosen nights.
+ */
 export function BookingBar({
-  variant = "floating",
+  variant = "bar",
   defaults,
   nightlyKobo,
+  room,
+  collapsible,
+  className,
 }: {
-  variant?: "floating" | "inline" | "stacked";
+  variant?: "bar" | "card";
   /** Show what the chosen dates cost at this nightly rate. */
   nightlyKobo?: number;
+  /** On a room page: its name, slug and how many it sleeps, so /book opens with it chosen. */
+  room?: { slug: string; name?: string; sleeps?: number };
+  /** On a phone, show one line ("Sat 5 – Mon 7 Dec · 2 adults  Change") until the guest asks to change it (M4). */
+  collapsible?: boolean;
+  className?: string;
   defaults?: { checkIn?: string; checkOut?: string; guests?: string };
 }) {
   // Lagos time with the 06:00 cut-off, whatever the visitor's own clock or time zone says.
   const today = useSyncExternalStore(noopSubscribe, () => tonight(), () => "");
   const [checkInValue, setCheckIn] = useState(defaults?.checkIn ?? "");
   const [checkOutValue, setCheckOut] = useState(defaults?.checkOut ?? "");
-  const [guests, setGuests] = useState(() => Math.min(MAX_GUESTS, Math.max(MIN_GUESTS, Number(defaults?.guests) || 2)));
+  const [party, setParty] = useState<Party>(() => ({ adults: Math.min(MAX_GUESTS, Math.max(1, Number(defaults?.guests) || 2)), children: 0 }));
+  const [sheet, setSheet] = useState<"dates" | "guests" | null>(null);
+  const [expanded, setExpanded] = useState(!collapsible);
+  const id = useId();
+  const datesButton = useRef<HTMLButtonElement>(null);
+  const guestsButton = useRef<HTMLButtonElement>(null);
   const checkIn = checkInValue || today;
   const checkOut = checkOutValue || addDays(checkIn, 1);
-  const row = variant !== "stacked";
+  const guests = party.adults + party.children;
   const nights = checkIn && checkOut ? Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 864e5) : 0;
+  const card = variant === "card";
+  const note = room?.name && room.sleeps ? `${room.name} sleeps ${room.sleeps}` : undefined;
 
-  const label = "text-xs font-semibold uppercase tracking-[0.16em] text-ink-500 sm:text-xs sm:tracking-[0.18em]";
-  const field = "mt-0.5 block w-full min-w-0 border-0 bg-transparent p-0 text-base font-medium text-navy-950 focus:outline-none focus:ring-0 sm:mt-1";
-  const cell = "flex min-w-0 items-center gap-3 bg-white px-3 py-2.5 sm:px-[18px] sm:py-3.5";
-  const stepButton =
-    "flex size-11 items-center justify-center rounded-md text-gold-600 hover:bg-ivory-100 disabled:text-ink-300 disabled:hover:bg-transparent";
+  const label = "text-xs font-semibold text-muted";
+  const box = "relative flex h-11 items-center justify-between gap-2.5 rounded-lg border border-[#bdb7a8] bg-white px-3 text-sm text-ink-900 focus-within:border-navy-700 focus-within:ring-2 focus-within:ring-navy-700/20";
+  const dateInput = "absolute inset-0 size-full cursor-pointer opacity-0";
+
+  const setDates = (a: string, b: string) => {
+    setCheckIn(a);
+    setCheckOut(b);
+  };
+  const changeIn = (v: string) => {
+    setCheckIn(v);
+    if (v && checkOut <= v) setCheckOut(addDays(v, 1));
+  };
+
+  const guestsPopover = (trigger: React.ReactNode, triggerClassName: string, align: "end" | "stretch") => (
+    <Popover label="Who's staying?" trigger={trigger} triggerClassName={triggerClassName} align={align} panelClassName="w-[22rem] max-w-[calc(100vw-2rem)] px-4 pt-1.5 pb-3">
+      {(close) => <GuestsPicker party={party} onChange={setParty} onDone={close} note={note} />}
+    </Popover>
+  );
+
+  const total =
+    nightlyKobo && nights > 0 ? (
+      <p aria-live="polite" className="flex justify-between gap-4 border-t border-hairline pt-2 text-[15px] tabular-nums">
+        <span>{plural(nights, "night")}</span>
+        <b>{formatNaira(nightlyKobo * nights)}</b>
+      </p>
+    ) : null;
 
   return (
-    <form
-      action="/book"
-      method="get"
-      data-booking-search
-      className={cn(
-        "grid grid-cols-2 gap-px overflow-hidden rounded-card bg-ivory-200",
-        row && "sm:grid-cols-[1fr_1fr_0.8fr_auto]",
-        variant === "floating" && "sm:shadow-float",
-        variant !== "floating" && "border border-hairline",
-      )}
-    >
-      <label className={cell}>
-        <span className="min-w-0 flex-1">
-          <span className={label}>Check-in</span>
-          <input
-            type="date"
-            name="checkIn"
-            required
-            min={today || undefined}
-            value={checkIn}
-            onChange={(e) => {
-              const v = e.target.value;
-              setCheckIn(v);
-              if (v && checkOut <= v) setCheckOut(addDays(v, 1));
-            }}
-            className={field}
-          />
-        </span>
-      </label>
-      <label className={cell}>
-        <span className="min-w-0 flex-1">
-          <span className={label}>Check-out</span>
-          <input
-            type="date"
-            name="checkOut"
-            required
-            min={addDays(checkIn, 1) || undefined}
-            value={checkOut}
-            onChange={(e) => setCheckOut(e.target.value)}
-            className={field}
-          />
-        </span>
-      </label>
-      <div className={cn("col-span-2 grid gap-px", row ? "grid-cols-[1fr_auto] sm:col-span-1 sm:contents" : "grid-cols-1")}>
-        <div className={cn(cell, "justify-between py-1 pr-1 sm:py-4 sm:pr-2")} role="group" aria-labelledby="guests-label">
-          <span className="min-w-0 flex-1">
-            <span id="guests-label" className={label}>Guests</span>
-            <output className="block text-base font-medium text-navy-950" aria-live="polite">
-              {guests} {guests === 1 ? "guest" : "guests"}
-            </output>
-          </span>
-          <input type="hidden" name="guests" value={guests} />
-          <span className="flex shrink-0">
-            <button type="button" className={stepButton} aria-label="Fewer guests" disabled={guests <= MIN_GUESTS} onClick={() => setGuests((g) => Math.max(MIN_GUESTS, g - 1))}>
-              <Minus className="size-4" aria-hidden />
-            </button>
-            <button type="button" className={stepButton} aria-label="More guests" disabled={guests >= MAX_GUESTS} onClick={() => setGuests((g) => Math.min(MAX_GUESTS, g + 1))}>
-              <Plus className="size-4" aria-hidden />
-            </button>
-          </span>
+    <>
+      {collapsible && !expanded ? (
+        <div className={cn("flex items-center justify-between gap-3 rounded-xl border border-hairline bg-white py-1 pr-1 pl-4 lg:hidden", className)}>
+          <p className="min-w-0 text-sm text-ink-900 tabular-nums">
+            {checkInValue ? <><b>{rangeLabel(checkIn, checkOut)}</b> · {partyLabel(party)}</> : "Add your dates to see what's free"}
+          </p>
+          <button type="button" onClick={() => setExpanded(true)} aria-controls={`${id}-search`} className="inline-flex min-h-11 shrink-0 items-center px-3 text-sm font-semibold text-navy-700">
+            {checkInValue ? "Change" : "Add dates"}
+          </button>
         </div>
-        <button
-          type="submit"
-          className={buttonStyles({ variant: "accent", size: "lg", className: "h-auto min-h-12 rounded-none border-0 px-5 text-[15px] sm:px-6 sm:py-4" })}
-        >
-          <span className="sm:hidden">Search</span>
-          <span className="hidden sm:inline">Check availability</span>
-        </button>
-      </div>
-      {nightlyKobo && nights > 0 ? (
-        <p aria-live="polite" className="col-span-2 flex justify-between gap-4 bg-white px-3 py-3 text-sm text-ink-600 tabular-nums">
-          <span>{formatNaira(nightlyKobo)} × {plural(nights, "night")}</span>
-          <span className="font-semibold text-navy-950">{formatNaira(nightlyKobo * nights)}</span>
-        </p>
       ) : null}
-    </form>
+      <form
+        id={`${id}-search`}
+        action="/book"
+        method="get"
+        data-booking-search
+        className={cn(
+          "font-sans tabular-nums",
+          collapsible && !expanded && "max-lg:hidden",
+          card ? "flex flex-col gap-3" : "flex flex-col gap-2.5 rounded-xl bg-white p-3 lg:flex-row lg:items-center lg:gap-0 lg:py-3.5 lg:pr-3.5 lg:pl-0",
+          !card && "shadow-[0_10px_30px_rgba(11,31,92,0.18)]",
+          className,
+        )}
+      >
+        <input type="hidden" name="checkIn" value={checkIn} />
+        <input type="hidden" name="checkOut" value={checkOut} />
+        <input type="hidden" name="guests" value={guests} />
+        {room ? <input type="hidden" name="room" value={room.slug} /> : null}
+
+        {/* Phone: dates and guests open bottom sheets (M1, D5). */}
+        <div className="flex flex-col gap-1 lg:hidden">
+          <span className={label} id={`${id}-dates-label`}>Dates</span>
+          <button ref={datesButton} type="button" data-dates-trigger aria-labelledby={`${id}-dates-label ${id}-dates-value`} onClick={() => setSheet("dates")} className={box}>
+            <span id={`${id}-dates-value`}>{rangeLabel(checkIn, checkOut)}</span>
+            <ChevronDown className="size-4 text-muted" aria-hidden />
+          </button>
+        </div>
+        <div className="flex flex-col gap-1 lg:hidden">
+          <span className={label} id={`${id}-guests-label-m`}>Guests</span>
+          <button ref={guestsButton} type="button" aria-labelledby={`${id}-guests-label-m ${id}-guests-value-m`} onClick={() => setSheet("guests")} className={box}>
+            <span id={`${id}-guests-value-m`}>{partyLabel(party)}</span>
+            <ChevronDown className="size-4 text-muted" aria-hidden />
+          </button>
+        </div>
+
+        {/* Computer. */}
+        {card ? (
+          <>
+            <div className="hidden grid-cols-2 gap-2.5 lg:grid">
+              <label className="flex flex-col gap-1">
+                <span className={label}>Arrive</span>
+                <span className={box}>
+                  {short(checkIn)}
+                  <ChevronDown className="size-4 text-muted" aria-hidden />
+                  <input type="date" required min={today || undefined} value={checkIn} onChange={(e) => changeIn(e.target.value)} onClick={openPicker} className={dateInput} />
+                </span>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className={label}>Leave</span>
+                <span className={box}>
+                  {short(checkOut)}
+                  <ChevronDown className="size-4 text-muted" aria-hidden />
+                  <input type="date" required min={addDays(checkIn, 1) || undefined} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} onClick={openPicker} className={dateInput} />
+                </span>
+              </label>
+            </div>
+            <div className="hidden flex-col gap-1 lg:flex">
+              <span className={label}>Guests</span>
+              {guestsPopover(<><span>{partyLabel(party)}</span><ChevronDown className="size-4 text-muted" aria-hidden /></>, cn(box, "w-full"), "stretch")}
+            </div>
+          </>
+        ) : (
+          <>
+            <label className="relative hidden flex-1 flex-col gap-1 border-r border-hairline px-[18px] focus-within:bg-ivory-100 lg:flex">
+              <span className={label}>Arrive</span>
+              <span className="text-base font-semibold">{short(checkIn)}</span>
+              <input type="date" required min={today || undefined} value={checkIn} onChange={(e) => changeIn(e.target.value)} onClick={openPicker} className={dateInput} />
+            </label>
+            <label className="relative hidden flex-1 flex-col gap-1 border-r border-hairline px-[18px] focus-within:bg-ivory-100 lg:flex">
+              <span className={label}>Leave</span>
+              <span className="text-base font-semibold">{short(checkOut)}{nights > 0 ? ` · ${plural(nights, "night")}` : ""}</span>
+              <input type="date" required min={addDays(checkIn, 1) || undefined} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} onClick={openPicker} className={dateInput} />
+            </label>
+            <div className="hidden flex-1 border-r border-hairline lg:block">
+              {guestsPopover(
+                <>
+                  <span className={label}>Guests</span>
+                  <span className="text-base font-semibold">{partyLabel(party)}</span>
+                </>,
+                "flex w-full flex-col items-start gap-1 px-[18px] text-left hover:bg-ivory-100",
+                "stretch",
+              )}
+            </div>
+          </>
+        )}
+
+        {card ? total : null}
+        <button type="submit" className={buttonStyles({ size: "lg", className: cn("w-full", !card && "mt-1 lg:mt-0 lg:ml-3.5 lg:w-auto") })}>
+          {card ? "Book this room" : "See rooms"}
+        </button>
+      </form>
+
+      <BottomSheet open={sheet === "dates"} onClose={() => setSheet(null)} title="When are you staying?" trigger={datesButton}>
+        <RangeCalendar start={checkIn} end={checkOut} min={today} onChange={setDates} />
+        <button type="button" onClick={() => setSheet(null)} className={buttonStyles({ size: "lg", className: "mt-3 w-full" })}>Done</button>
+      </BottomSheet>
+      <BottomSheet open={sheet === "guests"} onClose={() => setSheet(null)} title="Who's staying?" trigger={guestsButton}>
+        <GuestsPicker party={party} onChange={setParty} onDone={() => setSheet(null)} large />
+        {note ? <p className="mt-2 text-center text-[13px] text-muted">{note}</p> : null}
+      </BottomSheet>
+    </>
   );
 }

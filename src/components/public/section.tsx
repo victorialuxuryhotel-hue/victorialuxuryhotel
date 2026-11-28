@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
 
+/** Page width of the 28 Nov designs: 1440 wide with 64px sides on a computer, 16px on a phone. */
 export function Container({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn("mx-auto w-full max-w-6xl px-4 sm:px-6", className)}>{children}</div>;
+  return <div className={cn("mx-auto w-full max-w-360 px-4 lg:px-16", className)}>{children}</div>;
 }
 
 export function Section({
@@ -17,44 +18,44 @@ export function Section({
   id?: string;
 }) {
   const tones = {
-    light: "bg-ivory-50",
+    light: "bg-white",
     ivory: "bg-ivory-100",
-    navy: "bg-navy-950 text-ivory-50",
+    navy: "bg-[#0b1f5c] text-white",
   };
   return (
-    <section id={id} className={cn("py-16 sm:py-24", tones[tone], className)}>
+    <section id={id} className={cn("py-7 lg:py-18", tones[tone], className)}>
       <Container>{children}</Container>
     </section>
   );
 }
 
 export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <p className={cn("flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.25em] text-gold-600", className)}>
-      <span aria-hidden className="h-px w-7 bg-current" />
-      {children}
-    </p>
-  );
+  return <p className={cn("text-xs font-semibold tracking-[0.14em] text-gold-500 uppercase lg:text-[13px]", className)}>{children}</p>;
 }
 
+/** An eyebrow, a serif headline (32px on a phone, 44px on a computer) and an optional intro. */
 export function SectionHeading({
   eyebrow,
   title,
   intro,
   align = "left",
   invert,
+  as: Tag = "h2",
+  className,
 }: {
   eyebrow?: string;
   title: string;
   intro?: string;
   align?: "left" | "center";
   invert?: boolean;
+  as?: "h1" | "h2";
+  className?: string;
 }) {
   return (
-    <div className={cn("max-w-2xl", align === "center" && "mx-auto text-center")}>
-      {eyebrow ? <Eyebrow className={cn(align === "center" && "justify-center", invert && "text-gold-300")}>{eyebrow}</Eyebrow> : null}
-      <h2 className={cn("mt-3 font-display text-[2rem] leading-[1.1] font-medium sm:text-[2.75rem]", invert ? "text-ivory-50" : "text-navy-950")}>{title}</h2>
-      {intro ? <p className={cn("mt-4 text-base leading-relaxed sm:text-lg", invert ? "text-ivory-200/80" : "text-ink-600")}>{intro}</p> : null}
+    <div className={cn("max-w-3xl", align === "center" && "mx-auto text-center", className)}>
+      {eyebrow ? <Eyebrow className={cn("mb-1.5", invert && "text-gold-200")}>{eyebrow}</Eyebrow> : null}
+      <Tag className={cn("font-display text-[32px] leading-[1.1] font-semibold lg:text-[44px]", invert ? "text-white" : "text-ink-900")}>{title}</Tag>
+      {intro ? <p className={cn("mt-3 text-base leading-relaxed", invert ? "text-[#d3d9ee]" : "text-muted")}>{intro}</p> : null}
     </div>
   );
 }

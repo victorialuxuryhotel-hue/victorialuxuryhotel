@@ -19,7 +19,7 @@ async function Content({ searchParams }: Props) {
   return (
     <>
       <div className="mt-4"><StaySummaryBar checkIn={stay.checkIn} checkOut={stay.checkOut} guests={guests} nights={options[0]!.nights} /></div>
-      <div className="mt-6"><RoomResults options={options} stay={stay} selectHref={() => "/preview/book/details"} /></div>
+      <div className="mt-6"><RoomResults options={options} stay={stay} detailsPath="/preview/book/details" /></div>
     </>
   );
 }

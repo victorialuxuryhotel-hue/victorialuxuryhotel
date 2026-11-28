@@ -29,16 +29,16 @@ export function StickyBookBar() {
   function openSearch() {
     const form = document.querySelector<HTMLElement>("[data-booking-search]");
     form?.scrollIntoView({ behavior: "smooth", block: "center" });
-    form?.querySelector<HTMLInputElement>("input:not([type=hidden])")?.focus({ preventScroll: true });
+    form?.querySelector<HTMLButtonElement>("[data-dates-trigger]")?.click();
   }
 
   if (hidden) return null;
   return (
     <>
-      <div aria-hidden className="h-20 bg-navy-950 md:hidden" />
+      <div aria-hidden className="h-20 bg-[#0b1f5c] lg:hidden" />
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-ivory-50/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden",
+          "fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-white px-4 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] transition-transform duration-200 ease-out motion-reduce:transition-none lg:hidden",
           show ? "translate-y-0" : "pointer-events-none translate-y-full",
         )}
         aria-hidden={!show}
@@ -51,11 +51,11 @@ export function StickyBookBar() {
             </p>
           )}
           {onRooms ? (
-            <button type="button" tabIndex={show ? 0 : -1} onClick={openSearch} className={buttonStyles({ variant: "accent", size: "lg", className: "w-full px-4" })}>
+            <button type="button" tabIndex={show ? 0 : -1} onClick={openSearch} className={buttonStyles({ size: "lg", className: "w-full px-4" })}>
               Add dates to see what&apos;s free
             </button>
           ) : (
-            <Link href="/book" tabIndex={show ? 0 : -1} className={buttonStyles({ variant: "accent", size: "lg", className: "shrink-0 px-4 whitespace-nowrap min-[360px]:px-5" })}>
+            <Link href="/book" tabIndex={show ? 0 : -1} className={buttonStyles({ size: "lg", className: "shrink-0 px-4 whitespace-nowrap min-[360px]:px-5" })}>
               Check availability
             </Link>
           )}

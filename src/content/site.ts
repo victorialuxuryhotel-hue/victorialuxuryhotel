@@ -18,8 +18,7 @@ export type Photo = { image?: string; alt: string; shot?: string };
 export const home = {
   eyebrow: "Alagbaka GRA · Akure",
   title: "Where every guest is treated as royalty",
-  intro:
-    "An exclusive indoor pool, an in-house spa and a relaxed lounge and bar, in the heart of Alagbaka GRA. Book direct for instant confirmation.",
+  intro: "An exclusive indoor pool, an in-house spa and a relaxed lounge and bar. Book direct for instant confirmation.",
   facts: "Indoor pool, in-house spa, lounge and bar. 24/7 power and free Wi-Fi.",
   hero: {
     alt: "Victoria Luxury Hotel at dusk",
@@ -57,6 +56,18 @@ export const onSite: Array<{ slot: "pool" | "lounge" | "restaurant" | "club"; ti
   { slot: "lounge", title: "Lounge", text: "An evening drink, an easy meeting, or a quiet moment to yourself.", alt: "The lounge" },
   { slot: "restaurant", title: "Restaurant", text: "Dining on site for breakfast, lunch and dinner.", alt: "The restaurant" },
   { slot: "club", title: "Club", text: "Indoor and outdoor lounge for the evening.", alt: "The club" },
+];
+
+/** The home page's "Comfort, care and everything on site" tiles (design G1). */
+export const homeTiles: Array<{ name: string; text: string }> = [
+  { name: "24/7 power", text: "Uninterrupted, day and night" },
+  { name: "Free Wi-Fi", text: "Every room" },
+  { name: "Parking", text: "On site" },
+  { name: "Airport shuttle", text: "Ask the front desk" },
+  { name: "Spa", text: "Heated room, body scrub" },
+  { name: "Conference room", text: "Meetings and trainings" },
+  { name: "Laundry", text: "Short and long stays" },
+  { name: "Club", text: "Indoor and outdoor lounge" },
 ];
 
 export const facilities: Array<{ name: string; text: string; icon: LucideIcon }> = [

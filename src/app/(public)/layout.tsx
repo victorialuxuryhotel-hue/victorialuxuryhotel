@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { BookingHeader } from "@/components/public/booking-header";
 import { ChromeSwitch } from "@/components/public/chrome-switch";
 import { guestFont } from "@/components/public/guest-font";
 import { HotelSchema } from "@/components/public/hotel-schema";
@@ -9,11 +8,9 @@ import { StickyBookBar } from "@/components/public/sticky-book-bar";
 
 export default function PublicLayout({ children }: LayoutProps<"/">) {
   return (
-    <div className={`guest ${guestFont.variable} flex flex-1 flex-col`}>
+    <div className={`guest ${guestFont.variable} flex flex-1 flex-col bg-white`}>
       <div className="contents print:hidden">
-        <Suspense fallback={<SiteHeader />}>
-          <ChromeSwitch site={<SiteHeader />} booking={<BookingHeader />} />
-        </Suspense>
+        <SiteHeader />
       </div>
       <main className="flex flex-1 flex-col">{children}</main>
       <div className="contents print:hidden">

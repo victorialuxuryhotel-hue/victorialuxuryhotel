@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AutoRefresh } from "@/components/booking/auto-refresh";
+import { Steps } from "@/components/booking/booking-ui";
 import { BookingConfirmed, PaymentFailed, PaymentPending } from "@/components/booking/outcome";
 import { Container } from "@/components/public/section";
 import { buttonStyles } from "@/components/ui/button";
@@ -32,22 +33,25 @@ async function Outcome({ params }: { params: Promise<{ token: string }> }) {
   if (b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") {
     const rules = await publicBookingRules();
     return (
+      <>
+      <div className="mx-auto w-full max-w-[760px] pb-1 lg:flex lg:justify-center lg:pb-0"><Steps current={3} /></div>
       <BookingConfirmed
         stay={{
           reference: b.reference, guestName: b.guest.full_name, email: b.guest.email ?? "", category: b.roomCategory, room: b.room,
           checkIn: b.check_in, checkOut: b.check_out, nights: b.nights ?? 0, guests: b.guest_count, paidKobo: b.paidKobo,
           receiptNumber: b.receipt ?? "", checkInTime: checkInWhen(rules.checkInTime), checkOutTime: checkOutWhen(rules.checkOutTime),
-          token, siteUrl: publicEnv().NEXT_PUBLIC_SITE_URL,
+          token, siteUrl: publicEnv().NEXT_PUBLIC_SITE_URL, photo: b.photo,
         }}
       />
+      </>
     );
   }
 
   if (b.attention_reason) {
     return (
       <div className="mx-auto max-w-xl text-center">
-        <h1 className="font-display text-4xl text-navy-950">We&apos;re checking your payment</h1>
-        <p className="mt-3 text-ink-600">
+        <h1 className="font-display text-[34px] leading-tight font-semibold text-ink-900">We&apos;re checking your payment</h1>
+        <p className="mt-3 text-muted">
           Our team is reviewing booking <span className="font-mono">{b.reference}</span> and will contact you shortly. Please don&apos;t pay again. You can reach us on {hotel.phoneDisplay}.
         </p>
       </div>
@@ -64,26 +68,26 @@ async function Outcome({ params }: { params: Promise<{ token: string }> }) {
   }
 
   if (b.status === "pending_payment" && b.holdActive) {
-    return <PaymentFailed retryHref={`/book/review/${token}`} />;
+    return <PaymentFailed retryHref={`/book/review/${token}`} category={b.category.name} holdUntil={b.hold_expires_at ?? undefined} />;
   }
 
   const paid = b.paidKobo > 0;
   return (
     <div className="mx-auto max-w-xl text-center">
-      <h1 className="font-display text-4xl text-navy-950">{paid ? "We've received your payment" : "This booking hold has ended"}</h1>
-      <p className="mt-3 text-ink-600">
+      <h1 className="font-display text-[34px] leading-tight font-semibold text-ink-900">{paid ? "We've received your payment" : "This booking hold has ended"}</h1>
+      <p className="mt-3 text-muted">
         {paid
           ? `Our team will contact you shortly about booking ${b.reference}. You can also reach us on ${hotel.phoneDisplay}.`
           : "Payment wasn't completed in time, so the room was released. You're welcome to search again."}
       </p>
-      <Link href={paid ? "/contact" : "/book"} className={buttonStyles({ className: "mt-8" })}>{paid ? "Contact the hotel" : "Search again"}</Link>
+      <Link href={paid ? "/contact" : "/book"} className={buttonStyles({ className: "mx-auto mt-8 flex" })}>{paid ? "Contact the hotel" : "Search again"}</Link>
     </div>
   );
 }
 
 export default function ConfirmationPage(props: PageProps<"/book/confirmation/[token]">) {
   return (
-    <Container className="py-12 sm:pb-18">
+    <Container className="flex flex-col gap-4 pt-0 pb-10 lg:gap-[22px] lg:pt-8 lg:pb-16">
       <Suspense fallback={<PaymentPending reference="" />}>
         <Outcome params={props.params} />
       </Suspense>

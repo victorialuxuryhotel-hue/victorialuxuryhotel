@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { BookingBar } from "@/components/public/booking-bar";
 import { Photo } from "@/components/public/photo";
 import { PhotoStrip } from "@/components/public/photo-strip";
 import { RoomPriceBar } from "@/components/public/room-price-bar";
-import { Container, Section } from "@/components/public/section";
+import { Container } from "@/components/public/section";
+import { Badge } from "@/components/ui/badge";
 import { hotel } from "@/config/hotel";
 import { formatNaira } from "@/lib/format";
-import { getPublicCategories, getPublicCategory } from "@/server/queries/catalogue";
+import { getPublicCategory } from "@/server/queries/catalogue";
+import { publicBookingRules } from "@/server/queries/booking";
 
 const included = ["Free Wi-Fi", "24/7 power", "Access to the indoor pool", "On-site parking", "Laundry service", "Airport shuttle on request"];
 
@@ -30,9 +32,9 @@ export default function RoomTypePage(props: PageProps<"/rooms/[slug]">) {
   return (
     <Suspense
       fallback={
-        <Container className="py-12">
-          <div className="aspect-[16/7] animate-pulse rounded-card bg-ivory-200" />
-          <div className="mt-10 h-10 w-64 animate-pulse rounded bg-ivory-200" />
+        <Container className="py-8">
+          <div className="h-60 animate-pulse rounded-xl bg-ivory-200 lg:h-[440px]" />
+          <div className="mt-8 h-10 w-64 animate-pulse rounded bg-ivory-200" />
         </Container>
       }
     >
@@ -41,84 +43,76 @@ export default function RoomTypePage(props: PageProps<"/rooms/[slug]">) {
   );
 }
 
+/** Designs G3 (computer), M5 (phone), D4 and D5 (the guests picker). */
 async function RoomType({ params }: { params: Promise<{ slug: string }> }) {
   const c = await getPublicCategory((await params).slug);
   if (!c) notFound();
-  const others = (await getPublicCategories()).filter((o) => o.slug !== c.slug);
+  const rules = await publicBookingRules().catch(() => null);
   const [cover, ...rest] = c.photos;
-
   const amenities = [...new Set([...c.amenities, ...included])];
+  const chips = [`Sleeps ${c.maxOccupancy}`, ...c.amenities.slice(0, 2)];
+  const freeCancel = rules ? `Free cancellation up to ${rules.freeCancelHours} hours before arrival.` : null;
 
   return (
     <>
-      <Container className="pt-6">
-        <Link href="/rooms" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-ink-500 hover:text-navy-800">
+      <PhotoStrip
+        label={`Photos of ${c.name}`}
+        overlay={
+          <Link href="/rooms" aria-label="All rooms" className="absolute top-3 left-3 flex size-11 items-center justify-center rounded-full bg-white/90 text-ink-900 shadow-sm">
+            <ArrowLeft className="size-5" aria-hidden />
+          </Link>
+        }
+      >
+        {(c.photos.length ? c.photos : [{ alt: c.name }]).map((p, i) => (
+          <Photo key={i} photo={p} priority={i === 0} sizes="100vw" className="h-60" />
+        ))}
+      </PhotoStrip>
+
+      <Container className="flex flex-col gap-6 pt-5 pb-10 lg:pt-8 lg:pb-18">
+        <Link href="/rooms" className="hidden min-h-11 w-fit items-center gap-1.5 text-sm text-navy-700 hover:underline lg:inline-flex">
           <ArrowLeft className="size-4" aria-hidden /> All rooms
         </Link>
-        <div className="mt-2">
-          <PhotoStrip label={`Photos of ${c.name}`}>
-            {(c.photos.length ? c.photos : [{ alt: c.name }]).map((p, i) => (
-              <Photo key={i} photo={p} priority={i === 0} sizes="88vw" className="aspect-[4/3] rounded-card" />
-            ))}
-          </PhotoStrip>
+        {/* The cover, and up to 2 more beside it (only photos the room type has). */}
+        <div className={`hidden h-[440px] gap-3 lg:grid ${rest.length ? "grid-cols-[2fr_1fr]" : ""}`}>
+          <Photo photo={cover ?? { alt: c.name }} priority sizes="66vw" className="h-full rounded-xl" />
+          {rest.length ? (
+            <div className="grid gap-3" style={{ gridTemplateRows: `repeat(${Math.min(rest.length, 2)}, minmax(0, 1fr))` }}>
+              {rest.slice(0, 2).map((p, i) => (
+                <Photo key={i} photo={p} sizes="33vw" className="h-full rounded-xl" />
+              ))}
+            </div>
+          ) : null}
         </div>
-        {/* Up to 4 frames: the cover, and up to 3 more beside it (only photos the room type has). */}
-        <div className={`hidden gap-2.5 sm:grid ${rest.length ? "grid-cols-[2fr_1fr]" : ""}`} style={rest.length ? { gridTemplateRows: `repeat(${Math.min(rest.length, 3)}, minmax(0, 1fr))` } : undefined}>
-          <Photo photo={cover ?? { alt: c.name }} priority sizes="66vw" className="row-span-full aspect-[4/3] rounded-card" />
-          {rest.slice(0, 3).map((p, i) => (
-            <Photo key={i} photo={p} sizes="33vw" className="h-full rounded-card" />
-          ))}
-        </div>
-      </Container>
 
-      <Section className="pt-6 pb-16 sm:pt-9 sm:pb-16">
-        <div className="flex flex-col gap-10 lg:flex-row lg:items-start">
-          <div className="min-w-0 flex-1">
-            <h1 className="font-display text-4xl leading-[1.05] text-navy-950">{c.name}</h1>
-            <p className="mt-2.5 text-sm text-ink-600">
-              Sleeps up to {c.maxOccupancy} · from <span className="font-semibold text-navy-950 tabular-nums">{formatNaira(c.fromRateKobo)}</span> per night
-            </p>
-            {c.summary ? <p className="mt-6 text-lg leading-relaxed text-ink-700">{c.summary}</p> : null}
-            {c.description ? <div className="mt-4 space-y-4 leading-relaxed whitespace-pre-line text-ink-600">{c.description}</div> : null}
-
-            <section className="mt-9">
-              <h2 className="font-display text-[1.625rem] text-navy-950">What&apos;s included</h2>
-              <ul className="mt-3.5 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-6 gap-y-2.5 text-sm">
-                {amenities.map((a) => (
-                  <li key={a} className="flex items-center gap-2.5 text-ink-700"><Check className="size-4 shrink-0 text-gold-500" aria-hidden /> {a}</li>
-                ))}
+        <div className="grid items-start gap-8 lg:grid-cols-[1fr_400px] lg:gap-12">
+          <div className="flex min-w-0 flex-col gap-4 lg:gap-[18px]">
+            <h1 className="font-display text-[40px] leading-[1.05] font-semibold text-ink-900 lg:text-[52px]">{c.name}</h1>
+            <ul className="flex flex-wrap gap-2" aria-label="At a glance">
+              {chips.map((x) => <li key={x}><Badge>{x}</Badge></li>)}
+            </ul>
+            {c.summary ? <p className="max-w-[640px] text-[15px] leading-relaxed text-muted">{c.summary}</p> : null}
+            {c.description ? <div className="max-w-[640px] space-y-4 text-[15px] leading-relaxed whitespace-pre-line text-muted">{c.description}</div> : null}
+            <section className="mt-2">
+              <h2 className="font-sans text-lg font-bold text-ink-900">In the room</h2>
+              <ul className="mt-3 grid list-disc grid-cols-2 gap-x-6 gap-y-2 pl-5 text-sm text-ink-900 lg:max-w-[640px]">
+                {amenities.map((a) => <li key={a}>{a}</li>)}
               </ul>
             </section>
+            {freeCancel ? <p className="rounded-xl bg-ivory-100 px-3.5 py-2.5 text-sm text-muted lg:hidden">{freeCancel}</p> : null}
           </div>
 
-          <aside className="lg:w-[380px] lg:shrink-0">
-            <div id="availability" className="scroll-mt-24 rounded-card border border-hairline bg-white p-5 shadow-card lg:sticky lg:top-24">
-              <p className="text-[13px] text-ink-500"><span className="text-[1.625rem] font-semibold text-navy-950 tabular-nums">{formatNaira(c.fromRateKobo)}</span> / night</p>
-              <div className="mt-4"><BookingBar variant="stacked" nightlyKobo={c.fromRateKobo} /></div>
-              <p className="mt-3 text-xs text-ink-500">Check availability to confirm your total. Instant confirmation once paid. Secure payment by Paystack.</p>
+          <aside id="availability" className="scroll-mt-24 rounded-2xl border border-hairline bg-white p-4 shadow-[0_10px_30px_rgba(11,31,92,0.08)] lg:sticky lg:top-24 lg:p-5">
+            <p className="tabular-nums">
+              <b className="text-[28px]">{formatNaira(c.fromRateKobo)}</b>
+              <span className="text-sm text-muted"> / night</span>
+            </p>
+            <div className="mt-3">
+              <BookingBar variant="card" nightlyKobo={c.fromRateKobo} room={{ slug: c.slug, name: c.name, sleeps: c.maxOccupancy }} />
             </div>
+            {freeCancel ? <p className="mt-3 text-center text-[13px] text-muted max-lg:hidden">{freeCancel}</p> : null}
           </aside>
         </div>
-      </Section>
-
-      {others.length ? (
-        <Section tone="ivory" className="py-14 sm:py-14">
-          <h2 className="font-display text-[2rem] font-medium text-navy-950">Other ways to stay</h2>
-          <ul className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
-            {others.map((o) => (
-              <li key={o.slug}>
-                <Link href={`/rooms/${o.slug}`} className="flex h-full items-center gap-3.5 rounded-card border border-hairline bg-white p-2.5 transition-shadow hover:shadow-lift">
-                  <Photo photo={o.photos[0] ?? { alt: o.name }} sizes="72px" className="h-14 w-18 shrink-0 rounded-lg [&>span]:hidden" />
-                  <span>
-                    <span className="block font-display text-xl font-semibold text-navy-950">{o.name}</span>
-                    <span className="block text-[13px] text-ink-500">from {formatNaira(o.fromRateKobo)}/night</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
+      </Container>
 
       <RoomPriceBar price={formatNaira(c.fromRateKobo)} targetId="availability" />
     </>

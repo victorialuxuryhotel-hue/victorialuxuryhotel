@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { Suspense } from "react";
 import { Steps } from "@/components/booking/booking-ui";
 import { DetailsStep } from "@/components/booking/details-step";
@@ -17,12 +16,13 @@ const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : u
 function StartAgain({ message }: { message: string }) {
   return (
     <div className="mx-auto max-w-lg py-10 text-center">
-      <h1 className="font-display text-4xl text-navy-950">{message}</h1>
-      <Link href="/book" className={buttonStyles({ className: "mt-8" })}>Search again</Link>
+      <h1 className="font-display text-[34px] leading-tight font-semibold text-ink-900">{message}</h1>
+      <Link href="/book" className={buttonStyles({ className: "mx-auto mt-8 flex" })}>Search again</Link>
     </div>
   );
 }
 
+/** Booking step 2 (designs G5, M2). */
 async function Details({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const slug = one(sp.category);
@@ -35,30 +35,25 @@ async function Details({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <Steps current={2} />
-      <Link href={`/book?${new URLSearchParams({ checkIn: parsed.data.checkIn, checkOut: parsed.data.checkOut, guests: String(parsed.data.guests) })}`} className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm text-ink-500 hover:text-navy-800">
-        <ArrowLeft className="size-4" aria-hidden /> Change room
-      </Link>
-      <div className="mt-2 grid gap-6 lg:grid-cols-[1fr_21rem] lg:gap-10">
-        <DetailsStep
-          option={option}
-          search={parsed.data}
-          holdMinutes={rules.holdMinutes}
-          extras={extras}
-          action={createWebsiteBooking}
-          hidden={{ category: slug, checkIn: parsed.data.checkIn, checkOut: parsed.data.checkOut, guests: String(parsed.data.guests) }}
-          cancellationPolicy={rules.cancellationPolicy}
-          sidebarNote={<p className="mt-4 text-xs text-ink-500">Your room is held for {rules.holdMinutes} minutes while you complete payment.</p>}
-        />
-      </div>
+      <Steps current={1} />
+      <DetailsStep
+        option={option}
+        search={parsed.data}
+        extras={extras}
+        action={createWebsiteBooking}
+        hidden={{ category: slug, checkIn: parsed.data.checkIn, checkOut: parsed.data.checkOut, guests: String(parsed.data.guests) }}
+        cancellationPolicy={rules.cancellationPolicy}
+        backHref={`/book?${new URLSearchParams({ checkIn: parsed.data.checkIn, checkOut: parsed.data.checkOut, guests: String(parsed.data.guests), room: slug })}`}
+        sidebarNote={<p className="text-center text-xs text-muted">Your room is held for {rules.holdMinutes} minutes while you complete payment.</p>}
+      />
     </>
   );
 }
 
 export default function DetailsPage(props: PageProps<"/book/details">) {
   return (
-    <Container className="max-w-[65rem] pt-7 pb-16">
-      <Suspense fallback={<div className="skeleton h-96 !rounded-card" />}>
+    <Container className="flex flex-col gap-[22px] pt-4 pb-10 lg:pt-8 lg:pb-16">
+      <Suspense fallback={<div className="skeleton h-96 !rounded-xl" />}>
         <Details searchParams={props.searchParams} />
       </Suspense>
     </Container>
