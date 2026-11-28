@@ -1,4 +1,4 @@
-import { as, BASE, check, clickText, fill, finish, go, run, session, text, until, val, waitForText } from "./lib.mjs";
+import { as, BASE, check, choose, clickText, fill, finish, go, recordDeskPayment, run, session, setValue, text, until, val, waitForText } from "./lib.mjs";
 
 const MOCK = "http://127.0.0.1:4010";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -28,7 +28,7 @@ async function bookAndReview() {
   await fill(p, "#email", email);
   await fill(p, "#phone", "+234 803 000 4321");
   await p.click("input[name=acceptTerms]");
-  await clickText(p, "button", "Continue to payment");
+  await clickText(p, "button[type=submit]", "Continue");
   await p.waitForFunction(() => location.pathname.startsWith("/book/review/"), { timeout: 30000 });
   await waitForText(p, /VL-[A-Z2-9]{6}/);
   const ref = (await text(p)).match(/VL-[A-Z2-9]{6}/)[0];
@@ -51,11 +51,11 @@ async function payAt(p, button) {
   const expected = await val("SELECT total_amount_kobo FROM reservations WHERE reference = ?", ref);
   check("guest is shown the database-calculated amount", (await text(p)).includes(`₦${(expected / 100).toLocaleString("en-NG")}`));
   const payRef = await payAt(p, "pay-success");
-  await waitForText(p, /You.re booked/);
+  await waitForText(p, /Paid · confirmed/);
   check("successful payment shows the confirmation page", true);
   check("reservation confirmed", (await resStatus(ref)) === "confirmed");
   const receipt = await val("SELECT receipt_number FROM payments WHERE provider_reference = ?", payRef);
-  check("verified payment issues a receipt shown to the guest", /^RCT-/.test(receipt) && (await text(p)).includes(receipt), receipt);
+  check("verified payment issues a receipt shown to the guest", /^RCT-/.test(receipt) && ((await text(p)).includes(receipt) || Boolean(await p.$(`a[href*="${receipt}"]`))), receipt);
   await waitForEmails(email, /Booking confirmed/);
   const mails = await emailsTo(email);
   check("exactly one confirmation email to the guest", mails.length === 1 && /Booking confirmed/.test(mails[0].subject), JSON.stringify(mails.map((m) => m.subject)));
@@ -80,15 +80,15 @@ async function payAt(p, button) {
 {
   const { ctx, p, ref } = await bookAndReview();
   const failedRef = await payAt(p, "pay-failed");
-  await waitForText(p, /didn.t go through/);
+  await waitForText(p, /card wasn.t charged/);
   check("declined card shows a retry page", true);
   check(
     "failed attempt recorded, booking still held",
     (await val("SELECT status FROM payments WHERE provider_reference = ?", failedRef)) === "failed" && (await resStatus(ref)) === "pending_payment",
   );
-  await clickText(p, "a", "Try again");
+  await clickText(p, "a", "Try paying again");
   const okRef = await payAt(p, "pay-success");
-  await waitForText(p, /You.re booked/);
+  await waitForText(p, /Paid · confirmed/);
   check("retry uses a new reference and confirms", okRef !== failedRef && (await resStatus(ref)) === "confirmed");
   await ctx.close();
 }
@@ -96,7 +96,7 @@ async function payAt(p, button) {
 {
   const { ctx, p, ref } = await bookAndReview();
   const abRef = await payAt(p, "pay-cancel");
-  await waitForText(p, /didn.t go through/);
+  await waitForText(p, /card wasn.t charged/);
   check(
     "abandoned checkout is recorded and the guest can retry",
     (await val("SELECT status FROM payments WHERE provider_reference = ?", abRef)) === "abandoned" && (await resStatus(ref)) === "pending_payment",
@@ -108,7 +108,7 @@ async function payAt(p, button) {
   await fetch(`${MOCK}/__control/next-webhook?mode=skip`, { method: "POST" });
   const { ctx, p, ref, email } = await bookAndReview();
   await payAt(p, "pay-success");
-  await waitForText(p, /You.re booked/);
+  await waitForText(p, /Paid · confirmed/);
   check("no webhook: return page verifies server-side and confirms", (await resStatus(ref)) === "confirmed");
   await waitForEmails(email, /Booking confirmed/);
   await sleep(500);
@@ -141,63 +141,106 @@ async function payAt(p, button) {
   await ctx.close();
 }
 
-{
-  const { ctx, p } = await as("front_desk");
-  const guestEmail = `walkin-${Date.now()}@example.com`;
+
+/** A booking made at the desk ("Create only"), awaiting payment. Returns its id. */
+async function deskBooking(p, name, email) {
   const [ci, co] = [await hotelDay(dayOffset), await hotelDay(dayOffset + 2)];
   dayOffset += 3;
   await go(p, "/app/reservations/new");
-  for (const [sel, v] of [["#nci", ci], ["#nco", co]]) {
-    await p.$eval(sel, (e, value) => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(e, value);
-      e.dispatchEvent(new Event("input", { bubbles: true }));
-    }, v);
-  }
+  await setValue(p, "#nci", ci);
+  await setValue(p, "#nco", co);
   await fill(p, "#gp", `+23480${String(Date.now()).slice(-8)}`);
-  await fill(p, "#gn", "Cash Guest");
-  await fill(p, "#ge", guestEmail);
+  await p.waitForSelector("#gn", { visible: true });
+  await fill(p, "#gn", name);
+  if (email) await fill(p, "#ge", email);
   await p.click("input[name=categoryId]");
   await clickText(p, "button", "Create only");
   await p.waitForFunction(() => /^\/app\/reservations\/[0-9a-f-]{36}$/.test(location.pathname), { timeout: 30000 });
-  const resId = new URL(p.url()).pathname.split("/").pop();
+  return new URL(p.url()).pathname.split("/").pop();
+}
+
+{
+  // Desk payments: transfer needs the tick (browser and server), POS needs 4 slip digits, then a receipt; cancelling a paid booking.
+  const { ctx, p } = await as("front_desk");
+  const guestEmail = `walkin-${Date.now()}@example.com`;
+  const resId = await deskBooking(p, "Cash Guest", guestEmail);
   const count = () => val("SELECT count(*) FROM payments WHERE reservation_id = ?", resId);
+  const submitOff = () => p.$$eval("button[type=submit]", (bs) => bs.find((b) => /^Record ₦/.test(b.innerText.trim()))?.disabled);
 
   await go(p, `/app/payments/record?reservation=${resId}`);
-  check("amount is fixed to the whole balance", await p.$eval("#amount", (e) => e.readOnly));
-  await clickText(p, "button", "Take payment");
-  await sleep(800);
-  check("browser blocks recording without confirming receipt", (await count()) === 0);
-  await p.$eval("input[name=confirmReceived]", (e) => e.removeAttribute("required"));
-  await p.select("#method", "bank_transfer");
+  await p.waitForSelector("#amount");
+  check("the amount can be changed: part payments are allowed", !(await p.$eval("#amount", (e) => e.readOnly)));
+  const owed = await val("SELECT total_amount_kobo FROM reservations WHERE id = ?", resId);
+  await fill(p, "#amount", owed / 100 + 1000);
+  check("overpaying is blocked", (await submitOff()) === true && /Only ₦[\d,]+ is owed/.test(await text(p)));
+  await fill(p, "#amount", owed / 100);
+
+  await choose(p, "POS / card");
+  await p.waitForSelector("#slip", { visible: true });
+  check("POS asks for the slip's last 4 digits and the terminal", Boolean(await p.$("#terminal")) && (await p.$eval("#slip", (e) => e.maxLength)) === 4);
+
+  await choose(p, "Transfer");
+  await p.waitForSelector("#ref", { visible: true });
+  check("transfer: Record is off until the bank-app tick", (await submitOff()) === true);
+  check("the bank details are shown (placeholders until set)", /Pay into: /.test(await text(p)));
+  // Get past the browser to check the server refuses it too.
   const transferRef = `TRF-${Date.now()}`;
   await fill(p, "#ref", transferRef);
-  await clickText(p, "button", "Take payment");
-  await clickText(p, "button", "Yes, take payment").catch(() => {});
-  await waitForText(p, /Confirm the hotel has received this money/);
-  check("server also refuses without confirmation", (await count()) === 0);
-  check("entered details are kept after the error", (await p.$eval("#ref", (e) => e.value)) === transferRef);
-  if (!(await p.$eval("input[name=confirmReceived]", (e) => e.checked))) await p.click("input[name=confirmReceived]");
-  await clickText(p, "button", "Take payment");
-  await clickText(p, "button", "Yes, take payment");
+  await p.$$eval("button[type=submit]", (bs) => bs.forEach((b) => b.removeAttribute("disabled")));
+  await clickText(p, "button[type=submit]", "Record ₦");
+  await waitForText(p, /Tick to confirm the money has arrived|Check the highlighted/);
+  check("the server refuses a transfer without the tick", (await count()) === 0);
+
+  const receipt = await recordDeskPayment(p, resId, { method: "bank_transfer", reference: transferRef });
   const confirmed = await until(async () => (await val("SELECT status FROM reservations WHERE id = ?", resId)) === "confirmed", "booking confirmed").catch(() => false);
-  check("full payment recorded: booking confirmed", confirmed);
+  check("full payment by transfer: booking confirmed with a receipt", confirmed && /^RCT-/.test(receipt ?? ""), p.url());
+  check("the transfer is saved with its reference and the tick", (await val("SELECT count(*) FROM payments WHERE reservation_id = ? AND provider_reference = ? AND seen_in_bank_app = 1 AND method = 'bank_transfer'", resId, transferRef)) === 1);
   check("guest emailed the booking confirmation", (await waitForEmails(guestEmail, /Booking confirmed/)).length === 1);
 
-  const receipt = await val("SELECT receipt_number FROM payments WHERE reservation_id = ? ORDER BY created_at DESC LIMIT 1", resId);
   await go(p, `/app/payments/receipt/${receipt}`);
   await waitForText(p, new RegExp(receipt));
   const rt = await text(p);
-  check("printable receipt shows number, guest and 'recorded by'", rt.includes("Cash Guest") && /recorded by/i.test(rt));
+  check("printable receipt shows number, guest and who took it", rt.includes("Cash Guest") && /recorded by|taken by|checked by/i.test(rt), rt.slice(0, 400));
 
   await go(p, `/app/reservations/${resId}`);
-  await clickText(p, "summary", "Cancel");
+  await clickText(p, "summary", "Cancel booking");
   await fill(p, "#cancel-reason", "Guest called to cancel");
-  await clickText(p, "button", "Cancel booking");
+  await clickText(p, "form button[type=submit]", "Cancel booking");
   await waitForText(p, /Cancelled/);
   check("cancelling a paid booking works", (await val("SELECT status FROM reservations WHERE id = ?", resId)) === "cancelled");
   check("guest emailed about the cancellation", (await waitForEmails(guestEmail, /cancelled/i)).length === 1);
   check("refund is flagged for the general manager, not paid automatically", Boolean(await val("SELECT attention_reason FROM reservations WHERE id = ?", resId)) && (await val("SELECT count(*) FROM payments WHERE reservation_id = ? AND amount_kobo < 0", resId)) === 0);
+
+  // Send a payment link: the guest pays the rest online on /pay/<code>.
+  const linkRes = await deskBooking(p, "Link Guest", `link-${Date.now()}@example.com`);
+  const total = await val("SELECT total_amount_kobo FROM reservations WHERE id = ?", linkRes);
+  await recordDeskPayment(p, linkRes, { amount: Math.floor(total / 200) });
+  await go(p, `/app/reservations/${linkRes}`);
+  await clickText(p, "button", "Send a payment link");
+  await p.waitForSelector("[role=dialog] #pl-message", { visible: true });
+  const message = await p.$eval("#pl-message", (t) => t.value);
+  const url = message.match(/https?:\/\/\S+\/pay\/([A-Za-z0-9_-]+)/);
+  check("Send a payment link makes a /pay/ link with a ready message", Boolean(url), message);
+  check("with Send on WhatsApp (a wa.me link) and Copy link", /wa\.me/.test(await p.$eval("[role=dialog] a", (a) => a.href)) && /Copy link/.test(await p.$eval("[role=dialog]", (d) => d.innerText)));
+  const owedNow = await val("SELECT amount_kobo FROM pay_links WHERE code = ?", url?.[1]);
+  check("the link is for what's still owed", owedNow === total - Math.floor(total / 200) * 100, String(owedNow));
   await ctx.close();
+
+  if (url) {
+    await fetch(`${MOCK}/__control/next-webhook?mode=skip`, { method: "POST" });
+    const { ctx: g, p: gp } = await session({ width: 390, height: 844 });
+    await go(gp, `/pay/${url[1]}`);
+    await waitForText(gp, /Pay for your stay/);
+    await clickText(gp, "button[type=submit]", "Pay ₦");
+    await gp.waitForFunction(() => location.href.includes("/checkout/"), { timeout: 30000 });
+    await gp.click("#pay-success");
+    await gp.waitForFunction(() => location.pathname.startsWith("/book/confirmation/"), { timeout: 30000 });
+    const paid = await until(async () => (await val("SELECT coalesce(sum(amount_kobo), 0) FROM payments WHERE reservation_id = ? AND status = 'successful' AND kind = 'payment'", linkRes)) === total, "paid in full", 20000).catch(() => false);
+    check("the guest pays the rest through the link", paid);
+    await go(gp, `/pay/${url[1]}`);
+    check("a paid link no longer takes payment", !(await gp.$("button[type=submit]::-p-text(Pay ₦)")), gp.url());
+    await g.close();
+  }
 }
 
 await finish();

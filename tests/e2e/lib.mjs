@@ -1,7 +1,8 @@
-// Shared helpers for the browser tests: local D1, Clerk development users, sign-in (with the authenticator app), checks.
+// Shared helpers for the browser tests: local D1, staff sign-in by name and PIN on a station, checks.
+// The Clerk helpers (development users, the sign-in form, the authenticator app) are only for the tests about Clerk itself.
 import puppeteer from "puppeteer-core";
 import { getPlatformProxy } from "wrangler";
-import { createHmac, randomBytes, randomUUID } from "node:crypto";
+import { createHash, createHmac, pbkdf2Sync, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -325,8 +326,8 @@ export async function account(role) {
   return acc;
 }
 
-/** A signed-in browser context for a role, reusing its saved session cookies when they still work. */
-export async function as(role, { fresh = false, next = "" } = {}) {
+/** Clerk sign-in for a role, reusing its saved session cookies when they still work. Only for the tests about Clerk itself. */
+export async function asClerk(role, { fresh = false, next = "" } = {}) {
   const acc = await account(role);
   const sessions = readJson(SESSIONS_FILE);
   const s = await session();
@@ -341,6 +342,173 @@ export async function as(role, { fresh = false, next = "" } = {}) {
     writeJson(SESSIONS_FILE, sessions);
   }
   return { ...s, acc };
+}
+
+
+// ---------- stations and PINs (how staff sign in at the hotel) ----------
+
+/** Station type per role: the tills list restaurant & bar staff; the desk lists front desk and above; the office lists finance. */
+const STATION_TYPE = { restaurant_bar: "bar", restaurant_bar_manager: "bar", front_desk: "desk", hotel_manager: "desk", general_manager: "desk", owner: "desk", finance: "office" };
+/** Names on the grid: none is the start of another, so a name button is never ambiguous. */
+const PIN_NAME = { owner: "E2E Owner", general_manager: "E2E General Manager", hotel_manager: "E2E Hotel Manager", finance: "E2E Finance", front_desk: "E2E Desk Clerk", restaurant_bar: "E2E Bar Staff", restaurant_bar_manager: "E2E Bar Manager" };
+/** The test staff's PIN (4 to 6 digits, not a repeated digit or a straight run). */
+export const PIN = "2580";
+const STATIONS_FILE = join(STATE_DIR, "stations.json");
+
+/** PBKDF2-SHA256, 100,000 iterations, per-person salt, PIN + NUL + pepper: the app's format (src/lib/auth/pin.ts). */
+export function pinHash(pin, pepper = process.env.PIN_PEPPER ?? "") {
+  const salt = randomBytes(16);
+  const hash = pbkdf2Sync(Buffer.from(`${pin}\u0000${pepper}`), salt, 100_000, 32, "sha256");
+  return `pbkdf2$100000$${salt.toString("base64url")}$${hash.toString("base64url")}`;
+}
+export const tokenHash = (token) => createHash("sha256").update(token).digest("hex");
+
+/** A test staff member for this role (made once, then reused), active, with a known PIN that doesn't need changing. */
+export async function pinStaff(role, { slug = ROLE_SLUG[role], name = PIN_NAME[role], pin = PIN } = {}) {
+  const email = `e2e-pin-${slug}@victoria.test`;
+  const s = STORED[role];
+  let id = await val("SELECT id FROM staff_profiles WHERE email = ?", email);
+  if (!id) {
+    id = randomUUID();
+    await run("INSERT INTO staff_profiles (id, full_name, email, role, department, department_lead) VALUES (?, ?, ?, ?, ?, ?)", id, name, email, s.role, s.department, s.lead);
+  } else {
+    // Back to plain front desk first: the manager triggers refuse some direct role-to-role moves.
+    await run("UPDATE staff_profiles SET role = 'front_desk', department = NULL, department_lead = 0 WHERE id = ?", id);
+    await run("UPDATE staff_profiles SET role = ?, department = ?, department_lead = ?, full_name = ?, is_active = 1 WHERE id = ?", s.role, s.department, s.lead, name, id);
+  }
+  await run("UPDATE staff_profiles SET pin_hash = ?, pin_must_change = 0 WHERE id = ?", pinHash(pin), id);
+  return { id, role, email, fullName: name, pin };
+}
+
+/** A station of this type with a token only this checkout knows (kept in tests/e2e/.state, git-ignored). Reused while it isn't revoked. */
+export async function testStation(type, key = type, createdBy) {
+  const saved = readJson(STATIONS_FILE);
+  const known = saved[key];
+  if (known?.token && (await one("SELECT id FROM stations WHERE id = ? AND token_hash = ? AND type = ? AND revoked_at IS NULL", known.id, tokenHash(known.token), type))) return known;
+  if (!saved.tag) saved.tag = randomBytes(3).toString("hex");
+  const token = randomBytes(32).toString("base64url");
+  const id = randomUUID();
+  const name = `E2E ${key} ${saved.tag}`.slice(0, 40);
+  await run("INSERT INTO stations (id, name, type, token_hash, created_by) VALUES (?, ?, ?, ?, ?)", id, name, type, tokenHash(token), createdBy);
+  saved[key] = { id, name, type, token };
+  writeJson(STATIONS_FILE, saved);
+  return saved[key];
+}
+
+/** Makes this browser the station (the cookie the owner's set-up leaves). */
+export async function useStation(p, station) {
+  await p.setCookie({ name: "vl_station", value: station.token, domain: new URL(BASE).hostname, path: "/", httpOnly: true, sameSite: "Lax" });
+}
+
+/** Taps a name on the grid (the /station page or the lock over a page). */
+export async function tapName(p, name) {
+  await until(
+    () => p.evaluate((n) => {
+      const b = [...document.querySelectorAll("ul li button")].find((x) => x.offsetParent && [...x.querySelectorAll("span")].some((s) => s.textContent.trim() === n));
+      if (!b || b.disabled) return false;
+      b.click();
+      return true;
+    }, name),
+    `name "${name}" on the grid`,
+  );
+  await p.waitForSelector("[role=group][aria-labelledby=pin-prompt]", { visible: true });
+}
+
+/** Taps a name, enters the PIN on the on-screen keypad and taps OK. */
+export async function enterPin(p, name, pin) {
+  await tapName(p, name);
+  for (const d of String(pin)) await p.click(`[role=group][aria-labelledby=pin-prompt] button[aria-label="${d}"]`);
+  await p.click('[role=group][aria-labelledby=pin-prompt] button[aria-label="Sign in"]');
+}
+
+/**
+ * A browser signed in for a role the way staff sign in at the hotel: a test staff member with a known PIN, a
+ * station of the right type, then on /station tap the name and enter the PIN. `station` names a separate
+ * station when two people must be signed in at once (one person at a time per station).
+ */
+export async function as(role, { next = "", station: key = role, viewport } = {}) {
+  const acc = await pinStaff(role);
+  const station = await testStation(STATION_TYPE[role], key, acc.id);
+  const s = await session(viewport);
+  await useStation(s.p, station);
+  await go(s.p, `/station${next}`);
+  await enterPin(s.p, acc.fullName, acc.pin);
+  await s.p.waitForFunction(() => location.pathname.startsWith("/app") || document.querySelector("[role=alert]"), { timeout: 30000 });
+  if (!new URL(s.p.url()).pathname.startsWith("/app")) {
+    throw new Error(`${acc.fullName} couldn't sign in on ${station.name}: ${await s.p.$eval("[role=alert]", (e) => e.innerText).catch(() => "?")}`);
+  }
+  await settle(s.p);
+  return { ...s, acc: { ...acc, station } };
+}
+
+/** Lock from the account menu or the till strip: the name grid covers the page. */
+export async function lockScreen(p) {
+  await p.evaluate(() => window.dispatchEvent(new Event("vl:lock")));
+  await p.waitForSelector("[role=dialog][aria-label=Locked]", { visible: true });
+}
+
+// ---------- screens shared by several tests ----------
+
+/** Picks an option of a Segmented control (Cash | Transfer | POS / card): a radio group of labels. */
+export async function choose(p, option, group = "") {
+  await clickText(p, `[role=radiogroup]${group ? `[aria-label="${group}"]` : ""} label`, option);
+}
+
+/** Sets a date (or other controlled) input through the native setter, so React sees it. */
+export async function setValue(p, selector, value) {
+  await p.waitForSelector(selector);
+  await p.$eval(selector, (e, v) => {
+    const proto = e instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value").set.call(e, v);
+    e.dispatchEvent(new Event("input", { bubbles: true }));
+    e.dispatchEvent(new Event("change", { bubbles: true }));
+  }, value);
+}
+
+/**
+ * Take payment at the desk (/app/payments/record): Cash, Transfer (reference or sender, and the bank-app tick) or
+ * POS (4 slip digits and a terminal). Returns the receipt number shown after the redirect to the booking, or null.
+ */
+export async function recordDeskPayment(p, reservationId, { method = "cash", amount, reference, sender, slip, seen = true } = {}) {
+  await go(p, `/app/payments/record?reservation=${reservationId}`);
+  await p.waitForSelector("#amount", { visible: true });
+  if (method === "bank_transfer") await choose(p, "Transfer");
+  if (method === "pos_terminal") await choose(p, "POS / card");
+  if (amount != null) await fill(p, "#amount", amount);
+  if (method === "bank_transfer") {
+    await p.waitForSelector("#ref", { visible: true });
+    if (reference != null) await fill(p, "#ref", reference);
+    if (sender != null) await fill(p, "#sender", sender);
+    if (seen) await p.click("input[name=confirmReceived][type=checkbox]");
+  }
+  if (method === "pos_terminal") {
+    await p.waitForSelector("#slip", { visible: true });
+    await fill(p, "#slip", slip ?? "4417");
+  }
+  await clickText(p, "button[type=submit]", "Record ₦");
+  await p.waitForFunction(() => location.search.includes("paid=") || document.querySelector("form [role=alert], form p.text-danger-700"), { timeout: 30000 });
+  await settle(p);
+  return new URL(p.url()).searchParams.get("paid");
+}
+
+/** On a booking page: opens the Check in drawer from the next step, fills the registration card and checks in. */
+export async function checkInWithCard(p, card = {}) {
+  await clickText(p, "button", "Check in");
+  await p.waitForFunction(() => /Check in and give key/.test(document.querySelector("[role=dialog]")?.innerText ?? "") && /Booking/.test(document.querySelector("[role=dialog] dl")?.innerText ?? ""));
+  await fill(p, "#idNumber", card.idNumber ?? "A12345678");
+  await fill(p, "#address", card.address ?? "12 Oba Adesida Road, Akure");
+  await fill(p, "#comingFrom", card.comingFrom ?? "Lagos");
+  await fill(p, "#nationality", card.nationality ?? "Nigerian");
+  if (card.rules !== false) await clickText(p, "[role=dialog] label", "Guest has seen the house rules");
+  await clickText(p, "[role=dialog] button", "Check in and give key");
+}
+
+/** On a booking page: opens the Check out drawer, ticks Key returned and checks out. */
+export async function checkOutWithKey(p, { key = true } = {}) {
+  await clickText(p, "button", "Check out");
+  await p.waitForFunction(() => /Key returned/.test(document.querySelector("[role=dialog]")?.innerText ?? ""));
+  if (key) await clickText(p, "[role=dialog] label", "Key returned");
+  await clickText(p, "[role=dialog] button", "Check out");
 }
 
 export async function finish() {

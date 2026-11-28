@@ -1,4 +1,4 @@
-import { as, BASE, check, clickText, createUser, deleteUser, fill, finish, go, navLabels, one, run, session, signIn, signOut, text, val, waitForText, account } from "./lib.mjs";
+import { asClerk as as, BASE, check, clickText, createUser, deleteUser, fill, finish, go, navLabels, one, run, session, signIn, signOut, text, val, waitForText, account } from "./lib.mjs";
 
 const groups = async (p) => (await navLabels(p)).join(",");
 

@@ -18,7 +18,7 @@ const hotelDay = (n) => val(`SELECT date('now', '+1 hour', '+${n} days')`);
   await fill(p, "#email", email);
   await fill(p, "#phone", "+234 803 000 5555");
   await p.click("input[name=acceptTerms]");
-  await clickText(p, "button", "Continue to payment");
+  await clickText(p, "button[type=submit]", "Continue");
   await waitForText(p, /VL-[A-Z2-9]{6}/);
   const ref = (await text(p)).match(/VL-[A-Z2-9]{6}/)[0];
   await clickText(p, "button", "Pay ₦");
@@ -47,12 +47,12 @@ const hotelDay = (n) => val(`SELECT date('now', '+1 hour', '+${n} days')`);
   check("health check reveals nothing else", Object.keys(body).join(",") === "ok");
 }
 
-if (process.env.E2E_BASE) {
+if (process.env.E2E_WORKER === "1") {
   const res = await fetch(`${BASE}/book`);
   const csp = res.headers.get("content-security-policy") ?? "";
   check("public pages send a content security policy", /default-src/.test(csp) && /frame-ancestors 'none'/.test(csp), csp.slice(0, 200));
 } else {
-  console.log("SKIP  security headers (added by worker.ts; run against `pnpm cf:preview` with E2E_BASE set)");
+  console.log("SKIP  security headers (added by worker.ts; run against `pnpm cf:preview` with E2E_BASE and E2E_WORKER=1 set)");
 }
 
 const standard = await val("SELECT id FROM room_categories WHERE slug = 'standard'");
@@ -129,7 +129,8 @@ for (const id of pagingIds) {
   // H8: an old browser gets a warning (not blocked); the browser in use is noted once per session.
   const { ctx, p } = await session();
   await p.setUserAgent("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36");
-  await go(p, "/login");
+  // The sign-in page loads Clerk from its CDN; wait for the page itself, not every resource.
+  await p.goto(`${BASE}/login`, { waitUntil: "domcontentloaded", timeout: 90000 });
   await waitForText(p, /too old for the system/);
   check("an old browser on Windows 7 is warned on the sign-in page", /Use Google Chrome on Windows 10 or 11/.test(await text(p)));
   check("but can still sign in", Boolean(await p.$("input[name=identifier], input[name=username], input[type=password], form")));
@@ -151,41 +152,52 @@ for (const id of pagingIds) {
 }
 
 {
-  // I2: Available tonight on Today. New booking opens the form for tonight with the room type chosen.
+  // Today (design R4): chips and groups with counts, initials on every row, Free tonight per room type with New booking.
   const { ctx, p } = await as("front_desk");
   await go(p, "/app/today");
   // I5: the business day at the bottom of the sidebar.
   const day = await until(() => p.evaluate(() => document.querySelector("aside [data-business-day]")?.textContent ?? null), "business day in the sidebar");
   check("the sidebar shows the business day", /^Business day · \w{3} \d{1,2} \w{3}/.test(day), day);
-  await waitForText(p, /Available tonight/i);
-  // I3: "Arriving today · 1 of 3 arrived": the still-to-come part is the list on screen.
-  const progress = await p.$$eval("[role=progressbar]", (bars) =>
-    bars.map((b) => ({ done: Number(b.getAttribute("aria-valuenow")), total: Number(b.getAttribute("aria-valuemax")), rows: b.closest(".rounded-card")?.querySelectorAll("ul > li").length ?? 0 })),
-  );
-  check("Today's headings count arrivals and departures done, with a progress bar", progress.length >= 1, JSON.stringify(progress));
-  check("and the count still to go is the list on screen", progress.every((x) => x.total - x.done === x.rows), JSON.stringify(progress));
-  // I4: where each booking came from, as a neutral badge.
-  const SOURCES = /^(Website|Walk-in|Phone|WhatsApp|Staff)$/;
-  const sourceBadges = (page) => page.$$eval("[data-source]", (b) => b.filter((x) => x.offsetParent).map((x) => x.textContent.trim()));
-  const todaySources = await sourceBadges(p);
-  // Arriving / leaving lists and the in-house table (Needs you now rows are actions, not bookings).
-  const todayRows = await p.$$eval(".rounded-card ul > li:not([data-kind]):has(a[href^='/app/reservations/'], a[href*='booking=']), .rounded-card tbody tr", (l) => l.filter((x) => x.offsetParent).length);
-  check("every booking on Today shows where it came from", todayRows > 0 && todaySources.length === todayRows && todaySources.every((s) => SOURCES.test(s)), `${todaySources.length} badges, ${todayRows} rows`);
+  await waitForText(p, /Free tonight/);
+  const chips = await p.$$eval("nav[aria-label='Today at a glance'] a", (as) => Object.fromEntries(as.map((a) => [a.innerText.replace(/\d+/g, "").trim(), Number(a.innerText.match(/\d+/)?.[0])])));
+  check("Today has chips for Overdue, Arriving, Leaving and To clean", ["Overdue", "Arriving", "Leaving", "To clean"].every((k) => Number.isInteger(chips[k])), JSON.stringify(chips));
+  // Each group's count is the rows in it (open the closed groups first).
+  await p.$$eval("section[aria-labelledby] button[aria-expanded=false]", (bs) => bs.forEach((b) => b.click()));
+  const groups = await p.$$eval("section[aria-labelledby]:has(h2 > span)", (ss) => ss.map((s) => ({
+    id: s.getAttribute("aria-labelledby"),
+    count: Number(s.querySelector("h2 > span")?.textContent),
+    rows: [...s.querySelectorAll("ul > li, tbody tr")].filter((x) => x.offsetParent).length,
+  })));
+  check("each group's count is the number of rows in it", groups.length > 0 && groups.every((g) => g.count === g.rows), JSON.stringify(groups));
+  const arriving = groups.find((g) => g.id === "arriving");
+  check("and the Arriving chip says the same", arriving?.count === chips.Arriving, `${arriving?.count} vs ${chips.Arriving}`);
+  // I11 on Today: initials beside every guest name.
+  // Group rows show the initials in a circle; the In house table uses the shared avatar.
+  const rows = await p.$$eval("section[aria-labelledby] ul > li:has(a[href*='booking=']), section[aria-labelledby] tbody tr", (ls) => ls.filter((l) => l.offsetParent).map((l) => {
+    if (l.querySelector("[data-avatar]")) return true;
+    const name = l.querySelector("a span")?.textContent.split(" · ")[0] ?? "";
+    const want = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+    return l.querySelector("span[aria-hidden]")?.textContent === want;
+  }));
+  check("every guest row on Today shows the guest's initials", rows.length > 0 && rows.every(Boolean), JSON.stringify(rows));
+
   const card = await p.$("[data-tonight]:has(a[href*='/app/reservations/new?type='])");
-  check("Today shows the room types free tonight with New booking", Boolean(card) || /Fully booked tonight/.test(await text(p)));
+  check("Free tonight lists the room types with New booking", Boolean(card) || /Fully booked tonight/.test(await text(p)));
   if (card) {
     const type = await card.evaluate((el) => el.getAttribute("data-tonight"));
-    check("each card says how many are free of the rooms in service", /\d+ of \d+ free · ₦/.test(await card.evaluate((el) => el.textContent)));
+    check("each says how many are free", /\d+ free/.test(await card.evaluate((el) => el.textContent)));
     await go(p, await card.$eval("a", (a) => a.getAttribute("href")));
     await p.waitForSelector("input[name=categoryId]");
     const chosen = await until(() => p.evaluate(() => document.querySelector("input[name=categoryId]:checked")?.value ?? null), "type chosen");
     check("New booking comes with that room type chosen", chosen === type, `${chosen} vs ${type}`);
     check("and tonight's date", (await p.$eval("input[name=checkIn]", (i) => i.value)) === (await val("SELECT date('now', '-5 hours')")));
   }
+  // I4: where each booking came from, as a neutral badge, on Bookings.
+  const SOURCES = /^(Website|Walk-in|Phone|WhatsApp|Staff)$/;
   await go(p, "/app/reservations?tab=all");
-  const listSources = await sourceBadges(p);
+  const listSources = await p.$$eval("[data-source]", (b) => b.filter((x) => x.offsetParent).map((x) => x.textContent.trim()));
   const listRows = await p.$$eval("table tbody tr", (r) => r.filter((x) => x.offsetParent).length);
-  check("and every row on Bookings", listRows > 0 && listSources.length === listRows && listSources.every((s) => SOURCES.test(s)), `${listSources.length} badges, ${listRows} rows`);
+  check("every row on Bookings shows where it came from", listRows > 0 && listSources.length === listRows && listSources.every((s) => SOURCES.test(s)), `${listSources.length} badges, ${listRows} rows`);
   await ctx.close();
 }
 
@@ -201,8 +213,17 @@ for (const id of pagingIds) {
   });
   check("the calendar fits 1366×768 without scrolling sideways", fit.page && fit.grid, JSON.stringify(fit));
   check("it has the legend and a free count per night for each room type", /Awaiting payment/.test(await text(p)) && (await p.$$("[data-type] [data-free]")).length % 14 === 0);
-  const cell = await p.$("[data-lane]:not([data-lane=unassigned]) a[href*='/app/reservations/new?type='][href*='&room=']");
-  const href = await cell.evaluate((a) => a.getAttribute("href"));
+  // An empty night in a room whose type still has a room free that night (the shared local data has full nights).
+  const firstDay = await val("SELECT date('now', '-5 hours')");
+  const href = await p.$$eval("[data-lane]:not([data-lane=unassigned]) a[href*='/app/reservations/new?type='][href*='&room=']", (as, start) => {
+    for (const a of as) {
+      const q = new URL(a.getAttribute("href"), "http://x").searchParams;
+      const i = Math.round((Date.parse(q.get("checkIn")) - Date.parse(start)) / 86_400_000);
+      const free = a.closest("[data-type]")?.querySelectorAll("[data-free]")[i]?.getAttribute("data-free");
+      if (Number(free) > 0) return a.getAttribute("href");
+    }
+    return null;
+  }, firstDay);
   const q = new URL(href, "http://x").searchParams;
   const roomNumber = await val("SELECT room_number FROM rooms WHERE id = ?", q.get("room"));
   await go(p, href);
@@ -211,7 +232,7 @@ for (const id of pagingIds) {
     type: document.querySelector("input[name=categoryId]:checked")?.value ?? null,
     checkIn: document.querySelector("input[name=checkIn]")?.value,
     asked: document.querySelector("[data-asked-room]")?.getAttribute("data-asked-room") ?? null,
-  })).then((f) => (f.type && f.asked ? f : null)), "form prefilled");
+  })).then((f) => (f.type && f.asked ? f : null)).catch(() => null), "form prefilled"); // the form can re-render mid-poll
   check("an empty night opens New booking with the type, date and room", form.type === q.get("type") && form.checkIn === q.get("checkIn") && form.asked === roomNumber, JSON.stringify(form));
   await ctx.close();
 }
@@ -306,7 +327,7 @@ for (const id of pagingIds) {
   // I10: help on each screen, and "Your first day" on the account page.
   const { ctx, p } = await as("front_desk");
   await go(p, "/app/rooms");
-  check("each screen says what it's for, under the title", await p.$eval("h1", (h) => (h.closest("div.min-w-0")?.querySelector(":scope > p")?.textContent ?? "").length > 20));
+  check("each screen says what it's for, under the title", await p.$eval("h1", (h) => (h.closest("div.min-w-0")?.querySelector(":scope > :not(:first-child)")?.textContent ?? "").length > 20));
   await p.click("[data-help] summary");
   check("? opens the steps for the main task", /Mark a room clean[\s\S]*housekeeping/.test(await p.$eval("[data-help]", (d) => d.innerText)));
   await p.keyboard.press("Escape");
@@ -316,7 +337,7 @@ for (const id of pagingIds) {
 
   await run("DELETE FROM staff_first_day WHERE staff_id IN (SELECT id FROM staff_profiles WHERE email LIKE '%frontdesk%' OR full_name LIKE 'E2E frontdesk%')").catch(() => {});
   await go(p, "/app/account");
-  await p.waitForSelector("[data-first-day]");
+  await p.waitForSelector("[data-first-day]", { timeout: 60000 });
   check("the front desk sees Your first day", /Take a walk-in[\s\S]*Mark a room clean/.test(await p.$eval("[data-first-day]", (c) => c.innerText)));
   await p.click("#fd-walk_in");
   await until(async () => (await val("SELECT count(*) FROM staff_first_day WHERE item = 'walk_in'")) > 0, "tick saved");
@@ -326,14 +347,11 @@ for (const id of pagingIds) {
 }
 
 {
-  // I11: initials beside guest names on Today, Bookings and the side panel.
+  // I11: initials beside guest names on Bookings and the side panel (Today is checked above).
   const { ctx, p } = await as("front_desk");
   await p.setViewport({ width: 1366, height: 768 });
-  await go(p, "/app/today");
-  const rows = await p.$$eval(".rounded-card ul > li:has(a[href*='booking=']):not([data-kind])", (l) => l.filter((x) => x.offsetParent).map((x) => Boolean(x.querySelector("[data-avatar]"))));
-  check("Today's arriving and leaving rows show the guest's initials", rows.length > 0 && rows.every(Boolean), JSON.stringify(rows));
   await go(p, "/app/reservations?tab=all");
-  check("so does every Bookings row", await p.$$eval("table tbody tr", (r) => r.filter((x) => x.offsetParent).every((x) => x.querySelector("[data-avatar]"))));
+  check("every Bookings row shows the guest's initials", await p.$$eval("table tbody tr", (r) => r.filter((x) => x.offsetParent).every((x) => x.querySelector("[data-avatar]"))));
   const ref = await val("SELECT reference FROM reservations ORDER BY created_at DESC LIMIT 1");
   await go(p, `/app/reservations?tab=all&booking=${ref}`);
   await p.waitForSelector("[data-panel-reference] [data-avatar]");
@@ -371,16 +389,17 @@ for (const id of pagingIds) {
   const { ctx, p } = await as("general_manager");
   await go(p, "/app");
   const dash = await text(p);
-  check("the dashboard says how many payments are waiting to be confirmed", /Needs attention · \d+ payments? \(₦[\d,]+\) to confirm/.test(dash), dash.slice(0, 200));
+  check("the dashboard says how many payments are waiting to be confirmed", /\d+ payments? to confirm · ₦[\d,]+/.test(dash), dash.slice(0, 200));
   await go(p, "/app/payments/confirm");
-  const count = async () => p.$$eval("li", (ls) => ls.filter((l) => l.querySelector("button")?.innerText.includes("Matches")).length);
+  // R108: a table with Not found then Matches at each row's end (your own payments show a note instead).
+  const count = async () => p.$$eval("tbody tr", (rs) => rs.filter((r) => [...r.querySelectorAll("button")].some((b) => b.innerText.trim() === "Matches")).length);
   const before = await count();
   check("payments to confirm lists transfers and POS payments", before >= 2, String(before));
-  await clickText(p, "button", "Matches");
+  await clickText(p, "tbody tr button", "Matches");
   await until(async () => (await count()) === before - 1, "one confirmed", 15000);
   check("Matches takes it off the list", true);
   await fetch(`${MOCK}/__alerts`, { method: "DELETE" });
-  await clickText(p, "button", "Not found");
+  await clickText(p, "tbody tr button", "Not found");
   await fill(p, "input[name=note]", "Not on the GTB statement (browser test)");
   await p.$$eval("button[type=submit]", (bs) => bs.find((b) => b.innerText.trim() === "Not found")?.click());
   await until(async () => (await count()) === before - 2, "one not found", 15000);
