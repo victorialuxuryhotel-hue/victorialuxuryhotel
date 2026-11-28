@@ -119,6 +119,13 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number, 
   return { outcome, stmts, reason };
 }
 
+/** Marks the booking's open payment links paid by this payment. */
+function linksPaid(db: Db, reservationId: string, paymentId: string): Stmt {
+  return db
+    .prepare("UPDATE pay_links SET paid_payment_id = ? WHERE reservation_id = ? AND paid_payment_id IS NULL AND cancelled_at IS NULL")
+    .bind(paymentId, reservationId);
+}
+
 export async function beginPaystackPayment(db: Db, publicToken: string): Promise<{ reference: string; amountKobo: number; email: string; reservationReference: string }> {
   return retryOnStale(async () => {
     const res = await first<ReservationRow>(
@@ -203,6 +210,8 @@ export async function applyPaystackResult(
             )
             .bind(r.paidAt ?? now(), now(), r.channel || null, methodFor(r.channel), r.gatewayResponse || null, pay.id),
           ...settle.stmts,
+          // Payment links for this booking are done once it's paid in full (section 10).
+          ...(paid + pay.amount_kobo >= dueOf(res) ? [linksPaid(db, res.id, pay.id)] : []),
           activity(db, "payment.verified", "reservation", res.id, `Paystack payment verified for ${res.reference} (${naira(pay.amount_kobo)})`, {
             provider_reference: r.reference,
             outcome: settle.outcome,
@@ -321,6 +330,7 @@ export async function recordOfflinePayment(
             ),
           ...changeStmts,
           ...settle.stmts,
+          ...(paid + input.amountKobo >= dueAfter ? [linksPaid(db, res.id, paymentId)] : []),
           activity(db, "payment.recorded", "reservation", res.id, `${methodLabel} payment of ${naira(input.amountKobo)} recorded for ${res.reference}`, {
             payment_id: paymentId,
             outcome: settle.outcome,

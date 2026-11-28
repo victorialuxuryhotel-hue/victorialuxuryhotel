@@ -337,7 +337,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   return (
     // Laptops: the till fills the window. The menu (and unpaid orders under it) scrolls in its own
     // column and the order panel stays pinned, so the page itself never scrolls (UX brief: 1280×720).
-    <div className="space-y-8 pb-24 lg:h-full lg:pb-0">
+    <div className="space-y-8 pb-24 lg:flex lg:h-full lg:flex-col lg:space-y-0 lg:pb-0">
       {receipt ? <div className="hidden print:block"><PosReceipt r={receipt} printable={!stationConfigured || station.printLayout !== "a4"} /></div> : null}
       {/* The bar terminal (1280×720, kiosk) and wider: unpaid · menu · order. Smaller screens: menu · order, unpaid orders under the menu. */}
       {bar ? (

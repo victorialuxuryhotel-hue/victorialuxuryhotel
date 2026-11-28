@@ -43,7 +43,7 @@ export function StaffCard({ fullName, role, children, onStation = false, signedI
       <MenuSeparator />
       {onStation ? (
         <>
-          <MenuItem onSelect={requestLock} hint={<><span className="hidden pointer-fine:inline">Ctrl L · </span>Keeps you signed in</>}>Lock screen</MenuItem>
+          <MenuItem onSelect={requestLock} hint={<><span className="hidden pointer-fine:inline">Ctrl L · </span>Back to the names screen</>}>Lock screen</MenuItem>
           <MenuItem onSelect={requestLock} hint="Next person signs in">Switch user</MenuItem>
         </>
       ) : (

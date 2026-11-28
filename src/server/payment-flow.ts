@@ -4,6 +4,7 @@ import { AppError } from "@/lib/errors";
 import { first, getDb } from "./db";
 import { applyPaystackResult, type SettleOutcome as DbOutcome } from "./domain/payments";
 import { billChargeParts } from "./domain/pay-links";
+import { markBillLinksPaid } from "./domain/bills";
 import { after } from "next/server";
 import { alert } from "@/lib/alert";
 import { deliverEmails } from "./notifications";
@@ -46,6 +47,9 @@ export async function settlePaystackReference(reference: string, trigger: "callb
       );
     }
     logger.info("payment.settled", { reference, trigger, paystackStatus: tx.status, outcome: outcomes.join(","), bill: true });
+    const link = await first<{ bill_id: string }>(db, "SELECT bill_id FROM pay_links WHERE code = ?", bill.code);
+    const last = await first<{ id: string }>(db, "SELECT id FROM payments WHERE provider = 'paystack' AND provider_reference LIKE ? AND status = 'successful' ORDER BY provider_reference DESC LIMIT 1", `${reference}-%`);
+    if (link?.bill_id) await markBillLinksPaid(db, link.bill_id, last?.id ?? null);
     if (outcomes.includes("amount_mismatch")) await alert("payment_attention", "A company bill was paid online with an amount that doesn't match the bill", { reference });
     after(() => deliverEmails({}));
     return outcomes.find((o) => o === "confirmed") ?? outcomes[0] ?? "unknown_reference";

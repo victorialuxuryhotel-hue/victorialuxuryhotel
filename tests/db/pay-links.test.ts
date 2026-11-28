@@ -40,8 +40,9 @@ describe("payment links", () => {
   it("stops working once paid (it sends the guest to their booking) or when the hold ends", async () => {
     const r = await unpaid();
     const l = await createPayLink(db, desk, r, SITE);
-    await recordOfflinePayment(db, desk, { reservationId: r, amountKobo: 5_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
+    const paid = await recordOfflinePayment(db, desk, { reservationId: r, amountKobo: 5_000_000, method: "cash", paidOn: day(0), confirmReceived: true });
     expect((await payLinkView(db, l.code)).state).toBe("paid");
+    expect(await q1("SELECT paid_payment_id FROM pay_links WHERE code = ?", l.code)).toEqual({ paid_payment_id: paid.paymentId });
     const r2 = await unpaid();
     const l2 = await createPayLink(db, desk, r2, SITE);
     await exec("UPDATE reservations SET hold_expires_at = ? WHERE id = ?", iso(-60_000), r2);

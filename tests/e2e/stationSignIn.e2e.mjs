@@ -1,7 +1,7 @@
 // Staff sign-in by name and PIN on a station (FUNCTIONALITY.md section 1): right PIN, wrong PIN, Lock keeps an
 // open till order, switching user, and what the grid lists.
 import { randomBytes } from "node:crypto";
-import { as, check, clickText, enterPin, finish, go, one, pinStaff, run, session, settle, testStation, text, until, useStation, val, waitForText } from "./lib.mjs";
+import { as, check, clickText, enterPin, finish, go, one, pinStaff, run, session, settle, testStation, text, until, stationFor, val, waitForText } from "./lib.mjs";
 
 const bar = await pinStaff("restaurant_bar");
 const manager = await pinStaff("restaurant_bar_manager");
@@ -15,7 +15,7 @@ const gridNames = (p) => p.$$eval("ul li button", (bs) => bs.filter((b) => b.off
   const { ctx, p } = await session();
   await go(p, "/station");
   check("no station: /station goes to the sign-in page", new URL(p.url()).pathname === "/login", p.url());
-  await useStation(p, { token: randomBytes(32).toString("base64url") });
+  await stationFor(p, { token: randomBytes(32).toString("base64url") });
   await go(p, "/station");
   check("a forged station cookie is sent to sign-in", new URL(p.url()).pathname === "/login", p.url());
   await go(p, "/app/today");
@@ -25,7 +25,7 @@ const gridNames = (p) => p.$$eval("ul li button", (bs) => bs.filter((b) => b.off
 
 {
   const { ctx, p } = await session({ width: 1280, height: 720 });
-  await useStation(p, station);
+  await stationFor(p, station);
   await go(p, "/station");
   await waitForText(p, /Locked\. Tap your name to start/);
   const names = await gridNames(p);

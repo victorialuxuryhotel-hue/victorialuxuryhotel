@@ -150,6 +150,7 @@ export async function payBill(
   if (!Number.isInteger(p.amountKobo) || p.amountKobo <= 0) throw new AppError("VALIDATION", "Enter the amount received.", { fieldErrors: { amount: ["Enter an amount"] } });
   if (p.amountKobo > bill.owedKobo) throw new AppError("VALIDATION", `Only ${formatNaira(bill.owedKobo)} is owed on this bill.`, { fieldErrors: { amount: [`At most ${formatNaira(bill.owedKobo)}`] } });
   let left = p.amountKobo;
+  let lastPaymentId: string | null = null;
   const receipts: { reference: string; receiptNumber: string; amountKobo: number }[] = [];
   for (const [i, rid] of bill.reservationIds.entries()) {
     if (left <= 0) break;
@@ -164,6 +165,16 @@ export async function payBill(
     });
     receipts.push({ reference: res.reference, receiptNumber: r.receiptNumber, amountKobo: part });
     left -= part;
+    lastPaymentId = r.paymentId;
   }
+  await markBillLinksPaid(db, bill.id, lastPaymentId);
   return { receipts };
+}
+
+/** Once nothing is owed on a bill, its open payment links are marked paid (by the payment that cleared it). */
+export async function markBillLinksPaid(db: Db, billId: string, paymentId: string | null): Promise<void> {
+  if (!paymentId) return;
+  const bill = await getBill(db, { id: "system", role: "owner" }, billId);
+  if (!bill || bill.owedKobo > 0) return;
+  await db.prepare("UPDATE pay_links SET paid_payment_id = ? WHERE bill_id = ? AND paid_payment_id IS NULL AND cancelled_at IS NULL").bind(paymentId, billId).run();
 }

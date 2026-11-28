@@ -396,7 +396,7 @@ export async function testStation(type, key = type, createdBy) {
 }
 
 /** Makes this browser the station (the cookie the owner's set-up leaves). */
-export async function useStation(p, station) {
+export async function stationFor(p, station) {
   await p.setCookie({ name: "vl_station", value: station.token, domain: new URL(BASE).hostname, path: "/", httpOnly: true, sameSite: "Lax" });
 }
 
@@ -430,7 +430,7 @@ export async function as(role, { next = "", station: key = role, viewport } = {}
   const acc = await pinStaff(role);
   const station = await testStation(STATION_TYPE[role], key, acc.id);
   const s = await session(viewport);
-  await useStation(s.p, station);
+  await stationFor(s.p, station);
   await go(s.p, `/station${next}`);
   await enterPin(s.p, acc.fullName, acc.pin);
   await s.p.waitForFunction(() => location.pathname.startsWith("/app") || document.querySelector("[role=alert]"), { timeout: 30000 });

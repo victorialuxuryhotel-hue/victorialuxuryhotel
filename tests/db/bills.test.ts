@@ -1,6 +1,7 @@
 // Company bills, paid before arrival (FUNCTIONALITY.md section 11).
 import { describe, expect, it } from "vitest";
 import { cancelBill, createBill, getBill, payBill } from "@/server/domain/bills";
+import { createBillPayLink } from "@/server/domain/pay-links";
 import { netPaid } from "@/server/domain/reservations";
 import { day, db, desk, insertReservation, makeCategory, q, q1, rejects, status } from "./helpers";
 
@@ -38,6 +39,10 @@ describe("company bills", () => {
     expect(await netPaid(db, ids[1]!)).toBe(8_500_000);
     expect(await netPaid(db, ids[2]!)).toBe(0);
     expect((await getBill(db, desk, id))!.owedKobo).toBe(25_500_000);
+    // Paying the rest marks the bill's payment link paid.
+    const link = await createBillPayLink(db, desk, id, "https://victorialuxuryhotel.com");
+    await payBill(db, desk, id, { amountKobo: 25_500_000, method: "cash", paidOn: day(0), confirmReceived: true });
+    expect((await q1<{ paid_payment_id: string | null }>("SELECT paid_payment_id FROM pay_links WHERE code = ?", link.code)).paid_payment_id).not.toBeNull();
   });
 
   it("a bill can't be changed or deleted; cancelling is final; only front desk and up make bills", async () => {

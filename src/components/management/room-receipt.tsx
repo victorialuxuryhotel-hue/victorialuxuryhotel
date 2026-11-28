@@ -53,7 +53,7 @@ export function RoomReceipt({ payment, stay, lines, vatRateBp, taxId, copy }: { 
         </tfoot>
       </table>
       <p className="mt-8 border-t border-hairline pt-4 text-sm text-ink-700">
-        Thank you for staying with us.{payment.provider === "paystack" ? " Paid online through Paystack." : payment.recordedBy ? ` Checked by ${payment.recordedBy}.` : ""} This receipt was issued by {hotel.name}.
+        Thank you for staying with us.{payment.provider === "paystack" ? " Paid online through Paystack." : payment.recordedBy ? ` Received by ${payment.recordedBy}.` : ""} This receipt was issued by {hotel.name}.
       </p>
     </article>
   );

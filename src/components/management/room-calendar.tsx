@@ -109,8 +109,10 @@ export function RoomCalendar({ days, blocks, today, firstBookable, links }: { da
                     )}
                   </div>
                   {days.map((d, i) =>
-                    lane.outOfOrder || d < firstBookable ? (
-                      <div key={d} style={{ gridColumn: i + 2, gridRow: 1 }} className={cn("min-h-[42px] border-l border-[#f1eee8]", d === today && "bg-[#f7f9fe]")} />
+                    // No new booking where it couldn't be made: out of order, before the first bookable night, or the type is
+                    // already full that night (an overdue guest can hold the capacity while a room looks empty).
+                    lane.outOfOrder || d < firstBookable || (b.free[i] ?? 1) <= 0 ? (
+                      <div key={d} title={(b.free[i] ?? 1) <= 0 ? `${b.type.name} is full this night` : undefined} style={{ gridColumn: i + 2, gridRow: 1 }} className={cn("min-h-[42px] border-l border-[#f1eee8]", d === today && "bg-[#f7f9fe]")} />
                     ) : (
                       <Link
                         key={d}
