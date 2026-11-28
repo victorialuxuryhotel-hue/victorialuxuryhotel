@@ -461,3 +461,14 @@ These are deliberately **not final** in the app:
   Reference, Guest, Source, Dates, Room, Status, Total. The status says what the desk needs: Awaiting payment,
   Owes ₦X, Paid, Checked in, Overdue, Checked out, Cancelled (display only). One status at a time, as before.
 - New shared `Menu` (src/components/ui/menu.tsx) for the D1/D2 dropdowns.
+- Payments (R107): tiles for Taken today, Cash in the drawer, To confirm (count and amount, opens Payments to
+  confirm for those who can) and Refunds due; Today | Mine for the front desk (managers keep the list of every
+  payment, paged); Cash / Transfer / POS / Online chips that narrow the list on screen; then Time, Receipt, From,
+  Method ("Transfer · ref", "POS · slip 4417", "Card online"), Status (Paid, To confirm, Correction) and Amount.
+  *Record a payment* opens the existing page (which asks for the booking first). Two read-only additions in
+  `payment-list.ts`: a to-confirm flag per payment and the to-confirm / refunds-due totals (tests added).
+- Payments to confirm (R108): the "check in the bank app, never on the customer's phone" note; *Check with the bank*
+  kept as its own card with a count; tabs *To confirm · N*, *Matched*, *Not found* (the last two are new read-only
+  lists of past checks with who checked and when, `checkedPayments`, test added); the table Taken, Method,
+  Reference, Taken by, For, Amount with *Not found* then *Matches* at the row's end. The person who recorded a
+  payment still sees "You recorded this, so another manager or the owner confirms it." instead of the buttons.

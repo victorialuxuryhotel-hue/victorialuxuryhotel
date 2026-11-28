@@ -12,7 +12,7 @@ export function ConfirmButtons({ sourceType, sourceId }: { sourceType: string; s
   const [state, action, pending] = useActionState(confirmPayment, null);
   const [missing, setMissing] = useState(false);
   return (
-    <form action={action} className="flex flex-wrap items-center justify-end gap-2">
+    <form action={action} className={`flex items-center justify-end gap-2 ${missing ? "flex-wrap" : ""}`}>
       <input type="hidden" name="sourceType" value={sourceType} />
       <input type="hidden" name="sourceId" value={sourceId} />
       {missing ? (
@@ -24,8 +24,8 @@ export function ConfirmButtons({ sourceType, sourceId }: { sourceType: string; s
         </>
       ) : (
         <>
-          <Button type="submit" name="outcome" value="matched" size="sm" pending={pending}>Matches</Button>
           <Button type="button" size="sm" variant="secondary" onClick={() => setMissing(true)}>Not found</Button>
+          <Button type="submit" name="outcome" value="matched" size="sm" pending={pending}>Matches</Button>
         </>
       )}
       {state && !state.ok ? <FormMessage>{state.message}</FormMessage> : null}

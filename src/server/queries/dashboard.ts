@@ -70,16 +70,19 @@ const toPayment = (p: P): PaymentRow => ({
   status: p.status, paidAt: p.paid_at ?? undefined, receiptNumber: p.receipt_number ?? undefined, recordedBy: p.recorder ?? undefined,
 });
 
+export type ListedPaymentRow = PaymentRow & { at: string; recordedById?: string; kind: "payment" | "refund"; toConfirm: boolean };
+
 export async function listPayments(opts: { view?: string; page?: number; size?: number }) {
   const staff = await authorizeRead(["payments.record", "reports.view"]);
   const { view, rows } = await listPaymentsFor(await getDb(), actorOf(staff), opts);
   return {
     view,
-    rows: rows.map((p): PaymentRow & { at: string; recordedById?: string; kind: "payment" | "refund" } => ({
+    rows: rows.map((p): ListedPaymentRow => ({
       ...toPayment({ ...p, method: p.method }),
       at: p.paid_at ?? p.created_at,
       recordedById: p.recorded_by ?? undefined,
       kind: p.kind,
+      toConfirm: Boolean(p.to_confirm),
     })),
   };
 }

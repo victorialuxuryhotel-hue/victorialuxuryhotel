@@ -23,10 +23,17 @@ export type ListedPayment = {
   id: string; amount_kobo: number; kind: "payment" | "refund"; method: PaymentMethod | null; provider: "paystack" | "offline";
   provider_reference: string | null; status: PaymentStatus; paid_at: string | null; created_at: string; receipt_number: string | null;
   reservation_id: string; reference: string; guest_name: string; recorder: string | null; recorded_by: string | null;
+  /** 1 while a transfer or POS payment waits in Payments to confirm. */
+  to_confirm: number;
 };
 
+/** A desk transfer or POS payment nobody has checked yet: the same rule as Payments to confirm. */
+const UNCHECKED = `p.provider = 'offline' AND p.kind = 'payment' AND p.method IN ('bank_transfer', 'pos_terminal')
+    AND NOT EXISTS (SELECT 1 FROM payment_checks c WHERE c.source_type = 'payment' AND c.source_id = p.id)`;
+
 const SELECT = `SELECT p.id, p.amount_kobo, p.kind, p.method, p.provider, coalesce(p.provider_reference, p.slip_last4, p.sender_name) AS provider_reference, p.status, p.paid_at, p.created_at,
-    p.receipt_number, p.reservation_id, r.reference, g.full_name AS guest_name, s.full_name AS recorder, p.recorded_by
+    p.receipt_number, p.reservation_id, r.reference, g.full_name AS guest_name, s.full_name AS recorder, p.recorded_by,
+    (${UNCHECKED}) AS to_confirm
   FROM payments p JOIN reservations r ON r.id = p.reservation_id JOIN guests g ON g.id = r.guest_id
   LEFT JOIN staff_profiles s ON s.id = p.recorded_by`;
 
@@ -55,18 +62,28 @@ export type FrontDeskSummary = {
   todayCount: number;
   mineCount: number;
   totals: { cash: number; transfer: number; cardOnline: number; pos: number; other: number };
+  /** Desk transfers and POS payments waiting to be checked, and refunds asked for but not yet decided (any day). */
+  toConfirm: { count: number; kobo: number };
+  refundsDue: { count: number; kobo: number };
 };
 
 export async function frontDeskSummary(db: Db, actor: Actor, today = hotelToday()): Promise<FrontDeskSummary> {
   requireRole(actor, PAYMENT_READERS);
   const t = paymentScopeSql("today", actor.id, today);
   const m = paymentScopeSql("mine", actor.id, today);
-  const [counts, totals] = await Promise.all([
+  const [counts, waiting, totals] = await Promise.all([
     first<{ today: number; mine: number }>(
       db,
       `SELECT (SELECT count(*) FROM payments p WHERE ${t.where}) AS today, (SELECT count(*) FROM payments p WHERE ${m.where}) AS mine`,
       ...t.params,
       ...m.params,
+    ),
+    first<{ check_count: number; check_kobo: number; refund_count: number; refund_kobo: number }>(
+      db,
+      `SELECT (SELECT count(*) FROM payments p WHERE p.status = 'successful' AND ${UNCHECKED}) AS check_count,
+              (SELECT coalesce(sum(p.amount_kobo), 0) FROM payments p WHERE p.status = 'successful' AND ${UNCHECKED}) AS check_kobo,
+              (SELECT count(*) FROM refund_requests WHERE decided_at IS NULL) AS refund_count,
+              (SELECT coalesce(sum(amount_kobo), 0) FROM refund_requests WHERE decided_at IS NULL) AS refund_kobo`,
     ),
     all<{ bucket: keyof FrontDeskSummary["totals"]; kobo: number }>(
       db,
@@ -83,5 +100,11 @@ export async function frontDeskSummary(db: Db, actor: Actor, today = hotelToday(
   ]);
   const sum = { cash: 0, transfer: 0, cardOnline: 0, pos: 0, other: 0 };
   for (const r of totals) sum[r.bucket] = r.kobo;
-  return { todayCount: counts?.today ?? 0, mineCount: counts?.mine ?? 0, totals: sum };
+  return {
+    todayCount: counts?.today ?? 0,
+    mineCount: counts?.mine ?? 0,
+    totals: sum,
+    toConfirm: { count: waiting?.check_count ?? 0, kobo: waiting?.check_kobo ?? 0 },
+    refundsDue: { count: waiting?.refund_count ?? 0, kobo: waiting?.refund_kobo ?? 0 },
+  };
 }

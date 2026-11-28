@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createWebsiteReservation } from "@/server/domain/reservations";
 
 import { frontDeskSummary, listPaymentsFor } from "@/server/domain/payment-list";
+import { checkPayment } from "@/server/domain/payment-checks";
 import { addDays, hotelInstant, hotelToday } from "@/lib/hotel-date";
 import { day, db, desk, exec, gm, makeCategory, owner, rawPayment } from "./helpers";
 
@@ -77,5 +78,33 @@ describe("payments the front desk can see", () => {
     expect(after.todayCount - before.todayCount).toBe(1);
     expect(after.mineCount - before.mineCount).toBe(2);
     expect(after.totals.cash - before.totals.cash).toBe(1_500_000);
+  });
+
+  it("marks transfers and POS payments waiting in Payments to confirm, until a manager checks them", async () => {
+    const b = await booking();
+    const before = await frontDeskSummary(db, desk);
+    const transfer = await rawPayment(b.id, 900_000, { method: "bank_transfer", recordedBy: desk!.id });
+    const cash = await rawPayment(b.id, 400_000, { method: "cash", recordedBy: desk!.id });
+    const flag = async (id: string) => (await listPaymentsFor(db, gm, { size: 500 })).rows.find((r) => r.id === id)?.to_confirm;
+    expect(await flag(transfer)).toBe(1);
+    expect(await flag(cash)).toBe(0);
+    const waiting = await frontDeskSummary(db, desk);
+    expect(waiting.toConfirm.count - before.toConfirm.count).toBe(1);
+    expect(waiting.toConfirm.kobo - before.toConfirm.kobo).toBe(900_000);
+    await checkPayment(db, gm, { sourceType: "payment", sourceId: transfer, outcome: "matched" });
+    expect(await flag(transfer)).toBe(0);
+    expect((await frontDeskSummary(db, desk)).toConfirm.count).toBe(before.toConfirm.count);
+  });
+
+  it("counts refunds asked for and not yet decided", async () => {
+    const b = await booking();
+    const before = await frontDeskSummary(db, desk);
+    await exec(
+      "INSERT INTO refund_requests (id, reservation_id, amount_kobo, method, reason, requested_by) VALUES (?, ?, 200000, 'cash', 'Guest left early', ?)",
+      crypto.randomUUID(), b.id, desk!.id,
+    );
+    const after = await frontDeskSummary(db, desk);
+    expect(after.refundsDue.count - before.refundsDue.count).toBe(1);
+    expect(after.refundsDue.kobo - before.refundsDue.kobo).toBe(200_000);
   });
 });

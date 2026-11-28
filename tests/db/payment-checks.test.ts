@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Actor } from "@/server/db";
 import { createStaffProfile } from "@/server/domain/admin";
 import { createHallBooking, recordHallPayment } from "@/server/domain/events";
-import { checkPayment, paymentsToConfirm, toConfirmSummary } from "@/server/domain/payment-checks";
+import { checkedPayments, checkPayment, paymentsToConfirm, toConfirmSummary } from "@/server/domain/payment-checks";
 import { recordOfflinePayment } from "@/server/domain/payments";
 import { payOrder, saveMenuItem } from "@/server/domain/pos";
 import { day, db, desk, exec, gm, insertReservation, makeCategory, owner, q1, rejects } from "./helpers";
@@ -41,6 +41,20 @@ describe("payments to confirm", () => {
     const list = await paymentsToConfirm(db, fin);
     const sum = await toConfirmSummary(db, fin);
     expect(sum).toEqual({ count: list.length, kobo: list.reduce((t, r) => t + r.amount_kobo, 0) });
+  });
+
+  it("lists checked payments under Matched or Not found, with who checked them", async () => {
+    const a = await deskPayment("bank_transfer", `GTB ${rand()}`);
+    const b = await deskPayment("pos_terminal", "5512");
+    await checkPayment(db, gm, { sourceType: "payment", sourceId: a.paymentId, outcome: "matched" });
+    await checkPayment(db, gm, { sourceType: "payment", sourceId: b.paymentId, outcome: "not_found", note: "Not on the terminal report" });
+    const matched = await checkedPayments(db, fin, "matched");
+    const missing = await checkedPayments(db, fin, "not_found");
+    expect(matched.find((x) => x.source_id === a.paymentId)).toMatchObject({ outcome: "matched", amount_kobo: 5_000_000, method: "bank_transfer" });
+    expect(matched.find((x) => x.source_id === b.paymentId)).toBeUndefined();
+    expect(missing.find((x) => x.source_id === b.paymentId)).toMatchObject({ note: "Not on the terminal report", reference: "5512" });
+    expect(missing.find((x) => x.source_id === b.paymentId)?.checked_by).toBeTruthy();
+    await rejects(checkedPayments(db, desk, "matched"), /./);
   });
 
   it("Matches takes it off the list, once; the check can't be changed or deleted", async () => {
