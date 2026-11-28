@@ -487,3 +487,7 @@ These are deliberately **not final** in the app:
   a white grid with ROOM and day columns (today highlighted), the room number in bold with its type, bars in the R1
   colours (Booked navy, In house green, Awaiting payment amber, Overdue red) and the legend under the grid with "Tap
   an empty night to book it". The free-per-type row stays: it is how the desk sees a full night at a glance.
+- Guests (R106): "Contact details and stay history"; search; a *Guests* card with Guest (initials, name, email),
+  Phone, Stays, Last stay, Total paid and an *Open* button per row. The design's "Most recent first" sort dropdown is
+  not added: the list has one order on the server and a sort would be a query change. The guest page uses the same
+  white cards, and its bookings card is called *Stays* with a count.
