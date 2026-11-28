@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
+import { cn } from "@/lib/utils/cn";
 import { AccessDenied } from "@/components/management/access-denied";
 import { PageHeader } from "@/components/management/page-header";
 import { SettingsSection } from "@/components/management/settings";
@@ -14,35 +16,56 @@ import { getBookingRules, getCatalogueSettings } from "@/server/queries/settings
 
 export const metadata: Metadata = { title: "Booking rules" };
 
-export default function SettingsPage() {
+type Tab = "rules" | "payments" | "extras" | "promos";
+const TABS: [Tab, string][] = [["rules", "Rules"], ["payments", "Payment details"], ["extras", "Extras"], ["promos", "Promo codes"]];
+
+export default function SettingsPage(props: PageProps<"/app/settings">) {
   return (
-    <>
-      <PageHeader title="Booking rules" description="Check-in times, holds, cancellations and VAT." />
-      <Suspense fallback={<LoadingState />}>
-        <SettingsContent />
-      </Suspense>
-    </>
+    <Suspense fallback={<><PageHeader title="Booking rules" description="Changes apply to new bookings" /><LoadingState /></>}>
+      <SettingsContent searchParams={props.searchParams} />
+    </Suspense>
   );
 }
 
-async function SettingsContent() {
+async function SettingsContent({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const staff = await requireStaff();
   if (!can(staff.role, "settings.manage")) return <AccessDenied />;
+  const raw = (await searchParams).tab;
+  const tab: Tab = TABS.some(([t]) => t === raw) ? (raw as Tab) : "rules";
   const [rules, catalogue, pay] = await Promise.all([getBookingRules(), getCatalogueSettings(), getDb().then(paymentSettings)]);
   return (
-    <div className="space-y-6 px-4 py-6 lg:px-8">
-      <SettingsSection title="Booking rules" description="Changes apply to new bookings.">
-        <BookingRulesForm rules={rules} />
-      </SettingsSection>
-      <SettingsSection title="Payment details" description="The hotel's bank account for transfers, and the POS terminals.">
-        <PaymentDetailsForm value={pay} />
-      </SettingsSection>
-      <SettingsSection title="Extras" description="Guests can add these when they book online.">
-        <ExtrasManager extras={catalogue.extras} />
-      </SettingsSection>
-      <SettingsSection title="Promo codes" description="Percent off the room price when a guest enters the code.">
-        <PromoManager promos={catalogue.promos} />
-      </SettingsSection>
-    </div>
+    <>
+      <PageHeader title="Booking rules" description="Changes apply to new bookings" />
+      <nav aria-label="Booking rules" className="mx-4 mt-4 flex gap-6 overflow-x-auto border-b border-hairline lg:mx-8">
+        {TABS.map(([t, label]) => (
+          <Link
+            key={t}
+            href={t === "rules" ? "/app/settings" : `/app/settings?tab=${t}`}
+            aria-current={t === tab ? "page" : undefined}
+            className={cn("-mb-px shrink-0 border-b-[3px] px-0.5 pb-2.5 text-[15px] font-semibold whitespace-nowrap", t === tab ? "border-navy-900 text-ink-900" : "border-transparent text-ink-500 hover:text-ink-900")}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+      <div className="px-4 py-4 lg:px-8">
+        {tab === "rules" ? <BookingRulesForm rules={rules} /> : null}
+        {tab === "payments" ? (
+          <SettingsSection title="Payment details" description="The hotel's bank account for transfers, and the POS terminals.">
+            <div className="p-5"><PaymentDetailsForm value={pay} /></div>
+          </SettingsSection>
+        ) : null}
+        {tab === "extras" ? (
+          <SettingsSection title="Extras" description="Guests can add these when they book online.">
+            <ExtrasManager extras={catalogue.extras} />
+          </SettingsSection>
+        ) : null}
+        {tab === "promos" ? (
+          <SettingsSection title="Promo codes" description="Percent off the room price when a guest enters the code.">
+            <PromoManager promos={catalogue.promos} />
+          </SettingsSection>
+        ) : null}
+      </div>
+    </>
   );
 }

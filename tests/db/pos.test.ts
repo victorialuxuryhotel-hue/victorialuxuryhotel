@@ -215,14 +215,14 @@ describe("daily closing", () => {
 
     await rejects(verifyClosing(db, att, id, null), /role can't do this/);
     await verifyClosing(db, mgr, id, "Checked the till");
-    await rejects(verifyClosing(db, mgr, id, null), /already signed off/);
+    await rejects(verifyClosing(db, mgr, id, null), /already checked/);
     await rejects(exec("UPDATE pos_closings SET counted_cash_kobo = 300000 WHERE id = ?", id), /closing_immutable/);
     expect(await q1("SELECT expected_cash_kobo AS e, counted_cash_kobo AS c FROM pos_closings WHERE id = ?", id)).toEqual({ e: 300_000, c: 250_000 });
 
     const mgrSale = await payOrder(db, mgr, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: itemId, quantity: 1 }], method: "cash" });
     const own = await closeDay(db, mgr, { countedCashKobo: mgrSale.totalKobo, explanation: null });
     if (!own.closed) throw new Error("a matching count closes at once");
-    await rejects(verifyClosing(db, mgr, own.id, null), /Another manager or the owner/);
+    await rejects(verifyClosing(db, mgr, own.id, null), /Another manager must check/);
     await verifyClosing(db, owner, own.id, null);
   });
 });

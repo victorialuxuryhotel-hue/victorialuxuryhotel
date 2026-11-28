@@ -54,10 +54,10 @@ check("the receipt shows the POS slip", /POS \/ card · slip …7731/.test(await
 
 // Fix 5: the cash count is blind. (Not submitted here: that would close this salesperson's day.)
 await go(p, "/app/sales/closing");
-await waitForText(p, /Your day/);
+await waitForText(p, /Close my day/);
 const page = await text(p);
-const yourDay = page.slice(page.indexOf("Your day")).split(/Closings · last 14 days/i)[0];
-check("closing names the business day and when it ends", /Business day \w{3} \d{1,2} \w{3} \(ends 06:00\)/.test(yourDay), yourDay.slice(0, 120));
+const yourDay = page.slice(page.indexOf("Close my day")).split(/Your closings/i)[0];
+check("closing names the business day", /business day \w{3} \d{1,2} \w{3}/.test(yourDay), yourDay.slice(0, 120));
 check("no expected cash or money totals before the count", !/Cash expected|₦\s?[0-9]/.test(yourDay), JSON.stringify(yourDay.slice(0, 600)));
 check("the count comes first", /Submit my count/.test(yourDay));
 await ctx.close();

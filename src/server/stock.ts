@@ -6,7 +6,7 @@ import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { actorOf, authorize } from "./auth";
 import { getDb } from "./db";
 import { recordId } from "@/lib/ids";
-import { addStockItem, recordMove, updateStockItem } from "./domain/stock";
+import { addStockItem, recordDelivery, recordMove, updateStockItem } from "./domain/stock";
 
 export async function addItem(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   try {
@@ -58,6 +58,38 @@ export async function editStockItem(_prev: ActionResult | null, formData: FormDa
       })
       .parse(Object.fromEntries(formData));
     await updateStockItem(await getDb(), actorOf(staff), v.id, { category: v.category, minQuantity: v.minQuantity, active: formData.get("active") !== "0" });
+    refresh();
+    return ok(undefined);
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+/** Record a delivery (X12): quantity received, supplier, optional cost in naira, and a note for the invoice. */
+export async function receiveDelivery(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  try {
+    const staff = await authorize("inventory.manage");
+    const v = z
+      .object({
+        itemId: recordId("Choose the item"),
+        quantity: z.coerce.number("Enter how many came in").int("Enter a whole number").min(1, "Enter how many came in").max(1_000_000),
+        supplier: z.string().trim().min(2, "Enter who supplied it").max(80, "Keep the supplier short"),
+        cost: z
+          .string()
+          .transform((s) => s.replace(/[,\s₦]/g, ""))
+          .refine((s) => s === "" || (/^\d+(\.\d{1,2})?$/.test(s) && Number(s) <= 100_000_000), "Enter the cost in naira, or leave it empty")
+          .transform((s) => (s === "" ? null : Math.round(Number(s) * 100))),
+        note: z.string().trim().max(200, "Keep the note short"),
+      })
+      .safeParse({
+        itemId: formData.get("itemId") ?? "",
+        quantity: formData.get("quantity") ?? "",
+        supplier: formData.get("supplier") ?? "",
+        cost: String(formData.get("cost") ?? ""),
+        note: String(formData.get("note") ?? ""),
+      });
+    if (!v.success) throw new AppError("VALIDATION", "Check the highlighted fields", { fieldErrors: z.flattenError(v.error).fieldErrors });
+    await recordDelivery(await getDb(), actorOf(staff), { ...v.data, costKobo: v.data.cost, note: v.data.note || null });
     refresh();
     return ok(undefined);
   } catch (err) {

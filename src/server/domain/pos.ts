@@ -1,6 +1,6 @@
 import { AppError } from "@/lib/errors";
 import { formatNaira } from "@/lib/format";
-import { addDays, businessDate, businessDayStart } from "@/lib/hotel-date";
+import { addDays, BUSINESS_DAY_START_HOUR, businessDate, businessDayStart, hotelInstant } from "@/lib/hotel-date";
 import { dbErrorToken } from "../db-errors";
 import { can } from "@/lib/auth/permissions";
 import { checkDetails, duplicateError, duplicateWarning, type Details } from "./payment-details";
@@ -709,24 +709,34 @@ export async function closeDay(db: Db, actor: Actor, v: { countedCashKobo: numbe
   return { closed: true, id };
 }
 
+/**
+ * A manager marks a closing checked (X11). Nobody checks their own closing, the owner included (FUNCTIONALITY 8),
+ * and a short or over closing needs a note saying what they found.
+ */
 export async function verifyClosing(db: Db, actor: Actor, id: string, note: string | null): Promise<void> {
   requireRole(actor, POS_MANAGERS);
-  const c = await first<{ staff_id: string; verified_at: string | null }>(db, "SELECT staff_id, verified_at FROM pos_closings WHERE id = ?", id);
+  const c = await first<{ staff_id: string; verified_at: string | null; diff: number }>(
+    db, "SELECT staff_id, verified_at, counted_cash_kobo - expected_cash_kobo AS diff FROM pos_closings WHERE id = ?", id,
+  );
   if (!c) throw new AppError("NOT_FOUND", "Closing not found.");
-  if (c.verified_at) throw new AppError("CONFLICT", "This closing is already signed off.");
-  if (c.staff_id === actor.id && actor.role !== "owner") throw new AppError("FORBIDDEN", "Another manager or the owner must sign off your own closing.");
+  if (c.verified_at) throw new AppError("CONFLICT", "This closing is already checked.");
+  if (c.staff_id === actor.id) throw new AppError("FORBIDDEN", "Another manager must check your own closing.");
+  const why = note?.trim().slice(0, 300) || null;
+  if (c.diff !== 0 && (!why || why.length < 3)) throw new AppError("VALIDATION", `The cash is ${c.diff < 0 ? "short" : "over"}. Add a note saying what you found.`);
   const [r] = await writeBatch(db, actor, [
     db
       .prepare("UPDATE pos_closings SET verified_by = ?, verified_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), verify_note = ? WHERE id = ? AND verified_at IS NULL")
-      .bind(actor.id, note?.trim().slice(0, 300) || null, id),
-    activityIfChanged(db, "pos.closing_verified", "pos_closing", id, `Restaurant & bar closing signed off${note?.trim() ? `: ${note.trim()}` : ""}`),
+      .bind(actor.id, why, id),
+    activityIfChanged(db, "pos.closing_verified", "pos_closing", id, `Restaurant & bar closing checked${why ? `: ${why}` : ""}`),
   ]);
-  if (!r?.meta.changes) throw new AppError("CONFLICT", "This closing is already signed off.");
+  if (!r?.meta.changes) throw new AppError("CONFLICT", "This closing is already checked.");
 }
 
 export type ClosingRow = {
   id: string; business_date: string; staff: string; summary: string; expected_cash_kobo: number; counted_cash_kobo: number;
   explanation: string | null; closed_at: string; verified_by_name: string | null; verified_at: string | null; verify_note: string | null; staff_id: string;
+  /** The counters they sold at that day ("bar", "restaurant" or "bar,restaurant"); null if they sold nothing. */
+  outlets: string | null;
 };
 
 export async function listClosings(db: Db, actor: Actor, from: string, to: string): Promise<ClosingRow[]> {
@@ -734,10 +744,80 @@ export async function listClosings(db: Db, actor: Actor, from: string, to: strin
   return all<ClosingRow>(
     db,
     `SELECT c.id, c.business_date, s.full_name AS staff, c.summary, c.expected_cash_kobo, c.counted_cash_kobo, c.explanation, c.closed_at,
-            v.full_name AS verified_by_name, c.verified_at, c.verify_note, c.staff_id
+            v.full_name AS verified_by_name, c.verified_at, c.verify_note, c.staff_id,
+            (SELECT group_concat(outlet) FROM (SELECT DISTINCT o.outlet FROM pos_orders o
+               WHERE o.paid_by = c.staff_id AND o.status IN ('paid', 'void') AND o.paid_at >= ${dayStartSql("c.business_date")} AND o.paid_at < ${dayStartSql("date(c.business_date, '+1 day')")}
+               ORDER BY o.outlet)) AS outlets
      FROM pos_closings c JOIN staff_profiles s ON s.id = c.staff_id LEFT JOIN staff_profiles v ON v.id = c.verified_by
      WHERE c.business_date BETWEEN ? AND ? ${sees(actor) ? "" : "AND c.staff_id = ?"}
      ORDER BY c.business_date DESC, c.closed_at DESC`,
     from, to, ...(sees(actor) ? [] : [actor.id]),
   );
+}
+
+/** The UTC instant a business day starts, in SQL (Lagos is UTC+1), matching businessDayStart(). */
+const dayStartSql = (dateExpr: string) => `strftime('%Y-%m-%dT%H:%M:%fZ', ${dateExpr}, '${BUSINESS_DAY_START_HOUR - 1} hours')`;
+
+/** Closings are due by 10:00 Lagos time the day after the business date (FUNCTIONALITY 8). */
+export const CLOSING_DUE_HOUR = 10;
+
+export type NotClosed = { staff_id: string; name: string; sales: number; kobo: number };
+
+/**
+ * "Not closed": staff who sold on a business date and had no closing by 10:00 the next day. Before that time
+ * nobody is late yet, so the list is empty.
+ */
+export async function notClosed(db: Db, actor: Actor, date: string, now: Date = new Date()): Promise<NotClosed[]> {
+  requireRole(actor, POS_VIEWERS);
+  const due = hotelInstant(addDays(date, 1), `${String(CLOSING_DUE_HOUR).padStart(2, "0")}:00:00`);
+  if (now.toISOString() < due) return [];
+  return all<NotClosed>(
+    db,
+    `SELECT o.paid_by AS staff_id, s.full_name AS name, count(*) AS sales, sum(CASE WHEN o.status = 'paid' THEN o.total_kobo ELSE 0 END) AS kobo
+     FROM pos_orders o JOIN staff_profiles s ON s.id = o.paid_by
+     WHERE o.status IN ('paid', 'void') AND o.paid_at >= ? AND o.paid_at < ?
+       AND NOT EXISTS (SELECT 1 FROM pos_closings c WHERE c.staff_id = o.paid_by AND c.business_date = ? AND c.closed_at < ?)
+     GROUP BY o.paid_by ORDER BY s.full_name`,
+    dayStart(date), dayStart(addDays(date, 1)), date, due,
+  );
+}
+
+/** Monday of the business week a date falls in. */
+export function weekStart(date: string): string {
+  const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
+  return addDays(date, -((dow + 6) % 7));
+}
+
+export type ClosingsReview = {
+  rows: ClosingRow[];
+  toCheck: number;
+  short: { kobo: number; n: number };
+  over: { kobo: number; n: number };
+  notClosed: NotClosed[];
+  yesterday: string;
+};
+
+/**
+ * The managers' review (X11): every closing of the last 14 business days, how many wait to be checked, this
+ * week's short and over totals (worked out from the closings, never stored) and who didn't close yesterday.
+ */
+export async function closingsReview(db: Db, actor: Actor, now: Date = new Date()): Promise<ClosingsReview> {
+  requireRole(actor, POS_VIEWERS);
+  const today = businessDate(now);
+  const yesterday = addDays(today, -1);
+  const monday = weekStart(today);
+  const [rows, late, waiting] = await Promise.all([
+    listClosings(db, actor, addDays(today, -13), today),
+    notClosed(db, actor, yesterday, now),
+    first<{ n: number }>(db, "SELECT count(*) AS n FROM pos_closings WHERE verified_at IS NULL"),
+  ]);
+  const short = { kobo: 0, n: 0 };
+  const over = { kobo: 0, n: 0 };
+  for (const r of rows) {
+    if (r.business_date < monday) continue;
+    const diff = r.counted_cash_kobo - r.expected_cash_kobo;
+    if (diff < 0) { short.kobo += diff; short.n++; }
+    if (diff > 0) { over.kobo += diff; over.n++; }
+  }
+  return { rows, toCheck: waiting?.n ?? 0, short, over, notClosed: late, yesterday };
 }

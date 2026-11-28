@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
-import { ChevronRight, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useState } from "react";
+import { Badge, type Tone } from "@/components/ui/badge";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input } from "@/components/ui/form";
@@ -10,8 +11,7 @@ import type { StaffRow } from "@/domain/views";
 import type { ActionResult } from "@/lib/errors";
 import { formatDate } from "@/lib/format";
 import { keepValues } from "@/lib/forms";
-import { hotelDateOf } from "@/lib/hotel-date";
-import { cn } from "@/lib/utils/cn";
+import { addDays, hotelDateOf } from "@/lib/hotel-date";
 import { inviteStaff, makeOwner, resendInvite, updateStaff } from "@/server/staff";
 import { setPin } from "@/server/station";
 
@@ -34,21 +34,6 @@ const initials = (name: string) =>
     .slice(0, 2)
     .map((w) => w[0]!.toUpperCase())
     .join("");
-
-function status(s: StaffRow, today: string): string {
-  if (!s.isActive) return "Access removed";
-  if (s.lastSeen && hotelDateOf(s.lastSeen) === today) return "Active today";
-  if (s.lastSeen) return `Last active ${formatDate(hotelDateOf(s.lastSeen), { year: hotelDateOf(s.lastSeen).slice(0, 4) !== today.slice(0, 4) })}`;
-  return s.invited ? "Invited · not signed in yet" : "Not signed in yet";
-}
-
-function RoleTag({ role }: { role: StaffRole }) {
-  return (
-    <span className={cn("shrink-0 rounded-full border px-2.5 py-0.5 text-xs whitespace-nowrap", role === "owner" ? "border-gold-500 text-gold-800" : "border-hairline text-ink-700")}>
-      {staffRole[role]}
-    </span>
-  );
-}
 
 function RoleRadios({ name, value, onChange }: { name: string; value: Exclude<StaffRole, "owner">; onChange: (r: Exclude<StaffRole, "owner">) => void }) {
   return (
@@ -215,65 +200,84 @@ function ManageForm({ s, isSelf, onDone }: { s: StaffRow; isSelf: boolean; onDon
   );
 }
 
-export function StaffAccess({ rows, selfId, today }: { rows: StaffRow[]; selfId: string; today: string }) {
-  const [inviting, setInviting] = useState(false);
-  const [inviteKey, setInviteKey] = useState(0);
+function lastSeen(s: StaffRow, today: string): string {
+  if (!s.lastSeen) return "—";
+  const d = hotelDateOf(s.lastSeen);
+  if (d === today) return `Today ${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" }).format(new Date(s.lastSeen))}`;
+  if (d === addDays(today, -1)) return "Yesterday";
+  return formatDate(d, { weekday: false, year: d.slice(0, 4) !== today.slice(0, 4) });
+}
+
+function access(s: StaffRow): { tone: Tone; label: string; action: string } {
+  if (!s.isActive) return { tone: "neutral", label: "No access", action: "Restore" };
+  if (s.invited && !s.lastSeen) return { tone: "info", label: "Invited", action: "Resend invite" };
+  return { tone: "success", label: "Active", action: "Edit" };
+}
+
+export function StaffAccess({ rows, selfId, today, inviteOpen }: { rows: StaffRow[]; selfId: string; today: string; inviteOpen: boolean }) {
+  const router = useRouter();
   const [open, setOpen] = useState<string | null>(null);
   const [openKey, setOpenKey] = useState(0);
-  const inviteButton = useRef<HTMLButtonElement>(null);
-  const active = rows.filter((r) => r.isActive).length;
   const selected = rows.find((r) => r.id === open);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-ink-600 tabular-nums">
-          {active} active · {rows.length - active} removed
-        </p>
-        <Button
-          ref={inviteButton}
-          onClick={() => {
-            setInviteKey((k) => k + 1);
-            setInviting(true);
-          }}
-        >
-          <Plus className="size-4" aria-hidden /> Invite
-        </Button>
-      </div>
+    <div className="space-y-3">
+      <section className="overflow-clip rounded-xl border border-hairline bg-white">
+        <h2 className="flex items-center gap-2.5 border-b border-hairline px-4 py-3 text-base font-bold text-ink-900">
+          Staff <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-[#eceae4] px-2 text-[13px] font-semibold tabular-nums text-ink-700">{rows.length}</span>
+        </h2>
+        <div className="relative overflow-x-auto">
+          <table className="w-full min-w-[44rem] text-left text-sm">
+            <thead>
+              <tr className="border-b border-hairline text-[13px] text-ink-500">
+                <th scope="col" className="px-4 py-2.5 font-medium">Person</th>
+                <th scope="col" className="px-4 py-2.5 font-medium">Role</th>
+                <th scope="col" className="px-4 py-2.5 font-medium">Last seen</th>
+                <th scope="col" className="px-4 py-2.5 font-medium">Access</th>
+                <th scope="col" className="px-4 py-2.5"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-hairline">
+              {rows.map((s) => {
+                const a = access(s);
+                return (
+                  <tr key={s.id}>
+                    <td className="px-4 py-2.5">
+                      <span className="flex items-center gap-2.5">
+                        <span aria-hidden className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8eefb] text-[11px] font-bold text-navy-800">{initials(s.name)}</span>
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-ink-900">{s.name}{s.id === selfId ? <span className="font-normal text-ink-500"> (you)</span> : null}</span>
+                          <span className="block truncate text-[13px] text-ink-500">{s.email}</span>
+                        </span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-900">{staffRole[s.role]}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-900">{lastSeen(s, today)}</td>
+                    <td className="px-4 py-2.5"><Badge tone={a.tone}>{a.label}</Badge></td>
+                    <td className="px-4 py-2.5 text-right">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        aria-label={`${a.action}: ${s.name}`}
+                        onClick={() => {
+                          setOpenKey((k) => k + 1);
+                          setOpen(s.id);
+                        }}
+                      >
+                        {a.action}
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <p className="text-sm text-ink-600">Only the owner can invite, change roles or remove access. Removing someone keeps their name on everything they did.</p>
 
-      <ul className="divide-y divide-hairline overflow-clip rounded-card border border-hairline bg-ivory-50">
-        {rows.map((s) => (
-          <li key={s.id}>
-            <button
-              type="button"
-              onClick={() => {
-                setOpenKey((k) => k + 1);
-                setOpen(s.id);
-              }}
-              className={cn("flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-ink-900/4 sm:px-5", !s.isActive && "opacity-55")}
-            >
-              <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full border border-navy-800/30 bg-navy-50 text-sm text-navy-800">
-                {initials(s.name)}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] text-ink-900">
-                  {s.name}
-                  {s.id === selfId ? <span className="text-ink-500"> (you)</span> : null}
-                </span>
-                <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className={cn("text-xs", status(s, today) === "Active today" ? "text-success-700" : "text-ink-500")}>{status(s, today)}</span>
-                  <span className="sm:hidden"><RoleTag role={s.role} /></span>
-                </span>
-              </span>
-              <span className="hidden sm:block"><RoleTag role={s.role} /></span>
-              <ChevronRight className="size-4 shrink-0 text-ink-400" aria-hidden />
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <BottomSheet open={inviting} onClose={() => setInviting(false)} title="Invite staff" subtitle="They get an email with a link to sign in." trigger={inviteButton} dialogOnDesktop>
-        <InviteForm key={inviteKey} onDone={() => setInviting(false)} />
+      <BottomSheet open={inviteOpen} onClose={() => router.replace("/app/staff", { scroll: false })} title="Invite someone" subtitle="They get an email with a link to sign in." dialogOnDesktop>
+        <InviteForm onDone={() => router.replace("/app/staff", { scroll: false })} />
       </BottomSheet>
 
       <BottomSheet

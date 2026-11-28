@@ -8,7 +8,8 @@ import { ActivityLog } from "@/components/management/activity-log";
 import { activityCategory } from "@/server/domain/activity";
 import { hotelToday } from "@/lib/hotel-date";
 import { pageFrom } from "@/components/management/pager";
-import { Tabs } from "@/components/management/toolbar";
+import { AutoSubmitSelect } from "@/components/ui/auto-submit-select";
+import { Kpi } from "@/components/ui/choice";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
@@ -25,6 +26,7 @@ type Tab = "money" | "occupancy" | "activity";
 type SP = Promise<Record<string, string | string[] | undefined>>;
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 
+const shortDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", timeZone: "UTC" }).replace(",", "");
 const fixedLabel = { today: "Today", "14d": "14 days", month: "This month" } as const;
 const monthName = (m: string) => new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`));
 const rangeName = (r: ReportRange) => rangeLabel(r);
@@ -33,58 +35,83 @@ const METHODS: [Bucket, string][] = [["cash", "Cash"], ["transfer", "Transfer"],
 const DEPARTMENTS: [Department | null, string][] = [[null, "All departments"], ["rooms", "Rooms"], ["restaurant", "Restaurant"], ["bar", "Bar"], ["hall", "Conference hall"]];
 const deptQuery = (d: Department | null) => (d ? `&dept=${d}` : "");
 
-function DeptControl({ range, dept }: { range: ReportRange; dept: Department | null }) {
+/** Link tabs: Money | Occupancy | Activity (each its own address). */
+function ReportTabs({ items }: { items: { label: string; href: string; active: boolean }[] }) {
   return (
-    <nav aria-label="Department" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
-      {DEPARTMENTS.map(([d, label]) => (
+    <nav aria-label="Reports" className="mx-4 mt-4 flex gap-6 overflow-x-auto border-b border-hairline lg:mx-8">
+      {items.map((t) => (
         <Link
-          key={label}
-          href={`/app/reports?tab=money&range=${range}${deptQuery(d)}`}
-          aria-current={d === dept ? "page" : undefined}
-          className={cn(
-            "inline-flex min-h-10 shrink-0 items-center rounded-full border px-4 text-sm whitespace-nowrap",
-            d === dept ? "border-navy-800 bg-navy-800 text-white" : "border-ink-300 bg-ivory-50 text-ink-700 hover:bg-ink-900/5",
-          )}
+          key={t.label}
+          href={t.href}
+          aria-current={t.active ? "page" : undefined}
+          className={cn("-mb-px shrink-0 border-b-[3px] px-0.5 pb-2.5 text-[15px] font-semibold whitespace-nowrap", t.active ? "border-navy-900 text-ink-900" : "border-transparent text-ink-500 hover:text-ink-900")}
         >
-          {label}
+          {t.label}
         </Link>
       ))}
     </nav>
   );
 }
 
-function RangeControl({ tab, range, dept }: { tab: Tab; range: ReportRange; dept: Department | null }) {
+/**
+ * The period as a segmented control (design R303), an earlier month, the department and Export to Excel in
+ * one row. The periods are links so a report can be shared.
+ */
+function Controls({ tab, range, dept, hotelOnly }: { tab: Tab; range: ReportRange; dept: Department | null; hotelOnly: boolean }) {
   const months = recentMonths(hotelToday()).slice(1);
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <nav aria-label="Period" className="flex overflow-hidden rounded-md border border-hairline [&>*+*]:border-l [&>*+*]:border-hairline sm:w-96">
+    <div className="flex flex-wrap items-center gap-3">
+      <nav aria-label="Period" className="flex w-fit gap-1 rounded-lg bg-[#eae7df] p-1">
         {(["today", "14d", "month"] as const).map((r) => (
           <Link
             key={r}
             href={`/app/reports?tab=${tab}&range=${r}${deptQuery(dept)}`}
             aria-current={r === range ? "page" : undefined}
-            className={cn(
-              "flex min-h-11 flex-1 items-center justify-center px-2 text-sm",
-              r === range ? "text-navy-800 shadow-[inset_0_0_0_1px_var(--color-navy-800)]" : "text-ink-900 hover:bg-ink-900/7",
-            )}
+            className={cn("flex h-10 items-center whitespace-nowrap rounded-md px-5 text-[15px] font-semibold", r === range ? "bg-white text-ink-900 shadow-[0_1px_2px_rgba(0,0,0,.12)]" : "text-ink-600 hover:text-ink-900")}
           >
             {fixedLabel[r]}
           </Link>
         ))}
       </nav>
       {months.length ? (
-        <form action="/app/reports" className="flex gap-2">
+        <form action="/app/reports">
           <input type="hidden" name="tab" value={tab} />
           {dept ? <input type="hidden" name="dept" value={dept} /> : null}
-          <label htmlFor="month" className="sr-only">Earlier month</label>
-          <select id="month" name="range" defaultValue={months.includes(range) ? range : ""} className="min-h-11 rounded-md border border-hairline bg-ivory-50 px-3 text-sm">
-            <option value="" disabled>Earlier month</option>
+          <AutoSubmitSelect name="range" defaultValue={months.includes(range) ? range : ""} aria-label="Earlier month" className="w-48">
+            <option value="" disabled>Earlier month…</option>
             {months.map((m) => <option key={m} value={m}>{monthName(m)}</option>)}
-          </select>
-          <button type="submit" className={buttonStyles({ variant: "secondary" })}>Show</button>
+          </AutoSubmitSelect>
         </form>
       ) : null}
+      <span className="flex-1" />
+      {tab === "money" && !hotelOnly ? (
+        <form action="/app/reports">
+          <input type="hidden" name="tab" value="money" />
+          <input type="hidden" name="range" value={range} />
+          <AutoSubmitSelect name="dept" defaultValue={dept ?? ""} aria-label="Department" className="w-48">
+            {DEPARTMENTS.map(([d, label]) => <option key={label} value={d ?? ""}>{label}</option>)}
+          </AutoSubmitSelect>
+        </form>
+      ) : null}
+      {tab === "money" ? (
+        <a href={`/app/reports/income-csv?range=${range}${deptQuery(dept)}&format=xlsx`} className={buttonStyles({ variant: "secondary" })}>Export to Excel</a>
+      ) : null}
     </div>
+  );
+}
+
+function Panel({ title, description, action, children }: { title: string; description?: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="min-w-0 overflow-clip rounded-xl border border-hairline bg-white">
+      <div className="flex items-start justify-between gap-4 border-b border-hairline px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-ink-900">{title}</h2>
+          {description ? <p className="mt-0.5 text-sm text-ink-500">{description}</p> : null}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -109,136 +136,145 @@ function Bars({ items, label, format, scaleTo }: { items: { day: string; value: 
 }
 
 async function Money({ range, dept }: { range: ReportRange; dept: Department | null }) {
-  const { income, finance } = await moneyPageData(range, dept);
+  const [{ income, finance }, o] = await Promise.all([moneyPageData(range, dept), occupancyPageData(range)]);
   const mine = dept ? finance.departments.find((d) => d.key === dept)! : null;
   const deptName = dept ? DEPARTMENTS.find(([d]) => d === dept)![1] : "All departments";
-  const line = (label: string, kobo: number, strong = false) => (
-    <div className={cn("flex justify-between gap-4 py-2", strong && "border-t border-hairline pt-3 font-semibold text-ink-900")}>
-      <dt className={strong ? "" : "text-ink-600"}>{label}</dt>
-      <dd className="tabular-nums">{formatNaira(kobo)}</dd>
-    </div>
-  );
-  const cell = "px-3 py-2.5 text-right tabular-nums whitespace-nowrap";
+  const received = mine ? mine.incomeKobo : finance.incomeTotal;
+  // Average rate and RevPAR need room revenue earned per night, which the reports don't work out yet; money
+  // received includes advance payments for later stays, so dividing it by nights would mislead.
+  const roomsKobo = finance.departments.find((d) => d.key === "rooms")?.incomeKobo ?? 0;
+  const sold = o.nights.reduce((s, n) => s + n.occupied, 0);
+  const available = o.nights.length * o.roomsInService;
+  const cell = "px-4 py-2.5 text-right tabular-nums whitespace-nowrap";
   const days = [...income.daily].reverse().filter((d) => d.total !== 0 || d.day === hotelToday());
+  const byMethod = METHODS.map(([b, label]) => [label, income.byStaff.reduce((s, t) => s + (t.byMethod[b] ?? 0), 0)] as const).filter(([, k]) => k !== 0);
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader title="Sales and payments" description={`${rangeName(range)} · ${deptName.toLowerCase()}`} />
-        {mine ? (
-          <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
-            <div>{line("Received", mine.incomeKobo, true)}</div>
-            {finance.vatRateBp ? <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, mine.vatKobo)}</div> : null}
-          </dl>
-        ) : (
-          <>
-            <dl className="grid gap-x-10 px-5 pb-5 text-sm md:grid-cols-2">
-              <div>{line("Total received", finance.incomeTotal, true)}</div>
-              {finance.vatRateBp ? <div>{line(`VAT included (${finance.vatRateBp / 100}%)`, finance.vatKobo)}</div> : null}
-            </dl>
-            <div className="overflow-x-auto border-t border-hairline">
-              <table className="w-full min-w-[24rem] text-sm">
-                <thead className="text-xs text-ink-500">
-                  <tr className="border-b border-hairline">
-                    <th scope="col" className="px-5 py-2.5 text-left font-medium">Department</th>
-                    {finance.vatRateBp ? <th scope="col" className={cn(cell, "font-medium")}>VAT included</th> : null}
-                    <th scope="col" className={cn(cell, "pr-5 font-medium")}>Received</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-hairline">
-                  {finance.departments.map((d) => (
-                    <tr key={d.key}>
-                      <th scope="row" className="px-5 py-2.5 text-left font-medium text-ink-900">
-                        <Link href={`/app/reports?tab=money&range=${range}&dept=${d.key}`} className="hover:underline">{d.label}</Link>
-                      </th>
-                      {finance.vatRateBp ? <td className={cell}>{formatNaira(d.vatKobo)}</td> : null}
-                      <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(d.incomeKobo)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-        <div className="flex flex-col gap-2 border-t border-hairline px-5 py-4 sm:flex-row">
-          <a href={`/app/reports/income-csv?range=${range}${deptQuery(dept)}&format=xlsx`} className={buttonStyles({ variant: "secondary", className: "w-full sm:w-auto" })}>
-            <Download className="size-4" aria-hidden /> Income (Excel)
-          </a>
-          <a href={`/app/reports/income-csv?range=${range}${deptQuery(dept)}`} className={buttonStyles({ variant: "ghost", className: "w-full sm:w-auto" })}>
-            Income (CSV)
-          </a>
-        </div>
-      </Card>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <Kpi label="Received" value={formatNaira(received)} note={`${deptName.toLowerCase()}${finance.vatRateBp ? ` · VAT ${formatNaira(mine ? mine.vatKobo : finance.vatKobo)} included` : ""}`} />
+        <Kpi label="Occupancy" value={`${o.averagePct}%`} note="room-nights sold ÷ available" />
+        <Kpi label="Room-nights sold" value={sold.toLocaleString("en-NG")} note={`of ${available.toLocaleString("en-NG")} available`} />
+        <Kpi label="Rooms received" value={formatNaira(roomsKobo)} note="money in for rooms, including advance payments" />
+      </div>
 
-      <Card>
-        <CardHeader title="Income by day" description={`Money received each day${dept ? "" : ", by department"}. Days with nothing received are left out.`} />
-        {income.daily.length > 1 ? (
-          <div className="border-t border-hairline">
-            <Bars items={income.daily.map((d) => ({ day: d.day, value: d.total }))} label="Bar chart of income per day" format={formatNaira} />
-          </div>
-        ) : null}
-        <div className="overflow-x-auto border-t border-hairline">
-          <table className={cn("w-full text-sm", dept ? "" : "min-w-[40rem]")}>
-            <thead className="text-xs text-ink-500">
-              <tr className="border-b border-hairline">
-                <th scope="col" className="px-5 py-2.5 text-left font-medium">Day</th>
-                {dept ? null : (
-                  <>
-                    <th scope="col" className={cn(cell, "font-medium")}>Rooms</th>
-                    <th scope="col" className={cn(cell, "font-medium")}>Restaurant</th>
-                    <th scope="col" className={cn(cell, "font-medium")}>Bar</th>
-                    <th scope="col" className={cn(cell, "font-medium")}>Hall</th>
-                  </>
-                )}
-                <th scope="col" className={cn(cell, "pr-5 font-medium")}>Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hairline">
-              {days.map((d) => (
-                <tr key={d.day}>
-                  <th scope="row" className="px-5 py-2.5 text-left font-normal text-ink-700">{formatDate(d.day, { year: false })}</th>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <Panel title="Income by day" description={`Money received each day${dept ? "" : ", by department"}. Days with nothing received are left out.`}>
+          <div className="relative overflow-x-auto">
+            <table className={cn("w-full text-sm", dept ? "" : "min-w-[36rem]")}>
+              <thead>
+                <tr className="border-b border-hairline text-[13px] text-ink-500">
+                  <th scope="col" className="px-4 py-2.5 text-left font-medium">Day</th>
                   {dept ? null : (
                     <>
-                      <td className={cell}>{formatNaira(d.rooms)}</td>
-                      <td className={cell}>{formatNaira(d.restaurant)}</td>
-                      <td className={cell}>{formatNaira(d.bar)}</td>
-                      <td className={cell}>{formatNaira(d.hall)}</td>
+                      <th scope="col" className={cn(cell, "font-medium")}>Rooms</th>
+                      <th scope="col" className={cn(cell, "font-medium")}>Restaurant</th>
+                      <th scope="col" className={cn(cell, "font-medium")}>Bar</th>
+                      <th scope="col" className={cn(cell, "font-medium")}>Hall</th>
                     </>
                   )}
-                  <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(d.total)}</td>
+                  <th scope="col" className={cn(cell, "font-medium")}>Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              </thead>
+              <tbody className="divide-y divide-hairline">
+                {days.map((d) => (
+                  <tr key={d.day}>
+                    <th scope="row" className="px-4 py-2.5 text-left font-normal text-ink-900">{shortDay(d.day)}</th>
+                    {dept ? null : (
+                      <>
+                        <td className={cn(cell, "font-semibold text-ink-900")}>{d.rooms ? formatNaira(d.rooms) : "—"}</td>
+                        <td className={cn(cell, "font-semibold text-ink-900")}>{d.restaurant ? formatNaira(d.restaurant) : "—"}</td>
+                        <td className={cn(cell, "font-semibold text-ink-900")}>{d.bar ? formatNaira(d.bar) : "—"}</td>
+                        <td className={cn(cell, "font-semibold text-ink-900")}>{d.hall ? formatNaira(d.hall) : "—"}</td>
+                      </>
+                    )}
+                    <td className={cn(cell, "font-bold text-ink-900")}>{formatNaira(d.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+        <Panel title="By method">
+          {byMethod.length ? (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-[13px] text-ink-500">
+                  <th scope="col" className="px-4 py-2.5 text-left font-medium">Method</th>
+                  <th scope="col" className={cn(cell, "font-medium")}>Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-hairline">
+                {byMethod.map(([label, k]) => (
+                  <tr key={label}><th scope="row" className="px-4 py-2.5 text-left font-normal text-ink-900">{label}</th><td className={cn(cell, "font-bold text-ink-900")}>{formatNaira(k)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <p className="px-4 py-4 text-sm text-ink-500">No money taken in this period.</p>}
+        </Panel>
+      </div>
 
-      <Card>
-        <CardHeader title="Takings by staff and method" description={`${rangeName(range)} · ${deptName.toLowerCase()} · money each person took`} />
+      {mine ? null : (
+        <Panel title="By department" description={`${rangeName(range)} · open one to see only its money`}>
+          <div className="relative overflow-x-auto">
+            <table className="w-full min-w-[24rem] text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-[13px] text-ink-500">
+                  <th scope="col" className="px-4 py-2.5 text-left font-medium">Department</th>
+                  {finance.vatRateBp ? <th scope="col" className={cn(cell, "font-medium")}>VAT included ({finance.vatRateBp / 100}%)</th> : null}
+                  <th scope="col" className={cn(cell, "font-medium")}>Received</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-hairline">
+                {finance.departments.map((d) => (
+                  <tr key={d.key}>
+                    <th scope="row" className="px-4 py-2.5 text-left font-semibold text-ink-900">
+                      <Link href={`/app/reports?tab=money&range=${range}&dept=${d.key}`} className="hover:underline">{d.label}</Link>
+                    </th>
+                    {finance.vatRateBp ? <td className={cn(cell, "text-ink-700")}>{formatNaira(d.vatKobo)}</td> : null}
+                    <td className={cn(cell, "font-bold text-ink-900")}>{formatNaira(d.incomeKobo)}</td>
+                  </tr>
+                ))}
+                <tr className="bg-ivory-50">
+                  <th scope="row" className="px-4 py-2.5 text-left font-bold text-ink-900">Total received</th>
+                  {finance.vatRateBp ? <td className={cn(cell, "font-semibold text-ink-900")}>{formatNaira(finance.vatKobo)}</td> : null}
+                  <td className={cn(cell, "font-bold text-ink-900")}>{formatNaira(finance.incomeTotal)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
+
+      <Panel
+        title="Takings by staff and method"
+        description={`${rangeName(range)} · ${deptName.toLowerCase()} · money each person took`}
+        action={<a href={`/app/reports/income-csv?range=${range}${deptQuery(dept)}`} className={buttonStyles({ variant: "ghost", size: "sm" })}><Download className="size-4" aria-hidden /> Income (CSV)</a>}
+      >
         {income.byStaff.length === 0 ? (
-          <div className="p-5"><EmptyState title="No money taken in this period" /></div>
+          <p className="px-4 py-4 text-sm text-ink-500">No money taken in this period.</p>
         ) : (
-          <div className="overflow-x-auto border-t border-hairline">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[40rem] text-sm">
-              <thead className="text-xs text-ink-500">
-                <tr className="border-b border-hairline">
-                  <th scope="col" className="px-5 py-2.5 text-left font-medium">Taken by</th>
+              <thead>
+                <tr className="border-b border-hairline text-[13px] text-ink-500">
+                  <th scope="col" className="px-4 py-2.5 text-left font-medium">Taken by</th>
                   {METHODS.map(([, label]) => <th key={label} scope="col" className={cn(cell, "font-medium")}>{label}</th>)}
-                  <th scope="col" className={cn(cell, "pr-5 font-medium")}>Total</th>
+                  <th scope="col" className={cn(cell, "font-medium")}>Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-hairline">
                 {income.byStaff.map((t) => (
                   <tr key={t.staffId ?? t.who}>
-                    <th scope="row" className="px-5 py-2.5 text-left font-medium text-ink-900">{t.who}</th>
-                    {METHODS.map(([b]) => <td key={b} className={cn(cell, !t.byMethod[b] && "text-ink-400")}>{t.byMethod[b] ? formatNaira(t.byMethod[b]) : "–"}</td>)}
-                    <td className={cn(cell, "pr-5 font-semibold text-ink-900")}>{formatNaira(t.total)}</td>
+                    <th scope="row" className="px-4 py-2.5 text-left font-semibold text-ink-900">{t.who}</th>
+                    {METHODS.map(([b]) => <td key={b} className={cn(cell, t.byMethod[b] ? "text-ink-900" : "text-ink-400")}>{t.byMethod[b] ? formatNaira(t.byMethod[b]) : "–"}</td>)}
+                    <td className={cn(cell, "font-bold text-ink-900")}>{formatNaira(t.total)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </Card>
+      </Panel>
     </div>
   );
 }
@@ -304,16 +340,15 @@ async function Content({ searchParams }: { searchParams: SP }) {
   const dept = tab === "money" ? (hotelOnly ? "rooms" : reportDepartment(str(sp.dept))) : null;
   return (
     <>
-      <div className="bg-ivory-50">
-        <Tabs
-          items={[
-            { label: "Money", href: `/app/reports?tab=money&range=${range}`, active: tab === "money" },
-            { label: "Occupancy", href: `/app/reports?tab=occupancy&range=${range}`, active: tab === "occupancy" },
-            ...(can(staff.role, "activity.view") ? [{ label: "Activity", href: "/app/reports?tab=activity", active: tab === "activity" }] : []),
-          ]}
-        />
-      </div>
-      <div className="space-y-5 px-4 py-6 lg:px-8">
+      <PageHeader title="Reports" description="Money, occupancy and staff activity" />
+      <ReportTabs
+        items={[
+          { label: "Money", href: `/app/reports?tab=money&range=${range}`, active: tab === "money" },
+          { label: "Occupancy", href: `/app/reports?tab=occupancy&range=${range}`, active: tab === "occupancy" },
+          ...(can(staff.role, "activity.view") ? [{ label: "Activity", href: "/app/reports?tab=activity", active: tab === "activity" }] : []),
+        ]}
+      />
+      <div className="space-y-4 px-4 py-4 lg:px-8">
         {tab === "activity" ? (
           can(staff.role, "activity.view") ? (
             <Activity sp={sp} />
@@ -322,8 +357,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
           )
         ) : (
           <>
-            {tab === "money" && !hotelOnly ? <DeptControl range={range} dept={dept} /> : null}
-            <RangeControl tab={tab} range={range} dept={dept} />
+            <Controls tab={tab} range={range} dept={dept} hotelOnly={hotelOnly} />
             {tab === "money" ? <Money range={range} dept={dept} /> : <Occupancy range={range} />}
           </>
         )}
@@ -334,11 +368,8 @@ async function Content({ searchParams }: { searchParams: SP }) {
 
 export default function ReportsPage(props: PageProps<"/app/reports">) {
   return (
-    <>
-      <PageHeader title="Reports" description="Money, occupancy and staff activity." />
-      <Suspense fallback={<LoadingState />}>
-        <Content searchParams={props.searchParams} />
-      </Suspense>
-    </>
+    <Suspense fallback={<><PageHeader title="Reports" description="Money, occupancy and staff activity" /><LoadingState /></>}>
+      <Content searchParams={props.searchParams} />
+    </Suspense>
   );
 }

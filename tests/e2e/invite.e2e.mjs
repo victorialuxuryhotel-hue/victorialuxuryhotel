@@ -12,7 +12,7 @@ const acceptUrl = async (invite) => new URL((await fetch(invite.url, { redirect:
 {
   const { ctx, p } = await as("owner");
   await go(p, "/app/staff");
-  await clickText(p, "button", "Invite");
+  await clickText(p, "a", "Invite someone");
   await fill(p, "#sname", invitee);
   await fill(p, "#semail", email);
   await clickText(p, "button", "Send invitation");

@@ -85,7 +85,39 @@ export async function recordMove(db: Db, actor: Actor, v: { itemId: string; kind
   }
 }
 
-export type MoveRow = { id: number; item: string; unit: string; change: number; kind: MoveKind; note: string | null; who: string | null; created_at: string; order_number: number | null };
+/**
+ * Record a delivery (X12): a `received` move with a positive change, who supplied it and, optionally, what it
+ * cost. The note holds the invoice number or anything else worth keeping.
+ */
+export async function recordDelivery(
+  db: Db,
+  actor: Actor,
+  v: { itemId: string; quantity: number; supplier: string; costKobo: number | null; note: string | null },
+): Promise<void> {
+  requireRole(actor, POS_MANAGERS);
+  if (!Number.isInteger(v.quantity) || v.quantity < 1 || v.quantity > 1_000_000) throw new AppError("VALIDATION", "Enter how many came in, as a whole number.");
+  const supplier = v.supplier.trim();
+  if (supplier.length < 2 || supplier.length > 80) throw new AppError("VALIDATION", "Enter who supplied it.");
+  if (v.costKobo !== null && (!Number.isInteger(v.costKobo) || v.costKobo < 0 || v.costKobo > 10_000_000_000)) throw new AppError("VALIDATION", "Enter the cost in naira, or leave it empty.");
+  const note = v.note?.trim().slice(0, 200) || null;
+  try {
+    await writeBatch(db, actor, [
+      db
+        .prepare("INSERT INTO stock_moves (item_id, change, kind, note, staff_id, supplier, cost_kobo) VALUES (?, ?, 'received', ?, ?, ?, ?)")
+        .bind(v.itemId, v.quantity, note, actor.id, supplier, v.costKobo),
+      activity(db, "stock.received", "stock_item", v.itemId, `Delivery received: +${v.quantity} from ${supplier}${note ? ` (${note})` : ""}`, { supplier, cost_kobo: v.costKobo }),
+    ]);
+  } catch (err) {
+    const token = err instanceof AppError ? dbErrorToken(err.cause) : null;
+    if (token === "foreign_key") throw new AppError("NOT_FOUND", "Stock item not found.");
+    throw err;
+  }
+}
+
+export type MoveRow = {
+  id: number; item: string; unit: string; change: number; kind: MoveKind; note: string | null; who: string | null; created_at: string; order_number: number | null;
+  supplier: string | null; cost_kobo: number | null;
+};
 
 export async function stockMoves(db: Db, actor: Actor, f: { from?: string; to?: string; kind?: MoveKind; itemId?: string; limit?: number } = {}): Promise<MoveRow[]> {
   requireRole(actor, VIEW);
@@ -97,7 +129,7 @@ export async function stockMoves(db: Db, actor: Actor, f: { from?: string; to?: 
   if (f.itemId) { where.push("m.item_id = ?"); params.push(f.itemId); }
   return all<MoveRow>(
     db,
-    `SELECT m.id, i.name AS item, i.unit, m.change, m.kind, m.note, s.full_name AS who, m.created_at, o.number AS order_number
+    `SELECT m.id, i.name AS item, i.unit, m.change, m.kind, m.note, s.full_name AS who, m.created_at, o.number AS order_number, m.supplier, m.cost_kobo
      FROM stock_moves m JOIN stock_items i ON i.id = m.item_id LEFT JOIN staff_profiles s ON s.id = m.staff_id LEFT JOIN pos_orders o ON o.id = m.order_id
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY m.id DESC LIMIT ${Math.min(f.limit ?? 50, 5000)}`,
     ...params,

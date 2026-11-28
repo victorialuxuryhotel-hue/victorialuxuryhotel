@@ -40,7 +40,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
       <div className="space-y-5 print:hidden">
         <Link href="/app/sales/orders" className="inline-flex items-center gap-1.5 text-sm text-ink-600 hover:text-ink-900"><ArrowLeft className="size-4" aria-hidden /> Orders & receipts</Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-3xl text-navy-950">Order #{o.number}</h1>
+          <h1 className="text-2xl font-bold text-ink-900">{o.receipt_number ?? `Order #${o.number}`}</h1>
           <Badge tone={tone[o.status]}>{ORDER_STATUS[o.status]}</Badge>
         </div>
         <Card>
