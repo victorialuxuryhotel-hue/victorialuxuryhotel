@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { as, BASE, passBotCheck, check, clerk, clickText, fill, finish, go, navLabels, one, session, settle, text, until, val, waitForText } from "./lib.mjs";
+import { asClerk as as, BASE, passBotCheck, check, clerk, clickText, fill, finish, go, navLabels, one, session, settle, text, until, val, waitForText } from "./lib.mjs";
 
 const stamp = Date.now();
 const email = `e2e-invite-${stamp}+clerk_test@victorialuxuryhotel.com`;
