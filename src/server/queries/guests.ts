@@ -1,18 +1,9 @@
 import "server-only";
 import type { GuestRow } from "@/domain/views";
 import { authorizeRead } from "../auth";
-import { all, first, getDb } from "../db";
-import { cleanSearch } from "../db-errors";
+import { first, getDb } from "../db";
+import { GUEST_COLUMNS as COLUMNS, listGuestRecords, type GuestRecord as G, type GuestSort } from "../domain/guest-list";
 import { listReservations } from "./reservations";
-
-type G = { id: string; full_name: string; email: string | null; phone: string | null; notes: string | null; stays: number; last_stay: string | null; total_paid: number };
-
-const COLUMNS = `g.id, g.full_name, g.email, g.phone, g.notes,
-  (SELECT count(*) FROM reservations r WHERE r.guest_id = g.id AND r.status IN ('checked_in', 'checked_out')) AS stays,
-  (SELECT max(r.check_in) FROM reservations r WHERE r.guest_id = g.id AND r.status IN ('checked_in', 'checked_out')) AS last_stay,
-  (SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
-     FROM payments p JOIN reservations r ON r.id = p.reservation_id
-     WHERE r.guest_id = g.id AND p.status = 'successful') AS total_paid`;
 
 function toGuest(g: G): GuestRow & { notes?: string } {
   return {
@@ -27,19 +18,9 @@ function toGuest(g: G): GuestRow & { notes?: string } {
   };
 }
 
-export async function listGuests(q?: string, page = 1, size = 50): Promise<GuestRow[]> {
+export async function listGuests(q?: string, page = 1, size = 50, sort: GuestSort = "recent"): Promise<GuestRow[]> {
   await authorizeRead("guests.manage");
-  const term = cleanSearch(q);
-  const like = `%${term}%`;
-  const rows = await all<G>(
-    await getDb(),
-    `SELECT ${COLUMNS} FROM guests g
-     ${term ? "WHERE g.full_name LIKE ?1 OR g.phone LIKE ?1 OR g.email LIKE ?1" : "WHERE ?1 IS NOT NULL"}
-     ORDER BY g.updated_at DESC, g.id LIMIT ?2 OFFSET ?3`,
-    like,
-    size + 1,
-    (page - 1) * size,
-  );
+  const rows = await listGuestRecords(await getDb(), { q, sort, page, size });
   return rows.map(toGuest);
 }
 

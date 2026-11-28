@@ -1,31 +1,73 @@
-import { addDays, businessDaySql, hotelToday } from "@/lib/hotel-date";
+import { addDays, businessDaySql, hotelToday, isIsoDate, nightsBetween } from "@/lib/hotel-date";
 import { HOTEL_REPORTERS, all, first, requireRole, type Actor, type Db } from "../db";
 
-export type ReportRange = "today" | "7d" | "14d" | "month" | `${number}-${number}`;
+/**
+ * A report period: a fixed one, a past month ("2026-10"), or dates someone picked ("2026-11-02_2026-11-20",
+ * both days included). It stays one string so it travels in a single `range` query param.
+ */
+export type ReportRange = "today" | "week" | "7d" | "14d" | "month" | `${number}-${number}` | `${string}_${string}`;
 
-const FIXED_RANGE_LABEL = { today: "Today", "7d": "7 days", "14d": "14 days", month: "This month" } as const;
+const FIXED_RANGE_LABEL = { today: "Today", week: "This week", "7d": "7 days", "14d": "14 days", month: "This month" } as const;
 
-/** A label for any range reportRange() can return: a fixed period, or a past month ("October 2026"). */
+const shortDate = (d: string, year: boolean) =>
+  new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: year ? "numeric" : undefined, timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
+
+/** A label for any range reportRange() can return: a fixed period, a past month ("October 2026") or picked dates ("2 Nov – 20 Nov 2026"). */
 export function rangeLabel(range: ReportRange): string {
   if (range in FIXED_RANGE_LABEL) return FIXED_RANGE_LABEL[range as keyof typeof FIXED_RANGE_LABEL];
+  const picked = pickedDates(range);
+  if (picked) {
+    if (picked.from === picked.to) return shortDate(picked.from, true);
+    return `${shortDate(picked.from, picked.from.slice(0, 4) !== picked.to.slice(0, 4))} – ${shortDate(picked.to, true)}`;
+  }
   return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${range}-01T00:00:00Z`));
 }
 
 const MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/;
 export const FIRST_MONTH = "2026-11";
+/** The longest period that can be picked, in days (both ends counted). */
+export const MAX_PICKED_DAYS = 92;
 
+/** The from and to of a picked range ("2026-11-02_2026-11-20"), or null for any other range. */
+export function pickedDates(range: string): { from: string; to: string } | null {
+  const m = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(range);
+  return m ? { from: m[1]!, to: m[2]! } : null;
+}
+
+/** Why picked dates can't be used, or null when they can: real dates, from ≤ to ≤ today, at most MAX_PICKED_DAYS days. */
+export function pickedRangeError(from: string | undefined, to: string | undefined, today = hotelToday()): string | null {
+  if (!from || !to) return "Choose both dates.";
+  if (!isIsoDate(from) || !isIsoDate(to)) return "Those aren't valid dates.";
+  if (from > to) return "The first date must be on or before the second.";
+  if (to > today) return "Reports can't run past today.";
+  if (nightsBetween(from, to) + 1 > MAX_PICKED_DAYS) return `Pick at most ${MAX_PICKED_DAYS} days.`;
+  return null;
+}
+
+/** The period from a query string; anything that doesn't validate falls back to 14 days. */
 export function reportRange(range: string | undefined, today = hotelToday()): ReportRange {
-  if (range === "today" || range === "month" || range === "7d") return range;
+  if (range === "today" || range === "month" || range === "7d" || range === "week") return range;
   if (range && MONTH.test(range) && range >= FIRST_MONTH && range <= today.slice(0, 7)) return range === today.slice(0, 7) ? "month" : (range as ReportRange);
+  const picked = range ? pickedDates(range) : null;
+  if (picked && !pickedRangeError(picked.from, picked.to, today)) return `${picked.from}_${picked.to}`;
   return "14d";
+}
+
+/** Monday of the week holding `date` (weeks run Monday to Sunday). */
+export function mondayOf(date: string): string {
+  const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
+  return addDays(date, -((dow + 6) % 7));
 }
 
 export function rangeDates(range: ReportRange, today: string): { from: string; to: string; days: string[] } {
   let from = today;
   let to = today;
+  const picked = pickedDates(range);
   if (range === "14d") from = addDays(today, -13);
   else if (range === "7d") from = addDays(today, -6);
+  else if (range === "week") from = mondayOf(today);
   else if (range === "month") from = `${today.slice(0, 7)}-01`;
+  else if (picked) ({ from, to } = picked);
   else if (range !== "today") {
     from = `${range}-01`;
     const last = addDays(`${addDays(from, 31).slice(0, 7)}-01`, -1);
@@ -148,6 +190,8 @@ export async function occupancyReport(db: Db, actor: Actor, range: ReportRange, 
   const inService = rooms?.n ?? 0;
   const pct = (occupied: number) => (inService ? Math.min(100, Math.round((occupied / inService) * 100)) : 0);
   const sold = nights.reduce((s, n) => s + n.occupied, 0);
+  const revenue = await roomRevenue(db, from, to);
+  const available = nights.length * inService;
   return {
     from,
     to,
@@ -155,7 +199,41 @@ export async function occupancyReport(db: Db, actor: Actor, range: ReportRange, 
     nights: nights.map((n) => ({ day: n.day, occupied: n.occupied, pct: pct(n.occupied) })),
     averagePct: nights.length && inService ? Math.min(100, Math.round((sold / (nights.length * inService)) * 100)) : 0,
     byType,
+    soldNights: sold,
+    availableNights: available,
+    /** Room revenue earned by the nights stayed in the period (not money received). */
+    roomRevenueKobo: revenue.kobo,
+    /** Average daily rate: room revenue ÷ room-nights sold. */
+    adrKobo: revenue.nights ? Math.round(revenue.kobo / revenue.nights) : 0,
+    /** Revenue per available room: room revenue ÷ (rooms in service × nights in the period). */
+    revparKobo: available ? Math.round(revenue.kobo / available) : 0,
   };
+}
+
+/**
+ * Room revenue earned from stays between `from` and `to` (both nights included): for each staying booking, its
+ * booked nightly rate × the nights of the stay that fall in the period (STAY_END, as occupancy counts them), less
+ * that share of its discount (the discount spread evenly over the booked nights). Money received is a different
+ * figure: it includes advance payments for later stays and leaves out what is still owed.
+ */
+export async function roomRevenue(db: Db, from: string, to: string): Promise<{ kobo: number; nights: number }> {
+  const rows = await all<{ rate: number; discount: number; booked: number; n: number }>(
+    db,
+    `SELECT r.nightly_rate_kobo AS rate, r.discount_kobo AS discount, r.nights AS booked,
+            CAST(julianday(min(${STAY_END}, date(?2, '+1 day'))) - julianday(max(r.check_in, ?1)) AS INTEGER) AS n
+     FROM reservations r
+     WHERE ${STAYING} AND r.check_in <= ?2 AND ${STAY_END} > ?1`,
+    from,
+    to,
+  );
+  let kobo = 0;
+  let nights = 0;
+  for (const r of rows) {
+    if (r.n <= 0) continue;
+    kobo += r.rate * r.n - Math.round((r.discount * r.n) / r.booked);
+    nights += r.n;
+  }
+  return { kobo, nights };
 }
 
 export function csvField(value: string | number | null | undefined): string {

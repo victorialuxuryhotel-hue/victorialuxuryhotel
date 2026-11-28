@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { OPEN_SEARCH } from "./global-search";
+import { requestLock } from "./idle-lock";
 
 const typing = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
@@ -9,12 +10,17 @@ const typing = (el: EventTarget | null) =>
 /**
  * Front desk keyboard shortcuts (hardware brief H10): "/" jumps to the page's search box (Bookings,
  * Guests, Today); Esc closes an open popover such as Cancel booking (dialogs already close on Esc).
- * The till has no search box marked for "/", so nothing happens there.
+ * The till has no search box marked for "/", so nothing happens there. On a shared station (`lock`),
+ * Ctrl L locks the screen and keeps the person signed in, as Lock screen in the account menu does (design D1);
+ * elsewhere Ctrl L is left to the browser.
  */
-export function Shortcuts() {
+export function Shortcuts({ lock = false }: { lock?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target)) {
+      if (lock && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        requestLock();
+      } else if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target)) {
         // The page's own search box if it has one (Today, Bookings, Guests), else global search (I9).
         const search = document.querySelector<HTMLInputElement>("[data-search]");
         if (search) {
@@ -35,7 +41,7 @@ export function Shortcuts() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [lock]);
   return null;
 }
 

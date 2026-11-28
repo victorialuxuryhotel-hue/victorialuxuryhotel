@@ -40,7 +40,7 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
   return (
     <StaffRoleProvider role={staff.role}>
       <ConnectionBanner />
-      <Shortcuts />
+      <Shortcuts lock={Boolean(staff.station)} />
       <BrowserBanner />
       <NoteBrowser sessionKey={staff.id} />
       {staff.viewAs ? <ViewAsBanner /> : null}

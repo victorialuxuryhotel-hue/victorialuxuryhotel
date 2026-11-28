@@ -16,6 +16,8 @@ import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { bookingSource, reservationStatus } from "@/domain/status";
 import { requireStaff } from "@/server/auth";
 import { listReservations, tabCounts, type ReservationTab } from "@/server/queries/reservations";
+import { bookingStatuses } from "@/server/domain/booking-list";
+import { FilterMultiMenu } from "@/components/management/filter-menu";
 
 export const metadata: Metadata = { title: "Bookings" };
 
@@ -24,6 +26,8 @@ const tabs: Array<{ key: ReservationTab; label: string }> = [
   { key: "in_house", label: "In house" },
   { key: "awaiting", label: "Awaiting payment" },
   { key: "attention", label: "Needs attention" },
+  { key: "past", label: "Past" },
+  { key: "cancelled", label: "Cancelled" },
   { key: "all", label: "All" },
 ];
 
@@ -37,13 +41,16 @@ async function Content({ searchParams }: { searchParams: SP }) {
   const tab = (tabs.find((t) => t.key === one(sp.tab))?.key ?? "upcoming") as ReservationTab;
   const q = one(sp.q);
   const page = pageFrom(sp.page);
+  // Several statuses at once ("status=confirmed,checked_in"); anything that isn't a status is dropped.
+  const statuses = bookingStatuses(sp.status);
+  const status = statuses.join(",") || undefined;
   const [fetched, counts] = await Promise.all([
-    listReservations({ tab, q, status: one(sp.status), source: one(sp.source), page, pageSize: PAGE_SIZE }),
+    listReservations({ tab, q, statuses, source: one(sp.source), page, pageSize: PAGE_SIZE }),
     tabCounts(),
   ]);
   const rows = fetched.slice(0, PAGE_SIZE);
   const href = (key: string) => `/app/reservations?tab=${key}`;
-  const filtered = Boolean(q || one(sp.status) || one(sp.source));
+  const filtered = Boolean(q || status || one(sp.source));
   const count = !filtered && tab !== "all" ? counts[tab as keyof typeof counts] : page === 1 && fetched.length <= PAGE_SIZE ? rows.length : undefined;
   return (
     <>
@@ -53,11 +60,11 @@ async function Content({ searchParams }: { searchParams: SP }) {
       placeholder="Name, phone or reference"
       defaultQuery={q}
       hidden={{ tab }}
-      filtersActive={Boolean(one(sp.status) || one(sp.source))}
+      filtersActive={Boolean(status || one(sp.source))}
       filters={
         <>
           <FilterSelect name="source" label="Source" value={one(sp.source)} options={Object.entries(bookingSource)} />
-          <FilterSelect name="status" label="Status" value={one(sp.status)} options={Object.entries(reservationStatus).map(([k, v]) => [k, v.label])} />
+          <FilterMultiMenu name="status" label="Status" values={statuses} options={Object.entries(reservationStatus).map(([k, v]) => [k, v.label])} />
         </>
       }
     />
@@ -65,7 +72,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
       {rows.length ? (
         <>
           <ReservationTable rows={rows} hrefFor={(r) => withBooking("/app/reservations", sp, r.reference)} today={hotelToday()} />
-          <Pager basePath="/app/reservations" params={{ tab, q, status: one(sp.status), source: one(sp.source) }} page={page} hasMore={fetched.length > PAGE_SIZE} />
+          <Pager basePath="/app/reservations" params={{ tab, q, status, source: one(sp.source) }} page={page} hasMore={fetched.length > PAGE_SIZE} />
         </>
       ) : (
         <div className="p-5"><EmptyState title={q ? "No bookings match your search" : "No bookings here"} description={q ? "Try a reference, a guest's name or phone number." : undefined} /></div>

@@ -4,7 +4,7 @@ import { createWebsiteReservation } from "@/server/domain/reservations";
 import { createHallBooking, recordHallPayment } from "@/server/domain/events";
 import { financeSummary } from "@/server/domain/finance";
 import { payOrder, saveMenuItem } from "@/server/domain/pos";
-import { csvField, incomeReport, incomeRows, occupancyReport, rangeDates, rangeLabel, recentMonths, reportRange } from "@/server/domain/reports";
+import { csvField, incomeReport, incomeRows, occupancyReport, pickedRangeError, rangeDates, rangeLabel, recentMonths, reportRange, roomRevenue } from "@/server/domain/reports";
 import { addDays, businessDate, hotelInstant, hotelToday } from "@/lib/hotel-date";
 import { day, db, desk, exec, gm, insertReservation, makeCategory, owner, rejects, rawPayment } from "./helpers";
 
@@ -109,6 +109,62 @@ describe("occupancy", () => {
     expect(after.roomsInService - before.roomsInService).toBe(2);
     expect(after.nights[0]!.occupied - before.nights[0]!.occupied).toBe(1);
     expect(after.byType.find((t) => t.name === `Test ${c.slug}`)?.nights).toBe(1);
+  });
+});
+
+describe("average rate (ADR) and RevPAR, from nights stayed", () => {
+  it("counts only the nights inside the period, at the booked rate, less their share of the discount", async () => {
+    // A window far ahead that nothing else books, so the report holds only these bookings.
+    const from = day(3000 + Math.floor(Math.random() * 3000));
+    const to = addDays(from, 6);
+    const c = await makeCategory(3);
+    // Straddles the start: 2 of its 4 nights (from, from+1) fall in the period.
+    await insertReservation({ categoryId: c.id, checkIn: addDays(from, -2), checkOut: addDays(from, 2), status: "confirmed", rateKobo: 10_000_000 });
+    // Straddles the end with a ₦40,000 discount over 4 nights: 2 nights in the period, so ₦20,000 off.
+    const discounted = await insertReservation({ categoryId: c.id, checkIn: addDays(from, 5), checkOut: addDays(from, 9), status: "confirmed", rateKobo: 8_000_000 });
+    await exec("UPDATE reservations SET discount_kobo = 4000000 WHERE id = ?", discounted);
+    // Left early: booked 4 nights from+1 → from+5, checked out on the morning of from+2, so 1 night stayed.
+    const early = await insertReservation({ categoryId: c.id, roomId: c.roomIds[2], checkIn: addDays(from, 1), checkOut: addDays(from, 5), status: "confirmed", rateKobo: 6_000_000 });
+    await exec("UPDATE reservations SET status = 'checked_in' WHERE id = ?", early);
+    await exec("UPDATE reservations SET status = 'checked_out', checked_out_at = ? WHERE id = ?", hotelInstant(addDays(from, 2), "10:00:00"), early);
+    // Cancelled and awaiting-payment bookings earn nothing.
+    const cancelled = await insertReservation({ categoryId: c.id, checkIn: from, checkOut: addDays(from, 3), status: "confirmed", unpaid: true, rateKobo: 9_000_000 });
+    await exec("UPDATE reservations SET status = 'cancelled' WHERE id = ?", cancelled);
+    await insertReservation({ categoryId: c.id, checkIn: from, checkOut: addDays(from, 2), rateKobo: 9_000_000 });
+
+    expect(await roomRevenue(db, from, to)).toEqual({ kobo: 2 * 10_000_000 + (2 * 8_000_000 - 2_000_000) + 6_000_000, nights: 5 });
+
+    const r = await occupancyReport(db, gm, reportRange(`${from}_${to}`, to), to);
+    const revenue = 20_000_000 + 14_000_000 + 6_000_000;
+    expect([r.soldNights, r.roomRevenueKobo]).toEqual([5, revenue]);
+    expect(r.adrKobo).toBe(revenue / 5);
+    expect(r.availableNights).toBe(7 * r.roomsInService);
+    expect(r.revparKobo).toBe(Math.round(revenue / (7 * r.roomsInService)));
+  });
+});
+
+describe("This week and picked dates", () => {
+  it("this week runs Monday to today", () => {
+    expect(rangeDates("week", "2026-11-28")).toMatchObject({ from: "2026-11-23", to: "2026-11-28" }); // a Saturday
+    expect(rangeDates("week", "2026-11-23").days).toEqual(["2026-11-23"]); // a Monday
+    expect(rangeDates("week", "2026-11-29").days).toHaveLength(7); // a Sunday
+    expect(rangeLabel(reportRange("week"))).toBe("This week");
+  });
+
+  it("picked dates are checked: real dates, in order, not past today, at most 92 days", () => {
+    const today = "2026-11-28";
+    expect(reportRange("2026-11-02_2026-11-20", today)).toBe("2026-11-02_2026-11-20");
+    expect(rangeDates("2026-11-02_2026-11-20", today).days).toHaveLength(19);
+    expect(rangeLabel("2026-11-02_2026-11-20")).toBe("2 Nov – 20 Nov 2026");
+    expect(rangeLabel("2025-12-30_2026-01-02")).toBe("30 Dec 2025 – 2 Jan 2026");
+    expect(pickedRangeError("2026-08-29", "2026-11-28", today)).toBeNull(); // 92 days
+    expect(pickedRangeError("2026-08-28", "2026-11-28", today)).toMatch(/at most 92/);
+    expect(pickedRangeError("2026-11-20", "2026-11-02", today)).toMatch(/on or before/);
+    expect(pickedRangeError("2026-11-20", "2026-11-29", today)).toMatch(/past today/);
+    expect(pickedRangeError("2026-02-30", "2026-03-02", today)).toMatch(/valid/);
+    expect(pickedRangeError(undefined, "2026-11-02", today)).toMatch(/both/);
+    expect(reportRange("2026-08-28_2026-11-28", today)).toBe("14d");
+    expect(reportRange("2026-11-02_2026-11-29", today)).toBe("14d");
   });
 });
 
