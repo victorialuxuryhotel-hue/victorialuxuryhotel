@@ -424,3 +424,12 @@ These are deliberately **not final** in the app:
   open. Payment (R3): *Take payment · Table 4*, the amount, ← Back to order, Cash | Transfer | POS / card, and
   *Confirm ₦X paid* with "Prints the receipt and opens the cash drawer".
 - Calculator: + − × ÷ and C on screen only; it saves nothing and sends nothing (no eval; × and ÷ first).
+
+## Step 1f (part 1): Today (R4) and the shared look
+
+- Today: title, business day, *Find a booking*, Walk-in and the one primary *New booking*; chips for Overdue,
+  Arriving, Leaving and To clean; groups with a count and Hide/Show (Overdue, Needs you now, Arriving today, Leaving
+  today, In house); each row has initials, "Name · Room", what's happening and the next action. Right column: *Free
+  tonight* per room type and *Rooms to clean* with the room numbers.
+- Every staff screen picks up the R1 components from step 1b (Inter, filled primary buttons, badges, fields). The
+  screen-by-screen layouts for R101–R109, R201–R205 and R301–R305 follow after go-live, most-used first.

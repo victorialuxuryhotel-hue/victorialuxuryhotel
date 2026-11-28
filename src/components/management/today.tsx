@@ -1,11 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BedDouble, CheckCircle2, ChevronRight, Plus, Search } from "lucide-react";
+import { CheckCircle2, ChevronRight, Search } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import { Input } from "@/components/ui/form";
 import { SlashHint } from "./shortcuts";
 import { HelpButton, HelpPurpose } from "./screen-help";
-import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import type { NeedsYou, RoomCounts, tonightView } from "@/domain/today";
 import type { ReservationRow } from "@/domain/views";
@@ -15,6 +14,7 @@ import { MovementList } from "./front-desk";
 import { CheckOutButton, NoShowButton, TakePaymentLink } from "./reservation-actions";
 import { cn } from "@/lib/utils/cn";
 import { ReservationTable } from "./reservation-table";
+import { TodaySection } from "./today-section";
 
 export type TodayLinks = {
   reservation: (id: string) => string;
@@ -91,9 +91,23 @@ function describe(n: NeedsYou, links: TodayLinks): { title: string; reason: stri
   }
 }
 
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
+
+/** One guest row (design R4): initials, "Name · Room", what's happening, then the actions at the right end. */
+function Row({ name, place, status, href, panel, urgent, children }: { name: string; place: string; status: ReactNode; href: string; panel: boolean; urgent?: boolean; children?: ReactNode }) {
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
+      <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#e8eefb] text-[13px] font-bold text-navy-900">{initials(name)}</span>
+      <Link href={href} scroll={!panel} className="min-w-0 flex-1 hover:text-navy-700">
+        <span className="block font-semibold text-ink-900">{name} · {place}</span>
+        <span className={cn("block text-sm", urgent ? "text-[#a61b1b]" : "text-ink-600")}>{status}</span>
+      </Link>
+      <span className="flex shrink-0 flex-wrap items-center gap-2">{children}</span>
+    </li>
+  );
+}
+
 export function TodayView({
-  firstName,
-  greeting,
   today,
   needs,
   arrivals,
@@ -104,9 +118,10 @@ export function TodayView({
   progress,
   links,
   signedIn,
+  toClean = [],
 }: {
-  firstName: string;
-  greeting: string;
+  firstName?: string;
+  greeting?: string;
   today: string;
   needs: NeedsYou[];
   arrivals: ReservationRow[];
@@ -117,176 +132,153 @@ export function TodayView({
   /** Already arrived / left today, counted like the lists (I3). */
   progress: { arrived: number; left: number };
   links: TodayLinks;
-  /** "Signed in as … · Switch user" for the shared front desk computer. */
+  /** "Signed in as … · Lock" for the shared front desk computer. */
   signedIn?: ReactNode;
+  /** Room numbers waiting to be cleaned. */
+  toClean?: string[];
 }) {
   const href = (r: { id: string; reference: string }) => (links.panel ? links.panel(r) : links.reservation(r.id));
-  const needsCount = needs.length + tonight.overbooked.length;
+  const panel = Boolean(links.panel);
+  const overdue = needs.filter((n) => n.kind === "overdue_checkout" || n.kind === "owes");
+  const attention = needs.filter((n) => n.kind !== "overdue_checkout" && n.kind !== "owes");
+  const chip = "inline-flex h-9 w-fit items-center gap-2 rounded-lg border border-hairline bg-white px-3 text-sm font-semibold text-ink-900 hover:border-ink-400";
   return (
     <ActionFeedbackProvider>
-      <div className="space-y-6 px-4 py-6 lg:px-8">
+      <div className="space-y-5 px-4 py-6 lg:px-8">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-1.5">
-              <h1 className="text-[1.75rem] leading-tight font-semibold text-ink-900">{greeting}, {firstName}</h1>
+              <h1 className="text-[22px] font-bold text-ink-900">Today</h1>
               <HelpButton />
             </div>
-            <p className="mt-1 text-sm text-ink-500">{formatDate(today)}</p>
+            <p className="mt-0.5 text-sm text-ink-500">{formatDate(today, { weekday: true, year: false })} · business day</p>
             <HelpPurpose className="mt-0.5 max-w-xl text-sm text-ink-500" />
           </div>
           <div className="flex flex-col items-end gap-2">
             {signedIn}
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {/* "/" jumps here (front desk shortcut); searches all bookings. */}
+              <form method="get" action="/app/reservations" className="relative w-80 max-w-full" role="search">
+                <input type="hidden" name="tab" value="all" />
+                <label className="sr-only" htmlFor="today-search">Find a booking</label>
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+                <Input id="today-search" type="search" name="q" placeholder="Find a booking: name, phone, room" data-search="" aria-keyshortcuts="/" className="h-11 pl-9 pointer-fine:md:pr-9" />
+                <SlashHint />
+              </form>
               <Link href="/app/walk-in" className={buttonStyles({ variant: "secondary" })}>Walk-in</Link>
-              <Link href="/app/reservations/new" className={buttonStyles({ variant: "secondary" })}>New booking</Link>
+              <Link href="/app/reservations/new" className={buttonStyles()}>New booking</Link>
             </div>
-            {/* "/" jumps here (front desk shortcut); searches all bookings. */}
-            <form method="get" action="/app/reservations" className="relative w-72 max-w-full" role="search">
-              <input type="hidden" name="tab" value="all" />
-              <label className="sr-only" htmlFor="today-search">Find a booking</label>
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
-              <Input id="today-search" type="search" name="q" placeholder="Find a booking: name, phone or VL-…" data-search="" aria-keyshortcuts="/" className="h-10 pl-9 pointer-fine:md:pr-9" />
-              <SlashHint />
-            </form>
           </div>
         </header>
 
-        <section aria-labelledby="needs">
-          <h2 id="needs" className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">
-            Needs you now{needsCount ? ` · ${needsCount}` : ""}
-          </h2>
-          <Card>
-            {needsCount === 0 ? (
-              <div className="flex items-center gap-3 p-5">
-                <CheckCircle2 className="size-6 shrink-0 text-success-700" strokeWidth={1.5} aria-hidden />
-                <div>
-                  <p className="font-medium text-ink-900">Nothing needs you right now.</p>
-                  <p className="text-sm text-ink-500">Nobody owes money, nobody is overdue, and today&apos;s arrivals are paid with clean rooms.</p>
-                </div>
-              </div>
-            ) : (
-              <ul className="divide-y divide-hairline">
+        <nav aria-label="Today at a glance" className="flex flex-wrap gap-2">
+          <a href="#overdue" className={chip}>Overdue <span className={cn("tabular-nums", overdue.length > 0 && "text-[#a61b1b]")}>{overdue.length}</span></a>
+          <a href="#arriving" className={chip}>Arriving <span className="tabular-nums">{arrivals.length}</span></a>
+          <a href="#leaving" className={chip}>Leaving <span className="tabular-nums">{departures.length}</span></a>
+          <Link href={links.rooms("dirty")} className={chip}>To clean <span className={cn("tabular-nums", counts.toClean > 0 && "text-[#8a4b06]")}>{counts.toClean}</span></Link>
+        </nav>
+
+        <div className="grid gap-5 xl:grid-cols-[1fr_20rem]">
+          <div className="min-w-0 space-y-4">
+            {tonight.overbooked.length ? (
+              <ul className="space-y-2">
                 {tonight.overbooked.map((t) => (
-                  <li key={`overbooked-${t.categoryId}`} data-kind="overbooked" className="flex min-h-16 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5">
-                    <span aria-hidden className="size-2 shrink-0 rounded-full bg-danger-600" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-medium text-ink-900">Overbooked: {t.name} tonight</span>
-                      <span className="block text-sm text-danger-700">
-                        {-t.free} more {t.name} {-t.free === 1 ? "booking" : "bookings"} than rooms in service. Move a guest to another type, or bring a room back into service.
-                      </span>
-                    </span>
-                    <Link href={links.rooms()} className={linkStyle}>
-                      Rooms
-                      <ChevronRight className="size-4" aria-hidden />
-                    </Link>
+                  <li key={`overbooked-${t.categoryId}`} data-kind="overbooked" role="alert" className="rounded-xl border border-[#f1b8b8] bg-[#fde8e8] px-4 py-3 text-sm text-[#a61b1b]">
+                    <b>Overbooked: {t.name} tonight.</b> {-t.free} more {t.name} {-t.free === 1 ? "booking" : "bookings"} than rooms in service. Move a guest to another type, or bring a room back into service.{" "}
+                    <Link href={links.rooms()} className="font-semibold underline">Rooms</Link>
                   </li>
                 ))}
-                {needs.map((n) => {
-                  const d = describe(n, links);
-                  return (
-                    <li key={n.reservation.id} data-kind={n.kind} className="flex min-h-16 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5">
-                      <span aria-hidden className={cn("size-2 shrink-0 rounded-full", d.urgent ? "bg-danger-600" : "bg-gold-500")} />
-                      <Link href={href(n.reservation)} scroll={!links.panel} className="min-w-0 flex-1 hover:text-navy-700">
-                        <span className="block font-medium text-ink-900">{d.title}</span>
-                        <span className={cn("block text-sm", d.urgent ? "text-danger-700" : "text-ink-500")}>{d.reason}</span>
-                      </Link>
-                      <span className="flex shrink-0 items-center gap-1">
+              </ul>
+            ) : null}
+
+            {overdue.length ? (
+              <TodaySection id="overdue" title="Overdue: still in after check-out" count={overdue.length} tone="danger">
+                <ul className="divide-y divide-hairline">
+                  {overdue.map((n) => {
+                    const d = describe(n, links);
+                    const r = n.reservation;
+                    return (
+                      <Row key={r.id} name={r.guestName} place={r.roomNumber ? `Room ${r.roomNumber}` : r.category} status={d.reason} href={href(r)} panel={panel} urgent>
                         {d.alt}
                         {d.action}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
-        </section>
+                      </Row>
+                    );
+                  })}
+                </ul>
+              </TodaySection>
+            ) : null}
 
-        <TonightSection tonight={tonight} newBooking={links.newBooking} />
+            {attention.length ? (
+              <TodaySection id="attention" title="Needs you now" count={attention.length}>
+                <ul className="divide-y divide-hairline">
+                  {attention.map((n) => {
+                    const d = describe(n, links);
+                    const r = n.reservation;
+                    return (
+                      <Row key={r.id} name={r.guestName} place={r.roomNumber ? `Room ${r.roomNumber}` : r.category} status={d.reason} href={href(r)} panel={panel} urgent={d.urgent}>
+                        {d.alt}
+                        {d.action}
+                      </Row>
+                    );
+                  })}
+                </ul>
+              </TodaySection>
+            ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-2">
-          <MovementList kind="departures" title="Leaving today" rows={departures} hrefFor={href} today={today} done={progress.left} />
-          <MovementList kind="arrivals" title="Arriving today" rows={arrivals} hrefFor={href} today={today} done={progress.arrived} />
+            <TodaySection id="arriving" title="Arriving today" count={arrivals.length}>
+              <MovementList kind="arrivals" rows={arrivals} hrefFor={href} today={today} done={progress.arrived} bare />
+            </TodaySection>
+            <TodaySection id="leaving" title="Leaving today" count={departures.length} defaultOpen={departures.length <= 6}>
+              <MovementList kind="departures" rows={departures} hrefFor={href} today={today} done={progress.left} bare />
+            </TodaySection>
+            <TodaySection id="in-house" title="In house" count={inHouse.length} defaultOpen={false}>
+              {inHouse.length ? <ReservationTable rows={inHouse} hrefFor={href} today={today} inHouse /> : <div className="p-5"><EmptyState title="No guests checked in" /></div>}
+            </TodaySection>
+            {needs.length + tonight.overbooked.length === 0 ? (
+              <p className="flex items-center gap-2 text-sm text-ink-600"><CheckCircle2 className="size-5 text-[#166534]" aria-hidden /> Nothing needs you right now.</p>
+            ) : null}
+          </div>
+
+          <aside className="space-y-4">
+            <TonightSection tonight={tonight} newBooking={links.newBooking} />
+            <section aria-labelledby="to-clean" className="rounded-xl border border-hairline bg-white p-4">
+              <h2 id="to-clean" className="text-base font-bold text-ink-900">Rooms to clean · {counts.toClean}</h2>
+              <p className="mt-1 text-sm text-ink-600 tabular-nums">{toClean.length ? toClean.join(", ") : "None. Every free room is ready."}</p>
+              <Link href={links.rooms()} className={buttonStyles({ variant: "secondary", size: "sm", className: "mt-3" })}>Open rooms</Link>
+            </section>
+          </aside>
         </div>
-
-        <Card>
-          <CardHeader
-            title="In house"
-            description="Guests checked in now."
-            action={<span className="rounded-full bg-ivory-200 px-2.5 py-0.5 text-sm font-semibold tabular-nums">{inHouse.length}</span>}
-          />
-          {inHouse.length ? <ReservationTable rows={inHouse} hrefFor={href} today={today} inHouse /> : <div className="p-5"><EmptyState title="No guests checked in" /></div>}
-        </Card>
-
-        <section aria-label="Rooms">
-          <Card>
-            <CardHeader title="Rooms" description="Right now" />
-            <div className="grid grid-cols-4 divide-x divide-hairline">
-              {([
-                ["Ready", counts.ready, links.rooms("available")],
-                ["Occupied", counts.occupied, links.rooms("occupied")],
-                ["To clean", counts.toClean, links.rooms("dirty")],
-                ["Out of order", counts.outOfOrder, links.rooms("maintenance")],
-              ] as const).map(([label, n, to]) => (
-                <Link key={label} href={to} className="flex min-h-20 flex-col items-center justify-center px-2 py-3 hover:bg-ivory-50">
-                  <span className="text-2xl font-semibold tabular-nums text-ink-900">{n}</span>
-                  <span className="text-sm text-ink-500">{label}</span>
-                </Link>
-              ))}
-            </div>
-          </Card>
-        </section>
       </div>
     </ActionFeedbackProvider>
   );
 }
 
-/** Interface brief I2: what can be sold tonight, per room type, counted as the website and the booking form count. */
+/** Interface brief I2 / design R4 "Free tonight": what can be sold tonight, per room type, counted as the website counts. */
 function TonightSection({ tonight, newBooking }: { tonight: ReturnType<typeof tonightView>; newBooking: (categoryId: string) => string }) {
   if (tonight.cards.length === 0) return null;
   const held = tonight.cards.reduce((n, c) => n + c.held, 0);
   return (
-    <section aria-labelledby="tonight">
-      <h2 id="tonight" className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">Available tonight</h2>
+    <section aria-labelledby="tonight" className="rounded-xl border border-hairline bg-white p-4">
+      <h2 id="tonight" className="text-base font-bold text-ink-900">Free tonight</h2>
       {tonight.fullyBooked ? (
-        <Card>
-          <div className="flex items-center gap-3 p-5" data-testid="fully-booked">
-            <BedDouble className="size-6 shrink-0 text-ink-400" strokeWidth={1.5} aria-hidden />
-            <div>
-              <p className="font-medium text-ink-900">Fully booked tonight</p>
-              {held ? <p className="text-sm text-ink-500">{held} unpaid {held === 1 ? "hold" : "holds"}: a room comes free if a hold runs out.</p> : null}
-            </div>
-          </div>
-        </Card>
-      ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {tonight.cards.map((c) => (
-            <li key={c.categoryId} data-tonight={c.categoryId}>
-              <Card className="flex h-full flex-col gap-3 p-4">
-                <div className="min-w-0">
-                  <p className="font-medium text-ink-900">{c.name}</p>
-                  <p className={cn("text-sm", c.full ? "text-ink-500" : "text-ink-700")}>
-                    {c.full ? (
-                      "Full tonight"
-                    ) : (
-                      <>
-                        <span className="font-semibold tabular-nums text-ink-900">{c.shown}</span> of <span className="tabular-nums">{c.rooms}</span> free · {formatNaira(c.rateKobo)}
-                      </>
-                    )}
-                    {c.held ? <span className="text-ink-500"> · {c.held} on hold</span> : null}
-                  </p>
-                </div>
-                {c.full ? null : (
-                  <Link href={newBooking(c.categoryId)} className={buttonStyles({ variant: "secondary", size: "sm", className: "mt-auto self-start" })}>
-                    <Plus className="size-4" aria-hidden />
-                    New booking
-                  </Link>
-                )}
-              </Card>
-            </li>
-          ))}
-        </ul>
-      )}
+        <p className="mt-2 text-sm text-ink-600" data-testid="fully-booked">
+          Fully booked tonight.{held ? ` ${held} unpaid ${held === 1 ? "hold" : "holds"}: a room comes free if a hold runs out.` : ""}
+        </p>
+      ) : null}
+      <ul className="mt-2 divide-y divide-hairline">
+        {tonight.cards.map((c) => (
+          <li key={c.categoryId} data-tonight={c.categoryId} className="flex items-center justify-between gap-3 py-2">
+            <span className="text-[15px] text-ink-900">{c.name}{c.held ? <span className="text-xs text-ink-500"> · {c.held} on hold</span> : null}</span>
+            {c.full ? (
+              <span className="text-sm font-semibold text-[#a61b1b]">0 free</span>
+            ) : (
+              <Link href={newBooking(c.categoryId)} className="text-sm font-semibold text-navy-700 tabular-nums hover:underline" title={`New ${c.name} booking · ${formatNaira(c.rateKobo)}`}>
+                {c.shown} free
+              </Link>
+            )}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

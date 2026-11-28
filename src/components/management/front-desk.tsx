@@ -19,6 +19,7 @@ export function MovementList({
   title,
   today,
   done,
+  bare = false,
 }: {
   kind: "arrivals" | "departures";
   title?: string;
@@ -28,10 +29,23 @@ export function MovementList({
   today: string;
   /** Guests who have already arrived / left today (I3). Shows "13 of 18 arrived" and a progress bar. */
   done?: number;
+  /** Rows only (Today, design R4): the section around it has the heading and count. */
+  bare?: boolean;
 }) {
   const arrivals = kind === "arrivals";
   const progress = done === undefined ? null : movementProgress(kind, rows.length, done);
   const heading = title ?? (arrivals ? "Arrivals" : "Departures");
+  if (bare) {
+    return rows.length === 0 ? (
+      <p className="px-4 py-4 text-sm text-ink-500">
+        {progress && progress.total ? (arrivals ? "Everyone due today has arrived." : "Everyone due out has left.") : arrivals ? "No arrivals today." : "No departures today."}
+      </p>
+    ) : (
+      <ul className="divide-y divide-hairline">
+        {rows.map((r) => <MovementRow key={r.id} r={r} arrivals={arrivals} hrefFor={hrefFor} today={today} />)}
+      </ul>
+    );
+  }
   return (
     <Card>
       <CardHeader
@@ -104,5 +118,47 @@ export function MovementList({
         </ul>
       )}
     </Card>
+  );
+}
+
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
+
+/** One arriving or leaving guest (design R4): initials, "Name · Type · Room", payment and room status, the next action. */
+function MovementRow({ r, arrivals, hrefFor, today }: { r: ReservationRow; arrivals: boolean; hrefFor: (r: ReservationRow) => string; today: string }) {
+  const balance = owedOf(r);
+  const overdue = !arrivals && r.checkOut < today;
+  const step = nextStep(r, today);
+  const status = arrivals
+    ? balance > 0
+      ? <span className="font-semibold text-[#8a4b06]">Owes {formatNaira(balance)}</span>
+      : r.roomNumber
+        ? "Paid · room ready"
+        : "Paid · assign a room"
+    : balance > 0
+      ? <span className="font-semibold text-[#8a4b06]">Owes {formatNaira(balance)}</span>
+      : overdue
+        ? <span className="text-[#a61b1b]">Due out {formatDate(r.checkOut, { year: false })}</span>
+        : "Paid · due out today";
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
+      <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#e8eefb] text-[13px] font-bold text-navy-900">{initials(r.guestName)}</span>
+      <Link href={hrefFor(r)} scroll={!opensPanel(hrefFor(r))} className="min-w-0 flex-1 hover:text-navy-700">
+        <span className="block font-semibold text-ink-900">{r.guestName} · {r.category}{r.roomNumber ? ` · Room ${r.roomNumber}` : ""}</span>
+        <span className="block text-sm text-ink-600">{status}</span>
+      </Link>
+      <span className="shrink-0 [&_button]:whitespace-nowrap">
+        {step.kind === "take_payment" ? (
+          <TakePaymentLink reservationId={r.id} balanceKobo={step.owedKobo} size="sm" />
+        ) : step.kind === "assign_room" ? (
+          <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "secondary" })}>Assign room</Link>
+        ) : step.kind === "check_in" ? (
+          <CheckInButton reservationId={r.id} roomNumber={r.roomNumber} size="sm" />
+        ) : step.kind === "check_out" ? (
+          <CheckOutButton reservationId={r.id} balanceKobo={0} size="sm" />
+        ) : (
+          <Link href={hrefFor(r)} className={buttonStyles({ size: "sm", variant: "ghost" })}>Open</Link>
+        )}
+      </span>
+    </li>
   );
 }

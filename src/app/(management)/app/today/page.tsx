@@ -34,6 +34,7 @@ async function Content({ searchParams }: { searchParams: Search }) {
       departures={m.departures}
       inHouse={m.inHouse}
       counts={roomCounts(rooms)}
+      toClean={rooms.filter((r) => r.state !== "occupied" && r.state !== "maintenance" && r.readiness !== "ready").map((r) => r.number)}
       tonight={tonightView(tonight)}
       progress={m.progress}
       signedIn={<SignedInStrip name={staff.fullName} roleLabel={staffRole[staff.role]} onStation={Boolean(staff.station)} />}
