@@ -99,7 +99,7 @@ export function StockTable({ items, manage }: { items: StockItem[]; manage: bool
   const current = items.find((i) => i.id === adjusting);
   return (
     <>
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[36rem] text-left text-sm">
           <thead>
             <tr className="border-b border-hairline text-[13px] text-ink-500">

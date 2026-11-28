@@ -29,7 +29,7 @@ function ClosingsTable({ rows, title, markFor }: { rows: ClosingRow[]; title: st
     <section className="overflow-clip rounded-xl border border-hairline bg-white">
       <h2 className="flex items-center gap-2.5 border-b border-hairline px-4 py-3 text-base font-bold text-ink-900">{title} <Count n={rows.length} /></h2>
       {rows.length ? (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[56rem] text-left text-sm">
             <thead>
               <tr className="border-b border-hairline text-[13px] text-ink-500">

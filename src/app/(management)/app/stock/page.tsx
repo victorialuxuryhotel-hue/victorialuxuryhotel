@@ -64,7 +64,7 @@ async function Content() {
           <section className="overflow-clip rounded-xl border border-hairline bg-white">
             <h2 className="border-b border-hairline px-4 py-3 text-base font-bold text-ink-900">Recent movements</h2>
             {moves.length ? (
-              <div className="max-h-[36rem] overflow-auto">
+              <div className="relative max-h-[36rem] overflow-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="sticky top-0 bg-white">
                     <tr className="border-b border-hairline text-[13px] text-ink-500">
