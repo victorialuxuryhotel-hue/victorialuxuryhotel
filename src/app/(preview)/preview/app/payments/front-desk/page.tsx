@@ -14,7 +14,7 @@ async function Content({ searchParams }: Props) {
     <FrontDeskPayments
       view={view}
       rows={view === "mine" ? rows.filter((r) => r.recordedById === "me") : rows}
-      summary={{ todayCount: rows.length, mineCount: 7, totals: { cash: 12_000_000, transfer: 4_500_000, cardOnline: 16_500_000, pos: 0, other: 0 } }}
+      summary={{ todayCount: rows.length, mineCount: 7, totals: { cash: 12_000_000, transfer: 4_500_000, cardOnline: 16_500_000, pos: 0, other: 0 }, toConfirm: { count: 1, kobo: 4_500_000 }, refundsDue: { count: 0, kobo: 0 } }}
       staffId="me"
       basePath="/preview/app/payments/front-desk"
       reservationHref={() => "/preview/app/reservations/vl-7kq3pm"}

@@ -33,9 +33,9 @@ export function PanelShell({ title, closeHref, children }: { title: string; clos
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col overflow-y-auto border-l border-hairline bg-ivory-50 shadow-xl outline-none sm:w-[28rem]"
+        className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col overflow-y-auto border-l border-hairline bg-white shadow-[-12px_0_32px_rgba(11,31,92,.12)] outline-none sm:w-[400px]"
       >
-        <Link href={closeHref} scroll={false} aria-label="Close panel" className="absolute top-3 right-3 z-10 grid size-10 place-items-center rounded-md text-ink-500 hover:bg-ivory-200 hover:text-ink-900">
+        <Link href={closeHref} scroll={false} aria-label="Close panel" className="absolute top-[18px] right-5 z-10 grid size-9 place-items-center rounded-lg border border-[#cfcabd] bg-white text-ink-700 hover:bg-ivory-100 hover:text-ink-900">
           <X className="size-5" aria-hidden />
         </Link>
         {children}

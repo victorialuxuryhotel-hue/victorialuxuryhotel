@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Search } from "lucide-react";
-import { Input, Select } from "@/components/ui/form";
+import { Input } from "@/components/ui/form";
+import { FilterMenu } from "./filter-menu";
 import { cn } from "@/lib/utils/cn";
 import { FiltersToggle } from "./filters-toggle";
 import { SlashHint } from "./shortcuts";
@@ -24,16 +25,16 @@ export function ListToolbar({
     <form
       method="get"
       className={cn(
-        "sticky top-14 z-10 grid grid-cols-[1fr_auto] gap-2 border-b border-hairline bg-ivory-50 p-3 md:static md:flex md:items-center md:gap-3 md:p-4 lg:top-0",
+        "sticky top-14 z-10 grid grid-cols-[1fr_auto] gap-2 bg-ivory-100 py-2 md:static md:flex md:flex-wrap md:items-center md:gap-2.5 md:bg-transparent md:py-0 lg:top-0",
         !filters && "grid-cols-1",
         className,
       )}
     >
       {Object.entries(hidden ?? {}).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-      <label className="relative flex-1">
+      <label className="relative md:w-80">
         <span className="sr-only">Search</span>
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
-        <Input type="search" name="q" placeholder={placeholder} defaultValue={defaultQuery} data-search="" aria-keyshortcuts="/" className="h-11 pl-9 md:h-10 pointer-fine:md:pr-9" />
+        <Input type="search" name="q" placeholder={placeholder} defaultValue={defaultQuery} data-search="" aria-keyshortcuts="/" className="h-11 pl-9 text-sm md:h-10 pointer-fine:md:pr-9" />
         <SlashHint />
       </label>
       {filters ? <FiltersToggle initiallyOpen={filtersActive}>{filters}</FiltersToggle> : null}
@@ -41,36 +42,28 @@ export function ListToolbar({
   );
 }
 
+/** A list filter (design D2): a dropdown with the choices, a tick on the chosen one, and Clear. */
 export function FilterSelect({ name, label, options, value }: { name: string; label: string; options: Array<[string, string]>; value?: string }) {
-  return (
-    <label>
-      <span className="sr-only">{label}</span>
-      <Select name={name} defaultValue={value ?? ""} className="w-full md:w-auto md:min-w-36">
-        <option value="">{label}: all</option>
-        {options.map(([v, l]) => (
-          <option key={v} value={v}>{l}</option>
-        ))}
-      </Select>
-    </label>
-  );
+  return <FilterMenu name={name} label={label} value={value} options={options} />;
 }
 
-export function Tabs({ items }: { items: Array<{ label: string; count?: number; active?: boolean; href: string }> }) {
+/** Tabs that switch what a list shows (design R1): an underline under the chosen one, a count beside each. `inset` pads them inside a card. */
+export function Tabs({ items, inset = true }: { items: Array<{ label: string; count?: number; active?: boolean; href: string }>; inset?: boolean }) {
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b border-hairline px-4">
+    <nav className={cn("flex gap-[22px] overflow-x-auto border-b border-hairline", inset && "px-4 pt-3")}>
       {items.map((t) => (
         <a
           key={t.label}
           href={t.href}
           aria-current={t.active ? "page" : undefined}
           className={cn(
-            "-mb-px flex items-center gap-2 border-b-2 px-3 py-3 text-[15px] whitespace-nowrap",
-            t.active ? "border-navy-800 text-navy-950" : "border-transparent text-ink-500 hover:text-ink-900",
+            "-mb-px flex shrink-0 items-center gap-2 border-b-[3px] px-0.5 pb-2.5 text-[15px] whitespace-nowrap",
+            t.active ? "border-navy-900 font-semibold text-ink-900" : "border-transparent font-medium text-[#5b6372] hover:text-ink-900",
           )}
         >
           {t.label}
           {t.count !== undefined ? (
-            <span className={cn("rounded-full px-2 py-0.5 text-xs", t.active ? "bg-navy-800 text-white" : "bg-ivory-200 text-ink-600")}>{t.count}</span>
+            <span className={cn("inline-flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 text-xs font-semibold tabular-nums", t.active ? "bg-navy-900 text-white" : "bg-[#eceae4] text-ink-700")}>{t.count}</span>
           ) : null}
         </a>
       ))}

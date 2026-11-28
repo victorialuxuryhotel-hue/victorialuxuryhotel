@@ -17,25 +17,47 @@ export type ToConfirm = {
 
 const READERS = [...MONEY_APPROVERS, "finance"] as const;
 
-/** The non-cash payments nobody has checked yet, oldest first. */
-const UNCHECKED_SQL = `
+/**
+ * Every staff-taken transfer and POS payment (desk, hall, restaurant & bar). `unchecked` keeps only those nobody
+ * has checked yet; without it the rows join to their check (Matched / Not found tabs).
+ */
+const sourcesSql = (unchecked: boolean) => {
+  const notChecked = (type: string, id: string) => (unchecked ? `\n    AND NOT EXISTS (SELECT 1 FROM payment_checks c WHERE c.source_type = '${type}' AND c.source_id = ${id})` : "");
+  return `
   SELECT 'payment' AS source_type, p.id AS source_id, p.paid_at AS at, s.full_name AS taken_by, s.id AS taken_by_id,
          (CASE p.kind WHEN 'refund' THEN 'Refund to ' ELSE '' END) || g.full_name || ' · ' || r.reference AS who, p.method, p.amount_kobo, coalesce(p.provider_reference, p.slip_last4, p.sender_name) AS reference, r.id AS reservation_id
   FROM payments p JOIN reservations r ON r.id = p.reservation_id JOIN guests g ON g.id = r.guest_id LEFT JOIN staff_profiles s ON s.id = p.recorded_by
-  WHERE p.status = 'successful' AND p.provider = 'offline' AND (p.kind = 'payment' AND p.method IN ('bank_transfer', 'pos_terminal') OR p.kind = 'refund' AND p.method = 'bank_transfer')
-    AND NOT EXISTS (SELECT 1 FROM payment_checks c WHERE c.source_type = 'payment' AND c.source_id = p.id)
+  WHERE p.status = 'successful' AND p.provider = 'offline' AND (p.kind = 'payment' AND p.method IN ('bank_transfer', 'pos_terminal') OR p.kind = 'refund' AND p.method = 'bank_transfer')${notChecked("payment", "p.id")}
   UNION ALL
   SELECT 'hall_payment', hp.id, hp.created_at, s.full_name, s.id, 'Hall · ' || h.title || ' · ' || h.customer_name, hp.method, hp.amount_kobo, hp.reference, NULL
   FROM hall_payments hp JOIN hall_bookings h ON h.id = hp.booking_id LEFT JOIN staff_profiles s ON s.id = hp.recorded_by
-  WHERE hp.method IN ('bank_transfer', 'pos_terminal')
-    AND NOT EXISTS (SELECT 1 FROM payment_checks c WHERE c.source_type = 'hall_payment' AND c.source_id = hp.id)
+  WHERE hp.method IN ('bank_transfer', 'pos_terminal')${notChecked("hall_payment", "hp.id")}
   UNION ALL
   SELECT 'pos_order', o.id, o.paid_at, s.full_name, s.id,
          (CASE o.outlet WHEN 'bar' THEN 'Bar' ELSE 'Restaurant' END) || ' · ' || o.receipt_number || coalesce(' · ' || o.note, ''),
          o.method, o.total_kobo, coalesce(o.payment_reference, o.slip_last4, o.sender_name), NULL
   FROM pos_orders o LEFT JOIN staff_profiles s ON s.id = o.paid_by
-  WHERE o.status = 'paid' AND o.method IN ('bank_transfer', 'pos_terminal')
-    AND NOT EXISTS (SELECT 1 FROM payment_checks c WHERE c.source_type = 'pos_order' AND c.source_id = o.id)`;
+  WHERE o.status = 'paid' AND o.method IN ('bank_transfer', 'pos_terminal')${notChecked("pos_order", "o.id")}`;
+};
+
+/** The non-cash payments nobody has checked yet, oldest first. */
+const UNCHECKED_SQL = sourcesSql(true);
+
+export type Checked = ToConfirm & { outcome: "matched" | "not_found"; note: string | null; checked_at: string; checked_by: string | null };
+
+/** Payments already checked, newest check first (the Matched and Not found tabs). Read only. */
+export async function checkedPayments(db: Db, actor: Actor, outcome: "matched" | "not_found", limit = 100): Promise<Checked[]> {
+  requireRole(actor, READERS);
+  return all<Checked>(
+    db,
+    `SELECT x.*, c.outcome, c.note, c.checked_at, cb.full_name AS checked_by
+     FROM payment_checks c JOIN (${sourcesSql(false)}) x ON x.source_type = c.source_type AND x.source_id = c.source_id
+     LEFT JOIN staff_profiles cb ON cb.id = c.checked_by
+     WHERE c.outcome = ? ORDER BY c.checked_at DESC LIMIT ?`,
+    outcome,
+    limit,
+  );
+}
 
 export async function paymentsToConfirm(db: Db, actor: Actor, limit = 500): Promise<ToConfirm[]> {
   requireRole(actor, READERS);

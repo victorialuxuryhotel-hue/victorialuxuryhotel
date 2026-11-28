@@ -1,4 +1,6 @@
-import { Badge } from "@/components/ui/badge";
+import { Badge, type Tone } from "@/components/ui/badge";
+import { owedOf } from "@/domain/next-step";
+import { formatNaira } from "@/lib/format";
 import {
   bookingSource,
   paymentStatus,
@@ -14,10 +16,26 @@ export const ReservationBadge = ({ status }: { status: ReservationStatus }) => (
   <Badge tone={reservationStatus[status].tone}>{reservationStatus[status].label}</Badge>
 );
 
-/** Where the booking came from (interface brief I4). Always neutral: it's information, not a state. */
+/** Where the booking came from (interface brief I4): information, not a state. The website is pale navy (design R101). */
 export const SourceBadge = ({ source }: { source: BookingSource }) => (
-  <Badge tone="neutral" className="text-ink-600" data-source={source}>{bookingSource[source]}</Badge>
+  <Badge tone={source === "website" ? "info" : "neutral"} data-source={source}>{bookingSource[source]}</Badge>
 );
+
+/**
+ * A booking's state in the words the front desk uses (designs R101, R102): Awaiting payment, Owes ₦X, Paid,
+ * Checked in, Overdue (still in after check-out day), Checked out, Cancelled. Display only: it reads the same
+ * status and balance the rest of the app uses.
+ */
+export function BookingStatusBadge({ r, today }: { r: { status: ReservationStatus; checkOut: string; totalKobo: number; paidKobo: number; pendingKobo?: number }; today: string }) {
+  const owed = owedOf(r);
+  const [label, tone]: [string, Tone] =
+    r.status === "pending_payment" ? ["Awaiting payment", "warning"]
+    : r.status === "confirmed" ? (owed > 0 ? [`Owes ${formatNaira(owed)}`, "warning"] : ["Paid", "success"])
+    : r.status === "checked_in" ? (r.checkOut < today ? ["Overdue", "danger"] : owed > 0 ? [`Owes ${formatNaira(owed)}`, "warning"] : ["Checked in", "info"])
+    : r.status === "cancelled" ? ["Cancelled", "neutral"]
+    : [reservationStatus[r.status].label, reservationStatus[r.status].tone];
+  return <Badge tone={tone} data-status={r.status}>{label}</Badge>;
+}
 
 export const PaymentBadge = ({ status }: { status: PaymentStatus }) => (
   <Badge tone={paymentStatus[status].tone}>{paymentStatus[status].label}</Badge>

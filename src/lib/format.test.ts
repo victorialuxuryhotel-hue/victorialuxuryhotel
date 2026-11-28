@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatNaira, nightsBetween, numberWord, publicText, roomLabel } from "./format";
+import { formatDate, formatNaira, formatRange, nightsBetween, numberWord, publicText, roomLabel } from "./format";
 
 describe("format", () => {
+  it("writes a stay as a short range, with the year only when it differs", () => {
+    expect(formatRange("2026-11-28", "2026-11-30", "2026")).toBe("28 → 30 Nov");
+    expect(formatRange("2026-11-29", "2026-12-02", "2026")).toBe("29 Nov → 2 Dec");
+    expect(formatRange("2026-12-30", "2027-01-02", "2026")).toBe("30 Dec 2026 → 2 Jan 2027");
+    expect(formatRange("2027-02-01", "2027-02-03", "2026", "–")).toBe("1–3 Feb 2027");
+  });
+
   it("hides unfinished placeholder copy from guests", () => {
     expect(publicText("[Placeholder] Awaiting description")).toBe("");
     expect(publicText(" A calm room ")).toBe("A calm room");

@@ -558,3 +558,62 @@ These are deliberately **not final** in the app:
   and dividing money received (which includes advance payments) by nights would mislead. Booking rules adds a
   Payment details tab so that form stays. Staff opens *Invite someone* from the header (`?invite=1`).
 - Not done: D3 / D3b (till table dropdown and till account menu) live in `till.tsx`, which someone else owns.
+
+## Step 1f/2: front desk screens (R101–R109) and the staff sidebar
+
+- Shared: the page header is the white bar from the designs (22/700 title, one grey line, actions at the right);
+  tables use sentence-case grey headings on hairlines; `Section` (card.tsx) is the white card with a heading and a
+  count; guest initials are one pale-navy tone.
+- Booking page (R102): "VL-XXXX · Guest" with the status badge and dates; Stay (arrive/leave with the hotel's times,
+  nights, room, guests, booked), Bill (room nights, extras or discount, each payment as a minus line with its receipt
+  and *Correct this payment*, Balance in green or amber) and History as When/What/Who. Right column: *Next step* with
+  the one primary button (Take payment, Assign a room, Check in or Check out, from the same rule as before), Change
+  dates, Move room, Print bill, No-show, then *Cancel booking* in the danger style; the Guest card below. The change
+  forms fold under "Change dates or room" until one of those buttons opens them. Phones keep the bottom bar.
+- Bookings (R101): tabs with counts on the page (the existing Upcoming / In house / Awaiting payment / Needs
+  attention / All, kept because each is its own query), search, *Any source* and *Any status* dropdowns (D2: a tick
+  on the chosen one and Clear; choosing filters at once), then a *Bookings* card with a count and the table
+  Reference, Guest, Source, Dates, Room, Status, Total. The status says what the desk needs: Awaiting payment,
+  Owes ₦X, Paid, Checked in, Overdue, Checked out, Cancelled (display only). One status at a time, as before.
+- New shared `Menu` (src/components/ui/menu.tsx) for the D1/D2 dropdowns.
+- Payments (R107): tiles for Taken today, Cash in the drawer, To confirm (count and amount, opens Payments to
+  confirm for those who can) and Refunds due; Today | Mine for the front desk (managers keep the list of every
+  payment, paged); Cash / Transfer / POS / Online chips that narrow the list on screen; then Time, Receipt, From,
+  Method ("Transfer · ref", "POS · slip 4417", "Card online"), Status (Paid, To confirm, Correction) and Amount.
+  *Record a payment* opens the existing page (which asks for the booking first). Two read-only additions in
+  `payment-list.ts`: a to-confirm flag per payment and the to-confirm / refunds-due totals (tests added).
+- Payments to confirm (R108): the "check in the bank app, never on the customer's phone" note; *Check with the bank*
+  kept as its own card with a count; tabs *To confirm · N*, *Matched*, *Not found* (the last two are new read-only
+  lists of past checks with who checked and when, `checkedPayments`, test added); the table Taken, Method,
+  Reference, Taken by, For, Amount with *Not found* then *Matches* at the row's end. The person who recorded a
+  payment still sees "You recorded this, so another manager or the owner confirms it." instead of the buttons.
+- Rooms (R105): *Room number* in the header jumps to that room; chips *All · N*, *Ready · N*, *To clean · N*,
+  *Occupied · N*, *Out of order · N* (links, as before); rooms by floor as tiles with a coloured top edge, the number,
+  room type, a state badge, who is in it and when they leave (red when overdue), and on the tile itself *Mark clean*
+  for a room to clean or *Back in use* for one out of order. Tapping a room still opens all its actions; their
+  wording now matches (Mark clean, Back in use, Mark out of order in the danger style). Arriving is violet.
+- Booking side panel (R104): white 400px panel with the reference, guest and status (and phone); the stay and money
+  as facts (Arrive, Leave, Room, Source, Total, Paid, Owes, Hold ends); "Owes ₦X. The room is only held until 18:00"
+  while a hold runs; overdue, attention and notes as coloured notes; Extend stay and Change room kept; at the foot
+  the one large next action (same rule as before), then *Open booking* and *Change dates*. Initials stay beside the
+  name (the e2e suite looks for them).
+- Calendar (R103): "Every room, night by night" with the one primary *New booking*; *7 nights | 14 nights* (the same
+  14-night query; the week view shows the first 7), *← Earlier*, *Today*, *Later →* moving by the nights shown;
+  a white grid with ROOM and day columns (today highlighted), the room number in bold with its type, bars in the R1
+  colours (Booked navy, In house green, Awaiting payment amber, Overdue red) and the legend under the grid with "Tap
+  an empty night to book it". The free-per-type row stays: it is how the desk sees a full night at a glance.
+- Guests (R106): "Contact details and stay history"; search; a *Guests* card with Guest (initials, name, email),
+  Phone, Stays, Last stay, Total paid and an *Open* button per row. The design's "Most recent first" sort dropdown is
+  not added: the list has one order on the server and a sort would be a query change. The guest page uses the same
+  white cards, and its bookings card is called *Stays* with a count.
+- Hall bookings (R109): an *Upcoming* card with a count and the table When, Event, Booked by, Price, Status (Paid,
+  Owes ₦X, Awaiting payment, Enquiry, Cancelled) and, at the row's end, *Take payment* (opens the same payment form
+  under the row) or *Open* (the invoice), with Invoice and *Cancel booking* in a ⋯ menu. *New hall booking* is a
+  four-column form (Event, Booked by, Date, Guests / From, To, Price with ₦ inside, Phone / Email, Notes) with the
+  rule line and *Save hall booking* at the right. Notes is now a one-line field.
+- Staff sidebar (D1): navy #0b1f5c, the "Victoria Luxury" wordmark with MANAGEMENT in gold, group headings, plain
+  text links (no icons) with the current page in a lighter band; global search and the business day stay. At the
+  foot, one account button (initials, name, role) opens the account menu: name and role (and "signed in 09:53" on a
+  station), Manage sign-in (personal sign-in only), *This station*, then on a station *Lock screen* and *Switch user*
+  (both lock the screen; the next person taps their name), or *Sign out* in red with a personal sign-in. The owner's
+  *View as front desk* is in the same menu. The design's "Ctrl L" hint is left out: there is no such shortcut.

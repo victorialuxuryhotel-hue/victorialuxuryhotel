@@ -10,6 +10,8 @@ import { requireStaff } from "@/server/auth";
 import { getReservation, hotelToday } from "@/server/queries/reservations";
 import { assignableRooms } from "@/server/queries/rooms";
 import { managerToAskForDesk } from "@/server/queries/settings";
+import { publicBookingRules } from "@/server/queries/booking";
+import { checkInWhen, checkOutWhen } from "@/lib/stay-times";
 
 export const metadata: Metadata = { title: "Booking" };
 
@@ -21,9 +23,10 @@ async function Content({ params, searchParams }: PageProps<"/app/reservations/[i
   const [r, today] = await Promise.all([getReservation(id), hotelToday()]);
   if (!r) notFound();
   const canOverride = can(staff.role, "payments.override");
-  const [rooms, manager] = await Promise.all([
+  const [rooms, manager, rules] = await Promise.all([
     can(staff.role, "reservations.manage") && ["pending_payment", "confirmed", "checked_in"].includes(r.status) ? assignableRooms(r.id, r.checkIn, r.checkOut) : Promise.resolve([]),
     canOverride || !can(staff.role, "reservations.manage") ? Promise.resolve(null) : managerToAskForDesk(),
+    publicBookingRules(),
   ]);
   const sp = await searchParams;
   return (
@@ -41,6 +44,7 @@ async function Content({ params, searchParams }: PageProps<"/app/reservations/[i
       canApprove={can(staff.role, "payments.approve")}
       canManage={can(staff.role, "reservations.manage")}
       manager={manager}
+      stayTimes={{ checkIn: checkInWhen(rules.checkInTime), checkOut: checkOutWhen(rules.checkOutTime) }}
       justCreated={sp.created === "1"}
       paidReceipt={typeof sp.paid === "string" && /^RCT-\d{4}-\d{6}$/.test(sp.paid) ? sp.paid : undefined}
     />
