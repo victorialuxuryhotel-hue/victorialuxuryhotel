@@ -5,6 +5,7 @@ import { formatNaira } from "@/lib/format";
 import { hotelToday as today, tonight } from "@/lib/hotel-date";
 import { reservationStatus } from "@/domain/status";
 import { authorizeRead } from "../auth";
+import { bookingListWhere, bookingStatuses, bookingTabCounts, tabNewestFirst, type ReservationTab } from "../domain/booking-list";
 import { all, first, getDb } from "../db";
 import { cleanSearch } from "../db-errors";
 import { DUE_IN_SQL, DUE_OUT_SQL, movementProgress } from "../domain/movements";
@@ -56,27 +57,15 @@ export async function bookingTonight(): Promise<string> {
   return tonight();
 }
 
-export type ReservationTab = "upcoming" | "in_house" | "awaiting" | "attention" | "all";
+export type { ReservationTab } from "../domain/booking-list";
 
-const tabWhere: Record<ReservationTab, string> = {
-  upcoming: "r.status IN ('pending_payment', 'confirmed') AND r.check_out >= ?today",
-  in_house: "r.status = 'checked_in'",
-  awaiting: "r.status = 'pending_payment'",
-  attention: "r.attention_reason IS NOT NULL",
-  all: "1 = 1",
-};
-
-export async function listReservations(opts: { tab?: ReservationTab; q?: string; status?: string; source?: string; guestId?: string; page?: number; pageSize?: number } = {}) {
+export async function listReservations(opts: { tab?: ReservationTab; q?: string; statuses?: ReservationStatus[]; source?: string; guestId?: string; page?: number; pageSize?: number } = {}) {
   await authorizeRead(["reservations.manage", "reports.view"]);
   const db = await getDb();
   const tab = opts.tab ?? "upcoming";
   const size = opts.pageSize ?? 50;
-  const where = [tabWhere[tab].replace("?today", "?")];
-  const params: unknown[] = tab === "upcoming" ? [today()] : [];
-  if (opts.status && opts.status in reservationStatus) {
-    where.push("r.status = ?");
-    params.push(opts.status);
-  }
+  // Statuses are checked again here, so only real ones reach the query whatever the caller passed.
+  const { where, params } = bookingListWhere(tab, bookingStatuses(opts.statuses), today());
   if (opts.source) {
     where.push("r.source = ?");
     params.push(opts.source);
@@ -95,25 +84,15 @@ export async function listReservations(opts: { tab?: ReservationTab; q?: string;
   const rows = await all<ListRow>(
     db,
     `SELECT ${LIST_COLUMNS} ${LIST_FROM} WHERE ${where.join(" AND ")}
-     ORDER BY r.check_in ${tab === "all" ? "DESC" : "ASC"}, r.id LIMIT ? OFFSET ?`,
+     ORDER BY r.check_in ${tabNewestFirst(tab) ? "DESC" : "ASC"}, r.id LIMIT ? OFFSET ?`,
     ...params,
   );
   return rows.map(toRow);
 }
 
-export async function tabCounts(): Promise<Record<Exclude<ReservationTab, "all">, number>> {
+export async function tabCounts() {
   await authorizeRead(["reservations.manage", "reports.view"]);
-  const row = await first<Record<Exclude<ReservationTab, "all">, number>>(
-    await getDb(),
-    `SELECT
-       sum(status IN ('pending_payment', 'confirmed') AND check_out >= ?) AS upcoming,
-       sum(status = 'checked_in') AS in_house,
-       sum(status = 'pending_payment') AS awaiting,
-       sum(attention_reason IS NOT NULL) AS attention
-     FROM reservations`,
-    today(),
-  );
-  return { upcoming: row?.upcoming ?? 0, in_house: row?.in_house ?? 0, awaiting: row?.awaiting ?? 0, attention: row?.attention ?? 0 };
+  return bookingTabCounts(await getDb(), today());
 }
 
 export async function movements(day?: string) {

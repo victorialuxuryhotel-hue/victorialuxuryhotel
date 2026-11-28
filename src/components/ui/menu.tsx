@@ -19,7 +19,10 @@ export function Menu({
   side = "bottom",
   width = "w-[220px]",
   className,
+  onClose,
 }: {
+  /** Called each time the menu closes (a multi-choice filter applies its ticks then). */
+  onClose?: () => void;
   /** Accessible name of the button when its content isn't text (⋯). */
   label?: string;
   button: ReactNode;
@@ -35,6 +38,15 @@ export function Menu({
   const trigger = useRef<HTMLButtonElement>(null);
   const id = useId();
   const close = useCallback(() => setOpen(false), []);
+  const wasOpen = useRef(false);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+  useEffect(() => {
+    if (wasOpen.current && !open) onCloseRef.current?.();
+    wasOpen.current = open;
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
