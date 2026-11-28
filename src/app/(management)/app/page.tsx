@@ -5,6 +5,7 @@ import { getDb } from "@/server/db";
 import type { Metadata } from "next";
 import { owedOf } from "@/domain/next-step";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ArrowRight, CalendarPlus } from "lucide-react";
@@ -113,6 +114,12 @@ async function Content() {
   const staff = await requireStaff();
   if (staff.role === "front_desk" || staff.role === "hotel_manager") redirect("/app/today");
   if (staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager") redirect("/app/sales");
+  // The owner's phone opens the phone dashboard (FUNCTIONALITY.md section 12). Other pages stay reachable from the menu.
+  if (can(staff.role, "staff.manage") && !staff.station) {
+    const h = await headers();
+    const phone = h.get("sec-ch-ua-mobile") === "?1" || /Mobi|iPhone|Android.+Mobile/i.test(h.get("user-agent") ?? "");
+    if (phone) redirect("/app/owner");
+  }
   const money = can(staff.role, "reports.view");
   const [m, rooms, awaiting, recent, toConfirm, findings, depts, late] = await Promise.all([
     movements(),
