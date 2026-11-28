@@ -41,7 +41,8 @@ const gridNames = (p) => p.$$eval("ul li button", (bs) => bs.filter((b) => b.off
 
   // Right PIN: signed in, on the till, under their own name.
   await enterPin(p, bar.fullName, bar.pin);
-  await p.waitForFunction(() => location.pathname.startsWith("/app"), { timeout: 30000 });
+  // /app sends restaurant & bar staff on to the till; wait for that, not just the first page.
+  await p.waitForFunction(() => location.pathname === "/app/sales", { timeout: 30000 }).catch(() => {});
   await settle(p);
   check("the right PIN signs in and opens the till", new URL(p.url()).pathname === "/app/sales", p.url());
   const first = await openSession(bar.id);

@@ -57,6 +57,8 @@ const stamp = Date.now().toString(36).toUpperCase().slice(-6);
   check("the refund request is waiting, for one night", asked && asked.amount_kobo === room.rate && asked.decided_at === null, JSON.stringify(asked));
   check("nothing is paid out at the desk", (await val("SELECT count(*) FROM payments WHERE reservation_id = ? AND kind = 'refund'", res)) === 0);
   await clickText(p, "[role=dialog] label", "Key returned");
+  // The footer button turns on once the screen has the tick; pressing it earlier does nothing.
+  await p.waitForFunction(() => [...document.querySelectorAll("[role=dialog] button")].some((b) => b.textContent.trim().startsWith("Check out") && !b.disabled), { timeout: 10000 });
   await clickText(p, "[role=dialog] button", "Check out");
   await waitForText(p, /Checked out/).catch(() => {});
   check("and the guest is checked out", (await val("SELECT status FROM reservations WHERE id = ?", res)) === "checked_out", await p.$eval("[role=dialog]", (d) => d.innerText.replace(/\s+/g, " ")).catch(() => ""));

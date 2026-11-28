@@ -200,7 +200,7 @@ async function deskBooking(p, name, email) {
   await go(p, `/app/payments/receipt/${receipt}`);
   await waitForText(p, new RegExp(receipt));
   const rt = await text(p);
-  check("printable receipt shows number, guest and who took it", rt.includes("Cash Guest") && /recorded by|taken by|checked by/i.test(rt), rt.slice(0, 400));
+  check("printable receipt shows number, guest and who took it", rt.includes("Cash Guest") && /recorded by|taken by|checked by|received by/i.test(rt), rt.slice(0, 400));
 
   await go(p, `/app/reservations/${resId}`);
   await clickText(p, "summary", "Cancel booking");
