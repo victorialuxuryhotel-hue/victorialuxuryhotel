@@ -28,7 +28,7 @@ async function bookAndReview() {
   await fill(p, "#email", email);
   await fill(p, "#phone", "+234 803 000 4321");
   await p.click("input[name=acceptTerms]");
-  await clickText(p, "button", "Continue to payment");
+  await clickText(p, "button[type=submit]", "Continue");
   await p.waitForFunction(() => location.pathname.startsWith("/book/review/"), { timeout: 30000 });
   await waitForText(p, /VL-[A-Z2-9]{6}/);
   const ref = (await text(p)).match(/VL-[A-Z2-9]{6}/)[0];

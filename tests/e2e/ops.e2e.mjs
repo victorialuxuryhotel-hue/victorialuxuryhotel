@@ -18,7 +18,7 @@ const hotelDay = (n) => val(`SELECT date('now', '+1 hour', '+${n} days')`);
   await fill(p, "#email", email);
   await fill(p, "#phone", "+234 803 000 5555");
   await p.click("input[name=acceptTerms]");
-  await clickText(p, "button", "Continue to payment");
+  await clickText(p, "button[type=submit]", "Continue");
   await waitForText(p, /VL-[A-Z2-9]{6}/);
   const ref = (await text(p)).match(/VL-[A-Z2-9]{6}/)[0];
   await clickText(p, "button", "Pay ₦");
