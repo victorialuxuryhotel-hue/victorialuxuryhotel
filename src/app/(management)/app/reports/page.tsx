@@ -10,14 +10,15 @@ import { hotelToday } from "@/lib/hotel-date";
 import { pageFrom } from "@/components/management/pager";
 import { AutoSubmitSelect } from "@/components/ui/auto-submit-select";
 import { Kpi } from "@/components/ui/choice";
-import { buttonStyles } from "@/components/ui/button";
+import { Button, buttonStyles } from "@/components/ui/button";
+import { Field, FormMessage, Input } from "@/components/ui/form";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { can, canAny } from "@/lib/auth/permissions";
 import { formatDate, formatNaira, plural } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 import { requireStaff } from "@/server/auth";
-import { rangeLabel, recentMonths, reportDepartment, reportRange, type Bucket, type Department, type ReportRange } from "@/server/domain/reports";
+import { MAX_PICKED_DAYS, pickedDates, pickedRangeError, rangeDates, rangeLabel, recentMonths, reportDepartment, reportRange, type Bucket, type Department, type ReportRange } from "@/server/domain/reports";
 import { activityPageData, moneyPageData, occupancyPageData } from "@/server/queries/reports";
 
 export const metadata: Metadata = { title: "Reports" };
@@ -27,7 +28,9 @@ type SP = Promise<Record<string, string | string[] | undefined>>;
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 
 const shortDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", timeZone: "UTC" }).replace(",", "");
-const fixedLabel = { today: "Today", "14d": "14 days", month: "This month" } as const;
+const fixedLabel = { today: "Today", week: "This week", "14d": "14 days", month: "This month" } as const;
+/** The Pick dates form: the dates shown in it, and why they were refused (checked on the server). */
+type PickForm = { from: string; to: string; error: string | null };
 const monthName = (m: string) => new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`));
 const rangeName = (r: ReportRange) => rangeLabel(r);
 const METHODS: [Bucket, string][] = [["cash", "Cash"], ["transfer", "Transfer"], ["pos", "POS / card"], ["cardOnline", "Card online"], ["other", "Other"]];
@@ -57,34 +60,36 @@ function ReportTabs({ items }: { items: { label: string; href: string; active: b
  * The period as a segmented control (design R303), an earlier month, the department and Export to Excel in
  * one row. The periods are links so a report can be shared.
  */
-function Controls({ tab, range, dept, hotelOnly }: { tab: Tab; range: ReportRange; dept: Department | null; hotelOnly: boolean }) {
-  const months = recentMonths(hotelToday()).slice(1);
+function Controls({ tab, range, dept, hotelOnly, pick }: { tab: Tab; range: ReportRange | null; dept: Department | null; hotelOnly: boolean; pick: PickForm | null }) {
+  const today = hotelToday();
+  const months = recentMonths(today).slice(1);
+  const segment = (active: boolean) =>
+    cn("flex h-10 items-center whitespace-nowrap rounded-md px-4 text-[15px] font-semibold", active ? "bg-white text-ink-900 shadow-[0_1px_2px_rgba(0,0,0,.12)]" : "text-ink-600 hover:text-ink-900");
   return (
+    <div className="space-y-3">
     <div className="flex flex-wrap items-center gap-3">
-      <nav aria-label="Period" className="flex w-fit gap-1 rounded-lg bg-[#eae7df] p-1">
-        {(["today", "14d", "month"] as const).map((r) => (
-          <Link
-            key={r}
-            href={`/app/reports?tab=${tab}&range=${r}${deptQuery(dept)}`}
-            aria-current={r === range ? "page" : undefined}
-            className={cn("flex h-10 items-center whitespace-nowrap rounded-md px-5 text-[15px] font-semibold", r === range ? "bg-white text-ink-900 shadow-[0_1px_2px_rgba(0,0,0,.12)]" : "text-ink-600 hover:text-ink-900")}
-          >
+      <nav aria-label="Period" className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-lg bg-[#eae7df] p-1">
+        {(["today", "week", "14d", "month"] as const).map((r) => (
+          <Link key={r} href={`/app/reports?tab=${tab}&range=${r}${deptQuery(dept)}`} aria-current={!pick && r === range ? "page" : undefined} className={segment(!pick && r === range)}>
             {fixedLabel[r]}
           </Link>
         ))}
+        <Link href={`/app/reports?tab=${tab}&range=pick${deptQuery(dept)}`} aria-current={pick ? "page" : undefined} className={segment(Boolean(pick))}>
+          Pick dates
+        </Link>
       </nav>
       {months.length ? (
         <form action="/app/reports">
           <input type="hidden" name="tab" value={tab} />
           {dept ? <input type="hidden" name="dept" value={dept} /> : null}
-          <AutoSubmitSelect name="range" defaultValue={months.includes(range) ? range : ""} aria-label="Earlier month" className="w-48">
+          <AutoSubmitSelect name="range" defaultValue={range && months.includes(range) ? range : ""} aria-label="Earlier month" className="w-48">
             <option value="" disabled>Earlier month…</option>
             {months.map((m) => <option key={m} value={m}>{monthName(m)}</option>)}
           </AutoSubmitSelect>
         </form>
       ) : null}
       <span className="flex-1" />
-      {tab === "money" && !hotelOnly ? (
+      {tab === "money" && range && !hotelOnly ? (
         <form action="/app/reports">
           <input type="hidden" name="tab" value="money" />
           <input type="hidden" name="range" value={range} />
@@ -93,9 +98,26 @@ function Controls({ tab, range, dept, hotelOnly }: { tab: Tab; range: ReportRang
           </AutoSubmitSelect>
         </form>
       ) : null}
-      {tab === "money" ? (
+      {tab === "money" && range ? (
         <a href={`/app/reports/income-csv?range=${range}${deptQuery(dept)}&format=xlsx`} className={buttonStyles({ variant: "secondary" })}>Export to Excel</a>
       ) : null}
+    </div>
+    {pick ? (
+      <form action="/app/reports" className="flex flex-wrap items-end gap-3">
+        <input type="hidden" name="tab" value={tab} />
+        <input type="hidden" name="range" value="pick" />
+        {dept ? <input type="hidden" name="dept" value={dept} /> : null}
+        <Field label="From" htmlFor="report-from">
+          <Input id="report-from" type="date" name="from" defaultValue={pick.from} max={today} required className="w-44" />
+        </Field>
+        <Field label="To" htmlFor="report-to">
+          <Input id="report-to" type="date" name="to" defaultValue={pick.to} max={today} required className="w-44" />
+        </Field>
+        <Button type="submit">Show</Button>
+        <p className="w-full text-[13px] text-ink-500 sm:w-auto sm:self-center">Up to {MAX_PICKED_DAYS} days, ending today at the latest.</p>
+        {pick.error ? <div className="w-full"><FormMessage>{pick.error}</FormMessage></div> : null}
+      </form>
+    ) : null}
     </div>
   );
 }
@@ -135,27 +157,37 @@ function Bars({ items, label, format, scaleTo }: { items: { day: string; value: 
   );
 }
 
+type Occ = Awaited<ReturnType<typeof occupancyPageData>>;
+
+/**
+ * Money received (when given), occupancy, room-nights sold, average rate (ADR) and RevPAR. ADR and RevPAR come
+ * from the nights stayed in the period at their booked rates, not from money received, which includes advance
+ * payments for later stays.
+ */
+function StayKpis({ o, received }: { o: Occ; received?: { kobo: number; note: string } }) {
+  const n = (v: number) => v.toLocaleString("en-NG");
+  return (
+    <div className={cn("grid grid-cols-2 gap-3", received ? "md:grid-cols-3 xl:grid-cols-5" : "xl:grid-cols-4")}>
+      {received ? <Kpi label="Money received" value={formatNaira(received.kobo)} note={received.note} className="col-span-2 md:col-span-1" /> : null}
+      <Kpi label="Occupancy" value={`${o.averagePct}%`} note="room-nights sold ÷ available" />
+      <Kpi label="Room-nights sold" value={n(o.soldNights)} note={`of ${n(o.availableNights)} available`} />
+      <Kpi label="Average rate" value={formatNaira(o.adrKobo)} note={`room revenue ${formatNaira(o.roomRevenueKobo)} ÷ nights sold`} />
+      <Kpi label="RevPAR" value={formatNaira(o.revparKobo)} note="room revenue ÷ available room-nights" />
+    </div>
+  );
+}
+
 async function Money({ range, dept }: { range: ReportRange; dept: Department | null }) {
   const [{ income, finance }, o] = await Promise.all([moneyPageData(range, dept), occupancyPageData(range)]);
   const mine = dept ? finance.departments.find((d) => d.key === dept)! : null;
   const deptName = dept ? DEPARTMENTS.find(([d]) => d === dept)![1] : "All departments";
   const received = mine ? mine.incomeKobo : finance.incomeTotal;
-  // Average rate and RevPAR need room revenue earned per night, which the reports don't work out yet; money
-  // received includes advance payments for later stays, so dividing it by nights would mislead.
-  const roomsKobo = finance.departments.find((d) => d.key === "rooms")?.incomeKobo ?? 0;
-  const sold = o.nights.reduce((s, n) => s + n.occupied, 0);
-  const available = o.nights.length * o.roomsInService;
   const cell = "px-4 py-2.5 text-right tabular-nums whitespace-nowrap";
   const days = [...income.daily].reverse().filter((d) => d.total !== 0 || d.day === hotelToday());
   const byMethod = METHODS.map(([b, label]) => [label, income.byStaff.reduce((s, t) => s + (t.byMethod[b] ?? 0), 0)] as const).filter(([, k]) => k !== 0);
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Kpi label="Received" value={formatNaira(received)} note={`${deptName.toLowerCase()}${finance.vatRateBp ? ` · VAT ${formatNaira(mine ? mine.vatKobo : finance.vatKobo)} included` : ""}`} />
-        <Kpi label="Occupancy" value={`${o.averagePct}%`} note="room-nights sold ÷ available" />
-        <Kpi label="Room-nights sold" value={sold.toLocaleString("en-NG")} note={`of ${available.toLocaleString("en-NG")} available`} />
-        <Kpi label="Rooms received" value={formatNaira(roomsKobo)} note="money in for rooms, including advance payments" />
-      </div>
+      <StayKpis o={o} received={{ kobo: received, note: `${deptName.toLowerCase()}${finance.vatRateBp ? ` · VAT ${formatNaira(mine ? mine.vatKobo : finance.vatKobo)} included` : ""}` }} />
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Panel title="Income by day" description={`Money received each day${dept ? "" : ", by department"}. Days with nothing received are left out.`}>
@@ -283,6 +315,7 @@ async function Occupancy({ range }: { range: ReportRange }) {
   const o = await occupancyPageData(range);
   return (
     <div className="space-y-6">
+      <StayKpis o={o} />
       <Card>
         <div className="p-5">
           <p className="text-sm text-ink-500">Average occupancy · {rangeName(range).toLowerCase()}</p>
@@ -330,21 +363,42 @@ async function Activity({ sp }: { sp: Record<string, string | string[] | undefin
   return <ActivityLog p={p} rows={data.rows} total={data.total} people={data.people} today={hotelToday()} size={ACTIVITY_PAGE} />;
 }
 
+/**
+ * The period in the address. "Pick dates" submits range=pick&from=…&to=…; the dates are checked here on the
+ * server and, when they pass, become one range ("2026-11-02_2026-11-20") that the tabs and downloads carry.
+ * Picked dates that don't pass show the reason and no report (range null).
+ */
+function periodFrom(sp: Record<string, string | string[] | undefined>): { range: ReportRange | null; pick: PickForm | null } {
+  const today = hotelToday();
+  const raw = str(sp.range);
+  if (raw === "pick") {
+    const from = str(sp.from) || undefined;
+    const to = str(sp.to) || undefined;
+    if (!from && !to) return { range: null, pick: { from: rangeDates("month", today).from, to: today, error: null } };
+    const error = pickedRangeError(from, to, today);
+    return { range: error ? null : reportRange(`${from}_${to}`, today), pick: { from: from ?? "", to: to ?? "", error } };
+  }
+  const range = reportRange(raw, today);
+  const picked = pickedDates(range);
+  return { range, pick: picked ? { ...picked, error: null } : null };
+}
+
 async function Content({ searchParams }: { searchParams: SP }) {
   const staff = await requireStaff();
   if (!canAny(staff.role, ["reports.view", "reports.hotel"])) return <AccessDenied />;
   const hotelOnly = !can(staff.role, "reports.view");
   const sp = await searchParams;
   const tab: Tab = str(sp.tab) === "occupancy" ? "occupancy" : str(sp.tab) === "activity" ? "activity" : "money";
-  const range = reportRange(str(sp.range));
+  const { range, pick } = periodFrom(sp);
   const dept = tab === "money" ? (hotelOnly ? "rooms" : reportDepartment(str(sp.dept))) : null;
+  const rangeQuery = range ?? "pick";
   return (
     <>
       <PageHeader title="Reports" description="Money, occupancy and staff activity" />
       <ReportTabs
         items={[
-          { label: "Money", href: `/app/reports?tab=money&range=${range}`, active: tab === "money" },
-          { label: "Occupancy", href: `/app/reports?tab=occupancy&range=${range}`, active: tab === "occupancy" },
+          { label: "Money", href: `/app/reports?tab=money&range=${rangeQuery}`, active: tab === "money" },
+          { label: "Occupancy", href: `/app/reports?tab=occupancy&range=${rangeQuery}`, active: tab === "occupancy" },
           ...(can(staff.role, "activity.view") ? [{ label: "Activity", href: "/app/reports?tab=activity", active: tab === "activity" }] : []),
         ]}
       />
@@ -357,8 +411,14 @@ async function Content({ searchParams }: { searchParams: SP }) {
           )
         ) : (
           <>
-            <Controls tab={tab} range={range} dept={dept} hotelOnly={hotelOnly} />
-            {tab === "money" ? <Money range={range} dept={dept} /> : <Occupancy range={range} />}
+            <Controls tab={tab} range={range} dept={dept} hotelOnly={hotelOnly} pick={pick} />
+            {!range ? (
+              pick?.error ? null : <EmptyState title="Choose the dates" description={`Pick a from and to date (up to ${MAX_PICKED_DAYS} days), then Show.`} />
+            ) : tab === "money" ? (
+              <Money range={range} dept={dept} />
+            ) : (
+              <Occupancy range={range} />
+            )}
           </>
         )}
       </div>
