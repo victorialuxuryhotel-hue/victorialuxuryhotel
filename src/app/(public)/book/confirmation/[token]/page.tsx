@@ -3,7 +3,7 @@ import { checkInWhen, checkOutWhen } from "@/lib/stay-times";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { AutoRefresh } from "@/components/booking/auto-refresh";
+import { WaitingForTransfer } from "@/components/booking/payment-pending";
 import { BookingConfirmed, PaymentFailed, PaymentPending } from "@/components/booking/outcome";
 import { Container } from "@/components/public/section";
 import { buttonStyles } from "@/components/ui/button";
@@ -55,11 +55,14 @@ async function Outcome({ params }: { params: Promise<{ token: string }> }) {
   }
 
   if (b.status === "pending_payment" && b.latestAttempt?.status === "pending") {
+    const link = `${publicEnv().NEXT_PUBLIC_SITE_URL}/book/confirmation/${token}`;
     return (
-      <>
-        <AutoRefresh />
-        <PaymentPending reference={b.reference} />
-      </>
+      <WaitingForTransfer
+        reference={b.reference}
+        category={b.roomCategory ?? ""}
+        heldUntil={b.hold_expires_at}
+        whatsappText={`My booking at ${hotel.name}: ${b.reference}, ${b.check_in} to ${b.check_out}. ${link}`}
+      />
     );
   }
 

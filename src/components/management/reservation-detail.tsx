@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { owedOf } from "@/domain/next-step";
+import { SendPayLinkButton } from "./pay-link";
 import { AlertTriangle, ArrowLeft, BedDouble, CalendarDays, Clock, Mail, Phone, Printer, Users } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -153,6 +154,7 @@ export function ReservationDetailView({
         </div>
         <div className="hidden flex-wrap items-start gap-2 lg:flex">
           {canManage && step.kind === "take_payment" ? <TakePaymentLink reservationId={r.id} balanceKobo={step.owedKobo} /> : null}
+          {canManage && balance > 0 && ["pending_payment", "confirmed", "checked_in"].includes(r.status) ? <SendPayLinkButton reservationId={r.id} /> : null}
           {canManage && step.kind === "check_in" ? <CheckInButton reservationId={r.id} roomNumber={r.roomNumber} /> : null}
           {canManage && (step.kind === "assign_room" || step.kind === "wait_for_arrival") ? (
             <CheckInButton reservationId={r.id} disabledReason={step.kind === "assign_room" ? "Assign a room first" : `Arrival is ${formatDate(step.checkIn)}`} />

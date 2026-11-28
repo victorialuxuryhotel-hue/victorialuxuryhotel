@@ -460,3 +460,17 @@ These are deliberately **not final** in the app:
 - A refund can't be more than what was paid less what was used; the requester can't approve their own. Approving
   writes a refund payment; a refund by transfer appears under Payments to confirm for the other manager. Card bookings
   are refunded by transfer until Paystack refunds are built (step 3).
+
+## Step 2: payment links (X14), the guest's pay page (M14), waiting for a transfer (G12)
+
+- Booking page → *Send a payment link* (front desk and up, `paylinks.create`): makes `/pay/<random code>` for what's
+  owed, with a ready message; *Send on WhatsApp* (wa.me), *Send by email* (the staff member's mail app), *Copy link*.
+  The server sends nothing. A new link replaces the old one. It ends with the hold for an unpaid booking, after 3 days
+  for a part-paid one, or as soon as the booking is paid.
+- `/pay/<code>`: the booking, what's owed, the hold time, and *Pay ₦X* through Paystack (same verify and webhook flow).
+  A guest without an email gives one first (Paystack needs it). Paid links go to the booking's confirmation.
+- Part-paid bookings (a deposit at the desk) can now be paid online too.
+- Waiting for your transfer: checks every 10 seconds; "You don't need to pay again"; *Send my booking to WhatsApp*.
+- Never release a room with a payment in flight: a hold that ends while an online payment started in the last 2 hours
+  is still pending gets 30 minutes more, once, and the booking says why (the desk sees it).
+- Company bills (P3) can't be paid by link yet: they're paid at the desk (see the bill step).

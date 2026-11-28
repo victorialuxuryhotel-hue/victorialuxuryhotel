@@ -768,12 +768,34 @@ export async function resolveAttention(db: Db, actor: Actor, reservationId: stri
   });
 }
 
+/** A hold that ends while an online payment is still in flight gets this long more, once (section 10). */
+export const IN_FLIGHT_GRACE_MINUTES = 30;
+const IN_FLIGHT_NOTE = "Payment in progress when the hold ended";
+
 export async function expireUnpaidReservations(db: Db): Promise<number> {
   const t = now();
-  const [, expired] = await writeBatch(
+  const grace = new Date(Date.now() + IN_FLIGHT_GRACE_MINUTES * 60_000).toISOString();
+  const [, , , expired] = await writeBatch(
     db,
     null,
     [
+      // Never release a room with a payment in flight: an online payment started in the last 2 hours and not
+      // finished keeps the hold 30 minutes more, once, and the desk sees why on the booking.
+      db
+        .prepare(
+          `INSERT INTO activity_log (actor_type, action, entity_type, entity_id, summary)
+           SELECT 'system', 'reservation.hold_extended', 'reservation', r.id, r.reference || ' held ${IN_FLIGHT_GRACE_MINUTES} more minutes: a payment is still in progress'
+           FROM reservations r WHERE r.status = 'pending_payment' AND r.hold_expires_at <= ?1 AND coalesce(r.attention_reason, '') NOT LIKE '${IN_FLIGHT_NOTE}%'
+             AND EXISTS (SELECT 1 FROM payments p WHERE p.reservation_id = r.id AND p.provider = 'paystack' AND p.status = 'pending' AND p.created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 hours'))`,
+        )
+        .bind(t),
+      db
+        .prepare(
+          `UPDATE reservations SET hold_expires_at = ?2, attention_reason = '${IN_FLIGHT_NOTE}: held ${IN_FLIGHT_GRACE_MINUTES} more minutes. Check Paystack if it doesn''t arrive.'
+           WHERE status = 'pending_payment' AND hold_expires_at <= ?1 AND coalesce(attention_reason, '') NOT LIKE '${IN_FLIGHT_NOTE}%'
+             AND EXISTS (SELECT 1 FROM payments p WHERE p.reservation_id = reservations.id AND p.provider = 'paystack' AND p.status = 'pending' AND p.created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 hours'))`,
+        )
+        .bind(t, grace),
       db
         .prepare(
           `INSERT INTO activity_log (actor_type, action, entity_type, entity_id, summary)

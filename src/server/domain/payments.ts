@@ -124,15 +124,14 @@ export async function beginPaystackPayment(db: Db, publicToken: string): Promise
       publicToken,
     );
     if (!res) throw new AppError("NOT_FOUND", "Booking not found.");
-    if (res.status !== "pending_payment") {
-      throw new AppError("INVALID_TRANSITION", res.status === "confirmed" ? "This booking is already paid and confirmed." : "This booking can no longer be paid online.");
-    }
-    if (!res.hold_expires_at || res.hold_expires_at <= now()) throw new AppError("UNAVAILABLE", "Your booking hold has ended. Please search again.");
+    // Unpaid bookings within their hold, and part-paid ones (a deposit at the desk, then a payment link: section 10).
+    if (!["pending_payment", "confirmed", "checked_in"].includes(res.status)) throw new AppError("INVALID_TRANSITION", "This booking can no longer be paid online.");
+    if (res.status === "pending_payment" && (!res.hold_expires_at || res.hold_expires_at <= now())) throw new AppError("UNAVAILABLE", "Your booking hold has ended. Please search again.");
     const guest = await first<{ email: string | null }>(db, "SELECT email FROM guests WHERE id = ?", res.guest_id);
     if (!guest?.email) throw new AppError("VALIDATION", "An email address is needed to pay online.");
     const paid = await netPaid(db, res.id);
     const balance = dueOf(res) - paid;
-    if (balance <= 0) throw new AppError("INVALID_TRANSITION", "Nothing left to pay on this booking.");
+    if (balance <= 0) throw new AppError("INVALID_TRANSITION", res.status === "pending_payment" ? "Nothing left to pay on this booking." : "This booking is already paid and confirmed.");
 
     const hex = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(16).padStart(2, "0")).join("");
     const reference = `${res.reference.toLowerCase()}-${hex}`;
