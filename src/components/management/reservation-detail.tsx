@@ -13,7 +13,7 @@ import { publicEnv } from "@/lib/env";
 import { formatDate, formatDateTime, formatNaira, formatRange, plural } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
 import { whatsappLink } from "@/lib/whatsapp";
-import { ReservationBadge } from "./badges";
+import { BookingStatusBadge } from "./badges";
 import {
   AssignRoomForm,
   CancelForm,
@@ -137,7 +137,7 @@ export function ReservationDetailView({
           <span className="whitespace-nowrap">{r.reference}</span> · {r.guestName}
         </h1>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[#5b6372]">
-          <ReservationBadge status={r.status} />
+          <BookingStatusBadge r={r} today={today} />
           <span>{r.category} · {formatRange(r.checkIn, r.checkOut, year, "–")}</span>
         </p>
       </div>

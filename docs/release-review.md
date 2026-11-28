@@ -455,3 +455,9 @@ These are deliberately **not final** in the app:
   the one primary button (Take payment, Assign a room, Check in or Check out, from the same rule as before), Change
   dates, Move room, Print bill, No-show, then *Cancel booking* in the danger style; the Guest card below. The change
   forms fold under "Change dates or room" until one of those buttons opens them. Phones keep the bottom bar.
+- Bookings (R101): tabs with counts on the page (the existing Upcoming / In house / Awaiting payment / Needs
+  attention / All, kept because each is its own query), search, *Any source* and *Any status* dropdowns (D2: a tick
+  on the chosen one and Clear; choosing filters at once), then a *Bookings* card with a count and the table
+  Reference, Guest, Source, Dates, Room, Status, Total. The status says what the desk needs: Awaiting payment,
+  Owes ₦X, Paid, Checked in, Overdue, Checked out, Cancelled (display only). One status at a time, as before.
+- New shared `Menu` (src/components/ui/menu.tsx) for the D1/D2 dropdowns.

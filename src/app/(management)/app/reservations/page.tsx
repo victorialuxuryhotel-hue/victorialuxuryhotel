@@ -4,7 +4,6 @@ import { AccessDenied } from "@/components/management/access-denied";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { CalendarPlus } from "lucide-react";
 import { PageHeader } from "@/components/management/page-header";
 import { PAGE_SIZE, Pager, pageFrom } from "@/components/management/pager";
 import { ReservationTable } from "@/components/management/reservation-table";
@@ -12,7 +11,7 @@ import { BookingPanel } from "@/components/management/booking-panel";
 import { withBooking, withoutBooking } from "@/lib/panel";
 import { FilterSelect, ListToolbar, Tabs } from "@/components/management/toolbar";
 import { buttonStyles } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Section } from "@/components/ui/card";
 import { EmptyState, LoadingState } from "@/components/ui/feedback";
 import { bookingSource, reservationStatus } from "@/domain/status";
 import { requireStaff } from "@/server/auth";
@@ -44,23 +43,25 @@ async function Content({ searchParams }: { searchParams: SP }) {
   ]);
   const rows = fetched.slice(0, PAGE_SIZE);
   const href = (key: string) => `/app/reservations?tab=${key}`;
+  const filtered = Boolean(q || one(sp.status) || one(sp.source));
+  const count = !filtered && tab !== "all" ? counts[tab as keyof typeof counts] : page === 1 && fetched.length <= PAGE_SIZE ? rows.length : undefined;
   return (
     <>
     {one(sp.booking) ? <BookingPanel reference={one(sp.booking)!} closeHref={withoutBooking("/app/reservations", sp)} /> : null}
-    <Card>
-      <Tabs items={tabs.map((t) => ({ label: t.label, href: href(t.key), active: t.key === tab, count: t.key === "all" ? undefined : counts[t.key as keyof typeof counts] }))} />
-      <ListToolbar
-        placeholder="Search by reference, guest name or phone"
-        defaultQuery={q}
-        hidden={{ tab }}
-        filtersActive={Boolean(one(sp.status) || one(sp.source))}
-        filters={
-          <>
-            <FilterSelect name="status" label="Status" value={one(sp.status)} options={Object.entries(reservationStatus).map(([k, v]) => [k, v.label])} />
-            <FilterSelect name="source" label="Source" value={one(sp.source)} options={Object.entries(bookingSource)} />
-          </>
-        }
-      />
+    <Tabs inset={false} items={tabs.map((t) => ({ label: t.label, href: href(t.key), active: t.key === tab, count: t.key === "all" ? undefined : counts[t.key as keyof typeof counts] }))} />
+    <ListToolbar
+      placeholder="Name, phone or reference"
+      defaultQuery={q}
+      hidden={{ tab }}
+      filtersActive={Boolean(one(sp.status) || one(sp.source))}
+      filters={
+        <>
+          <FilterSelect name="source" label="Source" value={one(sp.source)} options={Object.entries(bookingSource)} />
+          <FilterSelect name="status" label="Status" value={one(sp.status)} options={Object.entries(reservationStatus).map(([k, v]) => [k, v.label])} />
+        </>
+      }
+    />
+    <Section title="Bookings" count={count}>
       {rows.length ? (
         <>
           <ReservationTable rows={rows} hrefFor={(r) => withBooking("/app/reservations", sp, r.reference)} today={hotelToday()} />
@@ -69,7 +70,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
       ) : (
         <div className="p-5"><EmptyState title={q ? "No bookings match your search" : "No bookings here"} description={q ? "Try a reference, a guest's name or phone number." : undefined} /></div>
       )}
-    </Card>
+    </Section>
     </>
   );
 }
@@ -77,7 +78,7 @@ async function Content({ searchParams }: { searchParams: SP }) {
 async function NewReservationButton() {
   const staff = await requireStaff();
   if (!can(staff.role, "reservations.manage")) return null;
-  return <Link href="/app/reservations/new" className={buttonStyles()}><CalendarPlus className="size-4" aria-hidden />New booking</Link>;
+  return <Link href="/app/reservations/new" className={buttonStyles()}>New booking</Link>;
 }
 
 export default function ReservationsPage(props: PageProps<"/app/reservations">) {
@@ -85,10 +86,10 @@ export default function ReservationsPage(props: PageProps<"/app/reservations">) 
     <>
       <PageHeader
         title="Bookings"
-        description="All bookings in one place."
+        description="All bookings in one place"
         actions={<Suspense fallback={null}><NewReservationButton /></Suspense>}
       />
-      <div className="px-4 py-6 lg:px-8">
+      <div className="space-y-3.5 px-4 py-5 lg:px-7">
         <Suspense fallback={<LoadingState />}>
           <Content searchParams={props.searchParams} />
         </Suspense>
