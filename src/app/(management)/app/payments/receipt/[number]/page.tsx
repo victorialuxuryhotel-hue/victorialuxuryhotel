@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/management/page-header";
-import { Receipt } from "@/components/management/payments";
+import { RoomReceipt } from "@/components/management/room-receipt";
 import { PrintButton } from "@/components/management/print-button";
 import { PrintAs, ThermalReceipt } from "@/components/management/thermal";
 import { paymentMethod } from "@/domain/status";
@@ -15,7 +15,7 @@ import { nowIso } from "@/server/clock";
 import { LoadingState } from "@/components/ui/feedback";
 import { getBookingRules } from "@/server/queries/settings";
 import { requireStaff } from "@/server/auth";
-import { getReservation, reservationIdForReceipt } from "@/server/queries/reservations";
+import { getBillCharges, getReservation, reservationIdForReceipt } from "@/server/queries/reservations";
 
 export const metadata: Metadata = { title: "Receipt" };
 
@@ -26,16 +26,16 @@ async function Content({ params }: { params: Promise<{ number: string }> }) {
   if (!/^RCT-\d{4}-\d{6}$/.test(number)) notFound();
   const reservationId = await reservationIdForReceipt(number);
   if (!reservationId) notFound();
-  const r = await getReservation(reservationId);
+  const [r, lines] = await Promise.all([getReservation(reservationId), getBillCharges(reservationId)]);
   const payment = r?.payments.find((x) => x.receiptNumber === number);
-  if (!r || !payment) notFound();
+  if (!r || !payment || !lines) notFound();
   const rules = await getBookingRules();
   const vat = rules.vatOnReceipts ? rules.vatRateBp : 0;
   const copy = isReprint(payment.paidAt, nowIso());
   const room = r.roomNumber ? `Room ${r.roomNumber}` : undefined;
   return (
     <>
-      <Receipt payment={payment} reservation={{ ...r, room }} vatRateBp={vat} taxId={rules.taxId} copy={copy} />
+      <RoomReceipt payment={payment} stay={{ ...r, room }} lines={lines} vatRateBp={vat} taxId={rules.taxId} copy={copy} />
       <PrintAs
         thermal={
           <ThermalReceipt
