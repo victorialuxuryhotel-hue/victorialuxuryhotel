@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { CalendarPlus, Check, Clock, MapPin, MessageCircle, Phone, Share2, XCircle } from "lucide-react";
+import { Clock } from "lucide-react";
 import { CopyButton } from "./copy-button";
+import { Photo } from "@/components/public/photo";
+import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
+import { bookingShareText, whatsappShareLink } from "@/lib/booking-share";
 import { formatDate, formatNaira, plural } from "@/lib/format";
 
 export type ConfirmedStay = {
@@ -21,61 +24,74 @@ export type ConfirmedStay = {
   room?: string;
   token: string;
   siteUrl: string;
+  /** The room type's cover photo (design G7). */
+  photo?: { image: string; alt: string };
 };
 
 export function BookingConfirmed({ stay }: { stay: ConfirmedStay }) {
-  const share = `https://wa.me/?text=${encodeURIComponent(`I'm staying at ${hotel.name}, ${formatDate(stay.checkIn)} to ${formatDate(stay.checkOut)}. ${stay.siteUrl}`)}`;
-  const rows: Array<[string, string]> = [
-    ["Room", `${stay.room ? `${stay.room} · ` : ""}${stay.category}`],
-    ["Guests", String(stay.guests)],
-    ["Check-in", `${formatDate(stay.checkIn)}, ${stay.checkInTime}`],
-    ["Check-out", `${formatDate(stay.checkOut)}, ${stay.checkOutTime}`],
+  const share = whatsappShareLink(
+    bookingShareText({ hotelName: hotel.name, reference: stay.reference, checkIn: stay.checkIn, checkOut: stay.checkOut, checkInTime: stay.checkInTime, checkOutTime: stay.checkOutTime, siteUrl: stay.siteUrl }),
+  );
+  const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "UTC" }).format(new Date(`${stay.checkIn}T12:00:00Z`));
+  const first = stay.guestName.split(" ")[0];
+  const room = `${stay.room ? `${stay.room} · ` : ""}${stay.category} · ${plural(stay.guests, "guest")}`;
+  const facts: Array<[string, string]> = [
+    ["Arrive", `${formatDate(stay.checkIn, { year: false })} · ${stay.checkInTime}`],
+    ["Leave", `${formatDate(stay.checkOut, { year: false })} · ${stay.checkOutTime}`],
+    ["Room", room],
     ["Paid", `${formatNaira(stay.paidKobo)} · ${plural(stay.nights, "night")}`],
+    ["Address", `${hotel.address.line1.replace(/^.*Plot \d+, /, "")}, ${hotel.address.city}`],
   ];
-  const contact = "inline-flex min-h-11 items-center gap-1.5 font-medium text-navy-800 hover:text-gold-600";
+  const receipt = stay.receiptNumber ? `/book/receipt/${stay.token}/${stay.receiptNumber}` : null;
+  const calendar = `/book/confirmation/${stay.token}/calendar`;
   return (
-    <div className="mx-auto max-w-[37.5rem] text-center">
-      <span className="mx-auto flex size-13 items-center justify-center rounded-full bg-success-50 text-success-600"><Check className="size-6" strokeWidth={3} aria-hidden /></span>
-      <h1 className="mt-[18px] font-display text-[2.25rem] leading-[1.05] font-medium text-navy-950 sm:text-[2.75rem]">You&apos;re booked, {stay.guestName.split(" ")[0]}</h1>
-      <p className="mt-2 text-[15px] text-ink-600">
-        Payment received and your reservation is confirmed.{stay.email ? <> Details sent to <span className="font-medium text-ink-900 [overflow-wrap:anywhere]">{stay.email}</span>.</> : null}
-      </p>
+    <div className="mx-auto w-full max-w-[760px] lg:overflow-hidden lg:rounded-2xl lg:border lg:border-hairline">
+      <Photo photo={stay.photo ?? { alt: stay.category }} className="-mx-4 h-[180px] lg:mx-0 lg:h-[200px]" sizes="(min-width: 1024px) 760px, 100vw" />
+      <div className="flex flex-col gap-4 pt-5 max-lg:items-center max-lg:text-center lg:p-7">
+        <Badge tone="success">Paid · confirmed</Badge>
+        <h1 className="font-display text-[30px] leading-tight font-semibold text-ink-900 lg:text-[42px]">See you on {weekday}, {first}</h1>
+        <p className="text-[15px] text-muted lg:text-base">
+          <span className="max-lg:hidden">Your booking reference is <b className="text-ink-900">{stay.reference}</b>. </span>
+          {stay.email ? <>We&apos;ve emailed your confirmation and receipt to <span className="[overflow-wrap:anywhere]">{stay.email}</span>.</> : "Your confirmation and receipt are below."}
+        </p>
 
-      <div className="mt-7 overflow-hidden rounded-card border border-hairline bg-white text-left">
-        <div className="flex items-center justify-between gap-3 bg-navy-950 py-2.5 pr-2.5 pl-5 text-ivory-50">
-          <span className="text-[11px] tracking-[0.2em] text-gold-300 uppercase">Booking reference</span>
-          <span className="flex items-center gap-2">
-            <span className="font-mono text-[17px] tracking-[0.06em]">{stay.reference}</span>
-            <span className="[&_button]:text-ivory-50"><CopyButton text={stay.reference} /></span>
-          </span>
-        </div>
-        <dl className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 p-5 text-sm">
-          {rows.map(([k, v]) => (
+        <dl className="hidden grid-cols-3 gap-3.5 rounded-xl bg-ivory-100 p-4 tabular-nums lg:grid">
+          {facts.map(([k, v]) => (
             <div key={k}>
-              <dt className="text-ink-500">{k}</dt>
-              <dd className="mt-0.5 font-medium text-ink-900 tabular-nums">{v}</dd>
+              <dt className="text-xs font-semibold text-muted">{k}</dt>
+              <dd className="mt-1 text-[15px] font-semibold">{v}</dd>
             </div>
           ))}
-          {stay.receiptNumber ? (
-            <div>
-              <dt className="text-ink-500">Receipt</dt>
-              <dd className="mt-0.5 font-medium"><Link href={`/book/receipt/${stay.token}/${stay.receiptNumber}`} className="text-navy-800 underline underline-offset-2">{stay.receiptNumber}</Link></dd>
-            </div>
-          ) : null}
+          <div>
+            <dt className="text-xs font-semibold text-muted">Reference</dt>
+            <dd className="-my-1.5 flex items-center gap-1 text-[15px] font-semibold">{stay.reference}<CopyButton text={stay.reference} className="min-h-8 px-2" /></dd>
+          </div>
         </dl>
-        <div className="flex flex-wrap gap-x-6 border-t border-hairline bg-ivory-50 px-5 py-1.5 text-sm">
-          <a href={hotel.mapsUrl} target="_blank" rel="noreferrer" className={contact}><MapPin className="size-4" aria-hidden />Directions</a>
-          <a href={`tel:${hotel.phone}`} className={contact}><Phone className="size-4" aria-hidden />Call the hotel</a>
-          <a href={`https://wa.me/${hotel.whatsapp}`} className={contact}><MessageCircle className="size-4" aria-hidden />WhatsApp</a>
-          <a href={`/book/confirmation/${stay.token}/calendar`} className={contact}><CalendarPlus className="size-4" aria-hidden />Calendar</a>
-          <a href={share} target="_blank" rel="noreferrer" className={contact}><Share2 className="size-4" aria-hidden />Share</a>
-        </div>
-      </div>
+        <dl className="flex w-full flex-col gap-2.5 rounded-xl border border-hairline p-4 text-left text-sm tabular-nums lg:hidden">
+          {[["Reference", stay.reference] as [string, string], ...facts.slice(0, 4)].map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-4">
+              <dt className="text-muted">{k}</dt>
+              <dd className="text-right font-semibold">{v}</dd>
+            </div>
+          ))}
+        </dl>
 
-      <p className="mt-4 text-sm text-ink-600">
-        Arrive {stay.checkInTime === "any time" ? "any time that day" : stay.checkInTime}. Need to change dates or cancel? <Link href="/account" className="text-navy-800 underline underline-offset-2">Manage your booking</Link>
-      </p>
-      <Link href="/" className={buttonStyles({ variant: "secondary", className: "mt-6" })}>Back to the website</Link>
+        <div className="grid w-full grid-cols-3 gap-2.5 lg:flex lg:flex-wrap">
+          {receipt ? <Link href={receipt} className={buttonStyles({ className: "col-span-3 max-lg:h-15 max-lg:w-full max-lg:text-lg" })}>Download receipt</Link> : null}
+          <a href={share} target="_blank" rel="noreferrer" className={buttonStyles({ variant: "secondary", className: "max-lg:w-full max-lg:px-2" })}>
+            <span className="lg:hidden">WhatsApp</span><span className="max-lg:hidden">Send to WhatsApp</span>
+          </a>
+          <a href={calendar} className={buttonStyles({ variant: "secondary", className: "max-lg:w-full max-lg:px-2" })}>
+            <span className="lg:hidden">Calendar</span><span className="max-lg:hidden">Add to calendar</span>
+          </a>
+          <a href={hotel.mapsUrl} target="_blank" rel="noreferrer" className={buttonStyles({ variant: "secondary", className: "max-lg:w-full max-lg:px-2" })}>Directions</a>
+        </div>
+        <p className="text-sm text-muted">
+          Need to change dates or cancel? <Link href="/account" className="inline-flex min-h-11 items-center font-semibold text-navy-700 underline-offset-2 hover:underline">Manage your booking</Link>
+          {" · "}
+          <a href={`tel:${hotel.phone}`} className="inline-flex min-h-11 items-center font-semibold text-navy-700 underline-offset-2 hover:underline">Call the hotel</a>
+        </p>
+      </div>
     </div>
   );
 }
@@ -95,16 +111,22 @@ export function PaymentPending({ reference }: { reference: string }) {
   );
 }
 
-export function PaymentFailed({ retryHref }: { retryHref: string }) {
+/** Payment didn't go through (designs G8, M9). The room stays held; the guest can try again or pay another way. */
+export function PaymentFailed({ retryHref, category, holdUntil }: { retryHref: string; category?: string; holdUntil?: string }) {
+  const until = holdUntil ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: hotel.timezone }).format(new Date(holdUntil)) : null;
   return (
-    <div className="mx-auto max-w-xl text-center">
-      <XCircle className="mx-auto size-14 text-danger-600" strokeWidth={1.5} aria-hidden />
-      <h1 className="mt-6 font-display text-5xl text-navy-950">Payment didn&apos;t go through</h1>
-      <p className="mt-3 text-ink-600">Your payment wasn&apos;t completed, so your booking isn&apos;t confirmed yet. Your room is held for a short while if you&apos;d like to try again.</p>
-      <div className="mt-8 flex flex-wrap justify-center gap-3">
-        <Link href={retryHref} className={buttonStyles({ size: "lg" })}>Try again</Link>
-        <a href={`https://wa.me/${hotel.whatsapp}`} className={buttonStyles({ variant: "secondary", size: "lg" })}>Get help on WhatsApp</a>
-      </div>
+    <div className="mx-auto flex w-full max-w-[520px] flex-col items-center gap-3.5 text-center lg:items-start lg:rounded-2xl lg:border lg:border-hairline lg:p-8 lg:text-left">
+      <Badge tone="danger">Payment didn&apos;t go through</Badge>
+      <h1 className="font-display text-[30px] leading-tight font-semibold text-ink-900 lg:text-[34px]">Your card wasn&apos;t charged</h1>
+      <p className="text-[15px] text-muted">
+        The payment didn&apos;t go through, so your booking isn&apos;t confirmed yet.{" "}
+        {until ? <>Your {category ? `${category} ` : ""}room is still held for you until <b className="text-ink-900 tabular-nums">{until}</b>.</> : "Your room is held for a short while if you'd like to try again."}
+      </p>
+      <Link href={retryHref} className={buttonStyles({ size: "lg", className: "mt-1 w-full" })}>Try paying again</Link>
+      <a href={`https://wa.me/${hotel.whatsapp}`} className={buttonStyles({ variant: "secondary", className: "w-full" })}>Pay another way</a>
+      <p className="text-center text-xs text-muted lg:self-center">
+        Paid by transfer and it&apos;s still processing? You don&apos;t need to pay twice. We&apos;ll email you as soon as it arrives.
+      </p>
     </div>
   );
 }

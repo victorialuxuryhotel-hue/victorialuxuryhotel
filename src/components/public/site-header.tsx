@@ -1,8 +1,11 @@
+import { Suspense } from "react";
 import Link from "next/link";
-import { Logo } from "@/components/brand/logo";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
+import { MyBookingLink } from "./account-menu";
+import { GuestMenu } from "./guest-menu";
 import { MobileNav } from "./mobile-nav";
+import { NavLinks } from "./nav-links";
 
 export const publicNav = [
   { href: "/rooms", label: "Rooms" },
@@ -12,36 +15,30 @@ export const publicNav = [
   { href: "/contact", label: "Contact" },
 ] as const;
 
+/** Design G1/M1: the wordmark, the pages, My booking (or the signed-in guest's menu, D4) and Book now. */
 export function SiteHeader() {
   return (
-      <header className="sticky top-0 z-40 border-b border-hairline bg-ivory-50/95 backdrop-blur supports-[backdrop-filter]:bg-ivory-50/85">
-        <div className="mx-auto flex h-17 max-w-6xl items-center justify-between gap-4 px-4 sm:px-5">
-          <Link href="/" className="flex items-center gap-3" aria-label={`${hotel.name}, home`}>
-            <Logo className="w-[34px]" priority />
-            <span className="leading-none">
-              <span className="block font-display text-[21px] font-semibold text-navy-950">Victoria Luxury</span>
-              <span className="mt-0.5 hidden text-[9px] font-medium whitespace-nowrap uppercase tracking-[0.3em] text-gold-600 sm:block">Hotel &amp; Apartment</span>
-            </span>
-          </Link>
-          <nav aria-label="Main" className="hidden items-center gap-7 text-sm font-medium text-ink-700 md:flex">
-            {publicNav.map((item) => (
-              <Link key={item.href} href={item.href} className="relative py-2 transition-colors hover:text-navy-800 after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:origin-left after:scale-x-0 after:bg-gold-500 after:transition-transform hover:after:scale-x-100">
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="flex items-center gap-3">
-            <a href={`tel:${hotel.phone}`} className="hidden text-[13px] whitespace-nowrap text-ink-600 hover:text-navy-800 lg:block">
-              {hotel.phoneDisplay}
-            </a>
-            <span className="hidden sm:block">
-              <Link href="/book" className={buttonStyles({ size: "md" })}>
-                Book now
-              </Link>
-            </span>
-            <MobileNav items={publicNav} />
-          </div>
+    <header className="sticky top-0 z-40 border-b border-hairline bg-white">
+      <div className="mx-auto flex h-16 max-w-360 items-center gap-10 px-4 lg:h-19 lg:px-16">
+        <Link href="/" className="shrink-0 leading-none" aria-label={`${hotel.name}, home`}>
+          <span className="block font-brand text-[22px] leading-none text-[#0b1f5c] lg:text-[26px]">Victoria Luxury</span>
+          <span className="mt-0.5 hidden text-[10px] font-semibold tracking-[0.2em] whitespace-nowrap text-gold-500 lg:block">SUITES AND APARTMENT · AKURE</span>
+        </Link>
+        <Suspense fallback={<NavLinks items={publicNav} static />}>
+          <NavLinks items={publicNav} />
+        </Suspense>
+        <span className="flex-1" />
+        <div className="hidden items-center gap-6 lg:flex">
+          <Suspense fallback={<MyBookingLink />}>
+            <GuestMenu />
+          </Suspense>
+          <Link href="/book" className={buttonStyles()}>Book now</Link>
         </div>
-      </header>
+        <div className="flex items-center gap-2 lg:hidden">
+          <Link href="/book" className={buttonStyles({ size: "sm", className: "h-10" })}>Book</Link>
+          <MobileNav items={publicNav} />
+        </div>
+      </div>
+    </header>
   );
 }

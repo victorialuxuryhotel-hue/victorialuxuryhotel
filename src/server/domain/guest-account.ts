@@ -41,18 +41,24 @@ export async function checkGuestCode(db: Db, email: string, code: string): Promi
 export type GuestBooking = {
   id: string; reference: string; token: string; status: string; checkIn: string; checkOut: string; nights: number; guests: number;
   category: string; dueKobo: number; paidKobo: number; canCancel: boolean; canChange: boolean; feeIfCancelledKobo: number;
+  /** For the guest's bookings page (design G9): the room type's photo, how long an unpaid booking is held, and its receipt. */
+  categorySlug: string; holdExpiresAt: string | null; receipt: string | null;
 };
 
 export async function guestBookings(db: Db, email: string): Promise<GuestBooking[]> {
   const rows = await all<{
     id: string; reference: string; public_token: string; status: string; check_in: string; check_out: string; nights: number; guest_count: number;
     category: string; total_amount_kobo: number; extras_kobo: number; room_change_kobo: number; discount_kobo: number; paid: number;
+    category_slug: string; hold_expires_at: string | null; receipt: string | null;
   }>(
     db,
     `SELECT r.id, r.reference, r.public_token, r.status, r.check_in, r.check_out, r.nights, r.guest_count, c.name AS category,
             r.total_amount_kobo, r.extras_kobo, r.room_change_kobo, r.discount_kobo,
             (SELECT coalesce(sum(CASE WHEN p.kind = 'payment' THEN p.amount_kobo ELSE -p.amount_kobo END), 0)
-               FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful') AS paid
+               FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful') AS paid,
+            c.slug AS category_slug, r.hold_expires_at,
+            (SELECT p.receipt_number FROM payments p WHERE p.reservation_id = r.id AND p.status = 'successful' AND p.kind = 'payment'
+               AND p.receipt_number IS NOT NULL ORDER BY p.created_at LIMIT 1) AS receipt
      FROM reservations r JOIN guests g ON g.id = r.guest_id JOIN room_categories c ON c.id = r.category_id
      WHERE g.email = ? AND r.status IN ('pending_payment', 'confirmed', 'checked_in', 'checked_out', 'cancelled')
      ORDER BY r.check_in DESC LIMIT 50`,
@@ -67,6 +73,7 @@ export async function guestBookings(db: Db, email: string): Promise<GuestBooking
       canCancel: upcoming,
       canChange: upcoming && !(r.paid > 0 && cancellationFee(r.total_amount_kobo, r.check_in, rule) > 0),
       feeIfCancelledKobo: r.status === "confirmed" ? cancellationFee(r.total_amount_kobo, r.check_in, rule) : 0,
+      categorySlug: r.category_slug, holdExpiresAt: r.hold_expires_at, receipt: r.receipt,
     };
   });
 }

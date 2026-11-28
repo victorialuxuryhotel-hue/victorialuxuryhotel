@@ -1,5 +1,6 @@
 import { Lock } from "lucide-react";
-import { BookingSummary, Steps } from "@/components/booking/booking-ui";
+import { StayAside, Steps, stayDates } from "@/components/booking/booking-ui";
+import { formatNaira } from "@/lib/format";
 import { Container } from "@/components/public/section";
 import { Button } from "@/components/ui/button";
 import { chosen, search } from "../_search";
@@ -23,7 +24,7 @@ export default function Page() {
           </p>
           <Button size="lg" className="mt-6 w-full sm:w-auto"><Lock className="size-4" aria-hidden /> Pay securely with Paystack</Button>
         </div>
-        <BookingSummary option={chosen} search={search} />
+        <StayAside rows={[["Dates", stayDates(search.checkIn, search.checkOut)], ["Guests", String(search.guests)], [chosen.name, formatNaira(chosen.totalKobo)]]} totalKobo={chosen.totalKobo} />
       </div>
     </Container>
   );

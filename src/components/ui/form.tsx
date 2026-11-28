@@ -2,7 +2,7 @@ import { Children, cloneElement, isValidElement, type InputHTMLAttributes, type 
 import { cn } from "@/lib/utils/cn";
 
 const control =
-  "block w-full rounded-lg border border-[#bdb7a8] bg-white px-3 text-[15px] text-ink-900 guest:rounded-md guest:text-base guest:md:text-sm caret-navy-700 placeholder:text-ink-400 hover:border-ink-900/45 focus:border-navy-700 focus:outline-none focus:ring-2 focus:ring-navy-700/20 disabled:opacity-45 aria-invalid:border-danger-600 guest:border-ink-300 guest:bg-white";
+  "block w-full rounded-lg border border-[#bdb7a8] bg-white px-3 text-[15px] text-ink-900 guest:max-md:text-base caret-navy-700 placeholder:text-ink-400 hover:border-ink-900/45 focus:border-navy-700 focus:outline-none focus:ring-2 focus:ring-navy-700/20 disabled:opacity-45 aria-invalid:border-danger-600";
 
 export function Field({ label, htmlFor, hint, error, optional, children, className }: {
   label: string;
@@ -38,11 +38,8 @@ export function Field({ label, htmlFor, hint, error, optional, children, classNa
   );
 }
 
-/** Guest-site heights apply only when the page doesn't set its own. */
-const guestHeight = (className: string | undefined) => (className && /(^|\s)([\w-]+:)*h-/.test(className) ? "" : "guest:h-11.5 guest:md:h-10");
-
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(control, "h-11", guestHeight(className), className)} {...props} />;
+  return <input className={cn(control, "h-11", className)} {...props} />;
 }
 
 /** An amount in naira: ₦ inside the box, tabular, as wide as an amount (design R1). */
@@ -57,7 +54,7 @@ export function MoneyInput({ className, ...props }: InputHTMLAttributes<HTMLInpu
 
 export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cn(control, "h-11 pr-8", guestHeight(className), className)} {...props}>
+    <select className={cn(control, "h-11 pr-8", className)} {...props}>
       {children}
     </select>
   );

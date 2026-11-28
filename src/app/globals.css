@@ -46,6 +46,8 @@
   --color-ink-600: #4b5260;
   --color-ink-700: #353b47;
   --color-ink-900: #171b24;
+  /* Secondary text in the 28 Nov designs (guest site). */
+  --color-muted: #5b6372;
 
   --color-success-50: #ecfdf3;
   --color-success-600: #15803d;
@@ -114,8 +116,9 @@
   --radius-3xl: 16px;
   --radius-card: 12px;
   --card-shadow: 0 1px 2px rgb(20 32 66 / 0.06), 0 4px 16px rgb(20 32 66 / 0.06);
-  --color-hairline: #e8e2d4;
+  --color-hairline: #e4e0d6;
   font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 

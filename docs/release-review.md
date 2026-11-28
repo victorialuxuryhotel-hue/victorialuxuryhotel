@@ -499,3 +499,27 @@ These are deliberately **not final** in the app:
 - This station: *This computer* (till opens on, receipt printer, auto-print, dark till) and *Checks* (browser,
   screen size, full screen, connection, silent printing).
 - Bar receipt (80 mm) and the A4 room receipt per the designs: the stay, each line, this payment, balance.
+
+## Step 1f/2: the guest website and its phone layout
+
+- Shared: header with the wordmark ("Suites and Apartment · Akure"), page links with the current one underlined,
+  *My booking* or the signed-in guest's menu (D4: name, email, Your bookings, Sign out), *Book now*; phone header with
+  *Book* and the menu (M3); navy footer (G1, M12). Buttons, fields and badges on the guest site are now the R1 ones
+  (Inter, 44px, 8px corners). Booking steps show the site header and no footer.
+- Search (G1, G2, M1, D4, D5): Arrive · Leave · Guests · *See rooms*; guests are adults and children (they still go
+  to /book as one guest count); on a phone, Dates and Guests open bottom sheets with a month calendar.
+- Home (G1, M1): photo hero with the search, room cards, the client's four On site cards with their split photos
+  (27 Nov, kept), *Comfort, care and everything on site* with eight tiles. The location/map block moved to Contact.
+- Rooms (G2, M4), room page (G3, M5): price box with dates, guests, the price for the nights and *Book this room*;
+  *Choose dates* on a phone opens the dates sheet. "About 30 m²" and "Breakfast available" aren't shown: we have no
+  such data, so the chips are Sleeps N and the room type's own amenities.
+- Booking (G4–G8, M2, M6–M9): steps Room · Your details · Pay · Confirmed; choose a room then *Continue*, with a
+  *Your stay* box; month calendar on a phone. The terms tick stays on Your details (the server needs it there), worded
+  as in G6. No *Arriving around* field: special requests already ask for the arrival time.
+- Confirmed (G7, M8): *Send to WhatsApp* is a wa.me share link with the reference, the dates and the My booking
+  link (never the private booking link); nothing is sent by the server.
+- Your bookings (G9, M10, M11): Upcoming and Past tabs, photo, status badge, Pay / receipt / Change dates / Cancel.
+  Change dates stays (self-service already exists). Sign-in is still by emailed code, so the button says *Email me a
+  code*. The header menu has no *Receipts* item: receipts are on each booking.
+- Facilities (G10, M12), Contact (G11, M13; map embed, Good to know kept). Emails (E1): every guest email in the new
+  card; the confirmation leads with *Manage your booking*. No hero photo in emails (no fixed public image URL).

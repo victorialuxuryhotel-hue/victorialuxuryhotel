@@ -1,70 +1,62 @@
 import Link from "next/link";
-import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
-import { Logo } from "@/components/brand/logo";
 import { hotel } from "@/config/hotel";
-import { publicNav } from "./site-header";
 
+const columns: Array<{ title: string; links: Array<{ href: string; label: string }> }> = [
+  { title: "STAY", links: [{ href: "/rooms", label: "Rooms" }, { href: "/facilities", label: "Facilities" }, { href: "/gallery", label: "Gallery" }] },
+  { title: "HOTEL", links: [{ href: "/about", label: "About" }, { href: "/contact", label: "Contact" }, { href: "/account", label: "My booking" }] },
+  {
+    title: "CONTACT",
+    links: [
+      { href: `tel:${hotel.phone}`, label: hotel.phoneDisplay },
+      { href: `mailto:${hotel.email}`, label: hotel.email },
+      { href: `https://wa.me/${hotel.whatsapp}`, label: "WhatsApp" },
+    ],
+  },
+];
+
+const phoneLinks = [
+  { href: "/rooms", label: "Rooms" },
+  { href: "/facilities", label: "Facilities" },
+  { href: "/contact", label: "Contact" },
+  { href: "/account", label: "My booking" },
+];
+
+/** Design G1 (desktop: wordmark and address, then three columns) and M12 (phone: one row of links). */
 export function SiteFooter() {
+  const address = `${hotel.address.line1}, ${hotel.address.city}, ${hotel.address.state}`;
   return (
-    <footer className="mt-auto bg-navy-950 text-ivory-100">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 pt-11 pb-7 sm:px-5 md:grid-cols-[1.4fr_1fr_1fr]">
+    <footer className="mt-auto bg-[#0b1f5c] text-white">
+      <div className="mx-auto grid max-w-360 gap-8 px-4 py-6 lg:grid-cols-[2fr_1fr_1fr_1fr] lg:px-16 lg:py-12">
         <div>
-          <div className="flex items-center gap-3">
-            <Logo className="w-[34px]" />
-            <span className="leading-none">
-              <span className="block font-display text-2xl text-ivory-50">Victoria Luxury</span>
-              <span className="mt-1 block text-xs uppercase tracking-[0.3em] text-gold-300">Hotel &amp; Apartment</span>
-            </span>
-          </div>
-          <p className="mt-3.5 max-w-sm text-[13px] leading-relaxed text-ivory-200/70">
-            Where every guest is treated as royalty. Rooms, suites and apartments in Alagbaka GRA, Akure.
-          </p>
-        </div>
-
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-300">Explore</p>
-          <ul className="mt-5 space-y-3 text-sm text-ivory-200/80">
-            {publicNav.map((item) => (
-              <li key={item.href}>
-                <Link href={item.href} className="hover:text-gold-300">{item.label}</Link>
+          <p className="font-brand text-[28px] leading-tight text-white">Victoria Luxury</p>
+          <a href={hotel.mapsUrl} className="mt-2 block max-w-80 text-sm text-[#d3d9ee] hover:text-white">
+            <span className="lg:hidden">{hotel.address.line1}, {hotel.address.city}</span>
+            <span className="hidden lg:inline">{address}</span>
+          </a>
+          <ul className="mt-1 flex flex-wrap gap-x-4 lg:hidden">
+            {phoneLinks.map((l) => (
+              <li key={l.href}>
+                <Link href={l.href} className="inline-flex min-h-11 items-center text-sm text-white">{l.label}</Link>
               </li>
             ))}
-            <li><Link href="/book" className="hover:text-gold-300">Book your stay</Link></li>
-            <li><Link href="/account" className="hover:text-gold-300">My bookings</Link></li>
           </ul>
         </div>
-
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-300">Contact</p>
-          <ul className="mt-5 space-y-4 text-sm text-ivory-200/80">
-            <li>
-              <a href={hotel.mapsUrl} className="flex gap-3 hover:text-gold-300">
-                <MapPin className="mt-0.5 size-4 shrink-0 text-gold-400" aria-hidden />
-                <span>{hotel.address.line1}<br />{hotel.address.city}, {hotel.address.state}</span>
-              </a>
-            </li>
-            <li>
-              <a href={`tel:${hotel.phone}`} className="flex gap-3 hover:text-gold-300">
-                <Phone className="size-4 shrink-0 text-gold-400" aria-hidden /> {hotel.phoneDisplay}
-              </a>
-            </li>
-            <li>
-              <a href={`https://wa.me/${hotel.whatsapp}`} className="flex gap-3 hover:text-gold-300">
-                <MessageCircle className="size-4 shrink-0 text-gold-400" aria-hidden /> WhatsApp us
-              </a>
-            </li>
-            <li>
-              <a href={`mailto:${hotel.email}`} className="flex gap-3 break-all hover:text-gold-300">
-                <Mail className="size-4 shrink-0 text-gold-400" aria-hidden /> {hotel.email}
-              </a>
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div className="border-t border-white/10">
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-xs text-ivory-200/50 sm:flex-row sm:justify-between sm:px-6">
-          <p>© {hotel.name}</p>
-        </div>
+        {columns.map((c) => (
+          <div key={c.title} className="hidden lg:block">
+            <p className="mb-1 text-[13px] font-semibold tracking-[0.08em] text-gold-400">{c.title}</p>
+            <ul className="space-y-2">
+              {c.links.map((l) => (
+                <li key={l.href}>
+                  {l.href.startsWith("/") ? (
+                    <Link href={l.href} className="text-sm text-[#d3d9ee] hover:text-white">{l.label}</Link>
+                  ) : (
+                    <a href={l.href} className="text-sm break-all text-[#d3d9ee] hover:text-white">{l.label}</a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
     </footer>
   );
