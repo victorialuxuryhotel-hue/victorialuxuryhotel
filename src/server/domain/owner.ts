@@ -47,7 +47,7 @@ export async function ownerSnapshot(db: Db, actor: Actor): Promise<OwnerSnapshot
   const wrong: OwnerSnapshot["wrong"] = [];
   const toConfirm = byCheck("payments_to_confirm");
   if (toConfirm.length) wrong.push({ text: toConfirm[0]!.message, href: "/app/payments/confirm" });
-  if (overdue?.n) wrong.push({ text: `${overdue.n} guest${overdue.n === 1 ? "" : "s"} overdue · owe ${formatNaira(Math.max(0, overdue.owed))}`, href: "/app/today#overdue" });
+  if (overdue?.n) wrong.push({ text: `${overdue.n} guest${overdue.n === 1 ? "" : "s"} overdue${overdue.owed > 0 ? ` · owe ${formatNaira(overdue.owed)}` : ", all paid"}`, href: "/app/today#overdue" });
   for (const f of byCheck("closing_unverified")) wrong.push({ text: f.message, href: "/app/sales/closing" });
   for (const f of byCheck("in_house_owes").slice(0, 3)) wrong.push({ text: f.message, href: "/app/today" });
   if (issues?.n) wrong.push({ text: `${issues.n} card payment${issues.n === 1 ? "" : "s"} declined but debited · ${formatNaira(issues.kobo)}: check with the bank`, href: "/app/payments/confirm" });

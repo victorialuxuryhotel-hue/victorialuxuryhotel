@@ -30,7 +30,7 @@ async function Content() {
         <div className={tile}><p className="text-[13px] font-medium text-ink-500">Tonight</p><p className="text-3xl font-bold tabular-nums">{s.occupancy.pct}%</p><p className="text-[13px] text-ink-500 tabular-nums">{s.occupancy.sold} of {s.occupancy.rooms} rooms</p></div>
         <div className={tile}><p className="text-[13px] font-medium text-ink-500">Taken today</p><p className="text-3xl font-bold tabular-nums">{short(s.takenTodayKobo)}</p><p className="text-[13px] text-ink-500">rooms, bar, hall</p></div>
         <div className={tile}><p className="text-[13px] font-medium text-ink-500">Bar today</p><p className="text-2xl font-bold tabular-nums">{formatNaira(s.bar.kobo)}</p><p className="text-[13px] text-ink-500 tabular-nums">{s.bar.orders} order{s.bar.orders === 1 ? "" : "s"}</p></div>
-        <div className={tile}><p className="text-[13px] font-medium text-ink-500">Overdue</p><p className={`text-3xl font-bold tabular-nums ${s.overdue.guests ? "text-[#a61b1b]" : ""}`}>{s.overdue.guests}</p><p className="text-[13px] text-ink-500 tabular-nums">{s.overdue.guests ? `owe ${formatNaira(s.overdue.owedKobo)}` : "nobody"}</p></div>
+        <div className={tile}><p className="text-[13px] font-medium text-ink-500">Overdue</p><p className={`text-3xl font-bold tabular-nums ${s.overdue.guests ? "text-[#a61b1b]" : ""}`}>{s.overdue.guests}</p><p className="text-[13px] text-ink-500 tabular-nums">{!s.overdue.guests ? "nobody" : s.overdue.owedKobo ? `owe ${formatNaira(s.overdue.owedKobo)}` : "all paid"}</p></div>
       </div>
       <section className="rounded-xl border border-hairline bg-white">
         <h2 className="flex items-center gap-2 px-4 py-3 text-base font-bold">Anything wrong? <span className={`rounded-md px-1.5 text-[13px] tabular-nums ${s.wrong.length ? "bg-[#fde8e8] text-[#a61b1b]" : "bg-[#e7f6ec] text-[#166534]"}`}>{s.wrong.length}</span></h2>
@@ -48,7 +48,7 @@ async function Content() {
         <h2 className="text-base font-bold">Takings, last 7 days</h2>
         <div className="mt-3 flex h-32 items-end gap-2" role="img" aria-label={`Takings: ${s.week.map((d) => `${formatDate(d.day, { weekday: true, year: false })} ${formatNaira(d.kobo)}`).join(", ")}`}>
           {s.week.map((d) => (
-            <div key={d.day} className="flex flex-1 flex-col items-center gap-1">
+            <div key={d.day} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
               <div className={`w-full rounded-t ${d.day === s.today ? "bg-navy-900" : "bg-[#b3c3f0]"}`} style={{ height: `${Math.max(2, Math.round((d.kobo / max) * 100))}%` }} title={formatNaira(d.kobo)} />
               <span className="text-xs text-ink-500">{new Date(`${d.day}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "narrow", timeZone: "UTC" })}</span>
             </div>

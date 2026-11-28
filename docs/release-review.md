@@ -491,3 +491,11 @@ These are deliberately **not final** in the app:
   (rooms, bar and restaurant, hall), bar and restaurant today, overdue guests and what they owe, *Anything wrong?*
   (payments to confirm, overdue guests, closings to check, guests in house owing, declined-but-debited, approvals
   waiting, PIN lockouts and revoked stations) and takings for the last 7 days by business date. Refreshes when opened.
+
+## Step 2: sign-in (S1), This station (S3), receipts (P1, P2)
+
+- Staff sign-in: the hotel photo with the wordmark; *Sign in* panel "For managers, and to set up a counter or desk
+  computer"; the PIN note for counter staff.
+- This station: *This computer* (till opens on, receipt printer, auto-print, dark till) and *Checks* (browser,
+  screen size, full screen, connection, silent printing).
+- Bar receipt (80 mm) and the A4 room receipt per the designs: the stay, each line, this payment, balance.
