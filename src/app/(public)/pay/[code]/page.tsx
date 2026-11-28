@@ -7,7 +7,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
 import { formatDate, formatNaira } from "@/lib/format";
 import { getDb } from "@/server/db";
-import { payLinkView } from "@/server/domain/pay-links";
+import { billLinkView, payLinkView, type BillLinkView } from "@/server/domain/pay-links";
 import { PayButton } from "./pay-button";
 
 export const metadata: Metadata = { title: "Pay for your stay", robots: { index: false, follow: false } };
@@ -17,7 +17,10 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: 
 /** The guest's pay page from a link the front desk sent (design M14; FUNCTIONALITY.md section 10). */
 async function Pay({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const v = await payLinkView(await getDb(), code);
+  const db = await getDb();
+  const bill = await billLinkView(db, code);
+  if (bill) return <BillPay code={code} v={bill} />;
+  const v = await payLinkView(db, code);
   if (v.state === "paid") redirect(`/book/confirmation/${v.token}`);
   if (v.state === "closed") {
     return (
@@ -50,6 +53,39 @@ async function Pay({ params }: { params: Promise<{ code: string }> }) {
       <p className="mt-6 text-center text-sm text-ink-500">
         Questions? <Link href="/contact" className="underline">Contact the hotel</Link> · {hotel.phoneDisplay}
       </p>
+    </div>
+  );
+}
+
+/** A company bill's pay link (P3): the bill, what's owed, and Pay. Each booking gets its own receipt. */
+function BillPay({ code, v }: { code: string; v: BillLinkView }) {
+  if (v.state === "paid") {
+    return (
+      <div className="mx-auto max-w-md text-center">
+        <h1 className="font-display text-4xl text-navy-950">Bill {v.number} is paid</h1>
+        <p className="mt-3 text-ink-600">Thank you. The rooms are confirmed, and a receipt for each booking has been issued.</p>
+      </div>
+    );
+  }
+  if (v.state === "closed") {
+    return (
+      <div className="mx-auto max-w-md text-center">
+        <h1 className="font-display text-4xl text-navy-950">This payment link has ended</h1>
+        <p className="mt-3 text-ink-600">Ask the front desk for a new one: {hotel.phoneDisplay}.</p>
+      </div>
+    );
+  }
+  const row = "flex justify-between gap-4 py-2.5";
+  return (
+    <div className="mx-auto max-w-md">
+      <p className="text-sm text-ink-500">Company bill {v.number}</p>
+      <h1 className="mt-1 font-display text-[2rem] leading-tight text-navy-950">Pay for {v.company}</h1>
+      <dl className="mt-5 divide-y divide-hairline rounded-xl border border-hairline bg-white px-4 text-[15px]">
+        <div className={row}><dt className="text-ink-500">Bookings</dt><dd className="text-right">{v.references.join(", ")}</dd></div>
+        <div className={row}><dt className="text-ink-500">Valid until</dt><dd>{formatDate(v.validUntil, { weekday: true, year: false })}</dd></div>
+        <div className={`${row} font-semibold`}><dt>To pay</dt><dd className="tabular-nums">{formatNaira(v.amountKobo)}</dd></div>
+      </dl>
+      <PayButton code={code} amount={formatNaira(v.amountKobo)} needsEmail />
     </div>
   );
 }

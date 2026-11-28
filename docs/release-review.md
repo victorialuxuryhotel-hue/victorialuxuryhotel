@@ -629,3 +629,18 @@ These are deliberately **not final** in the app:
 - Staging `592208ea-8e18-49f6-8474-a22467a1b834`. Previous live `88491cb0-fba2-423a-9a24-9edf21f2e092`, new live
   `557ce088-7910-4b61-bae4-0a2e7b202bd1`. Smoke test passed. Rollback: deploy `88491cb0` (0033 stays; the old code
   ignores its new tables and columns).
+
+## 0034_gaps
+
+- `room_categories.size_sqm` (optional), `reservations.arrival_time` (optional HH:MM), `pay_links.paystack_reference`
+  (unique when set). **Existing rows:** unchanged. **Previous Worker:** unaffected.
+
+## Gaps closed: till dropdowns (D3, D3b) and company bills paid online
+
+- Till: *Table or name* lists the tables with "Open · ₦X" where a table has an open order, and *Type a name…*; the
+  name in the till bar opens the till menu (name, counter and since when, Lock, Close my day, Orders & receipts,
+  Switch user).
+- Company bill → *Make a payment link*: one Paystack charge for what's owed on the bill (the payer gives an email),
+  split into a payment per booking when it succeeds, each with its own receipt. The printed bill shows the link.
+  The scheduled check asks Paystack about the charge once; a charge that doesn't match the bill is flagged on each
+  booking for a person to check.

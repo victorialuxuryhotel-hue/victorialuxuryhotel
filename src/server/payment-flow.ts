@@ -3,6 +3,7 @@ import { logger } from "@/lib/logger";
 import { AppError } from "@/lib/errors";
 import { first, getDb } from "./db";
 import { applyPaystackResult, type SettleOutcome as DbOutcome } from "./domain/payments";
+import { billChargeParts } from "./domain/pay-links";
 import { after } from "next/server";
 import { alert } from "@/lib/alert";
 import { deliverEmails } from "./notifications";
@@ -25,6 +26,30 @@ export async function settlePaystackReference(reference: string, trigger: "callb
   }
 
   const db = await getDb();
+  // A company bill paid online: one charge, settled as one payment per booking (each with its own receipt).
+  const bill = await billChargeParts(db, reference);
+  if (bill) {
+    const total = bill.parts.reduce((n, p) => n + p.amountKobo, 0);
+    const outcomes: SettleOutcome[] = [];
+    for (const part of bill.parts) {
+      outcomes.push(
+        await applyPaystackResult(db, {
+          reference: part.reference,
+          status: tx.status,
+          // A charge that doesn't match the bill's total is flagged on every booking for a person to check.
+          amountKobo: tx.status === "success" && tx.amountKobo !== total ? tx.amountKobo : part.amountKobo,
+          currency: tx.currency,
+          paidAt: tx.paidAt ?? new Date().toISOString(),
+          channel: tx.channel ?? null,
+          gatewayResponse: tx.gatewayResponse ?? null,
+        }),
+      );
+    }
+    logger.info("payment.settled", { reference, trigger, paystackStatus: tx.status, outcome: outcomes.join(","), bill: true });
+    if (outcomes.includes("amount_mismatch")) await alert("payment_attention", "A company bill was paid online with an amount that doesn't match the bill", { reference });
+    after(() => deliverEmails({}));
+    return outcomes.find((o) => o === "confirmed") ?? outcomes[0] ?? "unknown_reference";
+  }
   let outcome: SettleOutcome;
   try {
     outcome = await applyPaystackResult(db, {

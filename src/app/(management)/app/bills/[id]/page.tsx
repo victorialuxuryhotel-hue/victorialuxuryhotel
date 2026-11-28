@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AccessDenied } from "@/components/management/access-denied";
-import { CancelBillButton, PayBillForm } from "@/components/management/bills";
+import { BillPayLink, CancelBillButton, PayBillForm } from "@/components/management/bills";
+import { first } from "@/server/db";
+import { publicEnv } from "@/lib/env";
 import { PrintReceiptButton } from "@/components/management/pos-actions";
 import { LoadingState } from "@/components/ui/feedback";
 import { hotel } from "@/config/hotel";
@@ -24,6 +26,8 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
   const db = await getDb();
   const [bill, pay] = await Promise.all([getBill(db, actorOf(staff), (await params).id), paymentSettings(db)]);
   if (!bill) notFound();
+  const live = await first<{ code: string }>(db, "SELECT code FROM pay_links WHERE bill_id = ? AND cancelled_at IS NULL AND paid_payment_id IS NULL AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') ORDER BY created_at DESC LIMIT 1", bill.id);
+  const payUrl = live ? `${publicEnv().NEXT_PUBLIC_SITE_URL.replace(/^https?:\/\//, "")}/pay/${live.code}` : null;
   const bank = `${pay.bank.name ?? "[HOTEL BANK]"} · ${pay.bank.number ?? "[ACCOUNT NUMBER]"} · ${pay.bank.accountName ?? "[ACCOUNT NAME]"}`;
   const noBank = !pay.bank.name || !pay.bank.number || !pay.bank.accountName;
   return (
@@ -54,7 +58,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
           <tfoot><tr className="border-t-2 border-ink-900 text-base font-bold"><td className="py-3" colSpan={3}>Total due</td><td className="py-3 text-right tabular-nums">{formatNaira(bill.totalKobo)}</td></tr></tfoot>
         </table>
         <p className="mt-6">
-          <b>How to pay:</b> {noBank ? "Ask the front desk for the account details" : `transfer to ${bank}`}, with reference <b>{bill.number}</b>. Or pay at the front desk.
+          <b>How to pay:</b> {noBank ? "Ask the front desk for the account details" : `transfer to ${bank}`}, with reference <b>{bill.number}</b>. {payUrl ? <>Or pay online: <b className="break-all">{payUrl}</b></> : "Or pay at the front desk."}
         </p>
         <p className="mt-2 text-ink-700">The rooms are confirmed once payment arrives. If it hasn&apos;t arrived by the valid-until date, the rooms may be released.</p>
         <p className="mt-6 border-t border-hairline pt-3 text-center font-semibold">This is a bill, not a receipt. A numbered receipt is issued when payment is received.</p>
@@ -68,6 +72,12 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
             <PayBillForm billId={bill.id} owedKobo={bill.owedKobo} terminals={pay.terminals} today={hotelToday()} />
           </section>
         ) : bill.owedKobo === 0 ? <p className="rounded-xl bg-[#e7f6ec] p-4 text-sm text-[#166534]">Paid in full.</p> : null}
+        {!bill.cancelledAt && bill.owedKobo > 0 ? (
+          <section className="rounded-xl border border-hairline bg-white p-4">
+            <h2 className="mb-3 text-base font-bold">Pay online</h2>
+            <BillPayLink billId={bill.id} number={bill.number} />
+          </section>
+        ) : null}
         {!bill.cancelledAt ? <CancelBillButton id={bill.id} /> : null}
       </aside>
     </div>

@@ -33,12 +33,15 @@ export const MISMATCH_FLAG = "Amount/currency mismatch";
  * the batch's places and starve newer payments.
  */
 export async function paymentsToSweep(db: Db, now = Date.now(), limit = 50): Promise<string[]> {
+  // A company bill paid online is one Paystack charge (the link's reference) split into a payment per booking
+  // (that reference + "-1", "-2"…): ask Paystack about the charge, once.
   const rows = await all<{ provider_reference: string }>(
     db,
-    `SELECT provider_reference FROM payments
-     WHERE provider = 'paystack' AND status = 'pending' AND created_at >= ? AND created_at <= ?
-       AND coalesce(gateway_response, '') NOT LIKE '${MISMATCH_FLAG}%'
-     ORDER BY created_at LIMIT ?`,
+    `SELECT DISTINCT coalesce((SELECT l.paystack_reference FROM pay_links l WHERE l.paystack_reference IS NOT NULL AND p.provider_reference LIKE l.paystack_reference || '-%'), p.provider_reference) AS provider_reference
+     FROM payments p
+     WHERE p.provider = 'paystack' AND p.status = 'pending' AND p.created_at >= ? AND p.created_at <= ?
+       AND coalesce(p.gateway_response, '') NOT LIKE '${MISMATCH_FLAG}%'
+     ORDER BY p.created_at LIMIT ?`,
     new Date(now - 48 * 3600_000).toISOString(),
     new Date(now - 30 * 60_000).toISOString(),
     limit,

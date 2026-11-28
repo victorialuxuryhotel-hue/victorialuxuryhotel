@@ -6,6 +6,7 @@ import { Segmented } from "@/components/ui/choice";
 import { Field, FormMessage, Input, MoneyInput, Select } from "@/components/ui/form";
 import { formatDate, formatNaira } from "@/lib/format";
 import { cancelBillAction, newBill, payBillAction } from "@/server/bills";
+import { makeBillPayLink } from "@/server/pay-links";
 
 type Unpaid = { id: string; reference: string; guest_name: string; check_in: string; check_out: string; owed: number };
 
@@ -107,5 +108,35 @@ export function CancelBillButton({ id }: { id: string }) {
       <Button variant="ghost" onClick={() => setSure(false)}>Keep</Button>
       {error ? <span className="text-sm text-danger-700">{error}</span> : null}
     </span>
+  );
+}
+
+/** A payment link for the bill (pay online, split across its bookings). Sending is by the staff member's WhatsApp, email or copy. */
+export function BillPayLink({ billId, number }: { billId: string; number: string }) {
+  const [link, setLink] = useState<{ url: string; amountKobo: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [pending, start] = useTransition();
+  if (!link) {
+    return (
+      <div className="space-y-2">
+        <Button variant="secondary" pending={pending} onClick={() => start(async () => { const r = await makeBillPayLink(billId); if (r.ok) setLink(r.data); else setError(r.message); })}>
+          Make a payment link
+        </Button>
+        {error ? <FormMessage>{error}</FormMessage> : null}
+      </div>
+    );
+  }
+  const text = `Payment link for bill ${number} (${formatNaira(link.amountKobo)}): ${link.url}`;
+  return (
+    <div className="space-y-2 text-sm">
+      <p className="break-all rounded-lg bg-ivory-100 px-3 py-2 tabular-nums">{link.url}</p>
+      <div className="flex flex-wrap gap-2">
+        <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-lg border border-[#cfcabd] bg-white px-3 font-semibold">WhatsApp</a>
+        <a href={`mailto:?subject=${encodeURIComponent(`Bill ${number}`)}&body=${encodeURIComponent(text)}`} className="inline-flex h-9 items-center rounded-lg border border-[#cfcabd] bg-white px-3 font-semibold">Email</a>
+        <Button size="sm" variant="ghost" onClick={async () => { await navigator.clipboard.writeText(link.url).catch(() => undefined); setCopied(true); }}>{copied ? "Copied" : "Copy link"}</Button>
+      </div>
+      <p className="text-xs text-ink-500">Print the bill again to include the link. A new link replaces the old one.</p>
+    </div>
   );
 }
