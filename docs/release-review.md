@@ -482,3 +482,8 @@ These are deliberately **not final** in the app:
   while a hold runs; overdue, attention and notes as coloured notes; Extend stay and Change room kept; at the foot
   the one large next action (same rule as before), then *Open booking* and *Change dates*. Initials stay beside the
   name (the e2e suite looks for them).
+- Calendar (R103): "Every room, night by night" with the one primary *New booking*; *7 nights | 14 nights* (the same
+  14-night query; the week view shows the first 7), *← Earlier*, *Today*, *Later →* moving by the nights shown;
+  a white grid with ROOM and day columns (today highlighted), the room number in bold with its type, bars in the R1
+  colours (Booked navy, In house green, Awaiting payment amber, Overdue red) and the legend under the grid with "Tap
+  an empty night to book it". The free-per-type row stays: it is how the desk sees a full night at a glance.
