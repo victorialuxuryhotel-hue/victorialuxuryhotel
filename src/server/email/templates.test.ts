@@ -13,7 +13,7 @@ describe("guest emails (6f / 6g)", () => {
   it("booking confirmed: reference box, times, directions and WhatsApp, matching plain text", () => {
     const e = bookingConfirmedEmail({ ...stay, receiptNumber: "RCT-2026-000412" }, site);
     expect(e.subject).toBe("Booking confirmed: VL-7KQ3PM");
-    for (const s of ["You&#39;re booked, Adaeze", "Booking reference", "Show this at the front desk", ", any time", "by 12:00 noon", "Get directions", "Message us on WhatsApp", "RCT-2026-000412"]) {
+    for (const s of ["You&#39;re booked, Adaeze", "Booking reference", "Show this at the front desk", "· any time", "by 12:00 noon", "Manage your booking", "https://victorialuxuryhotel.com/account", "Get directions", "Message us on WhatsApp", "RCT-2026-000412"]) {
       expect(e.html).toContain(s);
     }
     expect(e.text).toContain("Booking reference: VL-7KQ3PM (Show this at the front desk)");

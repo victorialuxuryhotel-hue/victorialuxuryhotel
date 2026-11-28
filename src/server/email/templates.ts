@@ -4,50 +4,67 @@ import { formatDate, formatNaira, plural } from "@/lib/format";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
+/* Colours of design E1. */
 const NAVY = "#021c6c";
-const GOLD = "#cc8a0c";
+const WORDMARK = "#0b1f5c";
 const INK = "#171b24";
-const MUTED = "#4b5260";
-const LINE = "#e6e0d2";
+const MUTED = "#5b6372";
+const LINE = "#e4e0d6";
+const IVORY = "#f6f4ef";
+const LINK = "#0430a0";
 
 type Button = { label: string; href: string };
 type Feature = { label: string; value: string; sub?: string };
 
-function layout(opts: { preheader: string; heading: string; intro: string; feature?: Feature; rows: Array<[string, string]>; buttons?: Button[]; note?: string; siteUrl: string }) {
-  const rows = opts.rows
-    .map(([k, v]) => `<tr><td style="padding:11px 0;color:${MUTED};font-size:15px;border-bottom:1px solid ${LINE}">${esc(k)}</td><td style="padding:11px 0;color:${INK};font-size:15px;text-align:right;border-bottom:1px solid ${LINE}">${esc(v)}</td></tr>`)
-    .join("");
-  const feature = opts.feature
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 6px;border:1px solid ${GOLD};border-radius:4px"><tr><td style="padding:16px;text-align:center">
-  <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:${MUTED}">${esc(opts.feature.label)}</div>
-  <div style="margin-top:6px;font-family:Georgia,'Times New Roman',serif;font-size:30px;letter-spacing:1px;color:${NAVY}">${esc(opts.feature.value)}</div>
+/**
+ * Every guest email, styled after design E1: an ivory page, a white card with the "Victoria Luxury"
+ * wordmark, a bold heading, the details (as a two-column box when `grid` is set), then the buttons.
+ */
+function layout(opts: { preheader: string; heading: string; intro: string; feature?: Feature; rows: Array<[string, string]>; buttons?: Button[]; note?: string; siteUrl: string; grid?: boolean }) {
+  const cell = (label: string, value: string, sub?: string) =>
+    `<div style="font-size:11px;font-weight:600;color:${MUTED}">${esc(label)}</div><div style="margin-top:3px;font-size:14px;font-weight:600;color:${INK}">${esc(value)}</div>${sub ? `<div style="margin-top:2px;font-size:12px;color:${MUTED}">${esc(sub)}</div>` : ""}`;
+  let details: string;
+  if (opts.grid) {
+    const cells = [...(opts.feature ? [cell(opts.feature.label, opts.feature.value, opts.feature.sub)] : []), ...opts.rows.map(([k, v]) => cell(k, v))];
+    const pairs: string[] = [];
+    for (let i = 0; i < cells.length; i += 2) {
+      pairs.push(`<tr><td width="50%" valign="top" style="padding:7px 8px 7px 0">${cells[i]}</td><td width="50%" valign="top" style="padding:7px 0 7px 8px">${cells[i + 1] ?? ""}</td></tr>`);
+    }
+    details = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;background:${IVORY};border-radius:10px"><tr><td style="padding:8px 16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${pairs.join("")}</table></td></tr></table>`;
+  } else {
+    const feature = opts.feature
+      ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 6px;background:${IVORY};border-radius:10px"><tr><td style="padding:16px;text-align:center">
+  <div style="font-size:11px;font-weight:600;color:${MUTED}">${esc(opts.feature.label)}</div>
+  <div style="margin-top:6px;font-size:28px;font-weight:700;letter-spacing:1px;color:${NAVY}">${esc(opts.feature.value)}</div>
   ${opts.feature.sub ? `<div style="margin-top:4px;font-size:14px;color:${MUTED}">${esc(opts.feature.sub)}</div>` : ""}
 </td></tr></table>`
-    : "";
+      : "";
+    const rows = opts.rows
+      .map(([k, v]) => `<tr><td style="padding:10px 0;color:${MUTED};font-size:14px;border-bottom:1px solid ${LINE}">${esc(k)}</td><td style="padding:10px 0;color:${INK};font-size:14px;font-weight:600;text-align:right;border-bottom:1px solid ${LINE}">${esc(v)}</td></tr>`)
+      .join("");
+    details = `${feature}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px">${rows}</table>`;
+  }
   const buttons = (opts.buttons ?? [])
-    .map((b, i) => `<tr><td style="padding-top:${i ? 10 : 22}px"><a href="${esc(b.href)}" style="display:block;padding:14px 12px;border:1px solid ${i ? "#cfc8b8" : NAVY};border-radius:4px;text-align:center;font-size:16px;line-height:20px;color:${i ? INK : NAVY};text-decoration:none">${esc(b.label)}</a></td></tr>`)
+    .map(
+      (b, i) =>
+        `<a href="${esc(b.href)}" style="display:inline-block;margin:0 8px 10px 0;padding:12px 18px;border:1px solid ${i ? "#cfcabd" : NAVY};border-radius:8px;background:${i ? "#ffffff" : NAVY};font-size:15px;font-weight:600;line-height:20px;color:${i ? INK : "#ffffff"};text-decoration:none">${esc(b.label)}</a>`,
+    )
     .join("");
-  return `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"></head><body style="margin:0;background:#f8f5ee;font-family:Helvetica,Arial,sans-serif">
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"></head><body style="margin:0;background:${IVORY};font-family:Inter,Helvetica,Arial,sans-serif">
 <span style="display:none;max-height:0;overflow:hidden">${esc(opts.preheader)}</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f5ee;padding:20px 10px"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid ${LINE};border-radius:4px">
-<tr><td style="padding:24px 24px 18px;text-align:center;border-bottom:1px solid ${LINE}">
-  <img src="${opts.siteUrl}/brand/logo-mark.png" width="40" height="40" alt="" style="display:block;margin:0 auto 8px">
-  <div style="font-family:Georgia,'Times New Roman',serif;font-size:20px;color:${NAVY}">Victoria Luxury</div>
-  <div style="margin-top:3px;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:${GOLD}">Hotel &amp; Apartment · Akure</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${IVORY};padding:24px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:592px;background:#ffffff;border-radius:14px">
+<tr><td style="padding:28px 28px 8px">
+  <div style="font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif;font-weight:600;font-size:28px;line-height:1.1;color:${WORDMARK}">Victoria Luxury</div>
+  <h1 style="margin:14px 0 0;font-family:Inter,Helvetica,Arial,sans-serif;font-weight:700;font-size:22px;line-height:1.25;color:${INK}">${esc(opts.heading)}</h1>
+  <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:${MUTED}">${esc(opts.intro)}</p>
+  ${details}
+  ${buttons ? `<div style="margin-top:20px">${buttons}</div>` : ""}
+  ${opts.note ? `<p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:${MUTED}">${esc(opts.note)}</p>` : ""}
 </td></tr>
-<tr><td style="padding:24px 24px 8px">
-  <h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-weight:normal;font-size:28px;line-height:1.15;color:${NAVY}">${esc(opts.heading)}</h1>
-  <p style="margin:10px 0 0;font-size:16px;line-height:1.55;color:#353b47">${esc(opts.intro)}</p>
-  ${feature}
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px">${rows}</table>
-  ${buttons ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${buttons}</table>` : ""}
-  ${opts.note ? `<p style="margin:20px 0 0;font-size:14px;line-height:1.6;color:${MUTED}">${esc(opts.note)}</p>` : ""}
-</td></tr>
-<tr><td style="padding:18px 24px 22px;border-top:1px solid ${LINE};text-align:center;font-size:13px;line-height:1.7;color:${MUTED}">
-  ${esc(hotel.name)}<br>
-  ${esc(hotel.address.line1)}, ${esc(hotel.address.city)}, ${esc(hotel.address.state)}<br>
-  <a href="tel:${hotel.phone}" style="color:${GOLD}">Call</a> · <a href="https://wa.me/${hotel.whatsapp}" style="color:${GOLD}">WhatsApp</a> · <a href="mailto:${hotel.email}" style="color:${GOLD}">Email</a>
+<tr><td style="padding:18px 28px 24px;font-size:12px;line-height:1.7;color:${MUTED}">
+  ${esc(hotel.name)} · ${esc(hotel.address.line1)}, ${esc(hotel.address.city)}, ${esc(hotel.address.state)}<br>
+  <a href="tel:${hotel.phone}" style="color:${LINK}">Call</a> · <a href="https://wa.me/${hotel.whatsapp}" style="color:${LINK}">WhatsApp</a> · <a href="mailto:${hotel.email}" style="color:${LINK}">Email</a>
 </td></tr>
 </table></td></tr></table></body></html>`;
 }
@@ -99,21 +116,21 @@ export function bookingConfirmedEmail(s: StayInfo & { receiptNumber?: string }, 
   const intro =
     balance > 0
       ? `Your ${s.category} room is confirmed. ${formatNaira(balance)} is owed; our team will arrange this with you.`
-      : `Your payment has been received and your ${s.category} room is confirmed. We look forward to welcoming you to Akure.`;
+      : "Thank you for booking direct. Here are your details. Keep this email: it's your confirmation.";
   const feature: Feature = { label: "Booking reference", value: s.reference, sub: "Show this at the front desk" };
   const rows: Array<[string, string]> = [
-    ["Check-in", `${formatDate(s.checkIn)}, ${s.checkInTime}`],
-    ["Check-out", `${formatDate(s.checkOut)}, ${s.checkOutTime}`],
     ["Room", `${roomText(s)} · ${plural(s.guests, "guest")}`],
+    ["Arrive", `${formatDate(s.checkIn)} · ${s.checkInTime}`],
+    ["Leave", `${formatDate(s.checkOut)} · ${s.checkOutTime}`],
     [balance > 0 ? "Paid so far" : "Total paid", formatNaira(s.paidKobo)],
     ...(balance > 0 ? [["Owed", formatNaira(balance)] as [string, string]] : []),
     ...(s.receiptNumber ? [["Receipt", s.receiptNumber] as [string, string]] : []),
   ];
-  const buttons: Button[] = [{ label: "Get directions", href: hotel.mapsUrl }, whatsapp];
-  const note = "Need to change anything or arriving late? Reply to this email or message us on WhatsApp.";
+  const buttons: Button[] = [{ label: "Manage your booking", href: `${siteUrl}/account` }, { label: "Get directions", href: hotel.mapsUrl }, whatsapp];
+  const note = "Questions? Reply to this email or message the front desk on WhatsApp.";
   return {
     subject: `Booking confirmed: ${s.reference}`,
-    html: layout({ preheader: `${s.category}, ${formatDate(s.checkIn)} to ${formatDate(s.checkOut)}`, heading, intro, feature, rows, buttons, note, siteUrl }),
+    html: layout({ preheader: `${s.category}, ${formatDate(s.checkIn)} to ${formatDate(s.checkOut)}`, heading, intro, feature, rows, buttons, note, siteUrl, grid: true }),
     text: text(heading, intro, rows, note, feature, buttons),
   };
 }
