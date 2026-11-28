@@ -20,9 +20,9 @@ const READERS = [...MONEY_APPROVERS, "finance"] as const;
 /** The non-cash payments nobody has checked yet, oldest first. */
 const UNCHECKED_SQL = `
   SELECT 'payment' AS source_type, p.id AS source_id, p.paid_at AS at, s.full_name AS taken_by, s.id AS taken_by_id,
-         g.full_name || ' · ' || r.reference AS who, p.method, p.amount_kobo, coalesce(p.provider_reference, p.slip_last4, p.sender_name) AS reference, r.id AS reservation_id
+         (CASE p.kind WHEN 'refund' THEN 'Refund to ' ELSE '' END) || g.full_name || ' · ' || r.reference AS who, p.method, p.amount_kobo, coalesce(p.provider_reference, p.slip_last4, p.sender_name) AS reference, r.id AS reservation_id
   FROM payments p JOIN reservations r ON r.id = p.reservation_id JOIN guests g ON g.id = r.guest_id LEFT JOIN staff_profiles s ON s.id = p.recorded_by
-  WHERE p.status = 'successful' AND p.kind = 'payment' AND p.provider = 'offline' AND p.method IN ('bank_transfer', 'pos_terminal')
+  WHERE p.status = 'successful' AND p.provider = 'offline' AND (p.kind = 'payment' AND p.method IN ('bank_transfer', 'pos_terminal') OR p.kind = 'refund' AND p.method = 'bank_transfer')
     AND NOT EXISTS (SELECT 1 FROM payment_checks c WHERE c.source_type = 'payment' AND c.source_id = p.id)
   UNION ALL
   SELECT 'hall_payment', hp.id, hp.created_at, s.full_name, s.id, 'Hall · ' || h.title || ' · ' || h.customer_name, hp.method, hp.amount_kobo, hp.reference, NULL

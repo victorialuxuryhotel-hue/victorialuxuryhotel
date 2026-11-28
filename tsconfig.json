@@ -41,6 +41,7 @@
   ],
   "exclude": [
     ".open-next",
+    ".claude",
     "node_modules",
     "worker.ts"
   ]

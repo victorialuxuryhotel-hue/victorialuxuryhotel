@@ -505,6 +505,14 @@ export async function markNoShow(db: Db, actor: Actor, reservationId: string): P
       db
         .prepare("UPDATE reservations SET status = 'no_show', attention_reason = coalesce(?, attention_reason) WHERE id = ?")
         .bind(note, res.id),
+      // Policy 7.3: the first night is kept; the rest goes to the GM or owner in Approvals as a refund to decide.
+      ...(paid > res.nightly_rate_kobo
+        ? [
+            db
+              .prepare("INSERT INTO refund_requests (id, reservation_id, amount_kobo, method, reason, requested_by, source) VALUES (?, ?, ?, 'bank_transfer', ?, ?, 'no_show')")
+              .bind(uuid(), res.id, paid - res.nightly_rate_kobo, `No-show: first night (${naira(res.nightly_rate_kobo)}) kept, the rest to refund or keep`, actor!.id),
+          ]
+        : []),
       activity(db, "reservation.no_show", "reservation", res.id, `${res.reference} marked as no-show${paid ? `: ${naira(paid)} paid, waiting for a keep or refund decision` : ""}`, {
         paid_kobo: paid,
       }),

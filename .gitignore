@@ -54,3 +54,6 @@ next-env.d.ts
 # Production database exports (contain guest data)
 backups/
 /tests/e2e/.state/
+
+# Local agent working copies and settings
+.claude/

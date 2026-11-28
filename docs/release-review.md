@@ -443,3 +443,20 @@ These are deliberately **not final** in the app:
   station cookie is sent to sign-in.
 - Rollback: `wrangler versions deploy 10fffa0a-3ad4-4fc4-91c9-7d3aed18569b@100%`. The migrations stay (forward-only);
   the old code ignores the new tables, but its POS payments and voids are refused by the new rules (see 0030/0031).
+
+## 0033_step_two
+
+- **What:** `refund_requests.source` (desk, no_show); `reservations.owing_decided_by/at`, `owing_decision` (agreed,
+  chase), `owing_decision_note`; `stock_moves.supplier`, `cost_kobo`; `bills` and `bill_counter` (B-0001…);
+  `pay_links` (random code, booking or bill, expiry). Bills and pay links can't be deleted or changed once issued
+  (cancel and reissue). **Existing rows:** unchanged. **Previous Worker:** unaffected.
+
+## Step 2: Approvals (X10)
+
+- *Approvals* (GM and owner, `payments.approve`): Waiting · N | Approved | Declined. Refunds asked for at the desk,
+  a no-show's unused nights (marking a no-show now puts everything after the first night forward), changes waiting
+  for payment, and guests let go owing at check-out. *Review* opens the facts (paid, used, policy) with the amount,
+  how it's paid back and a required reason.
+- A refund can't be more than what was paid less what was used; the requester can't approve their own. Approving
+  writes a refund payment; a refund by transfer appears under Payments to confirm for the other manager. Card bookings
+  are refunded by transfer until Paystack refunds are built (step 3).
