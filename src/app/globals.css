@@ -278,3 +278,16 @@ html[data-till-full] [data-app-nav] { display: none !important; }
     display: block !important;
   }
 }
+
+/* The company bill (design P3): only the bill prints, on A4. */
+@media print {
+  body:has(.a4-bill[data-print]) *:not(:has(.a4-bill[data-print])):not(.a4-bill[data-print]):not(.a4-bill[data-print] *) {
+    display: none !important;
+  }
+  body:has(.a4-bill[data-print]) *:has(.a4-bill[data-print]) {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+}

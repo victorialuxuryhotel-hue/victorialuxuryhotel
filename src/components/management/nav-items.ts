@@ -1,5 +1,6 @@
 import {
-  Stamp, BarChart3, BedDouble, BookOpen, CalendarCheck, CalendarDays, ClipboardCheck, CreditCard, LayoutDashboard, Package, Presentation, ScrollText, Settings, ShieldCheck, Sun, Tags, TrendingUp, Users, UtensilsCrossed } from "lucide-react";
+  Stamp,
+  FileText, BarChart3, BedDouble, BookOpen, CalendarCheck, CalendarDays, ClipboardCheck, CreditCard, LayoutDashboard, Package, Presentation, ScrollText, Settings, ShieldCheck, Sun, Tags, TrendingUp, Users, UtensilsCrossed } from "lucide-react";
 import type { Permission } from "@/lib/auth/permissions";
 
 export type NavItem = { href: string; label: string; icon: typeof Sun; permission?: readonly Permission[] };
@@ -16,6 +17,7 @@ export const managementNavGroups: readonly NavGroup[] = [
       { href: "/app/guests", label: "Guests", icon: Users, permission: ["guests.manage"] },
       { href: "/app/payments", label: "Payments", icon: CreditCard, permission: ["payments.record", "reports.view"] },
       { href: "/app/events", label: "Hall bookings", icon: Presentation, permission: ["events.manage"] },
+      { href: "/app/bills", label: "Company bills", icon: FileText, permission: ["bills.manage"] },
     ],
   },
   {

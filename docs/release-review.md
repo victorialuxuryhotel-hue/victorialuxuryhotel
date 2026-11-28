@@ -474,3 +474,13 @@ These are deliberately **not final** in the app:
 - Never release a room with a payment in flight: a hold that ends while an online payment started in the last 2 hours
   is still pending gets 30 minutes more, once, and the booking says why (the desk sees it).
 - Company bills (P3) can't be paid by link yet: they're paid at the desk (see the bill step).
+
+## Step 2: company bills (P3)
+
+- *Company bills* (front desk and up, `bills.manage`): choose unpaid bookings, the company, attention and valid-until
+  (on or before the first arrival). Numbered B-0001…; lines per room type and extra; the bookings are held until the
+  valid-until date, then released by the usual expiry (logged).
+- The A4 bill shows bank details from settings (or "Ask the front desk for the account details" while they're empty),
+  reference = the bill number, and "This is a bill, not a receipt". *Record payment* splits a payment across the
+  bookings in order; each booking gets its own receipt. Bills can't be edited; cancel and make a new one.
+- Not yet: paying a bill by online link (bills are paid by transfer or at the desk for now).
