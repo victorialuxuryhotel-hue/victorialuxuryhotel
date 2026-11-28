@@ -491,3 +491,8 @@ These are deliberately **not final** in the app:
   Phone, Stays, Last stay, Total paid and an *Open* button per row. The design's "Most recent first" sort dropdown is
   not added: the list has one order on the server and a sort would be a query change. The guest page uses the same
   white cards, and its bookings card is called *Stays* with a count.
+- Hall bookings (R109): an *Upcoming* card with a count and the table When, Event, Booked by, Price, Status (Paid,
+  Owes ₦X, Awaiting payment, Enquiry, Cancelled) and, at the row's end, *Take payment* (opens the same payment form
+  under the row) or *Open* (the invoice), with Invoice and *Cancel booking* in a ⋯ menu. *New hall booking* is a
+  four-column form (Event, Booked by, Date, Guests / From, To, Price with ₦ inside, Phone / Email, Notes) with the
+  rule line and *Save hall booking* at the right. Notes is now a one-line field.
