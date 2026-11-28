@@ -30,8 +30,12 @@
   // The hotel's domain (DNS on Cloudflare). workers.dev stays on as a fallback address.
   "routes": [
     { "pattern": "victorialuxuryhotel.com", "custom_domain": true },
-    { "pattern": "www.victorialuxuryhotel.com", "custom_domain": true }
+    { "pattern": "www.victorialuxuryhotel.com", "custom_domain": true },
+    // The staff app's own address (src/proxy.ts, APP_HOST): sign-in, stations and every /app page.
+    { "pattern": "app.victorialuxuryhotel.com", "custom_domain": true }
   ],
+  // Live only (staging has none): moves the staff app to its own address.
+  "vars": { "APP_HOST": "app.victorialuxuryhotel.com" },
   "workers_dev": true,
   "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "victorialuxuryhotel" }],
   // next/image optimization via Cloudflare Images.

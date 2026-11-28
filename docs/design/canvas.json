@@ -1,0 +1,1002 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-11-27T22:56:24Z"
+ },
+ "title": "Victoria Hotel: staff screens by role",
+ "launch": {
+  "view": "canvas",
+  "page": "platform"
+ },
+ "pages": [
+  {
+   "id": "current",
+   "name": "Current screens"
+  },
+  {
+   "id": "redesign",
+   "name": "Redesign"
+  },
+  {
+   "id": "platform",
+   "name": "Guest website & more"
+  }
+ ],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1366,
+   "h": 1500,
+   "title": "Who sees which screen"
+  },
+  "101-Today.dc.html": {
+   "x": 0,
+   "y": 1900,
+   "w": 1366,
+   "h": 900,
+   "title": "Today"
+  },
+  "102-Bookings.dc.html": {
+   "x": 1446,
+   "y": 1900,
+   "w": 1366,
+   "h": 900,
+   "title": "Bookings"
+  },
+  "103-Booking-page.dc.html": {
+   "x": 2892,
+   "y": 1900,
+   "w": 1366,
+   "h": 900,
+   "title": "Booking page"
+  },
+  "104-Calendar.dc.html": {
+   "x": 4338,
+   "y": 1900,
+   "w": 1366,
+   "h": 900,
+   "title": "Calendar"
+  },
+  "105-Booking-side-panel.dc.html": {
+   "x": 5784,
+   "y": 1900,
+   "w": 1366,
+   "h": 900,
+   "title": "Booking side panel"
+  },
+  "106-Rooms.dc.html": {
+   "x": 0,
+   "y": 2920,
+   "w": 1366,
+   "h": 900,
+   "title": "Rooms"
+  },
+  "107-Guests.dc.html": {
+   "x": 1446,
+   "y": 2920,
+   "w": 1366,
+   "h": 900,
+   "title": "Guests"
+  },
+  "108-Payments.dc.html": {
+   "x": 2892,
+   "y": 2920,
+   "w": 1366,
+   "h": 900,
+   "title": "Payments"
+  },
+  "109-Payments-to-confirm.dc.html": {
+   "x": 4338,
+   "y": 2920,
+   "w": 1366,
+   "h": 900,
+   "title": "Payments to confirm"
+  },
+  "110-Hall-bookings.dc.html": {
+   "x": 5784,
+   "y": 2920,
+   "w": 1366,
+   "h": 900,
+   "title": "Hall bookings"
+  },
+  "201-Till.dc.html": {
+   "x": 0,
+   "y": 4320,
+   "w": 1366,
+   "h": 900,
+   "title": "Till"
+  },
+  "202-Till-taking-payment.dc.html": {
+   "x": 1446,
+   "y": 4320,
+   "w": 1366,
+   "h": 900,
+   "title": "Till: taking payment"
+  },
+  "203-Orders--receipts.dc.html": {
+   "x": 2892,
+   "y": 4320,
+   "w": 1366,
+   "h": 900,
+   "title": "Orders & receipts"
+  },
+  "204-Daily-closing.dc.html": {
+   "x": 4338,
+   "y": 4320,
+   "w": 1366,
+   "h": 900,
+   "title": "Daily closing"
+  },
+  "205-Menu.dc.html": {
+   "x": 5784,
+   "y": 4320,
+   "w": 1366,
+   "h": 900,
+   "title": "Menu"
+  },
+  "206-Stock.dc.html": {
+   "x": 0,
+   "y": 5340,
+   "w": 1366,
+   "h": 900,
+   "title": "Stock"
+  },
+  "207-Sales-reports.dc.html": {
+   "x": 1446,
+   "y": 5340,
+   "w": 1366,
+   "h": 900,
+   "title": "Sales reports"
+  },
+  "301-Dashboard.dc.html": {
+   "x": 0,
+   "y": 6740,
+   "w": 1366,
+   "h": 900,
+   "title": "Dashboard"
+  },
+  "302-Rates--room-types.dc.html": {
+   "x": 1446,
+   "y": 6740,
+   "w": 1366,
+   "h": 900,
+   "title": "Rates & room types"
+  },
+  "303-Reports.dc.html": {
+   "x": 2892,
+   "y": 6740,
+   "w": 1366,
+   "h": 900,
+   "title": "Reports"
+  },
+  "304-Booking-rules.dc.html": {
+   "x": 4338,
+   "y": 6740,
+   "w": 1366,
+   "h": 900,
+   "title": "Booking rules"
+  },
+  "305-Staff--access.dc.html": {
+   "x": 5784,
+   "y": 6740,
+   "w": 1366,
+   "h": 900,
+   "title": "Staff & access"
+  },
+  "R1-Components.dc.html": {
+   "x": 0,
+   "y": 30,
+   "w": 1366,
+   "h": 1900,
+   "title": "Components and rules",
+   "page": "redesign"
+  },
+  "R2-Till-order.dc.html": {
+   "x": 1606,
+   "y": 3384,
+   "w": 1280,
+   "h": 720,
+   "title": "Till: taking an order",
+   "page": "redesign"
+  },
+  "R3-Till-payment.dc.html": {
+   "x": 3052,
+   "y": 3384,
+   "w": 1280,
+   "h": 720,
+   "title": "Till: taking payment",
+   "page": "redesign"
+  },
+  "R4-Today.dc.html": {
+   "x": 1606,
+   "y": 300,
+   "w": 1366,
+   "h": 768,
+   "title": "Today",
+   "page": "redesign"
+  },
+  "R101-Bookings.dc.html": {
+   "x": 3052,
+   "y": 300,
+   "w": 1366,
+   "h": 768,
+   "title": "Bookings",
+   "page": "redesign"
+  },
+  "R102-Booking-page.dc.html": {
+   "x": 4498,
+   "y": 300,
+   "w": 1366,
+   "h": 768,
+   "title": "Booking page",
+   "page": "redesign"
+  },
+  "R103-Calendar.dc.html": {
+   "x": 5944,
+   "y": 300,
+   "w": 1366,
+   "h": 768,
+   "title": "Calendar",
+   "page": "redesign"
+  },
+  "R104-Booking-side-panel.dc.html": {
+   "x": 1606,
+   "y": 1188,
+   "w": 1366,
+   "h": 768,
+   "title": "Booking side panel",
+   "page": "redesign"
+  },
+  "R105-Rooms.dc.html": {
+   "x": 3052,
+   "y": 1188,
+   "w": 1366,
+   "h": 768,
+   "title": "Rooms",
+   "page": "redesign"
+  },
+  "R106-Guests.dc.html": {
+   "x": 4498,
+   "y": 1188,
+   "w": 1366,
+   "h": 768,
+   "title": "Guests",
+   "page": "redesign"
+  },
+  "R107-Payments.dc.html": {
+   "x": 5944,
+   "y": 1188,
+   "w": 1366,
+   "h": 768,
+   "title": "Payments",
+   "page": "redesign"
+  },
+  "R108-Payments-to-confirm.dc.html": {
+   "x": 1606,
+   "y": 2076,
+   "w": 1366,
+   "h": 768,
+   "title": "Payments to confirm",
+   "page": "redesign"
+  },
+  "R109-Hall-bookings.dc.html": {
+   "x": 3052,
+   "y": 2076,
+   "w": 1366,
+   "h": 768,
+   "title": "Hall bookings",
+   "page": "redesign"
+  },
+  "R201-Orders.dc.html": {
+   "x": 4498,
+   "y": 3384,
+   "w": 1366,
+   "h": 768,
+   "title": "Orders & receipts",
+   "page": "redesign"
+  },
+  "R202-Daily-closing.dc.html": {
+   "x": 5944,
+   "y": 3384,
+   "w": 1280,
+   "h": 720,
+   "title": "Daily closing",
+   "page": "redesign"
+  },
+  "R203-Menu.dc.html": {
+   "x": 1606,
+   "y": 4272,
+   "w": 1366,
+   "h": 768,
+   "title": "Menu",
+   "page": "redesign"
+  },
+  "R204-Stock.dc.html": {
+   "x": 3052,
+   "y": 4272,
+   "w": 1366,
+   "h": 768,
+   "title": "Stock",
+   "page": "redesign"
+  },
+  "R205-Sales-reports.dc.html": {
+   "x": 4498,
+   "y": 4272,
+   "w": 1366,
+   "h": 768,
+   "title": "Sales reports",
+   "page": "redesign"
+  },
+  "R301-Dashboard.dc.html": {
+   "x": 1606,
+   "y": 5580,
+   "w": 1366,
+   "h": 768,
+   "title": "Dashboard",
+   "page": "redesign"
+  },
+  "R302-Rates.dc.html": {
+   "x": 3052,
+   "y": 5580,
+   "w": 1366,
+   "h": 768,
+   "title": "Rates & room types",
+   "page": "redesign"
+  },
+  "R303-Reports.dc.html": {
+   "x": 4498,
+   "y": 5580,
+   "w": 1366,
+   "h": 768,
+   "title": "Reports",
+   "page": "redesign"
+  },
+  "R304-Booking-rules.dc.html": {
+   "x": 5944,
+   "y": 5580,
+   "w": 1366,
+   "h": 768,
+   "title": "Booking rules",
+   "page": "redesign"
+  },
+  "R305-Staff.dc.html": {
+   "x": 1606,
+   "y": 6468,
+   "w": 1366,
+   "h": 768,
+   "title": "Staff & access",
+   "page": "redesign"
+  },
+  "G1-Home.dc.html": {
+   "x": 0,
+   "y": 300,
+   "w": 1440,
+   "h": 2650,
+   "title": "Home",
+   "page": "platform"
+  },
+  "G2-Rooms.dc.html": {
+   "x": 1520,
+   "y": 300,
+   "w": 1440,
+   "h": 1820,
+   "title": "Rooms",
+   "page": "platform"
+  },
+  "G3-Room-detail.dc.html": {
+   "x": 3040,
+   "y": 300,
+   "w": 1440,
+   "h": 1500,
+   "title": "Room: Deluxe",
+   "page": "platform"
+  },
+  "G10-Facilities.dc.html": {
+   "x": 4560,
+   "y": 300,
+   "w": 1440,
+   "h": 1650,
+   "title": "Facilities",
+   "page": "platform"
+  },
+  "G11-Contact.dc.html": {
+   "x": 6080,
+   "y": 300,
+   "w": 1440,
+   "h": 1050,
+   "title": "Contact",
+   "page": "platform"
+  },
+  "G4-Book-room.dc.html": {
+   "x": 0,
+   "y": 3370,
+   "w": 1440,
+   "h": 1120,
+   "title": "Book 1: choose a room",
+   "page": "platform"
+  },
+  "G5-Book-details.dc.html": {
+   "x": 1520,
+   "y": 3370,
+   "w": 1440,
+   "h": 1200,
+   "title": "Book 2: your details",
+   "page": "platform"
+  },
+  "G6-Book-pay.dc.html": {
+   "x": 3040,
+   "y": 3370,
+   "w": 1440,
+   "h": 1000,
+   "title": "Book 3: check and pay",
+   "page": "platform"
+  },
+  "G7-Book-confirmed.dc.html": {
+   "x": 4560,
+   "y": 3370,
+   "w": 1440,
+   "h": 1000,
+   "title": "Book 4: confirmed",
+   "page": "platform"
+  },
+  "G8-Payment-failed.dc.html": {
+   "x": 6080,
+   "y": 3370,
+   "w": 1440,
+   "h": 700,
+   "title": "Payment didn't go through",
+   "page": "platform"
+  },
+  "G9-Guest-account.dc.html": {
+   "x": 7600,
+   "y": 3370,
+   "w": 1440,
+   "h": 900,
+   "title": "Guest account",
+   "page": "platform"
+  },
+  "M1-Mobile-home.dc.html": {
+   "x": 0,
+   "y": 6533,
+   "w": 390,
+   "h": 1560,
+   "title": "Phone: home",
+   "page": "platform"
+  },
+  "M2-Mobile-booking.dc.html": {
+   "x": 2820,
+   "y": 6533,
+   "w": 390,
+   "h": 1000,
+   "title": "Phone: book 2 \u00b7 your details",
+   "page": "platform"
+  },
+  "S1-Staff-sign-in.dc.html": {
+   "x": 0,
+   "y": 4990,
+   "w": 1366,
+   "h": 768,
+   "title": "Staff sign-in",
+   "page": "platform"
+  },
+  "S2-Counter-lock-PIN.dc.html": {
+   "x": 1446,
+   "y": 4990,
+   "w": 1280,
+   "h": 720,
+   "title": "Counter lock: name and PIN",
+   "page": "platform"
+  },
+  "S3-This-station.dc.html": {
+   "x": 2806,
+   "y": 4990,
+   "w": 1366,
+   "h": 768,
+   "title": "This station",
+   "page": "platform"
+  },
+  "P1-Bar-receipt-80mm.dc.html": {
+   "x": 4252,
+   "y": 4990,
+   "w": 320,
+   "h": 420,
+   "title": "Bar receipt (80 mm)",
+   "page": "platform"
+  },
+  "P2-Room-receipt-A4.dc.html": {
+   "x": 4652,
+   "y": 4990,
+   "w": 794,
+   "h": 1123,
+   "title": "Room receipt (A4)",
+   "page": "platform"
+  },
+  "E1-Confirmation-email.dc.html": {
+   "x": 5526,
+   "y": 4990,
+   "w": 640,
+   "h": 860,
+   "title": "Booking confirmation email",
+   "page": "platform"
+  },
+  "M3-Mobile-menu.dc.html": {
+   "x": 470,
+   "y": 6533,
+   "w": 390,
+   "h": 844,
+   "title": "Phone: menu open",
+   "page": "platform"
+  },
+  "M4-Mobile-rooms.dc.html": {
+   "x": 940,
+   "y": 6533,
+   "w": 390,
+   "h": 1850,
+   "title": "Phone: rooms",
+   "page": "platform"
+  },
+  "M5-Mobile-room-detail.dc.html": {
+   "x": 1410,
+   "y": 6533,
+   "w": 390,
+   "h": 980,
+   "title": "Phone: room detail",
+   "page": "platform"
+  },
+  "D5-Mobile-guests-sheet.dc.html": {
+   "x": 1880,
+   "y": 6533,
+   "w": 390,
+   "h": 980,
+   "title": "Phone: guests picker (bottom sheet)",
+   "page": "platform"
+  },
+  "M6-Mobile-book-dates.dc.html": {
+   "x": 2350,
+   "y": 6533,
+   "w": 390,
+   "h": 1180,
+   "title": "Phone: book 1 \u00b7 dates and room",
+   "page": "platform"
+  },
+  "M7-Mobile-book-pay.dc.html": {
+   "x": 3290,
+   "y": 6533,
+   "w": 390,
+   "h": 940,
+   "title": "Phone: book 3 \u00b7 check and pay",
+   "page": "platform"
+  },
+  "M8-Mobile-confirmed.dc.html": {
+   "x": 3760,
+   "y": 6533,
+   "w": 390,
+   "h": 900,
+   "title": "Phone: book 4 \u00b7 confirmed",
+   "page": "platform"
+  },
+  "M9-Mobile-payment-failed.dc.html": {
+   "x": 4230,
+   "y": 6533,
+   "w": 390,
+   "h": 620,
+   "title": "Phone: payment didn't go through",
+   "page": "platform"
+  },
+  "M11-Mobile-sign-in.dc.html": {
+   "x": 4700,
+   "y": 6533,
+   "w": 390,
+   "h": 620,
+   "title": "Phone: find your booking",
+   "page": "platform"
+  },
+  "M10-Mobile-account.dc.html": {
+   "x": 5170,
+   "y": 6533,
+   "w": 390,
+   "h": 1000,
+   "title": "Phone: guest account",
+   "page": "platform"
+  },
+  "M12-Mobile-facilities.dc.html": {
+   "x": 5640,
+   "y": 6533,
+   "w": 390,
+   "h": 1420,
+   "title": "Phone: facilities",
+   "page": "platform"
+  },
+  "M13-Mobile-contact.dc.html": {
+   "x": 6110,
+   "y": 6533,
+   "w": 390,
+   "h": 1060,
+   "title": "Phone: contact",
+   "page": "platform"
+  },
+  "D1-Menus-account-and-row.dc.html": {
+   "x": 0,
+   "y": 8803,
+   "w": 1366,
+   "h": 768,
+   "title": "Menus open: account and row actions",
+   "page": "platform"
+  },
+  "D2-Dropdown-bookings-filter.dc.html": {
+   "x": 1446,
+   "y": 8803,
+   "w": 1366,
+   "h": 768,
+   "title": "Dropdown open: booking status filter",
+   "page": "platform"
+  },
+  "D3-Dropdown-till-table.dc.html": {
+   "x": 2892,
+   "y": 8803,
+   "w": 1280,
+   "h": 720,
+   "title": "Dropdown open: table or name on the till",
+   "page": "platform"
+  },
+  "D3b-Menu-till-account.dc.html": {
+   "x": 4252,
+   "y": 8803,
+   "w": 1280,
+   "h": 720,
+   "title": "Menu open: Bisi's till menu",
+   "page": "platform"
+  },
+  "D4-Guest-menus.dc.html": {
+   "x": 5612,
+   "y": 8803,
+   "w": 1440,
+   "h": 1500,
+   "title": "Guest site: account menu and guests picker",
+   "page": "platform"
+  },
+  "X1-Walk-in.dc.html": {
+   "x": 0,
+   "y": 7636,
+   "w": 1366,
+   "h": 768,
+   "title": "Walk-in: guest to checked in",
+   "page": "redesign"
+  },
+  "X2-Check-in.dc.html": {
+   "x": 1486,
+   "y": 7636,
+   "w": 1366,
+   "h": 768,
+   "title": "Check-in with registration card",
+   "page": "redesign"
+  },
+  "X3-Check-out.dc.html": {
+   "x": 2972,
+   "y": 7636,
+   "w": 1366,
+   "h": 768,
+   "title": "Check-out",
+   "page": "redesign"
+  },
+  "X4-Desk-payment-transfer.dc.html": {
+   "x": 4458,
+   "y": 7636,
+   "w": 1366,
+   "h": 768,
+   "title": "Desk payment: transfer",
+   "page": "redesign"
+  },
+  "X5-Desk-payment-POS.dc.html": {
+   "x": 5944,
+   "y": 7636,
+   "w": 1366,
+   "h": 768,
+   "title": "Desk payment: POS",
+   "page": "redesign"
+  },
+  "X6-Till-transfer.dc.html": {
+   "x": 0,
+   "y": 8604,
+   "w": 1280,
+   "h": 720,
+   "title": "Till payment: transfer",
+   "page": "redesign"
+  },
+  "X7-Till-POS.dc.html": {
+   "x": 1400,
+   "y": 8604,
+   "w": 1280,
+   "h": 720,
+   "title": "Till payment: POS",
+   "page": "redesign"
+  },
+  "X8-Till-calculator.dc.html": {
+   "x": 2800,
+   "y": 8604,
+   "w": 1280,
+   "h": 720,
+   "title": "Till: calculator open",
+   "page": "redesign"
+  },
+  "X9-Void-manager-PIN.dc.html": {
+   "x": 4200,
+   "y": 8604,
+   "w": 1280,
+   "h": 720,
+   "title": "Void: manager approves at the counter",
+   "page": "redesign"
+  },
+  "X10-Approvals.dc.html": {
+   "x": 5600,
+   "y": 8604,
+   "w": 1366,
+   "h": 768,
+   "title": "Approvals: refunds and exceptions",
+   "page": "redesign"
+  },
+  "X11-Closings-review.dc.html": {
+   "x": 0,
+   "y": 9572,
+   "w": 1366,
+   "h": 768,
+   "title": "Closings review (manager)",
+   "page": "redesign"
+  },
+  "X12-Record-delivery.dc.html": {
+   "x": 1486,
+   "y": 9572,
+   "w": 1366,
+   "h": 768,
+   "title": "Stock: record a delivery",
+   "page": "redesign"
+  },
+  "X14-Send-pay-link.dc.html": {
+   "x": 2972,
+   "y": 9572,
+   "w": 1366,
+   "h": 768,
+   "title": "Desk: send a payment link",
+   "page": "redesign"
+  },
+  "X13-Owner-phone-dashboard.dc.html": {
+   "x": 0,
+   "y": 10703,
+   "w": 390,
+   "h": 844,
+   "title": "Owner's phone dashboard",
+   "page": "platform"
+  },
+  "G12-Waiting-for-transfer.dc.html": {
+   "x": 550,
+   "y": 10703,
+   "w": 1440,
+   "h": 700,
+   "title": "Waiting for your transfer",
+   "page": "platform"
+  },
+  "M14-Mobile-pay-link.dc.html": {
+   "x": 2150,
+   "y": 10703,
+   "w": 390,
+   "h": 760,
+   "title": "Phone: pay link for a phone booking",
+   "page": "platform"
+  },
+  "P3-Company-bill-A4.dc.html": {
+   "x": 2700,
+   "y": 10703,
+   "w": 794,
+   "h": 1123,
+   "title": "Company bill (pay before arrival)",
+   "page": "platform"
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "101-Today.dc.html",
+  "102-Bookings.dc.html",
+  "103-Booking-page.dc.html",
+  "104-Calendar.dc.html",
+  "105-Booking-side-panel.dc.html",
+  "106-Rooms.dc.html",
+  "107-Guests.dc.html",
+  "108-Payments.dc.html",
+  "109-Payments-to-confirm.dc.html",
+  "110-Hall-bookings.dc.html",
+  "201-Till.dc.html",
+  "202-Till-taking-payment.dc.html",
+  "203-Orders--receipts.dc.html",
+  "204-Daily-closing.dc.html",
+  "205-Menu.dc.html",
+  "206-Stock.dc.html",
+  "207-Sales-reports.dc.html",
+  "301-Dashboard.dc.html",
+  "302-Rates--room-types.dc.html",
+  "303-Reports.dc.html",
+  "304-Booking-rules.dc.html",
+  "305-Staff--access.dc.html",
+  "R1-Components.dc.html",
+  "R2-Till-order.dc.html",
+  "R3-Till-payment.dc.html",
+  "R4-Today.dc.html",
+  "R101-Bookings.dc.html",
+  "R102-Booking-page.dc.html",
+  "R103-Calendar.dc.html",
+  "R104-Booking-side-panel.dc.html",
+  "R105-Rooms.dc.html",
+  "R106-Guests.dc.html",
+  "R107-Payments.dc.html",
+  "R108-Payments-to-confirm.dc.html",
+  "R109-Hall-bookings.dc.html",
+  "R201-Orders.dc.html",
+  "R202-Daily-closing.dc.html",
+  "R203-Menu.dc.html",
+  "R204-Stock.dc.html",
+  "R205-Sales-reports.dc.html",
+  "R301-Dashboard.dc.html",
+  "R302-Rates.dc.html",
+  "R303-Reports.dc.html",
+  "R304-Booking-rules.dc.html",
+  "R305-Staff.dc.html",
+  "G1-Home.dc.html",
+  "G2-Rooms.dc.html",
+  "G3-Room-detail.dc.html",
+  "G10-Facilities.dc.html",
+  "G11-Contact.dc.html",
+  "G4-Book-room.dc.html",
+  "G5-Book-details.dc.html",
+  "G6-Book-pay.dc.html",
+  "G7-Book-confirmed.dc.html",
+  "G8-Payment-failed.dc.html",
+  "G9-Guest-account.dc.html",
+  "M1-Mobile-home.dc.html",
+  "M2-Mobile-booking.dc.html",
+  "S1-Staff-sign-in.dc.html",
+  "S2-Counter-lock-PIN.dc.html",
+  "S3-This-station.dc.html",
+  "P1-Bar-receipt-80mm.dc.html",
+  "P2-Room-receipt-A4.dc.html",
+  "E1-Confirmation-email.dc.html",
+  "M3-Mobile-menu.dc.html",
+  "M4-Mobile-rooms.dc.html",
+  "M5-Mobile-room-detail.dc.html",
+  "D5-Mobile-guests-sheet.dc.html",
+  "M6-Mobile-book-dates.dc.html",
+  "M7-Mobile-book-pay.dc.html",
+  "M8-Mobile-confirmed.dc.html",
+  "M9-Mobile-payment-failed.dc.html",
+  "M11-Mobile-sign-in.dc.html",
+  "M10-Mobile-account.dc.html",
+  "M12-Mobile-facilities.dc.html",
+  "M13-Mobile-contact.dc.html",
+  "D1-Menus-account-and-row.dc.html",
+  "D2-Dropdown-bookings-filter.dc.html",
+  "D3-Dropdown-till-table.dc.html",
+  "D3b-Menu-till-account.dc.html",
+  "D4-Guest-menus.dc.html",
+  "X1-Walk-in.dc.html",
+  "X2-Check-in.dc.html",
+  "X3-Check-out.dc.html",
+  "X4-Desk-payment-transfer.dc.html",
+  "X5-Desk-payment-POS.dc.html",
+  "X6-Till-transfer.dc.html",
+  "X7-Till-POS.dc.html",
+  "X8-Till-calculator.dc.html",
+  "X9-Void-manager-PIN.dc.html",
+  "X10-Approvals.dc.html",
+  "X11-Closings-review.dc.html",
+  "X12-Record-delivery.dc.html",
+  "X13-Owner-phone-dashboard.dc.html",
+  "G12-Waiting-for-transfer.dc.html",
+  "M14-Mobile-pay-link.dc.html",
+  "X14-Send-pay-link.dc.html",
+  "P3-Company-bill-A4.dc.html"
+ ],
+ "notes": {
+  "daily-work": {
+   "x": 0,
+   "y": 1640,
+   "text": "Daily work",
+   "kind": "title1",
+   "maxW": 7150
+  },
+  "restaurant--bar": {
+   "x": 0,
+   "y": 4060,
+   "text": "Restaurant & bar",
+   "kind": "title1",
+   "maxW": 7150
+  },
+  "running-the-hotel": {
+   "x": 0,
+   "y": 6480,
+   "text": "Running the hotel",
+   "kind": "title1",
+   "maxW": 7150
+  },
+  "r-daily-work": {
+   "x": 1606,
+   "y": 30,
+   "text": "Daily work",
+   "kind": "title1",
+   "maxW": 5704,
+   "page": "redesign"
+  },
+  "r-restaurant-and-bar": {
+   "x": 1606,
+   "y": 3114,
+   "text": "Restaurant & bar",
+   "kind": "title1",
+   "maxW": 5704,
+   "page": "redesign"
+  },
+  "r-running-the-hotel": {
+   "x": 1606,
+   "y": 5310,
+   "text": "Running the hotel",
+   "kind": "title1",
+   "maxW": 5704,
+   "page": "redesign"
+  },
+  "p-guest5": {
+   "x": 0,
+   "y": 30,
+   "text": "Guest website",
+   "kind": "title1",
+   "maxW": 7520,
+   "page": "platform"
+  },
+  "p-booking6": {
+   "x": 0,
+   "y": 3100,
+   "text": "Booking and guest account",
+   "kind": "title1",
+   "maxW": 9040,
+   "page": "platform"
+  },
+  "p-phone,8": {
+   "x": 0,
+   "y": 4720,
+   "text": "Staff sign-in, receipts and email",
+   "kind": "title1",
+   "maxW": 6166,
+   "page": "platform"
+  },
+  "p-mobile": {
+   "x": 0,
+   "y": 6263,
+   "text": "Phone: the whole guest site",
+   "kind": "title1",
+   "maxW": 6500,
+   "page": "platform"
+  },
+  "p-menus": {
+   "x": 0,
+   "y": 8533,
+   "text": "Menus and dropdowns, open",
+   "kind": "title1",
+   "maxW": 7052,
+   "page": "platform"
+  },
+  "r-daily-moments": {
+   "x": 0,
+   "y": 7466,
+   "text": "Daily moments: walk-in to closing",
+   "kind": "title1",
+   "maxW": 7150,
+   "page": "redesign"
+  },
+  "p-gaps": {
+   "x": 0,
+   "y": 10533,
+   "text": "Owner phone, waiting, pay link, company bill",
+   "kind": "title1",
+   "maxW": 7150,
+   "page": "platform"
+  }
+ },
+ "designSystems": []
+}

@@ -36,7 +36,7 @@ async function revokePendingInvitations(clerk: Clerk, email: string): Promise<vo
 }
 
 const sendInvitation = (clerk: Clerk, email: string) =>
-  clerk.invitations.createInvitation({ emailAddress: email, redirectUrl: `${publicEnv().NEXT_PUBLIC_SITE_URL}/auth/accept`, notify: true, ignoreExisting: true });
+  clerk.invitations.createInvitation({ emailAddress: email, redirectUrl: `${process.env.APP_HOST ? `https://${process.env.APP_HOST}` : publicEnv().NEXT_PUBLIC_SITE_URL}/auth/accept`, notify: true, ignoreExisting: true });
 
 export async function inviteStaff(_prev: ActionResult<{ email: string }> | null, formData: FormData): Promise<ActionResult<{ email: string }>> {
   try {

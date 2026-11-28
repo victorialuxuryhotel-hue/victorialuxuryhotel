@@ -644,3 +644,15 @@ These are deliberately **not final** in the app:
   split into a payment per booking when it succeeds, each with its own receipt. The printed bill shows the link.
   The scheduled check asks Paystack about the charge once; a charge that doesn't match the bill is flagged on each
   booking for a person to check.
+
+## The staff app on its own address: app.victorialuxuryhotel.com
+
+- `wrangler.jsonc` (live only): custom domain `app.victorialuxuryhotel.com` and `APP_HOST`. Cloudflare creates the
+  DNS record and certificate on deploy (the zone is on Cloudflare).
+- `src/proxy.ts`: on victorialuxuryhotel.com and www., `/app`, `/login`, `/station`, `/two-step`, `/auth` move to the
+  app address (308, same path and query); the app address's `/` opens `/app`. Guest pages, `/pay`, `/api` (Paystack
+  callback and webhook), `/media` and the scheduled job are unchanged on both. Off on localhost, staging, workers.dev.
+- Staff invitations link to the app address.
+- **After the first deploy:** sign in at app.victorialuxuryhotel.com. Clerk's production instance covers subdomains
+  of victorialuxuryhotel.com; if Clerk refuses the address, add it under Clerk → Domains / allowed origins. Stations set
+  up on the old address need setting up again (their cookie belongs to the old address).

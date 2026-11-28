@@ -26,6 +26,10 @@ Paystack, Resend, GitHub, the domain registrar.
 overdue check-outs, closings to sign off) and *Needs attention*;
 Payments → *To confirm* against the bank statement and the card terminal's report; sign off closings.
 
+**Staff address:** staff use **app.victorialuxuryhotel.com** (sign-in, stations, every staff page). Old links to
+victorialuxuryhotel.com/login or /app/… move there by themselves. Guests stay on victorialuxuryhotel.com. Set by
+`APP_HOST` in `wrangler.jsonc` (live only); staging keeps everything on staging.victorialuxuryhotel.com.
+
 **Shared stations (front desk, bar, restaurant):** set each counter computer up once. The owner or GM signs in
 on it, opens *This station*, chooses what it's used for (Front desk, Bar till, Restaurant till, Office) and names
 it; their own sign-in then ends. The owner gives each person a PIN in *Staff & access* (they choose their own the
