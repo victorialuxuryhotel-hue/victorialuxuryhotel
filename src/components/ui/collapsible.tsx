@@ -10,7 +10,8 @@ const subscribe = (cb: () => void) => {
   return () => mq.removeEventListener("change", cb);
 };
 
-export function Collapsible({ id, title, wideHeader, children }: { id: string; title: string; wideHeader?: React.ReactNode; children: React.ReactNode }) {
+/** `collapseWide`: stays folded on wide screens too, until opened or linked to (#id). */
+export function Collapsible({ id, title, wideHeader, collapseWide = false, children }: { id: string; title: string; wideHeader?: React.ReactNode; collapseWide?: boolean; children: React.ReactNode }) {
   const wide = useSyncExternalStore(subscribe, () => window.matchMedia(XL).matches, () => false);
   const [open, setOpen] = useState(false);
 
@@ -21,12 +22,20 @@ export function Collapsible({ id, title, wideHeader, children }: { id: string; t
         requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start", behavior: "smooth" }));
       }
     };
+    // A link to #id opens it again even when the address already ends in #id.
+    const onClick = (e: MouseEvent) => {
+      if (e.target instanceof Element && e.target.closest(`a[href="#${id}"]`)) setOpen(true);
+    };
     onHash();
     window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
+    document.addEventListener("click", onClick);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      document.removeEventListener("click", onClick);
+    };
   }, [id]);
 
-  if (wide) {
+  if (wide && !collapseWide) {
     return (
       <div id={id}>
         {wideHeader}
@@ -41,7 +50,7 @@ export function Collapsible({ id, title, wideHeader, children }: { id: string; t
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={`${id}-body`}
-        className="flex min-h-13 w-full items-center justify-between gap-3 px-4 text-left text-base text-ink-900 sm:px-5"
+        className="flex min-h-12 w-full items-center justify-between gap-3 px-4 text-left text-[15px] font-semibold text-navy-700 hover:bg-ivory-50"
       >
         {title}
         {open ? <Minus className="size-4 text-ink-500" aria-hidden /> : <Plus className="size-4 text-ink-500" aria-hidden />}

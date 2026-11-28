@@ -17,6 +17,28 @@ export function CardHeader({ title, description, action }: { title: string; desc
   );
 }
 
+/**
+ * A white card with a heading, an optional count and an action at the right (designs R101–R109): group, then list.
+ * `tone="danger"` colours the count red (overdue, short).
+ */
+export function Section({ title, count, tone, action, children, className, id, bodyClassName }: {
+  title: ReactNode; count?: number; tone?: "danger" | "warning"; action?: ReactNode; children?: ReactNode; className?: string; id?: string; bodyClassName?: string;
+}) {
+  const headingId = id ? `${id}-title` : undefined;
+  return (
+    <section id={id} aria-labelledby={headingId} className={cn("min-w-0 overflow-clip rounded-xl border border-hairline bg-white", className)}>
+      <div className={cn("flex min-h-[49px] items-center gap-2.5 px-4 py-2", children ? "border-b border-hairline" : "")}>
+        <h2 id={headingId} className="text-base font-bold text-ink-900">{title}</h2>
+        {count !== undefined ? (
+          <span className={cn("inline-flex h-6 min-w-6 items-center justify-center rounded-md px-2 text-[13px] font-semibold tabular-nums", tone === "danger" ? "bg-[#fde8e8] text-[#a61b1b]" : tone === "warning" ? "bg-[#fff4dc] text-[#8a4b06]" : "bg-[#eceae4] text-ink-700")}>{count}</span>
+        ) : null}
+        {action ? <span className="ml-auto flex items-center gap-2">{action}</span> : null}
+      </div>
+      {children ? <div className={bodyClassName}>{children}</div> : null}
+    </section>
+  );
+}
+
 export function StatGrid({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div

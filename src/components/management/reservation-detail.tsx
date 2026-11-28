@@ -1,17 +1,19 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { owedOf } from "@/domain/next-step";
-import { AlertTriangle, ArrowLeft, BedDouble, CalendarDays, Clock, Mail, Phone, Printer, Users } from "lucide-react";
+import { AlertTriangle, Clock, Printer } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
-import { Card, CardHeader } from "@/components/ui/card";
+import { Section } from "@/components/ui/card";
 import { Collapsible } from "@/components/ui/collapsible";
 import { FormMessage } from "@/components/ui/form";
 import { bookingSource, paymentMethod, staffRole } from "@/domain/status";
 import type { ReservationDetail as Detail } from "@/domain/views";
 import { hotel } from "@/config/hotel";
 import { publicEnv } from "@/lib/env";
-import { formatDate, formatDateTime, formatNaira, plural } from "@/lib/format";
+import { formatDate, formatDateTime, formatNaira, formatRange, plural } from "@/lib/format";
+import { cn } from "@/lib/utils/cn";
 import { whatsappLink } from "@/lib/whatsapp";
-import { PaidProgress, PaymentBadge, ReservationBadge } from "./badges";
+import { ReservationBadge } from "./badges";
 import {
   AssignRoomForm,
   CancelForm,
@@ -31,19 +33,21 @@ import { CorrectPaymentForm } from "./payment-correction";
 import type { ManagerToAsk } from "@/server/domain/admin";
 import { NextStepBar } from "./reservation-guide";
 import { nextStep } from "@/domain/next-step";
-import { reservationSteps, StepList } from "./reservation-steps";
+import { GuestAvatar } from "./guest-avatar";
+import { reservationSteps } from "./reservation-steps";
 
-function Fact({ icon: Icon, label, children }: { icon: typeof CalendarDays; label: string; children: React.ReactNode }) {
+/** One fact in the Stay card (design R102): a small grey label over the value. */
+function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex gap-3">
-      <Icon className="mt-0.5 size-5 shrink-0 text-gold-600" strokeWidth={1.5} aria-hidden />
-      <div>
-        <p className="text-xs uppercase tracking-wide text-ink-500">{label}</p>
-        <div className="mt-0.5 text-ink-900">{children}</div>
-      </div>
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span className="text-xs font-semibold text-[#5b6372]">{label}</span>
+      <span className="text-[15px] font-semibold text-ink-900">{children}</span>
     </div>
   );
 }
+
+const th = "px-4 py-2.5 text-xs font-semibold text-[#5b6372] whitespace-nowrap";
+const td = "px-4 py-2.5 align-top text-sm text-ink-900";
 
 export function ReservationDetailView({
   r,
@@ -61,6 +65,7 @@ export function ReservationDetailView({
   justCreated,
   paidReceipt,
   manager,
+  stayTimes,
 }: {
   r: Detail & { roomId?: string; publicToken?: string };
   today: string;
@@ -77,8 +82,11 @@ export function ReservationDetailView({
   justCreated?: boolean;
   paidReceipt?: string;
   manager?: ManagerToAsk | null;
+  /** "any time" / "by 12:00" from the booking rules, shown beside the dates. */
+  stayTimes?: { checkIn: string; checkOut: string };
 }) {
   const balance = owedOf(r);
+  const year = today.slice(0, 4);
   const receiptLink = r.publicToken ? `${publicEnv().NEXT_PUBLIC_SITE_URL}/book/confirmation/${r.publicToken}` : null;
   const shareReceipt = (receipt: string) =>
     receiptLink
@@ -92,26 +100,59 @@ export function ReservationDetailView({
   const received = r.payments.filter((p) => p.status === "successful");
   const notCompleted = r.payments.filter((p) => p.status !== "successful");
   const open = r.status === "confirmed" || r.status === "pending_payment";
-  const steps = reservationSteps(r, today);
+  const canChange = canManage && (open || r.status === "checked_in");
   const step = nextStep(r, today);
+  const now = reservationSteps(r, today)?.find((s) => s.state === "now");
+  const roomsKobo = r.nightlyRateKobo * r.nights;
+  const otherKobo = r.totalKobo - roomsKobo;
+  const date = (d: string) => formatDate(d, { year });
+
+  // The "Next step" card (design R102): what to do now, the one primary button, then the alternatives.
+  const headline =
+    step.kind === "take_payment" ? `Owes ${formatNaira(step.owedKobo)}`
+    : step.kind === "assign_room" ? "Paid · assign a room"
+    : step.kind === "wait_for_arrival" ? `Paid · arrives ${formatDate(step.checkIn, { year: false })}`
+    : step.kind === "check_in" ? "Paid and room ready"
+    : step.kind === "check_out" ? `In house · due out ${formatDate(r.checkOut, { year: false })}`
+    : step.kind === "stay_ended" ? "The stay dates have passed"
+    : r.status === "checked_out" ? "Stay complete"
+    : "Nothing more to do";
+  const primary =
+    !canManage ? null
+    : step.kind === "take_payment" ? <TakePaymentLink reservationId={r.id} balanceKobo={step.owedKobo} className="w-full" />
+    : step.kind === "check_in" ? <CheckInButton reservationId={r.id} roomNumber={r.roomNumber} className="w-full" />
+    : step.kind === "assign_room" ? <a href="#change-stay" className={buttonStyles({ className: "w-full" })}>Assign a room</a>
+    : step.kind === "wait_for_arrival" ? <CheckInButton reservationId={r.id} disabledReason={`Arrival is ${formatDate(step.checkIn)}`} className="w-full" />
+    : step.kind === "check_out" ? <CheckOutButton reservationId={r.id} balanceKobo={0} className="w-full" />
+    : null;
+  const secondary = buttonStyles({ variant: "secondary", className: "w-full" });
+  const canPrint = Boolean(billHref) && r.status !== "cancelled" && r.status !== "expired";
+  const noShowDue = r.status === "confirmed" && r.checkIn <= today;
 
   return (
     <ActionFeedbackProvider>
-    <div className="px-4 py-6 lg:px-8">
-      <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-900">
-        <ArrowLeft className="size-4" aria-hidden /> Bookings
-      </Link>
+    <div className="flex min-h-[72px] flex-wrap items-center gap-x-3 gap-y-2 border-b border-hairline bg-white px-4 py-3 lg:px-7">
+      <div className="min-w-0 flex-1">
+        <h1 className="text-[22px] font-bold text-ink-900">
+          <span className="whitespace-nowrap">{r.reference}</span> · {r.guestName}
+        </h1>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[#5b6372]">
+          <ReservationBadge status={r.status} />
+          <span>{r.category} · {formatRange(r.checkIn, r.checkOut, year, "–")}</span>
+        </p>
+      </div>
+      <Link href={backHref} className={buttonStyles({ variant: "secondary", size: "sm" })}>← Bookings</Link>
+    </div>
 
+    <div className="space-y-3.5 px-4 py-5 lg:px-7">
       {justCreated ? (
-        <div className="mt-4">
-          <FormMessage tone="success">
-            Booking {r.reference} created. The room is held until {r.holdExpiresAt ? formatDateTime(r.holdExpiresAt) : "payment"}. Take payment to confirm it.
-          </FormMessage>
-        </div>
+        <FormMessage tone="success">
+          Booking {r.reference} created. The room is held until {r.holdExpiresAt ? formatDateTime(r.holdExpiresAt) : "payment"}. Take payment to confirm it.
+        </FormMessage>
       ) : null}
 
       {paidReceipt ? (
-        <div className="mt-4">
+        <div>
           <FormMessage tone="success">
             Payment recorded. Receipt {paidReceipt}
             {r.guestEmail ? <> emailed to <span className="break-all">{r.guestEmail}</span></> : null}.{" "}
@@ -122,7 +163,7 @@ export function ReservationDetailView({
               href={shareReceipt(paidReceipt)!}
               target="_blank"
               rel="noopener noreferrer"
-              className={buttonStyles({ variant: "secondary", className: "mt-2 w-full sm:w-auto" })}
+              className={buttonStyles({ variant: "secondary", className: "mt-2" })}
             >
               Share on WhatsApp
             </a>
@@ -130,146 +171,143 @@ export function ReservationDetailView({
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[1.75rem] leading-tight font-semibold text-ink-900 sm:text-2xl">{r.guestName}</h1>
-            <ReservationBadge status={r.status} />
-          </div>
-          <p className="mt-1 text-sm text-ink-500">
-            <span className="font-mono">{r.reference}</span> · {bookingSource[r.source]} · created {formatDateTime(r.createdAt)}
-            {r.createdBy ? ` by ${r.createdBy}` : ""}
-          </p>
-          {/* One money line, so the first thing staff read is whether anything is owed. */}
-          <p className="mt-2 text-[15px] tabular-nums text-ink-700">
-            Total {formatNaira(r.totalKobo + (r.pendingKobo ?? 0))} · Paid {formatNaira(r.paidKobo)} ·{" "}
-            <span className={balance > 0 ? "font-semibold text-warning-700" : "text-ink-700"}>{balance > 0 ? `Owes ${formatNaira(balance)}` : "Nothing owed"}</span>
-          </p>
-          {r.status === "pending_payment" && r.holdExpiresAt ? (
-            <p className="mt-2 flex items-center gap-1.5 text-sm text-warning-700">
-              <Clock className="size-4" aria-hidden /> Held until {formatDateTime(r.holdExpiresAt)}, then released if unpaid
-            </p>
-          ) : null}
-        </div>
-        <div className="hidden flex-wrap items-start gap-2 lg:flex">
-          {canManage && step.kind === "take_payment" ? <TakePaymentLink reservationId={r.id} balanceKobo={step.owedKobo} /> : null}
-          {canManage && step.kind === "check_in" ? <CheckInButton reservationId={r.id} roomNumber={r.roomNumber} /> : null}
-          {canManage && (step.kind === "assign_room" || step.kind === "wait_for_arrival") ? (
-            <CheckInButton reservationId={r.id} disabledReason={step.kind === "assign_room" ? "Assign a room first" : `Arrival is ${formatDate(step.checkIn)}`} />
-          ) : null}
-          {canManage && step.kind === "check_out" ? <CheckOutButton reservationId={r.id} balanceKobo={0} /> : null}
-          {canManage && canOverride && r.status === "checked_in" && balance > 0 ? <CheckOutButton reservationId={r.id} balanceKobo={balance} canLeaveOwing /> : null}
-          {billHref && (r.status === "checked_in" || r.status === "checked_out") ? (
-            <Link href={billHref} className={buttonStyles({ variant: "secondary" })}>
-              <Printer className="size-4" aria-hidden /> Guest bill
-            </Link>
-          ) : null}
-          {canManage && r.status === "confirmed" && r.checkIn <= today ? <NoShowButton reservationId={r.id} /> : null}
-          {canManage && open ? <CancelForm reservationId={r.id} /> : null}
-        </div>
-      </div>
-
-      {canManage && steps ? <div className="mt-5 lg:max-w-md"><StepList steps={steps} /></div> : null}
-
-      {r.status === "pending_payment" && canOverride ? <div className="hidden lg:block"><OverrideForm reservationId={r.id} /></div> : null}
-      {canManage && r.status === "pending_payment" && !canOverride ? (
-        <p className="mt-6 hidden rounded-card border border-hairline bg-ivory-50 p-4 text-sm text-ink-700 lg:block">
-          <span className="mr-2 rounded-full bg-ivory-200 px-2 py-0.5 text-xs font-medium text-ink-600">Manager</span>
-          To hold the room longer, ask {manager ? `${manager.name} (${staffRole[manager.role]})` : "a manager"}.
-        </p>
-      ) : null}
-
-      {canManage && r.pendingChange ? <PendingChangeCard reservationId={r.id} change={r.pendingChange} owedKobo={balance} canApprove={Boolean(canApprove)} /> : null}
-
       {r.attention ? (
-        <div role="alert" className="mt-6 flex gap-3 rounded-card border border-warning-600/30 bg-warning-50 p-4 text-sm text-warning-700">
+        <div role="alert" className="flex gap-3 rounded-xl border border-[#f3d48a] bg-[#fff4dc] p-4 text-sm text-[#8a4b06]">
           <AlertTriangle className="size-5 shrink-0" aria-hidden />
           <div className="flex-1">
-            <p className="font-medium">Needs attention</p>
+            <p className="font-semibold">Needs attention</p>
             <p className="mt-0.5">{r.attention}</p>
             {canApprove ? <ResolveAttentionForm reservationId={r.id} /> : <p className="mt-1 text-xs">The general manager marks this resolved once it&apos;s sorted.</p>}
           </div>
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-        <div className="space-y-6">
-          <Card>
-            <CardHeader
-              title="Payments"
-              action={
-                <span className="flex gap-4">
-                  {billHref && r.status !== "cancelled" && r.status !== "expired" ? (
-                    <Link href={billHref} className="text-sm font-medium text-navy-800 hover:text-navy-600">Guest bill</Link>
-                  ) : null}
-                </span>
-              }
-            />
-            <div className="grid grid-cols-3 gap-3 border-b border-hairline p-4 sm:gap-4 sm:p-5">
-              <div>
-                <p className="text-xs text-ink-500">Total for stay</p>
-                <p className="mt-1 text-base sm:text-lg font-semibold tabular-nums">{formatNaira(r.totalKobo)}</p>
-                <p className="text-xs text-ink-500">{formatNaira(r.nightlyRateKobo)} × {plural(r.nights, "night")}</p>
-              </div>
-              <div>
-                <p className="text-xs text-ink-500">Received</p>
-                <p className="mt-1 text-base sm:text-lg font-semibold tabular-nums text-success-700">{formatNaira(r.paidKobo)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-ink-500">Owed</p>
-                <p className={`mt-1 text-base font-semibold tabular-nums sm:text-lg ${balance > 0 ? "text-warning-700" : "text-ink-900"}`}>{formatNaira(Math.max(0, balance))}</p>
-                <PaidProgress paidKobo={r.paidKobo} totalKobo={r.totalKobo} format={formatNaira} />
-              </div>
+      {canManage && r.pendingChange ? <PendingChangeCard reservationId={r.id} change={r.pendingChange} owedKobo={balance} canApprove={Boolean(canApprove)} /> : null}
+
+      <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start lg:gap-[18px]">
+        <div className="flex min-w-0 flex-1 flex-col gap-3.5">
+          <Section title="Stay" id="stay">
+            <div className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3">
+              <Fact label="Arrive">{date(r.checkIn)}{stayTimes ? ` · ${stayTimes.checkIn}` : ""}</Fact>
+              <Fact label="Leave">{date(r.checkOut)}{stayTimes ? ` · ${stayTimes.checkOut}` : ""}</Fact>
+              <Fact label="Nights">{r.nights}</Fact>
+              <Fact label="Room">
+                {r.category} · {r.roomNumber ? `Room ${r.roomNumber}` : <span className="text-[#8a4b06]">no room yet</span>}
+              </Fact>
+              <Fact label="Guests">{plural(r.guests, "guest")}</Fact>
+              <Fact label="Booked">
+                {bookingSource[r.source]} · {formatDate(r.createdAt.slice(0, 10), { weekday: false, year })}
+                {r.createdBy ? <span className="block text-xs font-normal text-[#5b6372]">by {r.createdBy}</span> : null}
+              </Fact>
             </div>
-            {received.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-ink-500">No payments received yet.</p>
-            ) : (
-              <ul className="divide-y divide-hairline">
-                {received.map((p) => (
-                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-4">
-                    {p.kind === "refund" ? (
-                      <div className="min-w-0">
-                        <p className="font-medium tabular-nums text-ink-900">−{formatNaira(p.amountKobo)}</p>
-                        <p className="text-xs text-ink-500">
-                          Correction{p.correctsPaymentId && receiptsById.get(p.correctsPaymentId) ? ` to ${receiptsById.get(p.correctsPaymentId)}` : ""} by {p.recordedBy ?? "a manager"}
-                          {p.paidAt ? ` · ${formatDateTime(p.paidAt)}` : ""}
-                        </p>
-                        {p.notes ? <p className="mt-0.5 text-xs text-ink-700">{p.notes}</p> : null}
-                      </div>
-                    ) : (
-                    <div className="min-w-0">
-                      <p className="font-medium tabular-nums text-ink-900">
-                        {formatNaira(p.amountKobo)}
-                        {p.correctedKobo ? <span className="ml-2 text-xs font-normal text-ink-500">{formatNaira(p.correctedKobo)} corrected</span> : null}
-                      </p>
-                      <p className="text-xs text-ink-500">
-                        {paymentMethod[p.method]} · {p.provider === "paystack" ? "Paid online" : `Taken by ${p.recordedBy ?? "staff"}`}
-                        {p.paidAt ? ` · ${formatDateTime(p.paidAt)}` : ""}
-                      </p>
-                    </div>
-                    )}
-                    <div className="flex items-center gap-3">
-                      <PaymentBadge status={p.status} />
-                      {p.receiptNumber ? (
-                        <Link href={receiptHref(p.receiptNumber)} className="inline-flex items-center gap-1.5 text-sm text-navy-800 hover:text-navy-600">
-                          <Printer className="size-4" aria-hidden /> Receipt
-                        </Link>
-                      ) : null}
-                    </div>
-                    {canApprove && p.kind !== "refund" && p.status === "successful" && p.amountKobo - (p.correctedKobo ?? 0) > 0 ? (
-                      <CorrectPaymentForm
-                        paymentId={p.id}
-                        reservationId={r.id}
-                        receiptNumber={p.receiptNumber}
-                        correctableKobo={p.amountKobo - (p.correctedKobo ?? 0)}
-                      />
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
+            {r.specialRequests && !canChange ? (
+              <div className="border-t border-hairline px-4 py-3">
+                <p className="text-xs font-semibold text-[#5b6372]">Special requests</p>
+                <p className="mt-0.5 text-sm text-ink-900">{r.specialRequests}</p>
+              </div>
+            ) : null}
+            {r.status === "pending_payment" && r.holdExpiresAt ? (
+              <p className="flex items-center gap-1.5 border-t border-hairline px-4 py-3 text-sm text-[#8a4b06]">
+                <Clock className="size-4" aria-hidden /> Held until {formatDateTime(r.holdExpiresAt)}, then released if unpaid
+              </p>
+            ) : null}
+            {canChange ? (
+              <div className="border-t border-hairline">
+                <Collapsible id="change-stay" collapseWide title={r.status === "pending_payment" ? "Change dates" : "Change dates or room"}>
+                  <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
+                  <ChangeDatesForm reservationId={r.id} checkIn={r.checkIn} checkOut={r.checkOut} inHouse={r.status === "checked_in"} />
+                  {r.status === "pending_payment" ? (
+                    <p className="border-t border-hairline bg-ivory-50 px-5 py-4 text-sm text-ink-600">A room is given automatically once the booking is paid.</p>
+                  ) : (
+                    <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} specialRequests={r.specialRequests} />
+                  )}
+                </Collapsible>
+              </div>
+            ) : null}
+          </Section>
+
+          <Section title="Bill" id="bill">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left tabular-nums">
+                <thead className="border-b border-hairline">
+                  <tr>
+                    <th scope="col" className={th}>Item</th>
+                    <th scope="col" className={cn(th, "text-right")}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f1eee8]">
+                  <tr>
+                    <td className={td}>{r.category} · {plural(r.nights, "night")} × {formatNaira(r.nightlyRateKobo)}</td>
+                    <td className={cn(td, "text-right font-semibold whitespace-nowrap")}>{formatNaira(roomsKobo)}</td>
+                  </tr>
+                  {otherKobo !== 0 ? (
+                    <tr>
+                      <td className={td}>{otherKobo > 0 ? "Extras and changes" : "Discount"}</td>
+                      <td className={cn(td, "text-right font-semibold whitespace-nowrap")}>{otherKobo < 0 ? "−" : ""}{formatNaira(Math.abs(otherKobo))}</td>
+                    </tr>
+                  ) : null}
+                  {r.pendingChange ? (
+                    <tr>
+                      <td className={td}>Waiting for payment: {r.pendingChange.description}</td>
+                      <td className={cn(td, "text-right font-semibold whitespace-nowrap")}>{formatNaira(r.pendingKobo ?? r.pendingChange.amountKobo)}</td>
+                    </tr>
+                  ) : null}
+                  {received.map((p) => (
+                    <tr key={p.id}>
+                      <td className={td}>
+                        {p.kind === "refund" ? (
+                          <>
+                            <span>
+                              Correction{p.correctsPaymentId && receiptsById.get(p.correctsPaymentId) ? ` to ${receiptsById.get(p.correctsPaymentId)}` : ""} by {p.recordedBy ?? "a manager"}
+                            </span>
+                            <span className="block text-xs text-[#5b6372]">{p.paidAt ? formatDateTime(p.paidAt) : null}{p.notes ? ` · ${p.notes}` : ""}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              Paid by {paymentMethod[p.method].toLowerCase()} {p.provider === "paystack" ? "online" : `· taken by ${p.recordedBy ?? "staff"}`}
+                              {p.receiptNumber ? (
+                                <Link href={receiptHref(p.receiptNumber)} className="inline-flex items-center gap-1 font-semibold text-navy-700 hover:text-navy-900">
+                                  <Printer className="size-3.5" aria-hidden /> {p.receiptNumber}
+                                </Link>
+                              ) : null}
+                            </span>
+                            <span className="block text-xs text-[#5b6372]">
+                              {p.paidAt ? formatDateTime(p.paidAt) : null}
+                              {p.correctedKobo ? ` · ${formatNaira(p.correctedKobo)} corrected` : ""}
+                            </span>
+                            {canApprove && p.amountKobo - (p.correctedKobo ?? 0) > 0 ? (
+                              <CorrectPaymentForm
+                                paymentId={p.id}
+                                reservationId={r.id}
+                                receiptNumber={p.receiptNumber}
+                                correctableKobo={p.amountKobo - (p.correctedKobo ?? 0)}
+                              />
+                            ) : null}
+                          </>
+                        )}
+                      </td>
+                      <td className={cn(td, "text-right font-semibold whitespace-nowrap")}>
+                        {p.kind === "refund" ? formatNaira(p.amountKobo) : `−${formatNaira(p.amountKobo)}`}
+                      </td>
+                    </tr>
+                  ))}
+                  {received.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} className={cn(td, "text-[#5b6372]")}>No payments received yet.</td>
+                    </tr>
+                  ) : null}
+                  <tr>
+                    <td className={td}><b>Balance</b></td>
+                    <td className={cn(td, "text-right whitespace-nowrap")}>
+                      <b className={balance > 0 ? "text-[#8a4b06]" : "text-[#166534]"}>{formatNaira(Math.max(0, balance))}</b>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             {notCompleted.length ? (
-              <details className="border-t border-hairline px-5 py-3 text-sm">
+              <details className="border-t border-hairline px-4 py-3 text-sm">
                 <summary className="cursor-pointer text-ink-600">
                   Show {notCompleted.length === 1 ? "1 online payment" : `${notCompleted.length} online payments`} not completed
                 </summary>
@@ -284,86 +322,87 @@ export function ReservationDetailView({
                 <p className="mt-2 text-xs text-ink-500">No money was received for these. They&apos;re kept for checking with Paystack.</p>
               </details>
             ) : null}
-          </Card>
+          </Section>
 
-          <Card>
-            <CardHeader title="Stay" />
-            <div className="grid grid-cols-2 gap-x-4 gap-y-5 p-4 sm:gap-6 sm:p-5">
-              <Fact icon={CalendarDays} label="Dates">
-                {formatDate(r.checkIn)} → {formatDate(r.checkOut)}
-                <p className="text-sm text-ink-500">{plural(r.nights, "night")}</p>
-              </Fact>
-              <Fact icon={Users} label="Guests">{plural(r.guests, "guest")}</Fact>
-              <Fact icon={BedDouble} label="Booked">{r.category}</Fact>
-              <Fact icon={BedDouble} label="Room">
-                {r.roomNumber ? `Room ${r.roomNumber}` : <span className="text-ink-400">Not assigned</span>}
-              </Fact>
+          <Section title="History" id="history">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left tabular-nums">
+                <thead className="border-b border-hairline">
+                  <tr>
+                    <th scope="col" className={th}>When</th>
+                    <th scope="col" className={th}>What</th>
+                    <th scope="col" className={th}>Who</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f1eee8]">
+                  {r.history.map((h, i) => (
+                    <tr key={i}>
+                      <td className={cn(td, "whitespace-nowrap")}>{formatDateTime(h.at)}</td>
+                      <td className={td}>
+                        {h.label}
+                        {h.note ? <span className="block text-xs text-[#5b6372]">{h.note}</span> : null}
+                      </td>
+                      <td className={cn(td, "whitespace-nowrap")}>{h.by ?? ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            {r.specialRequests && !(canManage && (r.status === "checked_in" || open)) ? (
-              <div className="border-t border-hairline px-5 py-4">
-                <p className="text-xs uppercase tracking-wide text-ink-500">Special requests</p>
-                <p className="mt-1 text-sm text-ink-700">{r.specialRequests}</p>
-              </div>
-            ) : null}
-            {canManage && (open || r.status === "checked_in") ? (
-              <div className="border-t border-hairline xl:border-0">
-                <Collapsible id="change-stay" title={r.status === "pending_payment" ? "Change dates" : "Change dates or room"}>
-                  <DetailsForm reservationId={r.id} guests={r.guests} specialRequests={r.specialRequests} maxGuests={maxGuests} />
-                  <ChangeDatesForm reservationId={r.id} checkIn={r.checkIn} checkOut={r.checkOut} inHouse={r.status === "checked_in"} />
-                  {r.status === "pending_payment" ? (
-                    <p className="border-t border-hairline bg-ivory-50 px-5 py-4 text-sm text-ink-600">A room is given automatically once the booking is paid.</p>
-                  ) : (
-                    <AssignRoomForm reservationId={r.id} current={r.roomNumber} rooms={rooms} booked={r.category} specialRequests={r.specialRequests} />
-                  )}
-                </Collapsible>
-              </div>
-            ) : null}
-          </Card>
+          </Section>
         </div>
 
-        <div className="space-y-6">
-          <Card>
-            <Collapsible
-              id="guest"
-              title="Guest · contact details"
-              wideHeader={<CardHeader title="Guest" action={guestHref ? <Link href={guestHref} className="text-sm font-medium text-navy-800">Profile</Link> : undefined} />}
-            >
-            <div className="space-y-3 p-5 text-sm">
-              <p className="text-base font-medium text-ink-900">{r.guestName}</p>
-              {r.guestPhone ? (
-                <a href={`tel:${r.guestPhone}`} className="flex items-center gap-2 text-ink-700 hover:text-navy-700">
-                  <Phone className="size-4 text-ink-400" aria-hidden /> {r.guestPhone}
-                </a>
+        <div className="flex w-full flex-col gap-3.5 lg:w-[300px] lg:flex-none">
+          {canManage ? (
+            <div className="hidden flex-col gap-2.5 rounded-xl border border-hairline bg-white p-4 lg:flex">
+              <span className="text-[13px] font-semibold text-[#5b6372]">NEXT STEP</span>
+              <span className="text-base font-bold text-ink-900">{headline}</span>
+              {now && (step.kind === "take_payment" || step.kind === "assign_room" || step.kind === "check_in") ? <span className="-mt-1.5 text-sm text-[#5b6372]">{now.detail}</span> : null}
+              {primary}
+              {canOverride && r.status === "checked_in" && balance > 0 ? (
+                <CheckOutButton reservationId={r.id} balanceKobo={balance} canLeaveOwing variant="secondary" className="w-full" />
               ) : null}
-              {r.guestEmail ? (
-                <a href={`mailto:${r.guestEmail}`} className="flex items-center gap-2 break-all text-ink-700 hover:text-navy-700">
-                  <Mail className="size-4 text-ink-400" aria-hidden /> {r.guestEmail}
-                </a>
+              {canChange ? <a href="#change-stay" className={secondary}>{r.status === "checked_in" ? "Extend or shorten" : "Change dates"}</a> : null}
+              {canChange && r.status !== "pending_payment" && r.roomNumber ? <a href="#change-stay" className={secondary}>Move room</a> : null}
+              {canPrint || noShowDue ? (
+                <div className="flex flex-wrap justify-center gap-1">
+                  {canPrint && billHref ? (
+                    <Link href={billHref} className={buttonStyles({ variant: "ghost", size: "sm" })}>
+                      <Printer className="size-4" aria-hidden /> Print bill
+                    </Link>
+                  ) : null}
+                  {noShowDue ? <NoShowButton reservationId={r.id} /> : null}
+                </div>
               ) : null}
-              {guestHref ? <Link href={guestHref} className="inline-flex min-h-10 items-center text-sm font-medium text-navy-800 xl:hidden">Guest profile</Link> : null}
+              {open ? (
+                <div className="flex justify-center border-t border-hairline pt-3">
+                  <CancelForm reservationId={r.id} />
+                </div>
+              ) : null}
             </div>
-            </Collapsible>
-          </Card>
+          ) : canPrint && billHref ? (
+            <Link href={billHref} className={buttonStyles({ variant: "secondary", className: "w-full" })}>
+              <Printer className="size-4" aria-hidden /> Print bill
+            </Link>
+          ) : null}
 
-          <Card>
-            <Collapsible id="history" title={`History · ${plural(r.history.length, "event")}`} wideHeader={<CardHeader title="History" />}>
-            <ol className="relative space-y-5 p-5 before:absolute before:top-7 before:bottom-7 before:left-[1.6rem] before:w-px before:bg-ivory-200">
-              {r.history.map((h, i) => (
-                <li key={i} className="relative flex gap-4">
-                  <span aria-hidden className="relative z-10 mt-1 size-2.5 shrink-0 rounded-full bg-gold-500 ring-4 ring-white" />
-                  <div className="text-sm">
-                    <p className="text-ink-900">{h.label}</p>
-                    {h.note ? <p className="text-ink-500">{h.note}</p> : null}
-                    <p className="mt-0.5 text-xs text-ink-400">
-                      {formatDateTime(h.at)}
-                      {h.by ? ` · ${h.by}` : ""}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-            </Collapsible>
-          </Card>
+          {r.status === "pending_payment" && canOverride ? <div className="hidden lg:block"><OverrideForm reservationId={r.id} /></div> : null}
+          {canManage && r.status === "pending_payment" && !canOverride ? (
+            <p className="hidden rounded-xl border border-hairline bg-white p-4 text-sm text-ink-700 lg:block">
+              <span className="mr-2 rounded-md bg-[#eceae4] px-2 py-0.5 text-xs font-semibold text-ink-700">Manager</span>
+              To hold the room longer, ask {manager ? `${manager.name} (${staffRole[manager.role]})` : "a manager"}.
+            </p>
+          ) : null}
+
+          <Section title="Guest" id="guest" action={guestHref ? <Link href={guestHref} className="text-sm font-semibold text-navy-700 hover:underline">Profile</Link> : undefined}>
+            <div className="flex flex-col gap-1.5 px-4 py-3.5 text-sm">
+              <span className="flex items-center gap-2.5">
+                <GuestAvatar name={r.guestName} size="sm" />
+                <span className="font-semibold text-ink-900">{r.guestName}</span>
+              </span>
+              {r.guestPhone ? <a href={`tel:${r.guestPhone}`} className="text-ink-900 hover:text-navy-700">{r.guestPhone}</a> : null}
+              {r.guestEmail ? <a href={`mailto:${r.guestEmail}`} className="break-all text-ink-900 hover:text-navy-700">{r.guestEmail}</a> : null}
+            </div>
+          </Section>
         </div>
       </div>
       {canManage ? <NextStepBar key={r.status} r={r} today={today} paymentsHref={paymentsHref} canOverride={canOverride} manager={manager ?? null} /> : null}

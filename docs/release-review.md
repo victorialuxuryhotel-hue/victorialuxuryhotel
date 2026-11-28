@@ -443,3 +443,15 @@ These are deliberately **not final** in the app:
   station cookie is sent to sign-in.
 - Rollback: `wrangler versions deploy 10fffa0a-3ad4-4fc4-91c9-7d3aed18569b@100%`. The migrations stay (forward-only);
   the old code ignores the new tables, but its POS payments and voids are refused by the new rules (see 0030/0031).
+
+## Step 1f/2: front desk screens (R101–R109) and the staff sidebar
+
+- Shared: the page header is the white bar from the designs (22/700 title, one grey line, actions at the right);
+  tables use sentence-case grey headings on hairlines; `Section` (card.tsx) is the white card with a heading and a
+  count; guest initials are one pale-navy tone.
+- Booking page (R102): "VL-XXXX · Guest" with the status badge and dates; Stay (arrive/leave with the hotel's times,
+  nights, room, guests, booked), Bill (room nights, extras or discount, each payment as a minus line with its receipt
+  and *Correct this payment*, Balance in green or amber) and History as When/What/Who. Right column: *Next step* with
+  the one primary button (Take payment, Assign a room, Check in or Check out, from the same rule as before), Change
+  dates, Move room, Print bill, No-show, then *Cancel booking* in the danger style; the Guest card below. The change
+  forms fold under "Change dates or room" until one of those buttons opens them. Phones keep the bottom bar.

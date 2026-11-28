@@ -37,6 +37,17 @@ export function nightsBetween(checkIn: string, checkOut: string): number {
   return Math.round((Date.parse(`${checkOut}T00:00:00Z`) - Date.parse(`${checkIn}T00:00:00Z`)) / 86_400_000);
 }
 
+/**
+ * A stay as the designs write it: "28 → 30 Nov", "29 Nov → 2 Dec", "28 Dec 2026 → 2 Jan 2027".
+ * The year shows only when it differs from `year` (the hotel's current year). `sep` is " → " or "–".
+ */
+export function formatRange(checkIn: string, checkOut: string, year: string, sep = " → "): string {
+  const [y1, y2] = [checkIn.slice(0, 4), checkOut.slice(0, 4)];
+  const end = formatDate(checkOut, { weekday: false, year: y1 !== y2 || y2 !== year });
+  if (checkIn.slice(0, 7) === checkOut.slice(0, 7)) return `${Number(checkIn.slice(8, 10))}${sep}${end}`;
+  return `${formatDate(checkIn, { weekday: false, year: y1 !== y2 })}${sep}${end}`;
+}
+
 export function plural(n: number, one: string, many = `${one}s`) {
   return `${n} ${n === 1 ? one : many}`;
 }

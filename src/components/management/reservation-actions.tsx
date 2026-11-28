@@ -13,6 +13,7 @@ import { useActionFeedback, withFeedback } from "./action-feedback";
 import { keepValues } from "@/lib/forms";
 import { OFFLINE_REASON, useOnline } from "./connection";
 import { CheckInDrawer, CheckOutDrawer } from "./check-in-out";
+import { cn } from "@/lib/utils/cn";
 
 /** blocked: why this room can't be chosen now ("Occupied · Adeyemi", "To clean", "Out of order"). */
 export type RoomOption = { id: string; number: string; category: string; ready: boolean; blocked?: string };
@@ -20,9 +21,9 @@ export type RoomOption = { id: string; number: string; category: string; ready: 
 type Size = "sm" | "md" | "lg";
 
 /** Shown instead of check-in or check-out while money is owed: the server refuses both until the balance is paid. */
-export function TakePaymentLink({ reservationId, balanceKobo, size = "md" }: { reservationId: string; balanceKobo: number; size?: Size }) {
+export function TakePaymentLink({ reservationId, balanceKobo, size = "md", className }: { reservationId: string; balanceKobo: number; size?: Size; className?: string }) {
   const online = useOnline();
-  const style = buttonStyles({ size, variant: size === "sm" ? "secondary" : "primary", className: size === "lg" ? "w-full" : "whitespace-nowrap" });
+  const style = buttonStyles({ size, variant: size === "sm" ? "secondary" : "primary", className: cn(size === "lg" ? "w-full" : "whitespace-nowrap", className) });
   if (!online) {
     return (
       <span role="link" aria-disabled="true" title={OFFLINE_REASON} className={`${style} cursor-not-allowed opacity-45`}>
@@ -33,7 +34,7 @@ export function TakePaymentLink({ reservationId, balanceKobo, size = "md" }: { r
   return (
     <Link
       href={`/app/payments/record?reservation=${reservationId}`}
-      className={buttonStyles({ size, variant: size === "sm" ? "secondary" : "primary", className: size === "lg" ? "w-full" : "whitespace-nowrap" })}
+      className={style}
     >
       <Wallet className="size-4" aria-hidden /> Take payment · {formatNaira(balanceKobo)}
     </Link>
@@ -41,22 +42,22 @@ export function TakePaymentLink({ reservationId, balanceKobo, size = "md" }: { r
 }
 
 /** Opens the check-in drawer (X2): the registration card is required, then check in and give the key. */
-export function CheckInButton({ reservationId, roomNumber, disabledReason, balanceKobo = 0, size }: { reservationId: string; roomNumber?: string; disabledReason?: string; balanceKobo?: number; size?: Size }) {
+export function CheckInButton({ reservationId, roomNumber, disabledReason, balanceKobo = 0, size, className }: { reservationId: string; roomNumber?: string; disabledReason?: string; balanceKobo?: number; size?: Size; className?: string }) {
   const feedback = useActionFeedback();
   const online = useOnline();
   const [open, setOpen] = useState(false);
-  if (balanceKobo > 0) return <TakePaymentLink reservationId={reservationId} balanceKobo={balanceKobo} size={size} />;
+  if (balanceKobo > 0) return <TakePaymentLink reservationId={reservationId} balanceKobo={balanceKobo} size={size} className={className} />;
   if (!online) disabledReason = OFFLINE_REASON;
   if (disabledReason) {
     return (
-      <Button disabled title={disabledReason} size={size === "lg" ? "md" : size}>
+      <Button disabled title={disabledReason} size={size === "lg" ? "md" : size} className={className}>
         <LogIn className="size-4" aria-hidden /> Check in
       </Button>
     );
   }
   return (
     <>
-      <Button size={size === "lg" ? "md" : size} onClick={() => setOpen(true)}>
+      <Button size={size === "lg" ? "md" : size} onClick={() => setOpen(true)} className={className}>
         <LogIn className="size-4" aria-hidden /> Check in
       </Button>
       <CheckInDrawer
@@ -73,14 +74,15 @@ export function CheckInButton({ reservationId, roomNumber, disabledReason, balan
 }
 
 /** Opens the check-out drawer (X3): key returned, room to cleaning, receipt; managers can leave a balance owing. */
-export function CheckOutButton({ reservationId, balanceKobo, size, canLeaveOwing = false }: { reservationId: string; balanceKobo: number; size?: Size; canLeaveOwing?: boolean }) {
+/** `variant` only changes the look, e.g. secondary when Take payment is the main button beside it. */
+export function CheckOutButton({ reservationId, balanceKobo, size, canLeaveOwing = false, variant, className }: { reservationId: string; balanceKobo: number; size?: Size; canLeaveOwing?: boolean; variant?: "primary" | "secondary"; className?: string }) {
   const feedback = useActionFeedback();
   const online = useOnline();
   const [open, setOpen] = useState(false);
-  if (balanceKobo > 0 && !canLeaveOwing) return <TakePaymentLink reservationId={reservationId} balanceKobo={balanceKobo} size={size} />;
+  if (balanceKobo > 0 && !canLeaveOwing) return <TakePaymentLink reservationId={reservationId} balanceKobo={balanceKobo} size={size} className={className} />;
   return (
     <>
-      <Button disabled={!online} title={online ? undefined : OFFLINE_REASON} size={size === "lg" ? "md" : size} variant={size === "sm" ? "secondary" : "primary"} onClick={() => setOpen(true)}>
+      <Button disabled={!online} title={online ? undefined : OFFLINE_REASON} size={size === "lg" ? "md" : size} variant={variant ?? (size === "sm" ? "secondary" : "primary")} onClick={() => setOpen(true)} className={className}>
         <LogOut className="size-4" aria-hidden /> Check out
       </Button>
       <CheckOutDrawer
@@ -181,10 +183,10 @@ export function CancelForm({ reservationId }: { reservationId: string }) {
   const [state, action, pending] = useActionState(cancelReservation, null);
   return (
     <details className="group relative" data-popover="">
-      <summary className="inline-flex h-10 cursor-pointer list-none items-center gap-2 rounded-md px-4 text-sm font-medium text-danger-700 hover:bg-danger-50">
-        <XCircle className="size-4" aria-hidden /> Cancel
+      <summary className={buttonStyles({ variant: "danger", size: "sm", className: "cursor-pointer list-none [&::-webkit-details-marker]:hidden" })}>
+        <XCircle className="size-4" aria-hidden /> Cancel booking
       </summary>
-      <form action={action} onSubmit={keepValues(action)} className="absolute right-0 z-20 mt-2 w-80 space-y-3 rounded-card border border-hairline bg-ivory-50 p-4 shadow-lg">
+      <form action={action} onSubmit={keepValues(action)} className="absolute right-0 z-20 mt-2 w-80 space-y-3 rounded-xl border border-hairline bg-white p-4 text-left shadow-[0_12px_32px_rgba(11,31,92,.18)]">
         <input type="hidden" name="reservationId" value={reservationId} />
         <Field label="Reason for cancelling" htmlFor="cancel-reason">
           <Textarea id="cancel-reason" name="reason" rows={2} required minLength={3} />
@@ -200,8 +202,8 @@ export function CancelForm({ reservationId }: { reservationId: string }) {
 export function OverrideForm({ reservationId }: { reservationId: string }) {
   const [state, action, pending] = useActionState(overridePayment, null);
   return (
-    <details className="mt-6 rounded-card border border-hairline bg-ivory-50 p-4 text-sm">
-      <summary className="cursor-pointer font-medium text-ink-900">Manager option: hold the room longer</summary>
+    <details className="rounded-xl border border-hairline bg-white p-4 text-sm">
+      <summary className="cursor-pointer font-semibold text-ink-900">Manager option: hold the room longer</summary>
       <form action={action} onSubmit={keepValues(action)} className="mt-4 space-y-3">
         <input type="hidden" name="reservationId" value={reservationId} />
         <Field label="Reason" htmlFor="override-reason">
@@ -286,7 +288,7 @@ export function PendingChangeCard({
   const [cancelState, cancelAction, cancelling] = useActionState(cancelPendingChange, null);
   const [approveState, approveAction, approving] = useActionState(applyChangeUnpaid, null);
   return (
-    <div className="mt-6 rounded-card border border-gold-300 bg-gold-50 p-4 text-sm">
+    <div className="rounded-xl border border-gold-300 bg-gold-50 p-4 text-sm">
       <p className="font-medium text-ink-900">Waiting for payment: {change.description}</p>
       <p className="mt-0.5 text-ink-700">{formatNaira(change.amountKobo)} more. Nothing changes for the guest until it&apos;s paid.</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
