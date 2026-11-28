@@ -472,3 +472,8 @@ These are deliberately **not final** in the app:
   lists of past checks with who checked and when, `checkedPayments`, test added); the table Taken, Method,
   Reference, Taken by, For, Amount with *Not found* then *Matches* at the row's end. The person who recorded a
   payment still sees "You recorded this, so another manager or the owner confirms it." instead of the buttons.
+- Rooms (R105): *Room number* in the header jumps to that room; chips *All · N*, *Ready · N*, *To clean · N*,
+  *Occupied · N*, *Out of order · N* (links, as before); rooms by floor as tiles with a coloured top edge, the number,
+  room type, a state badge, who is in it and when they leave (red when overdue), and on the tile itself *Mark clean*
+  for a room to clean or *Back in use* for one out of order. Tapping a room still opens all its actions; their
+  wording now matches (Mark clean, Back in use, Mark out of order in the danger style). Arriving is violet.
