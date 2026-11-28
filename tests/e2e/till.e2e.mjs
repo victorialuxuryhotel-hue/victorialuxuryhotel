@@ -48,9 +48,11 @@ const ref = String(Date.now()).slice(-6);
   await choose(p, "POS / card");
   await p.waitForSelector("input[name=slipLast4]");
   check("POS: Confirm is off until the slip's 4 digits are in", (await confirmOff(p)) === true);
-  for (const k of ["7", "7", "3", "1", "9"]) await p.click(`[role=group][aria-label="Number pad for the POS slip"] button[aria-label="${k}"]`);
+  // A different slip each run: the same slip and amount within 7 days gets the duplicate warning (section 2).
+  const slip4 = String(1000 + Math.floor(Math.random() * 9000));
+  for (const k of [...slip4, "9"]) await p.click(`[role=group][aria-label="Number pad for the POS slip"] button[aria-label="${k}"]`);
   const slip = await p.$eval("input[name=slipLast4]", (e) => e.value);
-  check("the keypad enters the slip, 4 digits at most", slip === "7731" && (await confirmOff(p)) === false, `${slip} confirm-disabled=${await confirmOff(p)}`);
+  check("the keypad enters the slip, 4 digits at most", slip === slip4 && (await confirmOff(p)) === false, `${slip} confirm-disabled=${await confirmOff(p)}`);
   check("the slip field doesn't open the touch keyboard", (await p.$eval("input[name=slipLast4]", (e) => e.inputMode)) === "none");
   check("there's a terminal to choose", Boolean(await p.$("select[name=terminal] option")));
   check("Confirm is on screen at 1280×720 with the keypad open", await p.$$eval("button[type=submit]", (bs) => {
@@ -59,8 +61,8 @@ const ref = String(Date.now()).slice(-6);
     return Boolean(r && r.top >= 0 && r.bottom <= innerHeight);
   }));
   await clickText(p, "button[type=submit]", "Confirm");
-  await waitForText(p, /slip …7731/);
-  check("the receipt shows the POS slip", /POS \/ card · slip …7731/.test(await text(p)));
+  await waitForText(p, new RegExp(`slip …${slip4}`));
+  check("the receipt shows the POS slip", new RegExp(`POS / card · slip …${slip4}`).test(await text(p)));
 
   // Fix 5: the cash count is blind. (Not submitted here: that would close this salesperson's day.)
   await go(p, "/app/sales/closing");
