@@ -617,3 +617,8 @@ These are deliberately **not final** in the app:
   station), Manage sign-in (personal sign-in only), *This station*, then on a station *Lock screen* and *Switch user*
   (both lock the screen; the next person taps their name), or *Sign out* in red with a personal sign-in. The owner's
   *View as front desk* is in the same menu. The design's "Ctrl L" hint is left out: there is no such shortcut.
+
+## Staging 2026-11-28 (2): step 2 and every screen
+
+- Migration 0033 applied to staging. Staging `592208ea-8e18-49f6-8474-a22467a1b834`; smoke test passed.
+- Not yet live. Before live: restore point, apply 0033, upload, deploy, smoke test (procedure in section 4).
