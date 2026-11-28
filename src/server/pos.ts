@@ -5,7 +5,7 @@ import { z } from "zod";
 import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { recordId } from "@/lib/ids";
 import { logger } from "@/lib/logger";
-import { actorOf, authorize } from "./auth";
+import { actorOf, authorize, authorizeRead } from "./auth";
 import { first, getDb } from "./db";
 import { reportPaymentIssue } from "./domain/payment-details";
 import * as pos from "./domain/pos";
@@ -73,12 +73,31 @@ export async function cancelOpenOrder(_prev: ActionResult | null, formData: Form
   }
 }
 
-export async function voidSale(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+/** Void a paid sale: a reason, the cash-returned tick for cash, and a manager's approval (section 3, X9). */
+export async function voidSale(input: {
+  id: string; reasonCode: string; note?: string; cashReturned?: boolean; approverId?: string; approverPin?: string;
+}): Promise<ActionResult<{ approvedBy: string }>> {
   try {
-    const staff = await authorize("pos.manage");
-    await pos.voidOrder(await getDb(), actorOf(staff), recordId().parse(formData.get("id")), z.string().max(200).parse(String(formData.get("reason") ?? "")));
+    const staff = await authorizeRead(["pos.sell", "pos.void.approve"]);
+    if (staff.viewAs) throw new AppError("FORBIDDEN", "You're viewing as front desk, which is read-only.");
+    const v = z
+      .object({
+        id: recordId(),
+        reasonCode: z.enum(["rung_up_wrongly", "customer_changed_mind", "item_unavailable", "other"], "Choose a reason"),
+        note: z.string().max(160).optional(),
+        cashReturned: z.boolean().optional(),
+        approverId: z.uuid().optional(),
+        approverPin: z.string().regex(/^\d{4,6}$/).optional(),
+      })
+      .parse(input);
+    const r = await pos.voidOrder(
+      await getDb(),
+      actorOf(staff),
+      { id: v.id, reasonCode: v.reasonCode, note: v.note ?? null, cashReturned: v.cashReturned, approver: v.approverId && v.approverPin ? { staffId: v.approverId, pin: v.approverPin } : null },
+      { station: staff.station ?? null, pepper: process.env.PIN_PEPPER ?? "" },
+    );
     refresh();
-    return ok(undefined);
+    return ok(r);
   } catch (err) {
     return fail(err, "pos.void_failed");
   }

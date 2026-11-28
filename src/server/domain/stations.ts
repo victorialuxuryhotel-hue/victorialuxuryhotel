@@ -12,7 +12,7 @@ import { ROLE } from "./admin";
 
 export type StationType = "desk" | "restaurant" | "bar" | "office";
 export type Station = { id: string; name: string; type: StationType };
-export type SessionStaff = { id: string; fullName: string; email: string; role: StaffRole; mustChange: boolean };
+export type SessionStaff = { id: string; fullName: string; email: string; role: StaffRole; mustChange: boolean; startedAt?: string };
 
 export const STATION_TYPES: Record<StationType, string> = { desk: "Front desk", restaurant: "Restaurant till", bar: "Bar till", office: "Office" };
 
@@ -248,7 +248,7 @@ export async function sessionByToken(db: Db, station: Station, token: string | u
   if (s.last_seen_at < new Date(at - 30_000).toISOString()) {
     await db.prepare("UPDATE staff_sessions SET last_seen_at = ? WHERE id = ? AND ended_at IS NULL").bind(new Date(at).toISOString(), s.id).run();
   }
-  return { sessionId: s.id, staff: { id: s.staff_id, fullName: s.full_name, email: s.email, role: s.role, mustChange: Boolean(s.pin_must_change) } };
+  return { sessionId: s.id, staff: { id: s.staff_id, fullName: s.full_name, email: s.email, role: s.role, mustChange: Boolean(s.pin_must_change), startedAt: s.started_at } };
 }
 
 async function endSessionById(db: Db, id: string, reason: "lock" | "idle" | "switch" | "expired" | "deactivated"): Promise<void> {
@@ -287,4 +287,15 @@ export async function setStaffPin(db: Db, actor: Actor, staffId: string, pin: st
 /** Lockouts and refused approvals in the last day, for the owner's and GM's "Anything wrong?". */
 export async function recentLockouts(db: Db, hours = 24): Promise<{ id: number; action: string; summary: string; created_at: string }[]> {
   return all(db, "SELECT id, action, summary, created_at FROM activity_log WHERE action IN ('staff.pin_locked', 'staff.approval_refused', 'station.revoked') AND created_at > ? ORDER BY created_at DESC", minutesAgo(hours * 60));
+}
+
+/** Voids refused because of 3 wrong PINs under this manager's name, before their current session: they're told at sign-in. */
+export async function refusedApprovals(db: Db, staffId: string, sessionStartedAt: string): Promise<{ summary: string; created_at: string }[]> {
+  return all(
+    db,
+    `SELECT summary, created_at FROM activity_log WHERE action = 'staff.approval_refused' AND entity_id = ? AND created_at < ? AND created_at > ? ORDER BY created_at DESC LIMIT 5`,
+    staffId,
+    sessionStartedAt,
+    new Date(Date.parse(sessionStartedAt) - 24 * 3_600_000).toISOString(),
+  );
 }

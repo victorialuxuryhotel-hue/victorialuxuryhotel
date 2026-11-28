@@ -111,7 +111,7 @@ describe("selling", () => {
     await rejects(payOrder(db, att, { id: dropped.id, method: "cash" }), /cancelled/);
   });
 
-  it("paid sales can't be edited or deleted; only a manager voids, with a reason, and stock comes back", async () => {
+  it("paid sales can't be edited or deleted; a void needs a reason and a manager, and stock comes back", async () => {
     const mgr = await staff("restaurant_bar_manager");
     const att = await staff("restaurant_bar");
     const { stockId, itemId } = await drink(mgr, 5);
@@ -119,12 +119,15 @@ describe("selling", () => {
     await rejects(exec("UPDATE pos_orders SET total_kobo = 1 WHERE id = ?", sale.id), /order_immutable/);
     await rejects(exec("DELETE FROM pos_orders WHERE id = ?", sale.id), /order_immutable/);
     await rejects(exec("UPDATE pos_order_items SET quantity = 1 WHERE order_id = ?", sale.id), /order_immutable/);
-    await rejects(voidOrder(db, att, sale.id, "Mistake"), /role can't do this/);
-    await rejects(voidOrder(db, mgr, sale.id, "x"), /Give a reason/);
-    await voidOrder(db, mgr, sale.id, "Rang up twice");
+    await rejects(exec("UPDATE pos_orders SET sender_name = 'Someone' WHERE id = ?", sale.id), /order_immutable/);
+    // Off a station there's nobody to enter a PIN: the salesperson can't void alone.
+    await rejects(voidOrder(db, att, { id: sale.id, reasonCode: "rung_up_wrongly", cashReturned: true }), /needs a manager's approval/);
+    await rejects(voidOrder(db, mgr, { id: sale.id, reasonCode: "other", note: "x", cashReturned: true }), /Say what happened/);
+    await rejects(voidOrder(db, mgr, { id: sale.id, reasonCode: "rung_up_wrongly" }), /cash back first/);
+    await voidOrder(db, mgr, { id: sale.id, reasonCode: "rung_up_wrongly", note: "Rang up twice", cashReturned: true });
     expect(await onHand(stockId)).toBe(5);
-    expect(await getOrder(db, mgr, sale.id)).toMatchObject({ status: "void", close_reason: "Rang up twice", receipt_number: sale.receiptNumber });
-    await rejects(voidOrder(db, mgr, sale.id, "Again"), /Only paid/);
+    expect(await getOrder(db, mgr, sale.id)).toMatchObject({ status: "void", close_reason: "Rung up wrongly: Rang up twice", receipt_number: sale.receiptNumber });
+    await rejects(voidOrder(db, mgr, { id: sale.id, reasonCode: "rung_up_wrongly", cashReturned: true }), /Only paid/);
     expect((await q("SELECT 1 FROM stock_moves WHERE order_id = ? AND kind = 'returned'", sale.id)).length).toBe(1);
   });
 
@@ -236,7 +239,7 @@ describe("restaurant & bar reports and the hotel's books", () => {
     await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: maltId, quantity: 2 }], method: "cash" });
     const food = await payOrder(db, att, { id: crypto.randomUUID(), outlet: "restaurant", lines: [{ menuItemId: rice, quantity: 1 }], method: "bank_transfer", senderName: "ADA OKAFOR", transferChecked: true });
     const oops = await payOrder(db, att, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: maltId, quantity: 1 }], method: "cash" });
-    await voidOrder(db, mgr, oops.id, "Wrong drink");
+    await voidOrder(db, mgr, { id: oops.id, reasonCode: "rung_up_wrongly", note: "Wrong drink", cashReturned: true });
 
     const bar = await posReport(db, mgr, "today", "bar");
     expect(bar.salesKobo - beforeBar.salesKobo).toBe(200_000);

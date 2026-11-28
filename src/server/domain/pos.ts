@@ -2,7 +2,10 @@ import { AppError } from "@/lib/errors";
 import { formatNaira } from "@/lib/format";
 import { addDays, businessDate, businessDayStart } from "@/lib/hotel-date";
 import { dbErrorToken } from "../db-errors";
+import { can } from "@/lib/auth/permissions";
 import { checkDetails, duplicateError, duplicateWarning, type Details } from "./payment-details";
+import { ROLE } from "./admin";
+import { checkPin, type Station } from "./stations";
 import {
   activity,
   activityIfChanged,
@@ -431,26 +434,87 @@ export async function cancelOrder(db: Db, actor: Actor, id: string, reason: stri
 }
 
 /** A manager reverses a paid sale: reason recorded, stock put back, original kept. */
-export async function voidOrder(db: Db, actor: Actor, id: string, reason: string): Promise<void> {
-  requireRole(actor, POS_MANAGERS);
-  const why = reason.trim();
-  if (why.length < 3) throw new AppError("VALIDATION", "Give a reason.");
-  const o = await first<{ status: OrderStatus; total_kobo: number; receipt_number: string | null }>(db, "SELECT status, total_kobo, receipt_number FROM pos_orders WHERE id = ?", id);
+export const VOID_REASONS = {
+  rung_up_wrongly: "Rung up wrongly",
+  customer_changed_mind: "Customer changed mind",
+  item_unavailable: "Item unavailable",
+  other: "Other",
+} as const;
+export type VoidReason = keyof typeof VOID_REASONS;
+
+/** Who can approve a void at the counter: restaurant & bar manager, general manager, owner (pos.void.approve). */
+export async function voidApprovers(db: Db): Promise<{ id: string; fullName: string }[]> {
+  const roles = (["restaurant_bar_manager", "general_manager", "owner"] as const).filter((r) => can(r, "pos.void.approve"));
+  return all<{ id: string; fullName: string }>(
+    db,
+    `SELECT id, full_name AS fullName FROM (SELECT id, full_name, ${ROLE} AS role FROM staff_profiles WHERE is_active = 1 AND pin_hash IS NOT NULL)
+     WHERE role IN (${roles.map(() => "?").join(", ")}) ORDER BY full_name`,
+    ...roles,
+  );
+}
+
+/**
+ * Void a paid sale at the counter (FUNCTIONALITY.md section 3, design X9). The salesperson picks a reason (a note
+ * for Other) and, for cash, ticks that the money went back; a manager who didn't make the sale approves:
+ * - on a shared station, by picking their name and entering their PIN there (it doesn't change who is signed in);
+ *   3 wrong PINs refuse the void and the manager is told at their next sign-in;
+ * - off a station (a manager signed in with their own account), the signed-in manager is the approver.
+ * Stock is put back; the closing's expected cash drops because only paid sales count.
+ */
+export async function voidOrder(
+  db: Db,
+  actor: Actor,
+  v: { id: string; reasonCode: VoidReason; note?: string | null; cashReturned?: boolean; approver?: { staffId: string; pin: string } | null },
+  ctx: { station?: Station | null; pepper?: string } = {},
+): Promise<{ approvedBy: string }> {
+  if (!actor || !can(actor.role, "pos.sell") && !can(actor.role, "pos.void.approve")) throw new AppError("FORBIDDEN", "Your role can't do this. Ask the General Manager or the Owner.");
+  if (!(v.reasonCode in VOID_REASONS)) throw new AppError("VALIDATION", "Choose why the sale is being voided.", { fieldErrors: { reasonCode: ["Choose a reason"] } });
+  const note = v.note?.trim().slice(0, 160) || null;
+  if (v.reasonCode === "other" && (!note || note.length < 3)) throw new AppError("VALIDATION", "Say what happened.", { fieldErrors: { note: ["Say what happened"] } });
+  const o = await first<{ status: OrderStatus; total_kobo: number; receipt_number: string | null; method: PayMethod | null; paid_by: string | null }>(
+    db,
+    "SELECT status, total_kobo, receipt_number, method, paid_by FROM pos_orders WHERE id = ?",
+    v.id,
+  );
   if (!o) throw new AppError("NOT_FOUND", "Order not found.");
-  if (o.status !== "paid") throw new AppError("INVALID_TRANSITION", "Only paid sales can be voided.");
+  if (o.status !== "paid") throw new AppError("INVALID_TRANSITION", o.status === "open" ? "This order isn't paid: cancel it instead." : "Only paid sales can be voided.");
+  if (o.method === "cash" && v.cashReturned !== true) throw new AppError("VALIDATION", "Give the customer their cash back first, then tick the box.", { fieldErrors: { cashReturned: ["Tick once the cash is returned"] } });
+
+  let approver: { id: string; name: string };
+  if (ctx.station) {
+    if (!v.approver) throw new AppError("VALIDATION", "A manager picks their name and enters their PIN to approve.", { fieldErrors: { approver: ["Manager's PIN needed"] } });
+    if (!(await voidApprovers(db)).some((a) => a.id === v.approver!.staffId)) throw new AppError("FORBIDDEN", "That person can't approve voids.");
+    if (v.approver.staffId === o.paid_by) throw new AppError("FORBIDDEN", "The manager who approves can't be the person who made the sale. Ask another manager.");
+    const who = await checkPin(db, ctx.station, v.approver.staffId, v.approver.pin, "approve", ctx.pepper ?? "", 3);
+    approver = { id: who.id, name: who.full_name };
+  } else {
+    if (!can(actor.role, "pos.void.approve")) throw new AppError("FORBIDDEN", "A void needs a manager's approval. Open it on the till so a manager can enter their PIN.");
+    if (actor.id === o.paid_by) throw new AppError("FORBIDDEN", "You made this sale, so another manager approves the void.");
+    const me = await first<{ full_name: string }>(db, "SELECT full_name FROM staff_profiles WHERE id = ?", actor.id);
+    approver = { id: actor.id, name: me?.full_name ?? "Manager" };
+  }
+  const seller = await first<{ full_name: string }>(db, "SELECT full_name FROM staff_profiles WHERE id = ?", actor.id);
+  const why = `${VOID_REASONS[v.reasonCode]}${note ? `: ${note}` : ""}`;
   const [r] = await writeBatch(db, actor, [
     db
-      .prepare("UPDATE pos_orders SET status = 'void', closed_by = ?, closed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), close_reason = ? WHERE id = ? AND status = 'paid'")
-      .bind(actor.id, why.slice(0, 200), id),
+      .prepare(
+        `UPDATE pos_orders SET status = 'void', closed_by = ?, closed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), close_reason = ?,
+           void_approved_by = ?, void_reason_code = ?, void_cash_returned = ? WHERE id = ? AND status = 'paid'`,
+      )
+      .bind(actor.id, why.slice(0, 200), approver.id, v.reasonCode, o.method === "cash" ? 1 : v.cashReturned ? 1 : 0, v.id),
     db
       .prepare(
         `INSERT INTO stock_moves (item_id, change, kind, order_id, staff_id, note)
          SELECT item_id, -sum(change), 'returned', ?1, ?2, 'Sale voided' FROM stock_moves WHERE order_id = ?1 AND kind = 'sold' AND changes() > 0 GROUP BY item_id`,
       )
-      .bind(id, actor.id),
-    activity(db, "pos.order_voided", "pos_order", id, `Sale ${o.receipt_number} (${naira(o.total_kobo)}) voided: ${why}`),
+      .bind(v.id, actor.id),
+    activity(db, "pos.order_voided", "pos_order", v.id, `Sale ${o.receipt_number} (${naira(o.total_kobo)}) voided by ${seller?.full_name ?? "staff"}, approved by ${approver.name}: ${why}`, {
+      approved_by: approver.id,
+      reason: v.reasonCode,
+    }),
   ]);
   if (!r?.meta.changes) throw new AppError("CONFLICT", "This sale was just changed. Reload and check it.");
+  return { approvedBy: approver.name };
 }
 
 // ---------------------------------------------------------------------------
@@ -540,6 +604,7 @@ export async function listOrders(db: Db, actor: Actor, f: OrderFilter, limit = 2
 export type OrderDetail = OrderRow & {
   lines: { line: number; name: string; category: MenuCategory; unit_price_kobo: number; quantity: number; note: string | null }[];
   cash_received_kobo: number | null; closed_by_name: string | null; closed_at: string | null; close_reason: string | null;
+  paid_by: string | null; void_approved_by_name: string | null;
 };
 
 export async function getOrder(db: Db, actor: Actor, id: string): Promise<OrderDetail | null> {
@@ -548,9 +613,9 @@ export async function getOrder(db: Db, actor: Actor, id: string): Promise<OrderD
     db,
     `SELECT o.id, o.number, o.outlet, o.status, o.total_kobo, o.method, coalesce(o.payment_reference, o.slip_last4, o.sender_name) AS payment_reference, o.receipt_number, o.note, o.created_at, o.paid_at, o.cash_received_kobo,
             o.closed_at, o.close_reason, o.paid_by, o.created_by,
-            p.full_name AS taken_by, c.full_name AS created_by_name, x.full_name AS closed_by_name, '' AS items
+            p.full_name AS taken_by, c.full_name AS created_by_name, x.full_name AS closed_by_name, a.full_name AS void_approved_by_name, '' AS items
      FROM pos_orders o LEFT JOIN staff_profiles p ON p.id = o.paid_by LEFT JOIN staff_profiles c ON c.id = o.created_by
-     LEFT JOIN staff_profiles x ON x.id = o.closed_by WHERE o.id = ?`,
+     LEFT JOIN staff_profiles x ON x.id = o.closed_by LEFT JOIN staff_profiles a ON a.id = o.void_approved_by WHERE o.id = ?`,
     id,
   );
   if (!o) return null;

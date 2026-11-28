@@ -39,6 +39,7 @@ const tokens: Record<string, [ErrorCode, string]> = {
   change_immutable: ["CONFLICT", "That change has already been paid for or cancelled. Reload to see where it is now."],
   payment_check_own_payment: ["FORBIDDEN", "You recorded this payment, so someone else confirms it: the General Manager or the Owner."],
   payment_issue_closed: ["CONFLICT", "This has already been checked and closed."],
+  void_needs_manager: ["FORBIDDEN", "A void needs a manager who didn't make the sale to approve it with their PIN, a reason, and for cash the tick that the money went back."],
   station_fixed: ["CONFLICT", "A station can't be changed once set up. Revoke it and set up the computer again."],
   session_ended: ["CONFLICT", "That sign-in has already ended. Tap your name to start again."],
   card_photos_full: ["CONFLICT", "This place holds up to 4 photos. Remove one first."],

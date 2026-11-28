@@ -22,6 +22,8 @@ export type Staff = {
   id: string; fullName: string; email: string; role: StaffRole; viewAs?: boolean; twoStep?: TwoStepState;
   /** Set when this person signed in with their PIN on a shared station (FUNCTIONALITY.md section 1). */
   station?: Station;
+  /** When this PIN session started (station sign-in only). */
+  sessionStartedAt?: string;
 };
 
 /** The station token (set when the owner or GM sets the computer up) and the PIN session on it. */
@@ -40,7 +42,7 @@ async function stationStaff(): Promise<Staff | null> {
   const station = await getStation();
   if (!station) return null;
   const s = await sessionByToken(await getDb(), station, (await cookies()).get(STAFF_SESSION_COOKIE)?.value);
-  return s ? { id: s.staff.id, fullName: s.staff.fullName, email: s.staff.email, role: s.staff.role, station } : null;
+  return s ? { id: s.staff.id, fullName: s.staff.fullName, email: s.staff.email, role: s.staff.role, station, sessionStartedAt: s.staff.startedAt } : null;
 }
 
 async function currentTwoStep(role: StaffRole, secondFactorAge: number | undefined, claims: Record<string, unknown> | null): Promise<TwoStepState | undefined> {

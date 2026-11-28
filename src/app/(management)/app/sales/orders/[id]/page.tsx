@@ -17,7 +17,7 @@ import { formatDateTime, formatNaira } from "@/lib/format";
 import { recordId } from "@/lib/ids";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { first, getDb } from "@/server/db";
-import { getOrder, ORDER_STATUS, OUTLETS, type OrderStatus } from "@/server/domain/pos";
+import { getOrder, ORDER_STATUS, OUTLETS, PAY_METHODS, voidApprovers, type OrderStatus } from "@/server/domain/pos";
 import { VAT_SHOWN_SQL } from "@/server/vat";
 
 export const metadata: Metadata = { title: "Order" };
@@ -51,7 +51,7 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
             {o.closed_at ? (
               <div className={row}>
                 <dt className="text-ink-500">{o.status === "void" ? "Voided" : "Cancelled"}</dt>
-                <dd className="text-right">{formatDateTime(o.closed_at)} by {o.closed_by_name ?? "staff"}{o.close_reason ? <span className="block text-ink-600">“{o.close_reason}”</span> : null}</dd>
+                <dd className="text-right">{formatDateTime(o.closed_at)} by {o.closed_by_name ?? "staff"}{o.void_approved_by_name ? `, approved by ${o.void_approved_by_name}` : ""}{o.close_reason ? <span className="block text-ink-600">“{o.close_reason}”</span> : null}</dd>
               </div>
             ) : null}
             <div className={row}><dt className="text-ink-500">Total</dt><dd className="font-semibold tabular-nums">{formatNaira(o.total_kobo)}</dd></div>
@@ -63,7 +63,17 @@ async function Content({ params }: { params: Promise<{ id: string }> }) {
             {can(staff.role, "pos.sell") ? <CancelOrderForm id={o.id} /> : null}
           </div>
         ) : null}
-        {o.status === "paid" && can(staff.role, "pos.manage") ? <VoidSaleForm id={o.id} total={formatNaira(o.total_kobo)} /> : null}
+        {o.status === "paid" && canAny(staff.role, ["pos.sell", "pos.void.approve"]) ? (
+          <VoidSaleForm
+            id={o.id}
+            total={formatNaira(o.total_kobo)}
+            cash={o.method === "cash"}
+            soldLine={`${o.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")} · ${o.method ? PAY_METHODS[o.method] : ""} · sold by ${o.taken_by ?? "staff"}${o.paid_at ? `, ${formatDateTime(o.paid_at)}` : ""}`}
+            approvers={await voidApprovers(db)}
+            onStation={Boolean(staff.station)}
+            sellerId={o.paid_by}
+          />
+        ) : null}
       </div>
       <div className="space-y-3">
         {receipt ? (

@@ -372,3 +372,20 @@ These are deliberately **not final** in the app:
 - Payments to confirm: your own payment shows "another manager or the owner confirms it".
 - Shared staff components restyled to design R1 (Inter, filled navy primary button, 60/44/36px sizes, badges,
   Segmented/Tabs/Chip/KPI tile, ₦ money field). The serif stays on the wordmark only.
+
+## 0031_void_approval
+
+- **What:** `pos_orders.void_approved_by`, `void_reason_code` (rung up wrongly, customer changed mind, item
+  unavailable, other) and `void_cash_returned`. Trigger `pos_orders_void_approved`: a new void needs an active
+  restaurant & bar manager, GM or owner who isn't the seller, a reason code, and for cash the cash-returned tick
+  (error `void_needs_manager`). `pos_orders_payment_frozen`: 0030's payment details can't change once an order is
+  paid. **Existing rows:** old voids unchanged. **Previous Worker:** its void (manager only, free-text reason) is
+  refused by the new trigger, so deploy the Worker with the migration.
+
+## Step 1c: void with a manager PIN at the counter (X9)
+
+- Any salesperson can start a void from Orders & receipts → the sale → Void sale: reason, note, "cash returned".
+  On a station a manager who didn't make the sale picks their name and enters their PIN there; that doesn't change who
+  is signed in. Both names go in the log and on the order. Off a station the signed-in manager approves.
+- 3 wrong manager PINs refuse the void; the manager sees it in a banner at their next sign-in, and the owner and GM
+  in *Anything wrong?*. Stock comes back; the closing's expected cash drops (only paid sales count).

@@ -16,7 +16,7 @@ import { can } from "@/lib/auth/permissions";
 import { Eye } from "lucide-react";
 import { requireStaff } from "@/server/auth";
 import { getDb } from "@/server/db";
-import { idleMinutes } from "@/server/domain/stations";
+import { idleMinutes, refusedApprovals } from "@/server/domain/stations";
 import { exitViewAs, startViewAsFrontDesk } from "@/server/view-as";
 import { guestFont as staffFont } from "@/components/public/guest-font";
 
@@ -45,6 +45,7 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
       <BrowserBanner />
       <NoteBrowser sessionKey={staff.id} />
       {staff.viewAs ? <ViewAsBanner /> : null}
+      {staff.station && staff.sessionStartedAt ? <RefusedApprovals staffId={staff.id} since={staff.sessionStartedAt} /> : null}
       {staff.station ? (
         <StationLock stationName={staff.station.name} minutes={await idleMinutes(await getDb(), staff.station.type)} />
       ) : (
@@ -57,6 +58,17 @@ async function StaffShell({ children }: { children: React.ReactNode }) {
         {staff.role === "front_desk" ? <DeskTabs /> : null}
       </div>
     </StaffRoleProvider>
+  );
+}
+
+/** FUNCTIONALITY.md section 3: a manager is told at their next sign-in when a void was refused after 3 wrong PINs under their name. */
+async function RefusedApprovals({ staffId, since }: { staffId: string; since: string }) {
+  const rows = await refusedApprovals(await getDb(), staffId, since);
+  if (!rows.length) return null;
+  return (
+    <div role="alert" className="border-b border-[#f1b8b8] bg-[#fde8e8] px-4 py-2.5 text-sm text-[#a61b1b] print:hidden">
+      {rows.map((r) => <p key={r.created_at}>{r.summary}. If it wasn&apos;t you, tell the owner.</p>)}
+    </div>
   );
 }
 
