@@ -26,6 +26,13 @@ Paystack, Resend, GitHub, the domain registrar.
 overdue check-outs, closings to sign off) and *Needs attention*;
 Payments → *To confirm* against the bank statement and the card terminal's report; sign off closings.
 
+**Shared stations (front desk, bar, restaurant):** set each counter computer up once. The owner or GM signs in
+on it, opens *This station*, chooses what it's used for (Front desk, Bar till, Restaurant till, Office) and names
+it; their own sign-in then ends. The owner gives each person a PIN in *Staff & access* (they choose their own the
+first time). Staff then tap their name and enter their PIN; the screen locks after 5 idle minutes at a till and 10 at
+the desk, or when they tap Lock. A lost or stolen computer: the owner revokes it in *This station*; everyone on it is
+signed out. Someone locked out after 5 wrong PINs can try again after 15 minutes, or the owner resets their PIN.
+
 **Weekly, maintainer (15 minutes):**
 - GitHub → Actions: last *Backup* run green (a drill runs on the first Monday of the month).
 - Review and merge Dependabot pull requests whose CI is green (security fixes first).
