@@ -1,5 +1,6 @@
 import {
   Stamp,
+  Smartphone,
   FileText, BarChart3, BedDouble, BookOpen, CalendarCheck, CalendarDays, ClipboardCheck, CreditCard, LayoutDashboard, Package, Presentation, ScrollText, Settings, ShieldCheck, Sun, Tags, TrendingUp, Users, UtensilsCrossed } from "lucide-react";
 import type { Permission } from "@/lib/auth/permissions";
 
@@ -43,7 +44,10 @@ export const managementNavGroups: readonly NavGroup[] = [
   },
   {
     label: "Owner",
-    items: [{ href: "/app/staff", label: "Staff & access", icon: ShieldCheck, permission: ["staff.manage"] }],
+    items: [
+      { href: "/app/owner", label: "Owner's view", icon: Smartphone, permission: ["staff.manage"] },
+      { href: "/app/staff", label: "Staff & access", icon: ShieldCheck, permission: ["staff.manage"] },
+    ],
   },
 ];
 

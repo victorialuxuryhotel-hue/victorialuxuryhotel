@@ -484,3 +484,10 @@ These are deliberately **not final** in the app:
   reference = the bill number, and "This is a bill, not a receipt". *Record payment* splits a payment across the
   bookings in order; each booking gets its own receipt. Bills can't be edited; cancel and make a new one.
 - Not yet: paying a bill by online link (bills are paid by transfer or at the desk for now).
+
+## Step 2: owner's phone dashboard (X13)
+
+- *Owner's view* (`/app/owner`, owner only), laid out for a phone and view only: tonight's occupancy, money taken today
+  (rooms, bar and restaurant, hall), bar and restaurant today, overdue guests and what they owe, *Anything wrong?*
+  (payments to confirm, overdue guests, closings to check, guests in house owing, declined-but-debited, approvals
+  waiting, PIN lockouts and revoked stations) and takings for the last 7 days by business date. Refreshes when opened.
