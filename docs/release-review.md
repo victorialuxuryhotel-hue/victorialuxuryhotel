@@ -622,3 +622,10 @@ These are deliberately **not final** in the app:
 
 - Migration 0033 applied to staging. Staging `592208ea-8e18-49f6-8474-a22467a1b834`; smoke test passed.
 - Not yet live. Before live: restore point, apply 0033, upload, deploy, smoke test (procedure in section 4).
+
+## Release 2026-11-28 (2): step 2 and every screen in the new design
+
+- Migration 0033. Restore point before it: `00000544-00000000-00005131-81264884689ef8e976f5168f9c60e28e`.
+- Staging `592208ea-8e18-49f6-8474-a22467a1b834`. Previous live `88491cb0-fba2-423a-9a24-9edf21f2e092`, new live
+  `557ce088-7910-4b61-bae4-0a2e7b202bd1`. Smoke test passed. Rollback: deploy `88491cb0` (0033 stays; the old code
+  ignores its new tables and columns).
