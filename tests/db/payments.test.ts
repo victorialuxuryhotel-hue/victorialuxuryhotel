@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyPaystackResult, beginPaystackPayment, recordOfflinePayment, recordPaymentCorrection } from "@/server/domain/payments";
-import { cancelReservation, changeReservationDates, createWebsiteReservation, overridePaymentRequirement, resolveAttention } from "@/server/domain/reservations";
+import { cancelReservation, changeReservationDates, createWebsiteReservation, netPaid, overridePaymentRequirement, resolveAttention } from "@/server/domain/reservations";
+import { AppError } from "@/lib/errors";
 import { claimOutbox, finishOutbox, hitRateLimit } from "@/server/domain/system";
 import { day, db, desk, exec, gm, insertReservation, iso, lapseHold, makeCategory, q, q1, rejects, status } from "./helpers";
 
@@ -145,25 +146,49 @@ describe("offline payments", () => {
     await rejects(offline(b.id, 100, { confirmReceived: false }), /Confirm that the hotel has received/);
   });
 
-  it("bookings are paid in full: a part payment is refused, the full amount confirms", async () => {
+  it("part payments are allowed at the desk: a deposit confirms the booking (no hold left to lapse) and the rest stays owed", async () => {
     const b = await heldBooking(1, 5_000_000);
-    await rejects(offline(b.id, 4_000_000), /paid in full\. Take the full ₦100,000 owed/);
-    expect(await status(b.id)).toBe("pending_payment");
-    const full = await offline(b.id, 10_000_000);
-    expect(full.outcome).toBe("confirmed");
-    expect(full.receiptNumber).toMatch(/^RCT-/);
+    const part = await offline(b.id, 4_000_000);
+    expect(part.receiptNumber).toMatch(/^RCT-/);
     expect(await status(b.id)).toBe("confirmed");
+    expect(await netPaid(db, b.id)).toBe(4_000_000);
+    const rest = await offline(b.id, 6_000_000);
+    expect(rest.outcome).toBe("already_settled");
+    expect(await netPaid(db, b.id)).toBe(10_000_000);
   });
 
-  it("refuses overpayment, future dates, very old dates and duplicate references", async () => {
+  it("refuses overpayment (cash: record what's owed and give change), future dates and very old dates", async () => {
     const b = await heldBooking(1, 5_000_000);
-    await rejects(offline(b.id, 10_000_100), /paid in full/);
+    await rejects(offline(b.id, 10_000_100), /Only ₦100,000 is owed\. Take no more/);
+    await rejects(offline(b.id, 10_000_100, { method: "cash", reference: null }), /Record ₦100,000 and give the change/);
     await rejects(offline(b.id, 100, { paidOn: day(1) }), /can't be in the future/);
     await rejects(offline(b.id, 100, { paidOn: day(-61) }), /older than 60 days/);
+  });
+
+  it("warns, without blocking, when the same transfer reference was used in the last 7 days", async () => {
     const ref = `TRF-DUP-${crypto.randomUUID().slice(0, 6)}`;
+    const b = await heldBooking(1, 5_000_000);
     await offline(b.id, 10_000_000, { reference: ref });
     const b2 = await heldBooking(1, 5_000_000);
-    await rejects(offline(b2.id, 10_000_000, { reference: ref }), /already been recorded/, "CONFLICT");
+    const err = await offline(b2.id, 10_000_000, { reference: ref }).catch((e: unknown) => e as AppError);
+    expect(err).toBeInstanceOf(AppError);
+    expect((err as AppError).code).toBe("CONFLICT");
+    expect((err as AppError).fieldErrors?.duplicate?.[0]).toMatch(/already recorded .* in the last 7 days/);
+    // Said to record it anyway: it is recorded.
+    expect((await offline(b2.id, 10_000_000, { reference: ref, duplicateOk: true })).receiptNumber).toMatch(/^RCT-/);
+  });
+
+  it("a transfer needs the reference or the sender's name, and the bank-app tick; POS needs exactly 4 slip digits and a terminal", async () => {
+    const b = await heldBooking(1, 5_000_000);
+    await rejects(offline(b.id, 100, { reference: null, senderName: null }), /reference or the sender's name/);
+    await rejects(offline(b.id, 100, { confirmReceived: false }), /Confirm that the hotel has received/);
+    expect((await offline(b.id, 100, { reference: null, senderName: "Chidi Okafor" })).receiptNumber).toMatch(/^RCT-/);
+    const pos = { method: "pos_terminal" as const, reference: null, terminal: "Front desk terminal" };
+    await rejects(offline(b.id, 100, { ...pos, slipLast4: "441" }), /exactly the last 4 digits/);
+    await rejects(offline(b.id, 100, { ...pos, slipLast4: "44a7" }), /exactly the last 4 digits/);
+    await rejects(offline(b.id, 100, { ...pos, slipLast4: "4417", terminal: "Somebody's phone" }), /Choose the terminal/);
+    const r = await offline(b.id, 100, { ...pos, slipLast4: "4417" });
+    expect(await q1("SELECT slip_last4, terminal, sender_name FROM payments WHERE id = ?", r.paymentId)).toEqual({ slip_last4: "4417", terminal: "Front desk terminal", sender_name: null });
   });
 
   it("records who took the money, audits it and queues a receipt email", async () => {

@@ -216,11 +216,14 @@ describe("payments", () => {
     );
   });
 
-  it("rejects a duplicate provider reference, and a reopened attempt", async () => {
+  it("rejects a duplicate Paystack reference and a reopened attempt; a repeated desk reference is only warned about (section 2)", async () => {
     const c = await makeCategory(1);
     const r = await insertReservation({ categoryId: c.id, checkIn: day(5), checkOut: day(6) });
     await offline(r, 100, "TRF-1");
-    await rejects(offline(r, 100, "TRF-1"), /UNIQUE constraint/);
+    await offline(r, 100, "TRF-1");
+    const ps = `ps-${crypto.randomUUID()}`;
+    await exec("INSERT INTO payments (id, reservation_id, amount_kobo, provider, provider_reference, status) VALUES (?, ?, 100, 'paystack', ?, 'pending')", crypto.randomUUID(), r, ps);
+    await rejects(exec("INSERT INTO payments (id, reservation_id, amount_kobo, provider, provider_reference, status) VALUES (?, ?, 100, 'paystack', ?, 'pending')", crypto.randomUUID(), r, ps), /UNIQUE constraint/);
     const id = crypto.randomUUID();
     await exec("INSERT INTO payments (id, reservation_id, amount_kobo, provider, provider_reference, status) VALUES (?, ?, 100, 'paystack', ?, 'failed')", id, r, `ref-${id}`);
     await rejects(exec("UPDATE payments SET status = 'pending' WHERE id = ?", id), /payment_closed/);

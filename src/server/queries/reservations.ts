@@ -169,7 +169,7 @@ export async function getReservation(
       kind: "payment" | "refund"; corrects_payment_id: string | null; notes: string | null; corrected_kobo: number;
     }>(
       db,
-      `SELECT p.id, p.amount_kobo, p.method, p.provider, p.provider_reference, p.status, p.paid_at, p.receipt_number, s.full_name AS recorder,
+      `SELECT p.id, p.amount_kobo, p.method, p.provider, coalesce(p.provider_reference, p.slip_last4, p.sender_name) AS provider_reference, p.status, p.paid_at, p.receipt_number, s.full_name AS recorder,
               p.kind, p.corrects_payment_id, p.notes,
               (SELECT coalesce(sum(c.amount_kobo), 0) FROM payments c WHERE c.corrects_payment_id = p.id AND c.status = 'successful') AS corrected_kobo
        FROM payments p LEFT JOIN staff_profiles s ON s.id = p.recorded_by

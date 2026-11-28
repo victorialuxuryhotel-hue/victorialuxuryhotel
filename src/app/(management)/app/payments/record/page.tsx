@@ -12,6 +12,8 @@ import { LoadingState } from "@/components/ui/feedback";
 import { can } from "@/lib/auth/permissions";
 import { requireStaff } from "@/server/auth";
 import { getReservation, hotelToday } from "@/server/queries/reservations";
+import { getDb } from "@/server/db";
+import { paymentSettings } from "@/server/domain/payment-details";
 
 export const metadata: Metadata = { title: "Take payment" };
 
@@ -28,7 +30,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
       </Card>
     );
   }
-  const [r, today] = await Promise.all([getReservation(id), hotelToday()]);
+  const [r, today, settings] = await Promise.all([getReservation(id), hotelToday(), getDb().then(paymentSettings)]);
   if (!r) notFound();
   const created = (await searchParams).created === "1";
   return (
@@ -39,7 +41,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
           <Link href={`/app/reservations/${r.id}`} className="underline underline-offset-2">open the booking</Link>.
         </p>
       ) : null}
-      <OfflinePaymentForm reservation={r} today={today} />
+      <OfflinePaymentForm reservation={r} today={today} settings={settings} />
     </Card>
   );
 }

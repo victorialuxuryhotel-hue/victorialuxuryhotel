@@ -8,6 +8,7 @@ import { actorOf, authorize } from "./auth";
 import { getDb } from "./db";
 import * as admin from "./domain/admin";
 import { updateBookingRules as save } from "./domain/admin";
+import { updatePaymentSettings } from "./domain/payment-details";
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:00)?$/, "Use a time like 14:00");
 
@@ -88,4 +89,24 @@ export async function togglePromo(formData: FormData): Promise<void> {
   const staff = await authorize("settings.manage");
   await admin.setPromoActive(await getDb(), actorOf(staff), z.uuid().parse(formData.get("id")), formData.get("active") === "1");
   refresh();
+}
+
+export async function savePaymentDetails(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  try {
+    const staff = await authorize("settings.manage");
+    const v = z
+      .object({ bankName: z.string().trim().max(60), bankAccountNumber: z.string().trim().max(14), bankAccountName: z.string().trim().max(80), terminals: z.string().max(500) })
+      .parse(Object.fromEntries(formData));
+    await updatePaymentSettings(await getDb(), actorOf(staff), {
+      bankName: v.bankName || null,
+      bankAccountNumber: v.bankAccountNumber || null,
+      bankAccountName: v.bankAccountName || null,
+      terminals: v.terminals.split("\n"),
+    });
+    refresh();
+    return ok(undefined);
+  } catch (err) {
+    if (!(err instanceof AppError) || err.code === "INTERNAL") logger.error("settings.payment_details_failed", err);
+    return toActionError(err);
+  }
 }

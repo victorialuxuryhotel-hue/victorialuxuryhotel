@@ -18,6 +18,7 @@ import { requireStaff } from "@/server/auth";
 import { getDb } from "@/server/db";
 import { idleMinutes } from "@/server/domain/stations";
 import { exitViewAs, startViewAsFrontDesk } from "@/server/view-as";
+import { guestFont as staffFont } from "@/components/public/guest-font";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -75,7 +76,7 @@ function ViewAsBanner() {
 export default function ManagementLayout({ children }: LayoutProps<"/app">) {
   return (
     <ClerkProvider signInUrl="/login">
-      <div className="flex min-h-screen flex-1 flex-col bg-ivory-100">
+      <div className={`staff ${staffFont.variable} flex min-h-screen flex-1 flex-col bg-ivory-100`}>
         <Suspense fallback={<LoadingState label="Checking your access…" />}>
           <StaffShell>{children}</StaffShell>
         </Suspense>

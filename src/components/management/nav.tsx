@@ -65,7 +65,7 @@ function Brand({ base }: { base: string }) {
     <Link href={base} className="flex items-center gap-3 px-5">
       <Logo className="w-8" />
       <span className="leading-none">
-        <span className="block font-display text-lg text-ivory-50">Victoria Luxury</span>
+        <span className="block font-brand text-lg text-ivory-50">Victoria Luxury</span>
         <span className="mt-0.5 block text-xs uppercase tracking-[0.25em] text-gold-300">Management</span>
       </span>
     </Link>

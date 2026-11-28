@@ -2,7 +2,7 @@ import { Children, cloneElement, isValidElement, type InputHTMLAttributes, type 
 import { cn } from "@/lib/utils/cn";
 
 const control =
-  "block w-full rounded-md border border-hairline bg-transparent px-3 text-base text-ink-900 caret-navy-700 md:text-sm placeholder:text-ink-400 hover:border-ink-900/45 focus:border-navy-700 focus:outline-none focus:ring-2 focus:ring-navy-700/20 disabled:opacity-45 aria-invalid:border-danger-600 guest:border-ink-300 guest:bg-white";
+  "block w-full rounded-lg border border-[#bdb7a8] bg-white px-3 text-[15px] text-ink-900 guest:rounded-md guest:text-base guest:md:text-sm caret-navy-700 placeholder:text-ink-400 hover:border-ink-900/45 focus:border-navy-700 focus:outline-none focus:ring-2 focus:ring-navy-700/20 disabled:opacity-45 aria-invalid:border-danger-600 guest:border-ink-300 guest:bg-white";
 
 export function Field({ label, htmlFor, hint, error, optional, children, className }: {
   label: string;
@@ -24,7 +24,7 @@ export function Field({ label, htmlFor, hint, error, optional, children, classNa
       : children;
   return (
     <div className={cn("space-y-1.5", className)}>
-      <label htmlFor={htmlFor} className="block text-[13px] text-ink-700 guest:text-sm guest:font-medium">
+      <label htmlFor={htmlFor} className="block text-sm font-medium text-ink-900 guest:text-sm guest:font-medium">
         {label}
         {optional ? <span className="font-normal text-ink-500"> (optional)</span> : null}
       </label>
@@ -38,13 +38,26 @@ export function Field({ label, htmlFor, hint, error, optional, children, classNa
   );
 }
 
+/** Guest-site heights apply only when the page doesn't set its own. */
+const guestHeight = (className: string | undefined) => (className && /(^|\s)([\w-]+:)*h-/.test(className) ? "" : "guest:h-11.5 guest:md:h-10");
+
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(control, "h-11.5 md:h-10", className)} {...props} />;
+  return <input className={cn(control, "h-11", guestHeight(className), className)} {...props} />;
+}
+
+/** An amount in naira: ₦ inside the box, tabular, as wide as an amount (design R1). */
+export function MoneyInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <span className={cn("flex h-11 w-48 items-center rounded-lg border border-[#bdb7a8] bg-white px-3 focus-within:border-navy-700 focus-within:ring-2 focus-within:ring-navy-700/20 has-[[aria-invalid=true]]:border-danger-600", className)}>
+      <span aria-hidden className="mr-2.5 border-r border-hairline pr-2 text-ink-500">₦</span>
+      <input inputMode="decimal" className="h-full w-full min-w-0 bg-transparent text-[15px] font-semibold tabular-nums text-ink-900 outline-none" {...props} />
+    </span>
+  );
 }
 
 export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cn(control, "h-11.5 pr-8 md:h-10", className)} {...props}>
+    <select className={cn(control, "h-11 pr-8", guestHeight(className), className)} {...props}>
       {children}
     </select>
   );

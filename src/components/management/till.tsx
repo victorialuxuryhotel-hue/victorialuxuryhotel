@@ -3,10 +3,12 @@
 import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { CheckCircle2, MessageSquare, Minus, Plus, Printer, Repeat2, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FormMessage, Input } from "@/components/ui/form";
+import { FormMessage, Input, Select } from "@/components/ui/form";
+import { Segmented } from "@/components/ui/choice";
+import { BankLine, type PaySettings } from "./offline-payment-form";
 import { formatNaira } from "@/lib/format";
 import { cn } from "@/lib/utils/cn";
-import { cancelOpenOrder, saveOpenOrder, takePayment } from "@/server/pos";
+import { cancelOpenOrder, reportTillDebit, saveOpenOrder, takePayment } from "@/server/pos";
 import { OFFLINE_MESSAGE, safeAction } from "@/lib/safe-action";
 import type { MenuCategory, MenuItem, OpenOrder, Outlet, PayMethod } from "@/server/domain/pos";
 import { NumPad } from "@/components/ui/num-pad";
@@ -93,8 +95,10 @@ function parseDraft(raw: string | null, menu: MenuItem[]) {
   }
 }
 
-export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] }, staffId = "", fullScreenRole = false }: {
+export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutlet = "bar", resume, favourites = { restaurant: [], bar: [] }, staffId = "", fullScreenRole = false, pay = { bank: { name: null, number: null, accountName: null }, terminals: [] } }: {
   menu: MenuItem[]; open: OpenOrder[]; attendant: string; vatRateBp: number; taxId?: string | null; startOutlet?: Outlet; resume?: string;
+  /** The hotel's bank details (shown for transfers) and POS terminals (section 2). */
+  pay?: PaySettings;
   /** Restaurant & bar staff get the full-screen till on any computer; others on a station set to a counter (I8). */
   fullScreenRole?: boolean;
   /** Each counter's best sellers, shown as a quick row above the menu. */
@@ -120,6 +124,13 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   const [method, setMethod] = useState<PayMethod>("cash");
   const [transferRef, setTransferRef] = useState("");
   const [transferChecked, setTransferChecked] = useState(false);
+  const [senderName, setSenderName] = useState("");
+  const [slip, setSlip] = useState("");
+  const [terminal, setTerminal] = useState("");
+  const [debit, setDebit] = useState<null | "ask" | "done">(null);
+  const [debitError, setDebitError] = useState<string | null>(null);
+  const dupOk = useRef<HTMLInputElement>(null);
+  const defaultTerminal = pay.terminals.find((t) => t.toLowerCase().includes(outlet === "bar" ? "bar" : "restaurant")) ?? pay.terminals[0] ?? "";
   const [typeName, setTypeName] = useState(false);
   const [given, setGiven] = useState("");
   const [receipt, setReceipt] = useState<PosReceiptData | null>(null);
@@ -224,6 +235,16 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
   const q = search.trim().toLowerCase();
   const openShown = q ? open.filter((o) => `#${o.number} ${o.note ?? ""} ${o.items}`.toLowerCase().includes(q)) : open;
   const linesJson = JSON.stringify(lines.map((l) => ({ menuItemId: l.item.id, quantity: l.q, note: l.note || null })));
+
+  /** POS declined but the customer was debited: the order is kept unpaid and flagged for the manager (section 2). */
+  const flagDebit = async () => {
+    setDebitError(null);
+    if (!orderId.current) orderId.current = crypto.randomUUID();
+    const r = await reportTillDebit({ id: orderId.current, outlet, lines: linesJson, note, terminal: terminal || defaultTerminal, slipLast4: slip });
+    if (!r.ok) return setDebitError(r.message);
+    setEditing({ id: orderId.current, number: r.data.number });
+    setDebit("done");
+  };
 
   // A refresh, a UPS changeover or a power cut mustn't lose the order being taken: a copy of the
   // current order is kept in this browser, and after a reload the till offers to bring it back.
@@ -344,7 +365,8 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               snapshot.current = {
                 outlet, receiptNumber: "", orderNumber: 0, paidAt: "", attendant, vatRateBp, taxId,
                 lines: lines.map((l) => ({ name: l.item.name, quantity: l.q, unitKobo: l.item.price_kobo, note: l.note || null })),
-                totalKobo: total, method, cashReceivedKobo: method === "cash" ? givenKobo : null, reference: method === "cash" ? null : transferRef.trim() || null,
+                totalKobo: total, method, cashReceivedKobo: method === "cash" ? givenKobo : null,
+                reference: method === "pos_terminal" ? slip : method === "bank_transfer" ? transferRef.trim() || senderName.trim() || null : null,
               };
             }}
             className="space-y-4"
@@ -354,14 +376,15 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
             <input type="hidden" name="lines" value={linesJson} />
             <input type="hidden" name="note" value={note} />
             <input type="hidden" name="method" value={method} />
-            <fieldset>
-              <legend className="mb-2 text-[13px] text-ink-700">How is the customer paying?</legend>
-              <div className="grid grid-cols-3 gap-2">
-                {(Object.keys(METHODS) as PayMethod[]).map((k) => (
-                  <button key={k} type="button" aria-pressed={method === k} onClick={() => { setMethod(k); setTransferRef(""); }} className={cn(chip(method === k), "rounded-md px-2")}>{METHODS[k]}</button>
-                ))}
-              </div>
-            </fieldset>
+            <input ref={dupOk} type="hidden" name="duplicateOk" defaultValue="" />
+            <Segmented
+              label="How is the customer paying?"
+              size="lg"
+              className="w-full"
+              value={method}
+              onChange={(k) => { setMethod(k); setTransferRef(""); setSlip(""); setDebit(null); }}
+              options={(Object.keys(METHODS) as PayMethod[]).map((k) => ({ value: k, label: METHODS[k] }))}
+            />
             {method === "cash" ? (
               <div className="space-y-2 rounded-md bg-white p-3">
                 <label className="block">
@@ -386,51 +409,69 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               </div>
             ) : null}
             {method === "bank_transfer" ? (
-              <div className="space-y-3 rounded-md bg-white p-3">
+              <div className="space-y-3 rounded-lg bg-white p-3">
                 <label className="block">
-                  <span className="mb-1 block text-[13px] text-ink-700">{typeName ? "Sender's name, as in the bank app" : "Last 4 digits of the transfer reference"}</span>
-                  <Input
-                    name="paymentReference"
-                    value={transferRef}
-                    onChange={(e) => setTransferRef(e.target.value)}
-                    inputMode={typeName ? "text" : "none"}
-                    maxLength={80}
-                    autoComplete="off"
-                    required
-                    minLength={3}
-                    className={typeName ? undefined : "text-lg tracking-[0.3em] tabular-nums"}
-                  />
+                  <span className="mb-1.5 block text-sm font-medium text-ink-900">Transfer reference</span>
+                  <Input name="paymentReference" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} inputMode={typeName ? "text" : "none"} maxLength={80} autoComplete="off" className="w-56 text-lg tabular-nums" />
+                  <span className="mt-1 block text-sm text-ink-500">Or the sender&apos;s name if there is no reference</span>
                 </label>
                 {typeName ? null : <NumPad onChange={setTransferRef} maxLength={12} label="the transfer reference" />}
-                <button type="button" onClick={() => { setTypeName(!typeName); setTransferRef(""); }} className="text-sm font-medium text-navy-800 underline-offset-2 hover:underline">
-                  {typeName ? "Use the number pad instead" : "Only the sender's name? Type it instead"}
-                </button>
-                <label className="flex gap-3 rounded-md border border-gold-300 bg-gold-50 p-3 text-sm text-ink-800">
-                  <input type="checkbox" name="transferChecked" checked={transferChecked} onChange={(e) => setTransferChecked(e.target.checked)} required className="mt-0.5 size-4 shrink-0 accent-navy-800" />
-                  <span>
-                    <span className="font-medium">I&apos;ve checked the hotel&apos;s bank app and the money is there.</span> A screenshot or SMS alert is not enough.
-                  </span>
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-ink-900">Sender&apos;s name</span>
+                  <Input name="senderName" value={senderName} onFocus={() => setTypeName(true)} onChange={(e) => setSenderName(e.target.value)} maxLength={80} autoComplete="off" className="w-64" />
                 </label>
+                <label className="flex gap-3 rounded-lg border border-hairline p-3 text-sm text-ink-800">
+                  <input type="checkbox" name="transferChecked" checked={transferChecked} onChange={(e) => setTransferChecked(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-navy-900" />
+                  <span className="font-semibold text-ink-900">I&apos;ve seen {formatNaira(total)} land in the hotel&apos;s bank app</span>
+                </label>
+                <p className="text-sm text-[#8a4b06]">Never on the customer&apos;s phone. Fake alerts look real. Check the hotel&apos;s bank app, or ask the manager.</p>
+                <BankLine bank={pay.bank} />
+                <p className="text-xs text-ink-500">Your name goes on this sale. The manager confirms it against the bank tomorrow.</p>
               </div>
             ) : null}
             {method === "pos_terminal" ? (
-              <div className="space-y-2 rounded-md bg-white p-3">
+              <div className="space-y-3 rounded-lg bg-white p-3">
                 <label className="block">
-                  <span className="mb-1 block text-[13px] text-ink-700">Last 4 digits of the POS slip, once the terminal says Approved</span>
+                  <span className="mb-1.5 block text-sm font-medium text-ink-900">Slip: last 4 digits</span>
                   <Input
-                    name="paymentReference"
-                    value={transferRef}
-                    onChange={(e) => setTransferRef(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    name="slipLast4"
+                    value={slip}
+                    onChange={(e) => setSlip(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     inputMode="none"
                     pattern="[0-9]{4}"
                     maxLength={4}
                     autoComplete="off"
-                    required
-                    className="text-lg tracking-[0.3em] tabular-nums"
+                    className="w-32 text-lg tracking-[0.3em] tabular-nums"
                   />
                 </label>
-                <NumPad onChange={setTransferRef} maxLength={4} label="the POS slip" />
-                <p className="text-xs text-ink-500">The manager matches these against the terminal&apos;s own report.</p>
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-ink-900">Terminal</span>
+                  <Select name="terminal" value={terminal || defaultTerminal} onChange={(e) => setTerminal(e.target.value)} className="w-60">
+                    {pay.terminals.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </Select>
+                </label>
+                <p className="text-sm text-ink-600">Only after the terminal prints <strong>APPROVED</strong>.</p>
+                <NumPad onChange={setSlip} maxLength={4} label="the POS slip" />
+                {debit === "done" ? (
+                  <FormMessage tone="success">Flagged for the manager to check with the bank. Nothing was recorded; the order stays unpaid.</FormMessage>
+                ) : debit === "ask" ? (
+                  <div className="space-y-2 rounded-lg border border-[#f1b8b8] p-3">
+                    <p className="text-sm text-ink-900">Declined but the customer was debited {formatNaira(total)}? Nothing is recorded as paid; the order is kept unpaid and the manager checks with the bank.</p>
+                    {debitError ? <FormMessage>{debitError}</FormMessage> : null}
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="danger" onClick={() => void flagDebit()}>Flag it</Button>
+                      <Button variant="ghost" onClick={() => setDebit(null)}>Back</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button variant="ghost" className="px-0" onClick={() => setDebit("ask")}>Declined but customer was debited</Button>
+                )}
+              </div>
+            ) : null}
+            {payState && !payState.ok && payState.fieldErrors?.duplicate ? (
+              <div role="alert" className="space-y-2 rounded-lg border border-[#f3d28a] bg-[#fff4dc] p-3 text-sm text-[#8a4b06]">
+                <p>{payState.fieldErrors.duplicate[0]}</p>
+                <Button variant="secondary" onClick={() => { if (dupOk.current) dupOk.current.value = "1"; (document.getElementById("till-pay") as HTMLFormElement | null)?.requestSubmit(); }}>Record anyway</Button>
               </div>
             ) : null}
           </form>
@@ -676,7 +717,7 @@ export function Till({ menu, open, attendant, vatRateBp, taxId = null, startOutl
               <div className="grid grid-cols-[auto_1fr] gap-2">
                 {/* Back and Confirm stay with the order; the payment details are in the wide column (form="till-pay"). */}
                 <Button type="button" variant="secondary" size="lg" onClick={() => setStep("order")}>Back</Button>
-                <Button type="submit" form="till-pay" size="lg" className="h-16 text-lg" pending={paying} title={online ? undefined : OFFLINE_REASON} disabled={!online || !lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && (transferRef.trim().length < 3 || !transferChecked)) || (method === "pos_terminal" && !/^\d{4}$/.test(transferRef))}>
+                <Button type="submit" form="till-pay" size="lg" className="h-16 w-full min-w-0 text-lg" pending={paying} title={online ? undefined : OFFLINE_REASON} disabled={!online || !lines.length || (method === "cash" && change != null && change < 0) || (method === "bank_transfer" && ((transferRef.trim().length < 3 && senderName.trim().length < 2) || !transferChecked)) || (method === "pos_terminal" && (!/^\d{4}$/.test(slip) || !(terminal || defaultTerminal) || debit === "done"))}>
                   Confirm {formatNaira(total)} paid
                 </Button>
               </div>

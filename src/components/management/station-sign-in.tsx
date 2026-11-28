@@ -115,7 +115,7 @@ export function StationSignIn({ stationName, roster, onSignedIn }: { stationName
   return (
     <div className="flex min-h-full w-full flex-col items-center justify-center gap-10 bg-navy-950 p-6 tabular-nums lg:flex-row lg:gap-14">
       <div className="flex w-full max-w-[460px] flex-col gap-4">
-        <p className="font-display text-[30px] font-semibold text-white">{stationName}</p>
+        <p className="font-brand text-[30px] text-white">{stationName}</p>
         <p className="text-[15px] text-[#cfd6f0]">Locked. Tap your name to start.</p>
         {roster.length ? (
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">

@@ -125,7 +125,7 @@ describe("section 3 invariants", () => {
     await rejects(exec("UPDATE hall_bookings SET price_kobo = 300000 WHERE id = ?", id), /hall_not_paid/);
   });
 
-  it("I10 a bar order paid by transfer without a reference is rejected", async () => {
+  it("I10 a bar order paid by transfer needs the reference or sender's name, and the bank-app tick", async () => {
     const seller: Actor = { id: crypto.randomUUID(), role: "restaurant_bar_manager" };
     await exec(
       "INSERT INTO staff_profiles (id, full_name, email, role, department, department_lead) VALUES (?, 'Bar Lead', ?, 'front_desk', 'restaurant_bar', 1)",
@@ -133,14 +133,15 @@ describe("section 3 invariants", () => {
     );
     const item = await saveMenuItem(db, seller, { name: `Zobo ${rand()}`, outlet: "bar", category: "soft_drinks", priceKobo: 100_000, available: true, active: true });
     const order = await saveOrder(db, seller, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: item, quantity: 1 }] });
-    const pay = (ref: string | null) =>
+    const pay = (ref: string | null, sender: string | null = null, seen = 1) =>
       exec(
-        `UPDATE pos_orders SET status = 'paid', method = 'bank_transfer', payment_reference = ?, paid_by = ?, paid_at = ?, receipt_number = ? WHERE id = ?`,
-        ref, seller!.id, iso(0), `RB-T-${rand()}`, order.id,
+        `UPDATE pos_orders SET status = 'paid', method = 'bank_transfer', payment_reference = ?, sender_name = ?, seen_in_bank_app = ?, paid_by = ?, paid_at = ?, receipt_number = ? WHERE id = ?`,
+        ref, sender, seen, seller!.id, iso(0), `RB-T-${rand()}`, order.id,
       );
     await rejects(pay(null), /payment_needs_reference/);
     await rejects(pay("  "), /payment_needs_reference/);
-    await pay("4821");
+    await rejects(pay("4821", null, 0), /payment_needs_reference/); // not seen in the bank app
+    await pay(null, "Kunle Ade"); // the sender's name is enough
   });
 
   it("I15 a bar order paid by POS/card without the slip's last 4 digits is rejected", async () => {
@@ -151,13 +152,14 @@ describe("section 3 invariants", () => {
     );
     const item = await saveMenuItem(db, seller, { name: `Malt ${rand()}`, outlet: "bar", category: "soft_drinks", priceKobo: 100_000, available: true, active: true });
     const order = await saveOrder(db, seller, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: item, quantity: 1 }] });
-    const pay = (ref: string | null) =>
+    const pay = (slip: string | null, terminal: string | null = "Bar terminal") =>
       exec(
-        `UPDATE pos_orders SET status = 'paid', method = 'pos_terminal', payment_reference = ?, paid_by = ?, paid_at = ?, receipt_number = ? WHERE id = ?`,
-        ref, seller!.id, iso(0), `RB-T-${rand()}`, order.id,
+        `UPDATE pos_orders SET status = 'paid', method = 'pos_terminal', slip_last4 = ?, terminal = ?, paid_by = ?, paid_at = ?, receipt_number = ? WHERE id = ?`,
+        slip, terminal, seller!.id, iso(0), `RB-T-${rand()}`, order.id,
       );
     await rejects(pay(null), /payment_needs_reference/);
-    await rejects(pay("12a4"), /payment_needs_reference/);
+    await rejects(pay("12a4"), /CHECK constraint/);
+    await rejects(pay("1234", null), /payment_needs_reference/); // which terminal
     await pay("1234");
   });
 
@@ -165,19 +167,20 @@ describe("section 3 invariants", () => {
     const c = await makeCategory(2);
     const r = await insertReservation({ categoryId: c.id, checkIn: day(5), checkOut: day(6) });
     const r2 = await insertReservation({ categoryId: c.id, checkIn: day(5), checkOut: day(6) });
-    const insert = (reservationId: string, reference: string | null) =>
+    const insert = (reservationId: string, slip: string | null, terminal: string | null = "Front desk terminal") =>
       exec(
-        `INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, provider_reference, status, paid_at, verified_at, recorded_by)
-         VALUES (?, ?, 100, 'offline', 'pos_terminal', ?, 'successful', ?, ?, ?)`,
-        crypto.randomUUID(), reservationId, reference, iso(0), iso(0), desk!.id,
+        `INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, slip_last4, terminal, status, paid_at, verified_at, recorded_by)
+         VALUES (?, ?, 100, 'offline', 'pos_terminal', ?, ?, 'successful', ?, ?, ?)`,
+        crypto.randomUUID(), reservationId, slip, terminal, iso(0), iso(0), desk!.id,
       );
-    await rejects(insert(r, null), /payment_needs_reference/);
-    await rejects(insert(r, "slip"), /payment_needs_reference/);
+    await rejects(insert(r, null), /payment_incomplete/);
+    await rejects(insert(r, "slip"), /CHECK constraint/);
+    await rejects(insert(r, "7731", null), /payment_incomplete/);
     await insert(r, "7731");
     await insert(r2, "7731"); // two genuine slips can end in the same 4 digits
     await rejects(
-      recordOfflinePayment(db, desk, { reservationId: r, amountKobo: 5_000_000, method: "pos_terminal", reference: "", paidOn: day(0), confirmReceived: true }),
-      /last 4 digits of the slip/,
+      recordOfflinePayment(db, desk, { reservationId: r, amountKobo: 5_000_000, method: "pos_terminal", slipLast4: "", terminal: "Front desk terminal", paidOn: day(0), confirmReceived: true }),
+      /last 4 digits of the POS slip/,
       "VALIDATION",
     );
   });

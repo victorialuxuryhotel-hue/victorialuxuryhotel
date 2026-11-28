@@ -94,7 +94,7 @@ export async function getBookingByToken(token: string) {
     const photos = await coverPhotos(db);
     const payments = await all<{ provider: string; provider_reference: string | null; status: string; amount_kobo: number; kind: string; receipt_number: string | null; created_at: string }>(
       db,
-      "SELECT provider, provider_reference, status, amount_kobo, kind, receipt_number, created_at FROM payments WHERE reservation_id = ? ORDER BY created_at DESC",
+      "SELECT provider, coalesce(provider_reference, slip_last4, sender_name) AS provider_reference, status, amount_kobo, kind, receipt_number, created_at FROM payments WHERE reservation_id = ? ORDER BY created_at DESC",
       r.id,
     );
     const holdActive = r.status === "pending_payment" && Boolean(r.hold_expires_at) && Date.parse(r.hold_expires_at!) > Date.now();
@@ -155,7 +155,7 @@ export async function getGuestReceipt(token: string, receiptNumber: string) {
   const [p, paid] = await Promise.all([
     first<{ receipt_number: string; paid_at: string | null; method: string | null; provider: "paystack" | "offline"; provider_reference: string | null; amount_kobo: number }>(
       db,
-      "SELECT receipt_number, paid_at, method, provider, provider_reference, amount_kobo FROM payments WHERE reservation_id = ? AND receipt_number = ? AND status = 'successful' AND kind = 'payment'",
+      "SELECT receipt_number, paid_at, method, provider, coalesce(provider_reference, slip_last4, sender_name) AS provider_reference, amount_kobo FROM payments WHERE reservation_id = ? AND receipt_number = ? AND status = 'successful' AND kind = 'payment'",
       r.id, receiptNumber,
     ),
     first<{ kobo: number }>(

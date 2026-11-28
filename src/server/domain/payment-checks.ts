@@ -11,7 +11,7 @@ import { activity, all, first, MONEY_APPROVERS, requireRole, uuid, writeBatch, t
 
 export type CheckSource = "payment" | "hall_payment" | "pos_order";
 export type ToConfirm = {
-  source_type: CheckSource; source_id: string; at: string; taken_by: string | null; who: string;
+  source_type: CheckSource; source_id: string; at: string; taken_by: string | null; taken_by_id: string | null; who: string;
   method: "bank_transfer" | "pos_terminal"; amount_kobo: number; reference: string | null; reservation_id: string | null;
 };
 
@@ -19,20 +19,20 @@ const READERS = [...MONEY_APPROVERS, "finance"] as const;
 
 /** The non-cash payments nobody has checked yet, oldest first. */
 const UNCHECKED_SQL = `
-  SELECT 'payment' AS source_type, p.id AS source_id, p.paid_at AS at, s.full_name AS taken_by,
-         g.full_name || ' · ' || r.reference AS who, p.method, p.amount_kobo, p.provider_reference AS reference, r.id AS reservation_id
+  SELECT 'payment' AS source_type, p.id AS source_id, p.paid_at AS at, s.full_name AS taken_by, s.id AS taken_by_id,
+         g.full_name || ' · ' || r.reference AS who, p.method, p.amount_kobo, coalesce(p.provider_reference, p.slip_last4, p.sender_name) AS reference, r.id AS reservation_id
   FROM payments p JOIN reservations r ON r.id = p.reservation_id JOIN guests g ON g.id = r.guest_id LEFT JOIN staff_profiles s ON s.id = p.recorded_by
   WHERE p.status = 'successful' AND p.kind = 'payment' AND p.provider = 'offline' AND p.method IN ('bank_transfer', 'pos_terminal')
     AND NOT EXISTS (SELECT 1 FROM payment_checks c WHERE c.source_type = 'payment' AND c.source_id = p.id)
   UNION ALL
-  SELECT 'hall_payment', hp.id, hp.created_at, s.full_name, 'Hall · ' || h.title || ' · ' || h.customer_name, hp.method, hp.amount_kobo, hp.reference, NULL
+  SELECT 'hall_payment', hp.id, hp.created_at, s.full_name, s.id, 'Hall · ' || h.title || ' · ' || h.customer_name, hp.method, hp.amount_kobo, hp.reference, NULL
   FROM hall_payments hp JOIN hall_bookings h ON h.id = hp.booking_id LEFT JOIN staff_profiles s ON s.id = hp.recorded_by
   WHERE hp.method IN ('bank_transfer', 'pos_terminal')
     AND NOT EXISTS (SELECT 1 FROM payment_checks c WHERE c.source_type = 'hall_payment' AND c.source_id = hp.id)
   UNION ALL
-  SELECT 'pos_order', o.id, o.paid_at, s.full_name,
+  SELECT 'pos_order', o.id, o.paid_at, s.full_name, s.id,
          (CASE o.outlet WHEN 'bar' THEN 'Bar' ELSE 'Restaurant' END) || ' · ' || o.receipt_number || coalesce(' · ' || o.note, ''),
-         o.method, o.total_kobo, o.payment_reference, NULL
+         o.method, o.total_kobo, coalesce(o.payment_reference, o.slip_last4, o.sender_name), NULL
   FROM pos_orders o LEFT JOIN staff_profiles s ON s.id = o.paid_by
   WHERE o.status = 'paid' AND o.method IN ('bank_transfer', 'pos_terminal')
     AND NOT EXISTS (SELECT 1 FROM payment_checks c WHERE c.source_type = 'pos_order' AND c.source_id = o.id)`;
@@ -70,6 +70,11 @@ export async function checkPayment(
   if (!item) {
     const done = await first(db, "SELECT 1 FROM payment_checks WHERE source_type = ? AND source_id = ?", v.sourceType, v.sourceId);
     throw new AppError(done ? "CONFLICT" : "NOT_FOUND", done ? "Someone has already checked this payment. Reload the list." : "That payment isn't one to confirm. Reload the list.");
+  }
+  if (await first(db, `SELECT 1 FROM (SELECT recorded_by AS who FROM payments WHERE id = ?1 AND ?2 = 'payment'
+       UNION ALL SELECT recorded_by FROM hall_payments WHERE id = ?1 AND ?2 = 'hall_payment'
+       UNION ALL SELECT paid_by FROM pos_orders WHERE id = ?1 AND ?2 = 'pos_order') WHERE who = ?3`, v.sourceId, v.sourceType, actor!.id)) {
+    throw new AppError("FORBIDDEN", "You recorded this payment, so someone else confirms it: the General Manager or the Owner.");
   }
   const what = `${METHOD[item.method]} of ${formatNaira(item.amount_kobo)} (${item.who}${item.reference ? `, ref ${item.reference}` : ""})`;
   const stmts: Stmt[] = [

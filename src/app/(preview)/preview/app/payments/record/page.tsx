@@ -7,7 +7,7 @@ export default function Page() {
   return (
     <>
       <PageHeader title="Record offline payment" description="Cash, bank transfer or POS received directly by the hotel." />
-      <div className="px-4 py-6 lg:px-8"><Card className="mx-auto max-w-2xl p-6"><OfflinePaymentForm reservation={reservations[3]!} today="2026-12-01" /></Card></div>
+      <div className="px-4 py-6 lg:px-8"><Card className="mx-auto max-w-2xl p-6"><OfflinePaymentForm reservation={reservations[3]!} today="2026-12-01" settings={{ bank: { name: null, number: null, accountName: null }, terminals: ["Front desk terminal", "Bar terminal"] }} /></Card></div>
     </>
   );
 }

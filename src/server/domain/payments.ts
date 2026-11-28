@@ -21,6 +21,7 @@ import {
 } from "../db";
 import { applyChangeStatements, pendingChange, rethrowChangeError } from "./changes";
 import { autoAssignRoomStatements, freeUnits } from "./inventory";
+import { checkDetails, duplicateError, duplicateWarning } from "./payment-details";
 import { dueOf, loadReservation, netPaid, RES_COLUMNS, type ReservationRow } from "./reservations";
 
 /** Marker on a Paystack payment whose amount or currency didn't match: it waits for a person (alerted once). */
@@ -66,7 +67,12 @@ function retryIfCapacityRace(err: unknown): never {
 }
 
 
-async function settleStatements(db: Db, res: ReservationRow, paidAfter: number, dueAfter = dueOf(res)): Promise<{ outcome: SettleOutcome; stmts: Stmt[]; reason?: string }> {
+/**
+ * What a payment does to the booking. `partConfirms` (desk payments): any payment confirms an unpaid booking,
+ * so a deposit ends the hold and the room isn't released with money taken; the balance shows as owed and
+ * check-in still needs it paid or a manager's override. Online payments confirm only when paid in full.
+ */
+async function settleStatements(db: Db, res: ReservationRow, paidAfter: number, dueAfter = dueOf(res), partConfirms = false): Promise<{ outcome: SettleOutcome; stmts: Stmt[]; reason?: string }> {
   const stmts: Stmt[] = [];
   let outcome: SettleOutcome;
   let reason: string | undefined;
@@ -77,7 +83,7 @@ async function settleStatements(db: Db, res: ReservationRow, paidAfter: number, 
     );
   const flag = (text: string) => stmts.push(db.prepare("UPDATE reservations SET attention_reason = ? WHERE id = ?").bind(text, res.id));
 
-  if (paidAfter < dueAfter) {
+  if (paidAfter < dueAfter && !(partConfirms && (res.status === "pending_payment" || res.status === "expired"))) {
     outcome = "part_paid";
   } else if (res.status === "pending_payment" && res.hold_expires_at && res.hold_expires_at > now()) {
     confirm();
@@ -233,28 +239,26 @@ export async function recordOfflinePayment(
     reservationId: string;
     paymentId?: string;
     amountKobo: number;
-    method: "cash" | "bank_transfer" | "pos_terminal" | "other";
+    method: "cash" | "bank_transfer" | "pos_terminal";
+    /** Transfer: the reference and/or the sender's name. */
     reference?: string | null;
+    senderName?: string | null;
+    /** POS: exactly the last 4 digits of the slip, and the terminal (from settings). */
+    slipLast4?: string | null;
+    terminal?: string | null;
     paidOn: string;
     notes?: string | null;
+    /** The money is in hand, or (transfer) was seen in the hotel's own bank app. */
     confirmReceived: boolean;
+    /** Record even though the same reference or slip was used in the last 7 days. */
+    duplicateOk?: boolean;
   },
 ): Promise<{ paymentId: string; receiptNumber: string; outcome: SettleOutcome }> {
   requireRole(actor, ALL_STAFF);
   if (input.confirmReceived !== true) throw new AppError("VALIDATION", "Confirm that the hotel has received this money before recording it.");
-  if (!["cash", "bank_transfer", "pos_terminal", "other"].includes(input.method)) throw new AppError("VALIDATION", "Choose how the money was received.");
   if (!Number.isInteger(input.amountKobo) || input.amountKobo <= 0) throw new AppError("VALIDATION", "Enter the amount received.");
-  // Every non-cash payment can be checked: transfers against the bank statement, POS slips against the terminal (I7, I16).
-  if (input.method === "bank_transfer" && (input.reference?.trim().length ?? 0) < 3) {
-    throw new AppError("VALIDATION", "This transfer needs its reference. Enter the transfer reference or the sender's name, as shown in the hotel's bank app.", {
-      fieldErrors: { reference: ["Enter the transfer reference or the sender's name"] },
-    });
-  }
-  if (input.method === "pos_terminal" && !/\d{4}/.test(input.reference ?? "")) {
-    throw new AppError("VALIDATION", "This POS payment needs its slip number. Enter the last 4 digits of the slip, once the terminal says Approved.", {
-      fieldErrors: { reference: ["Enter the last 4 digits of the POS slip"] },
-    });
-  }
+  // Every non-cash payment can be checked: transfers against the bank statement, POS slips against the terminal (section 2).
+  const details = await checkDetails(db, { ...input, seenInBankApp: input.confirmReceived });
   const today = hotelToday();
   if (!input.paidOn || input.paidOn > today) throw new AppError("VALIDATION", "The payment date can't be in the future.");
   if (input.paidOn < addDays(today, -60)) throw new AppError("VALIDATION", "Payments older than 60 days must be recorded by a manager with the accounts team.");
@@ -279,10 +283,21 @@ export async function recordOfflinePayment(
     const dueAfter = dueOf(res) + (change?.amount_kobo ?? 0);
     const balance = dueAfter - paid;
     if (balance <= 0) throw new AppError("VALIDATION", "This booking is already paid in full.");
-    if (input.amountKobo !== balance) throw new AppError("VALIDATION", `Bookings are paid in full. Take the full ${naira(balance)} owed.`);
+    // Part payments are allowed; overpaying isn't (for cash, record what's owed and give change).
+    if (input.amountKobo > balance) {
+      throw new AppError("VALIDATION", input.method === "cash" ? `Only ${naira(balance)} is owed. Record ${naira(balance)} and give the change.` : `Only ${naira(balance)} is owed. Take no more than that.`, {
+        fieldErrors: { amount: [`At most ${naira(balance)}`] },
+      });
+    }
+    // A change waiting for payment (upgrade, move, extra nights) is applied with the payment, so it's paid in one go.
+    if (change && input.amountKobo !== balance) throw new AppError("VALIDATION", `This includes a change waiting for payment. Take the full ${naira(balance)} owed.`, { fieldErrors: { amount: [`Take ${naira(balance)}`] } });
+    if (!input.duplicateOk) {
+      const dup = await duplicateWarning(db, input.method, details, input.amountKobo);
+      if (dup) throw duplicateError(dup);
+    }
 
     const paymentId = input.paymentId ?? uuid();
-    const settle = await settleStatements(db, res, paid + input.amountKobo, dueAfter);
+    const settle = await settleStatements(db, res, paid + input.amountKobo, dueAfter, true);
     const changeStmts = change ? await applyChangeStatements(db, res, change, { paymentId, decidedBy: actor!.id, paidAfterKobo: paid + input.amountKobo }) : [];
     const methodLabel = input.method.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
     try {
@@ -294,11 +309,12 @@ export async function recordOfflinePayment(
           assertNetPaid(db, res.id, paid),
           db
             .prepare(
-              `INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, provider_reference, status, paid_at, verified_at, recorded_by, notes)
-               VALUES (?, ?, ?, 'offline', ?, ?, 'successful', ?, ?, ?, ?)`,
+              `INSERT INTO payments (id, reservation_id, amount_kobo, provider, method, provider_reference, sender_name, slip_last4, terminal, seen_in_bank_app,
+                 status, paid_at, verified_at, recorded_by, notes)
+               VALUES (?, ?, ?, 'offline', ?, ?, ?, ?, ?, ?, 'successful', ?, ?, ?, ?)`,
             )
             .bind(
-              paymentId, res.id, input.amountKobo, input.method, input.reference?.trim() || null,
+              paymentId, res.id, input.amountKobo, input.method, details.reference, details.senderName, details.slipLast4, details.terminal, details.seenInBankApp ? 1 : 0,
               hotelInstant(input.paidOn, hotelTimeNow()), now(), actor.id, input.notes?.trim() || null,
             ),
           ...changeStmts,

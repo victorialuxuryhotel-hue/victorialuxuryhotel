@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Input, Textarea } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/errors";
-import { updateBookingRules } from "@/server/settings";
+import { savePaymentDetails, updateBookingRules } from "@/server/settings";
 import { keepValues } from "@/lib/forms";
 
 const fieldError = (state: ActionResult<unknown> | null, name: string) =>
@@ -61,6 +61,34 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
         <Textarea id="cpol" name="cancellationPolicy" rows={3} maxLength={2000} defaultValue={rules.cancellationPolicy ?? ""} />
       </Field>
       <div className="flex justify-end md:col-span-2"><Button type="submit" pending={pending}>Save rules</Button></div>
+    </form>
+  );
+}
+
+/** Bank details (shown for transfers, placeholders while empty) and the POS terminals list (FUNCTIONALITY.md section 0, 2). */
+export function PaymentDetailsForm({ value }: { value: { bank: { name: string | null; number: string | null; accountName: string | null }; terminals: string[] } }) {
+  const [state, action, pending] = useActionState(savePaymentDetails, null);
+  const err = (n: string) => (state && !state.ok ? state.fieldErrors?.[n]?.[0] : undefined);
+  return (
+    <form action={action} className="space-y-4">
+      {state && !state.ok && !state.fieldErrors ? <FormMessage>{state.message}</FormMessage> : null}
+      {state?.ok ? <FormMessage tone="success">Payment details saved.</FormMessage> : null}
+      <div className="flex flex-wrap gap-4">
+        <Field label="Bank" htmlFor="bankName" optional error={err("bankName")}>
+          <Input id="bankName" name="bankName" defaultValue={value.bank.name ?? ""} maxLength={60} className="w-56" />
+        </Field>
+        <Field label="Account number" htmlFor="bankAccountNumber" optional hint="10 digits" error={err("bankAccountNumber")}>
+          <Input id="bankAccountNumber" name="bankAccountNumber" inputMode="numeric" defaultValue={value.bank.number ?? ""} maxLength={14} className="w-40 tabular-nums" />
+        </Field>
+        <Field label="Account name" htmlFor="bankAccountName" optional error={err("bankAccountName")}>
+          <Input id="bankAccountName" name="bankAccountName" defaultValue={value.bank.accountName ?? ""} maxLength={80} className="w-72" />
+        </Field>
+      </div>
+      <p className="text-sm text-ink-600">While these are empty, the transfer screens show [HOTEL BANK] · [ACCOUNT NUMBER] · [ACCOUNT NAME].</p>
+      <Field label="POS terminals" htmlFor="terminals" hint="One per line, e.g. Front desk Moniepoint. Staff pick one when they record a POS payment." error={err("terminals")}>
+        <Textarea id="terminals" name="terminals" defaultValue={value.terminals.join("\n")} rows={3} className="w-80" />
+      </Field>
+      <Button type="submit" pending={pending}>Save payment details</Button>
     </form>
   );
 }

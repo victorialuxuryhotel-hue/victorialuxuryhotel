@@ -1,6 +1,7 @@
 // Interface brief I1: payments to confirm.
 import { describe, expect, it } from "vitest";
 import type { Actor } from "@/server/db";
+import { createStaffProfile } from "@/server/domain/admin";
 import { createHallBooking, recordHallPayment } from "@/server/domain/events";
 import { checkPayment, paymentsToConfirm, toConfirmSummary } from "@/server/domain/payment-checks";
 import { recordOfflinePayment } from "@/server/domain/payments";
@@ -10,10 +11,11 @@ import { day, db, desk, exec, gm, insertReservation, makeCategory, owner, q1, re
 const rand = () => crypto.randomUUID().slice(0, 8);
 const fin: Actor = { id: owner!.id, role: "finance" };
 
-async function deskPayment(method: "cash" | "bank_transfer" | "pos_terminal", reference: string | null) {
+async function deskPayment(method: "cash" | "bank_transfer" | "pos_terminal", reference: string | null, by: Actor = desk) {
   const c = await makeCategory(1, { rateKobo: 5_000_000 });
   const r = await insertReservation({ categoryId: c.id, checkIn: day(60), checkOut: day(61), rateKobo: 5_000_000 });
-  const { paymentId } = await recordOfflinePayment(db, desk, { reservationId: r, amountKobo: 5_000_000, method, reference, paidOn: day(0), confirmReceived: true });
+  const details = method === "pos_terminal" ? { slipLast4: reference, terminal: "Front desk terminal" } : { reference };
+  const { paymentId } = await recordOfflinePayment(db, by, { reservationId: r, amountKobo: 5_000_000, method, ...details, paidOn: day(0), confirmReceived: true, duplicateOk: true });
   return { reservationId: r, paymentId };
 }
 const listed = async (sourceId: string) => (await paymentsToConfirm(db, gm)).find((x) => x.source_id === sourceId);
@@ -28,7 +30,7 @@ describe("payments to confirm", () => {
     await recordHallPayment(db, gm, { bookingId: hall, amountKobo: 1_000_000, method: "bank_transfer", paidOn: day(0), reference: `TRF ${rand()}`, paymentId: hallPaymentId });
     const seller: Actor = { id: owner!.id, role: "owner" };
     const item = await saveMenuItem(db, seller, { name: `Zobo ${rand()}`, outlet: "bar", category: "soft_drinks", priceKobo: 100_000, available: true, active: true });
-    const bar = await payOrder(db, seller, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: item, quantity: 1 }], method: "pos_terminal", paymentReference: "7731" });
+    const bar = await payOrder(db, seller, { id: crypto.randomUUID(), outlet: "bar", lines: [{ menuItemId: item, quantity: 1 }], method: "pos_terminal", slipLast4: "7731", terminal: "Bar terminal", duplicateOk: true });
 
     expect(await listed(transfer.paymentId)).toMatchObject({ source_type: "payment", method: "bank_transfer", amount_kobo: 5_000_000 });
     expect(await listed(pos.paymentId)).toMatchObject({ method: "pos_terminal", reference: "4821" });
@@ -62,11 +64,24 @@ describe("payments to confirm", () => {
     const { paymentId } = await deskPayment("pos_terminal", "1234");
     await rejects(checkPayment(db, fin, { sourceType: "payment", sourceId: paymentId, outcome: "matched" }), /role can't do this/, "FORBIDDEN");
     await rejects(checkPayment(db, desk, { sourceType: "payment", sourceId: paymentId, outcome: "matched" }), /role can't do this/, "FORBIDDEN");
+    const other = { id: await createStaffProfile(db, owner, { fullName: "Other Desk", email: `desk-${rand()}@example.com`, role: "front_desk" }) };
     await rejects(
-      exec("INSERT INTO payment_checks (id, source_type, source_id, outcome, checked_by) VALUES (?, 'payment', ?, 'matched', ?)", crypto.randomUUID(), paymentId, desk!.id),
+      exec("INSERT INTO payment_checks (id, source_type, source_id, outcome, checked_by) VALUES (?, 'payment', ?, 'matched', ?)", crypto.randomUUID(), paymentId, other.id),
       /payment_check_forbidden/,
     );
     expect(Array.isArray(await paymentsToConfirm(db, fin))).toBe(true);
     await rejects(paymentsToConfirm(db, desk), /role can't do this/, "FORBIDDEN");
+  });
+
+  it("nobody confirms a payment they recorded themselves: the GM's own transfer waits for the owner, and the database refuses it too", async () => {
+    const { paymentId } = await deskPayment("bank_transfer", `GM-${rand()}`, gm);
+    expect((await listed(paymentId))?.taken_by_id).toBe(gm!.id);
+    await rejects(checkPayment(db, gm, { sourceType: "payment", sourceId: paymentId, outcome: "matched" }), /You recorded this payment/, "FORBIDDEN");
+    await rejects(
+      exec("INSERT INTO payment_checks (id, source_type, source_id, outcome, checked_by) VALUES (?, 'payment', ?, 'matched', ?)", crypto.randomUUID(), paymentId, gm!.id),
+      /payment_check_own_payment/,
+    );
+    await checkPayment(db, owner, { sourceType: "payment", sourceId: paymentId, outcome: "matched" });
+    expect(await listed(paymentId)).toBeUndefined();
   });
 });

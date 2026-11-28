@@ -343,3 +343,32 @@ These are deliberately **not final** in the app:
 - Owner, GM and finance keep signing in with Clerk on their own devices; that idle lock is unchanged.
 - New permissions (section 14): `pos.void.approve`, `refunds.request`, `stations.manage`, `paylinks.create`,
   `bills.manage`.
+
+## 0030_payment_details
+
+- **What:** payments at the desk and the till (FUNCTIONALITY.md sections 0 and 2). `payments` and `pos_orders` get
+  `sender_name`, `slip_last4`, `terminal` and `seen_in_bank_app`; `hotel_settings` gets `bank_name`,
+  `bank_account_number`, `bank_account_name` (empty = placeholders) and `terminals` (JSON list, default
+  "Front desk terminal", "Bar terminal"). New table `payment_issues` for "declined but the guest was debited".
+- **Rules in the database (new rows only):** a transfer needs the reference or the sender's name and the bank-app
+  tick; POS needs 4 slip digits and a terminal (desk: `payments_complete_insert` replaced, `payments_pos_slip`
+  dropped; till: `pos_orders_payment_reference` replaced). `payment_checks_not_own`: nobody confirms a payment they
+  recorded (error `payment_check_own_payment`). A payment issue is closed once, never by its reporter, never deleted.
+- **Changed on purpose:** a repeated desk transfer reference is no longer refused by the database; the screens warn
+  and ask "Record anyway" (section 2, duplicate guard). Paystack references stay unique.
+- **Existing rows:** unchanged. **Previous Worker:** a POS payment from the old screens has no slip column or
+  terminal and would be refused, so deploy the Worker straight after the migration.
+
+## Step 1b: payments at the desk (X4, X5) and the till (X6, X7)
+
+- Cash, Transfer or POS / card. Transfer: reference or sender's name, the hotel's bank details (placeholders until
+  set in Booking rules → Payment details), and "I've seen ₦X arrive in the hotel's bank app". POS: last 4 slip digits
+  and the terminal. Every payment records who took it and gets a numbered receipt.
+- **Part payments at the desk** (decided 28 Nov): any payment confirms an unpaid booking so the room isn't released
+  with money taken; the rest shows as owed; check-in still needs it paid or a manager's override. Overpaying is
+  blocked (cash: record what's owed and give change). A change waiting for payment is still paid in one go.
+- "Declined but debited" records nothing and puts the item under Payments to confirm → *Check with the bank* for the
+  GM and owner, who close it with the receipt of the payment once the money arrives, or with what the bank said.
+- Payments to confirm: your own payment shows "another manager or the owner confirms it".
+- Shared staff components restyled to design R1 (Inter, filled navy primary button, 60/44/36px sizes, badges,
+  Segmented/Tabs/Chip/KPI tile, ₦ money field). The serif stays on the wordmark only.

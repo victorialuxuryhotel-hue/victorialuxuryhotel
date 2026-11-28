@@ -14,6 +14,7 @@ import { recordId } from "@/lib/ids";
 import { actorOf, authorizeRead, requireStaff } from "@/server/auth";
 import { first, getDb } from "@/server/db";
 import { closingSummary, topSellers, listMenu, openOrders } from "@/server/domain/pos";
+import { paymentSettings } from "@/server/domain/payment-details";
 import { businessDate } from "@/lib/hotel-date";
 import { VAT_SHOWN_SQL } from "@/server/vat";
 
@@ -27,7 +28,8 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
   const db = await getDb();
   const sp = await searchParams;
   const resume = typeof sp.order === "string" && recordId().safeParse(sp.order).success ? sp.order : undefined;
-  const [menu, open, mine, settings, closed, favourites] = await Promise.all([
+  const [pay, menu, open, mine, settings, closed, favourites] = await Promise.all([
+    paymentSettings(db),
     listMenu(db, actor),
     openOrders(db, actor),
     closingSummary(db, actor, staff.id),
@@ -58,7 +60,7 @@ async function Content({ searchParams }: { searchParams: Promise<Record<string, 
         </p>
       ) : (
         <div className="lg:min-h-0 lg:flex-1">
-          <Till menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} taxId={settings?.tax_id ?? null} resume={resume} favourites={favourites} staffId={staff.id} fullScreenRole={staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager"} />
+          <Till pay={pay} menu={menu} open={open} attendant={staff.fullName} vatRateBp={settings?.vat_rate_bp ?? 0} taxId={settings?.tax_id ?? null} resume={resume} favourites={favourites} staffId={staff.id} fullScreenRole={staff.role === "restaurant_bar" || staff.role === "restaurant_bar_manager"} />
         </div>
       )}
     </div>

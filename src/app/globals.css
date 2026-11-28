@@ -37,7 +37,7 @@
   --color-gold-900: #5a3910;
 
   --color-ivory-50: #fdfcf9;
-  --color-ivory-100: #f8f5ee;
+  --color-ivory-100: #f6f4ef;
   --color-ivory-200: #efe9dc;
 
   --color-ink-300: #c4c8d0;
@@ -117,6 +117,31 @@
   --color-hairline: #e8e2d4;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * The staff app (design R1): Inter for everything with numbers that line up; the serif only on the
+ * "Victoria Luxury" wordmark (font-brand). Put `staff ${staffFont.variable}` on staff pages.
+ */
+.staff {
+  --font-sans: var(--font-guest), "Inter", system-ui, sans-serif;
+  --font-display: var(--font-guest), "Inter", system-ui, sans-serif;
+  --color-hairline: #e4e0d6;
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+.staff :where(h1, h2, h3, h4) {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+@media screen {
+  html[data-till-dark] .staff { --color-hairline: rgb(244 242 236 / 0.16); }
+}
+@utility font-brand {
+  font-family: var(--font-display-base), "Cormorant Garamond", Georgia, serif;
+  font-weight: 600;
 }
 
 /* Skeleton blocks shimmer while content loads. */

@@ -25,7 +25,7 @@ export type ListedPayment = {
   reservation_id: string; reference: string; guest_name: string; recorder: string | null; recorded_by: string | null;
 };
 
-const SELECT = `SELECT p.id, p.amount_kobo, p.kind, p.method, p.provider, p.provider_reference, p.status, p.paid_at, p.created_at,
+const SELECT = `SELECT p.id, p.amount_kobo, p.kind, p.method, p.provider, coalesce(p.provider_reference, p.slip_last4, p.sender_name) AS provider_reference, p.status, p.paid_at, p.created_at,
     p.receipt_number, p.reservation_id, r.reference, g.full_name AS guest_name, s.full_name AS recorder, p.recorded_by
   FROM payments p JOIN reservations r ON r.id = p.reservation_id JOIN guests g ON g.id = r.guest_id
   LEFT JOIN staff_profiles s ON s.id = p.recorded_by`;

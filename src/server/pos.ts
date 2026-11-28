@@ -6,7 +6,8 @@ import { AppError, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { recordId } from "@/lib/ids";
 import { logger } from "@/lib/logger";
 import { actorOf, authorize } from "./auth";
-import { getDb } from "./db";
+import { first, getDb } from "./db";
+import { reportPaymentIssue } from "./domain/payment-details";
 import * as pos from "./domain/pos";
 
 const outlet = z.enum(["restaurant", "bar"]);
@@ -48,7 +49,11 @@ export async function takePayment(_prev: ActionResult<PaidResult> | null, formDa
       method: method.parse(formData.get("method")),
       cashReceivedKobo: cash,
       paymentReference: z.string().trim().max(80).parse(String(formData.get("paymentReference") ?? "")) || null,
+      senderName: z.string().trim().max(80).parse(String(formData.get("senderName") ?? "")) || null,
+      slipLast4: z.string().trim().max(4).parse(String(formData.get("slipLast4") ?? "")) || null,
+      terminal: z.string().trim().max(40).parse(String(formData.get("terminal") ?? "")) || null,
       transferChecked: formData.get("transferChecked") === "on",
+      duplicateOk: formData.get("duplicateOk") === "1",
     });
     refresh();
     return ok(r);
@@ -145,5 +150,37 @@ export async function signOffClosing(_prev: ActionResult | null, formData: FormD
     return ok(undefined);
   } catch (err) {
     return fail(err, "pos.verify_failed");
+  }
+}
+
+/**
+ * POS declined but the customer was debited (section 2): the order is saved unpaid (as it stands) and a payment
+ * issue is raised for the manager to check with the bank. Nothing is recorded as paid.
+ */
+export async function reportTillDebit(input: { id: string; outlet: string; lines: string; note: string; terminal?: string; slipLast4?: string }): Promise<ActionResult<{ number: number }>> {
+  try {
+    const staff = await authorize("pos.sell");
+    const form = new FormData();
+    form.set("lines", input.lines);
+    const db = await getDb();
+    const saved = await pos.saveOrder(db, actorOf(staff), {
+      id: recordId().parse(input.id),
+      outlet: outlet.parse(input.outlet),
+      lines: parseLines(form),
+      note: z.string().max(120).parse(input.note ?? ""),
+    });
+    const order = await first<{ total_kobo: number }>(db, "SELECT total_kobo FROM pos_orders WHERE id = ?", saved.id);
+    await reportPaymentIssue(db, actorOf(staff), {
+      sourceType: "pos_order",
+      sourceId: saved.id,
+      amountKobo: order?.total_kobo ?? 0,
+      terminal: input.terminal ?? null,
+      slipLast4: input.slipLast4 && /^\d{4}$/.test(input.slipLast4) ? input.slipLast4 : null,
+      note: "Declined at the till but the customer says they were debited",
+    });
+    refresh();
+    return ok({ number: saved.number });
+  } catch (err) {
+    return fail(err, "pos.debit_issue_failed");
   }
 }
