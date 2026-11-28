@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { MapMotif } from "@/components/public/map-card";
-import { PageHero } from "@/components/public/page-hero";
-import { Section } from "@/components/public/section";
+import { Photo } from "@/components/public/photo";
+import { Container, Section } from "@/components/public/section";
+import { sitePhoto } from "@/components/public/site-photo";
 import { buttonStyles } from "@/components/ui/button";
 import { hotel } from "@/config/hotel";
 import { faqJsonLd, hotelFaqs, ldJson } from "@/lib/seo";
+import { getSitePhotos } from "@/server/queries/catalogue";
 import { publicBookingRules } from "@/server/queries/booking";
 
 export const metadata: Metadata = {
@@ -17,73 +17,62 @@ export const metadata: Metadata = {
   alternates: { canonical: "/contact" },
 };
 
-const channels: Array<{ icon: LucideIcon; label: string; value: string; href: string; action: string; short: string }> = [
-  { icon: Phone, label: "Call the front desk", value: hotel.phoneDisplay, href: `tel:${hotel.phone}`, action: "Call now", short: "Call" },
-  { icon: MessageCircle, label: "WhatsApp", value: hotel.phoneDisplay, href: `https://wa.me/${hotel.whatsapp}`, action: "Start a chat", short: "Chat" },
-  { icon: Mail, label: "Email", value: hotel.email, href: `mailto:${hotel.email}`, action: "Send an email", short: "Email" },
-];
+const address = `${hotel.address.line1}, ${hotel.address.city}, ${hotel.address.state}`;
 
+/** Designs G11 (computer) and M13 (phone). */
 export default function ContactPage() {
-  const address = `${hotel.address.line1}, ${hotel.address.city}, ${hotel.address.state}`;
+  const rows: Array<{ label: string; value: string; href: string; phone?: boolean }> = [
+    { label: "Address", value: `${hotel.address.line1}, ${hotel.address.city}`, href: hotel.mapsUrl },
+    { label: "Front desk", value: `${hotel.phoneDisplay} · open 24 hours`, href: `tel:${hotel.phone}` },
+    { label: "WhatsApp", value: hotel.phoneDisplay, href: `https://wa.me/${hotel.whatsapp}`, phone: true },
+    { label: "Email", value: hotel.email, href: `mailto:${hotel.email}` },
+  ];
   return (
     <>
-      <PageHero eyebrow="Contact" title="We look forward to welcoming you" intro="For reservations, questions or special requests, our team is a call or message away." />
-
-      <Section className="pt-6 sm:pt-20">
-        <ul className="divide-y divide-hairline border-b border-hairline md:hidden">
-          {channels.map((c) => (
-            <li key={c.label}>
-              <a href={c.href} className="flex min-h-16 items-center justify-between gap-3 py-3">
-                <span className="min-w-0">
-                  <span className="block text-sm text-ink-500">{c.label}</span>
-                  <span className="block font-display text-xl break-words text-navy-950">{c.value}</span>
-                </span>
-                <span className="shrink-0 text-sm font-medium text-gold-600">{c.short}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-        <div className="hidden gap-6 md:grid md:grid-cols-3">
-          {channels.map((c) => (
-            <a key={c.label} href={c.href} className="group rounded-card bg-ivory-50 p-8 shadow-card transition-shadow hover:shadow-lg">
-              <span className="flex size-12 items-center justify-center rounded-full bg-gold-50">
-                <c.icon className="size-6 text-gold-600" strokeWidth={1.5} aria-hidden />
-              </span>
-              <p className="mt-6 text-sm text-ink-500">{c.label}</p>
-              <p className="mt-1 break-all font-display text-2xl text-navy-950">{c.value}</p>
-              <p className="mt-6 text-sm font-medium text-navy-800 group-hover:text-gold-600">{c.action} →</p>
-            </a>
-          ))}
-        </div>
-
-        <div className="mt-8 grid overflow-hidden rounded-card bg-ivory-50 shadow-card sm:mt-12 lg:grid-cols-[1fr_1.4fr]">
-          <MapMotif className="lg:hidden" />
-          <div className="p-5 sm:p-12">
-            <MapPin className="hidden size-8 text-gold-500 lg:block" strokeWidth={1.5} aria-hidden />
-            <h2 className="font-display text-2xl text-navy-950 sm:text-4xl lg:mt-5">Find us</h2>
-            <address className="mt-2 text-base leading-relaxed not-italic text-ink-700 sm:mt-4 sm:text-lg">
-              {hotel.address.line1}
-              <br />
-              {hotel.address.city}, {hotel.address.state}
-              <br />
-              {hotel.address.country}
-            </address>
-            <a href={hotel.mapsUrl} className={buttonStyles({ variant: "secondary", size: "lg", className: "mt-5 w-full sm:mt-8 sm:w-auto" })}>Open in Google Maps</a>
+      <Container className="grid gap-6 pt-4 pb-10 lg:grid-cols-2 lg:gap-12 lg:pt-12 lg:pb-18">
+        <div className="flex flex-col">
+          <p className="text-[13px] font-semibold tracking-[0.14em] text-gold-500 max-lg:hidden">CONTACT</p>
+          <h1 className="font-display text-[34px] leading-[1.1] font-semibold text-ink-900 lg:mt-4 lg:text-[52px]">We look forward to welcoming you</h1>
+          <ul className="mt-3 lg:mt-4">
+            {rows.map((r) => (
+              <li key={r.label} className={r.phone ? "max-lg:hidden" : undefined}>
+                <a href={r.href} className="flex flex-col gap-0.5 border-b border-hairline py-3.5 hover:text-navy-700">
+                  <span className="text-xs font-semibold text-muted lg:text-[13px]">{r.label}</span>
+                  <span className="text-[15px] font-semibold break-words lg:text-[17px]">{r.value}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-4 flex flex-col gap-2.5 lg:mt-6 lg:flex-row">
+            <Link href="/book" className={buttonStyles({ className: "max-lg:hidden" })}>Book now</Link>
+            <a href={`tel:${hotel.phone}`} className={buttonStyles({ size: "lg", className: "w-full lg:hidden" })}>Call the front desk</a>
+            <a href={`https://wa.me/${hotel.whatsapp}`} className={buttonStyles({ variant: "secondary", className: "max-lg:w-full" })}>Message us on WhatsApp</a>
           </div>
+        </div>
+        <div className="flex flex-col gap-3.5">
+          <Suspense fallback={<div className="h-80 rounded-xl bg-ivory-200 max-lg:hidden" />}>
+            <ContactPhoto />
+          </Suspense>
           <iframe
             title={`Map showing ${hotel.name}`}
             src={`https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`}
-            className="hidden w-full border-0 lg:block lg:h-full lg:min-h-[28rem]"
+            className="h-[180px] w-full rounded-xl border-0 bg-[#e8eefb] lg:h-[220px]"
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
           />
+          <a href={hotel.mapsUrl} className="inline-flex min-h-11 items-center self-start text-sm font-semibold text-navy-700 hover:underline">Open in Google Maps</a>
         </div>
-      </Section>
+      </Container>
       <Suspense fallback={null}>
         <GoodToKnow />
       </Suspense>
     </>
   );
+}
+
+async function ContactPhoto() {
+  const photos = await getSitePhotos();
+  return <Photo photo={sitePhoto(photos, "exterior", { alt: "Victoria Luxury Hotel" })} className="h-80 rounded-xl max-lg:hidden" sizes="50vw" />;
 }
 
 async function GoodToKnow() {
@@ -93,12 +82,12 @@ async function GoodToKnow() {
   const faqs = hotelFaqs(rules, rules.cancellationPolicy ?? "Please contact the hotel.");
   return (
     <Section tone="ivory">
-      <h2 className="font-display text-4xl text-navy-950">Good to know</h2>
-      <dl className="mt-8 grid gap-x-10 gap-y-6 md:grid-cols-2">
+      <h2 className="font-display text-[32px] leading-tight font-semibold text-ink-900 lg:text-[44px]">Good to know</h2>
+      <dl className="mt-6 grid gap-x-10 gap-y-5 md:grid-cols-2">
         {faqs.map((f) => (
           <div key={f.q} className="border-t border-hairline pt-4">
-            <dt className="font-medium text-navy-950">{f.q}</dt>
-            <dd className="mt-1 text-sm leading-relaxed text-ink-700">{f.a}</dd>
+            <dt className="font-semibold text-ink-900">{f.q}</dt>
+            <dd className="mt-1 text-sm leading-relaxed text-muted">{f.a}</dd>
           </div>
         ))}
       </dl>
