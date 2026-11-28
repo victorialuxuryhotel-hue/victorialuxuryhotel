@@ -443,3 +443,38 @@ These are deliberately **not final** in the app:
   station cookie is sent to sign-in.
 - Rollback: `wrangler versions deploy 10fffa0a-3ad4-4fc4-91c9-7d3aed18569b@100%`. The migrations stay (forward-only);
   the old code ignores the new tables, but its POS payments and voids are refused by the new rules (see 0030/0031).
+
+## Step 1f/2: restaurant & bar, running the hotel, closings review (X11) and deliveries (X12)
+
+- **Orders & receipts (R201):** one row of filters (receipt number, dates, counter, who, method) that reload the list,
+  status chips, and a table with receipt, time, counter, items, sold by, method, status badge, amount and Reprint or
+  Open. Downloads moved to the page header. The order page and Void sale are unchanged (heading shows the receipt).
+- **Daily closing (R202) and Closings review (X11):** salespeople see Close my day in three columns (steps, cash in the
+  drawer with an optional note, a large number pad with 00). The count is still blind and the first count is final.
+  Managers and viewers see *Daily closings*: To check, Short this week, Over this week, Not closed (yesterday), and
+  every closing of the last 14 days with counter, counted, expected, difference (red short, amber over, green nil),
+  their note and status. *Mark checked* needs a note when the cash doesn't match; nobody checks their own closing,
+  the owner included (the old owner exception is gone; no test needed it). Not closed = sold on a business date and
+  no closing by 10:00 the next day. Weekly totals are worked out from the closings (Monday to today), not stored.
+  Marking checked needs `pos.manage`; the GM and finance see the review read-only. A manager who also sells opens
+  their own count from *Close my day*.
+- **Menu (R203):** Add menu item (drawer), Both / Restaurant / Bar, Find an item, one table with a Today badge
+  (Available, Off today, Out of stock, Off the menu) and Uses from stock; Edit opens a drawer with the item and its
+  stock links.
+- **Stock (R204) and Record a delivery (X12):** table with Low at and an OK / Low / Out badge; Adjust (used, damaged,
+  count fix, item settings) and Add stock item open drawers; the low-stock banner holds *Record a delivery*. A
+  delivery writes a `received` stock move with the supplier and optional cost (`inventory.manage`) and shows
+  "Stock goes from X to Y" before saving; recent movements show "Delivery · supplier". Manual "Received" without a
+  supplier is no longer offered in Adjust (the server action still accepts it).
+- **Sales reports (R205):** Today / 7 days / This month with Earlier month, Both counters and Export to Excel; KPI
+  tiles (sales, average order, voids, cash over/short); By day, By method and By salesperson side by side; the
+  other tables and the downloads below.
+- **Dashboard (R301):** occupancy tonight, taken today, arrivals and overdue tiles; Anything wrong? with a button to
+  where each item is dealt with (it now also lists staff who didn't close yesterday, for the owner and GM); Rooms
+  right now; Arriving today as a table. Departments, this month's money and recent bookings stay below.
+- **Rates & room types (R302), Reports (R303), Booking rules (R304), Staff & access (R305):** tables and tabs as
+  designed. Reports keeps Today / 14 days / This month (the domain has no "this week" or custom dates yet) and shows
+  Room-nights sold and Rooms received instead of Average rate and RevPAR: those need room revenue earned per night,
+  and dividing money received (which includes advance payments) by nights would mislead. Booking rules adds a
+  Payment details tab so that form stays. Staff opens *Invite someone* from the header (`?invite=1`).
+- Not done: D3 / D3b (till table dropdown and till account menu) live in `till.tsx`, which someone else owns.
