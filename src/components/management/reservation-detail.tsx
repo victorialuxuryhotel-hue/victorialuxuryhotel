@@ -362,7 +362,7 @@ export function ReservationDetailView({
               {canOverride && r.status === "checked_in" && balance > 0 ? (
                 <CheckOutButton reservationId={r.id} balanceKobo={balance} canLeaveOwing variant="secondary" className="w-full" />
               ) : null}
-              {balance > 0 && ["pending_payment", "confirmed", "checked_in"].includes(r.status) ? <SendPayLinkButton reservationId={r.id} /> : null}
+              {balance > 0 && ["pending_payment", "confirmed", "checked_in"].includes(r.status) ? <SendPayLinkButton reservationId={r.id} className="w-full" /> : null}
               {canChange ? <a href="#change-stay" className={secondary}>{r.status === "checked_in" ? "Extend or shorten" : "Change dates"}</a> : null}
               {canChange && r.status !== "pending_payment" && r.roomNumber ? <a href="#change-stay" className={secondary}>Move room</a> : null}
               {canPrint || noShowDue ? (

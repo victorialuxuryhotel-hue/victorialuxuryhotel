@@ -17,7 +17,7 @@ const waNumber = (phone: string) => {
  * Send a payment link (design X14; FUNCTIONALITY.md section 10). Makes a /pay/<code> link for what's owed; the
  * staff member sends it on WhatsApp (wa.me) or by email from their own app, or copies it. The server sends nothing.
  */
-export function SendPayLinkButton({ reservationId, size = "md" }: { reservationId: string; size?: "sm" | "md" }) {
+export function SendPayLinkButton({ reservationId, size = "md", className }: { reservationId: string; size?: "sm" | "md"; className?: string }) {
   const [open, setOpen] = useState(false);
   const [link, setLink] = useState<PayLink | null>(null);
   const [phone, setPhone] = useState("");
@@ -43,7 +43,7 @@ export function SendPayLinkButton({ reservationId, size = "md" }: { reservationI
 
   return (
     <>
-      <Button variant="secondary" size={size} onClick={openDrawer}>Send a payment link</Button>
+      <Button variant="secondary" size={size} className={className} onClick={openDrawer}>Send a payment link</Button>
       <Drawer
         open={open}
         onClose={() => setOpen(false)}
