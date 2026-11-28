@@ -41,6 +41,8 @@ const tokens: Record<string, [ErrorCode, string]> = {
   payment_issue_closed: ["CONFLICT", "This has already been checked and closed."],
   void_needs_manager: ["FORBIDDEN", "A void needs a manager who didn't make the sale to approve it with their PIN, a reason, and for cash the tick that the money went back."],
   refund_decided: ["CONFLICT", "That refund has already been decided."],
+  bill_fixed: ["CONFLICT", "A bill can't be changed once issued. Cancel it and make a new one."],
+  pay_link_fixed: ["CONFLICT", "That payment link can't be changed. Cancel it and send a new one."],
   station_fixed: ["CONFLICT", "A station can't be changed once set up. Revoke it and set up the computer again."],
   session_ended: ["CONFLICT", "That sign-in has already ended. Tap your name to start again."],
   card_photos_full: ["CONFLICT", "This place holds up to 4 photos. Remove one first."],
