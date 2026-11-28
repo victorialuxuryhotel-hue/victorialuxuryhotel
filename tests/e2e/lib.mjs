@@ -447,6 +447,70 @@ export async function lockScreen(p) {
   await p.waitForSelector("[role=dialog][aria-label=Locked]", { visible: true });
 }
 
+// ---------- screens shared by several tests ----------
+
+/** Picks an option of a Segmented control (Cash | Transfer | POS / card): a radio group of labels. */
+export async function choose(p, option, group = "") {
+  await clickText(p, `[role=radiogroup]${group ? `[aria-label="${group}"]` : ""} label`, option);
+}
+
+/** Sets a date (or other controlled) input through the native setter, so React sees it. */
+export async function setValue(p, selector, value) {
+  await p.waitForSelector(selector);
+  await p.$eval(selector, (e, v) => {
+    const proto = e instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value").set.call(e, v);
+    e.dispatchEvent(new Event("input", { bubbles: true }));
+    e.dispatchEvent(new Event("change", { bubbles: true }));
+  }, value);
+}
+
+/**
+ * Take payment at the desk (/app/payments/record): Cash, Transfer (reference or sender, and the bank-app tick) or
+ * POS (4 slip digits and a terminal). Returns the receipt number shown after the redirect to the booking, or null.
+ */
+export async function recordDeskPayment(p, reservationId, { method = "cash", amount, reference, sender, slip, seen = true } = {}) {
+  await go(p, `/app/payments/record?reservation=${reservationId}`);
+  await p.waitForSelector("#amount", { visible: true });
+  if (method === "bank_transfer") await choose(p, "Transfer");
+  if (method === "pos_terminal") await choose(p, "POS / card");
+  if (amount != null) await fill(p, "#amount", amount);
+  if (method === "bank_transfer") {
+    await p.waitForSelector("#ref", { visible: true });
+    if (reference != null) await fill(p, "#ref", reference);
+    if (sender != null) await fill(p, "#sender", sender);
+    if (seen) await p.click("input[name=confirmReceived][type=checkbox]");
+  }
+  if (method === "pos_terminal") {
+    await p.waitForSelector("#slip", { visible: true });
+    await fill(p, "#slip", slip ?? "4417");
+  }
+  await clickText(p, "button[type=submit]", "Record ₦");
+  await p.waitForFunction(() => location.search.includes("paid=") || document.querySelector("form [role=alert], form p.text-danger-700"), { timeout: 30000 });
+  await settle(p);
+  return new URL(p.url()).searchParams.get("paid");
+}
+
+/** On a booking page: opens the Check in drawer from the next step, fills the registration card and checks in. */
+export async function checkInWithCard(p, card = {}) {
+  await clickText(p, "button", "Check in");
+  await p.waitForFunction(() => /Check in and give key/.test(document.querySelector("[role=dialog]")?.innerText ?? "") && /Booking/.test(document.querySelector("[role=dialog] dl")?.innerText ?? ""));
+  await fill(p, "#idNumber", card.idNumber ?? "A12345678");
+  await fill(p, "#address", card.address ?? "12 Oba Adesida Road, Akure");
+  await fill(p, "#comingFrom", card.comingFrom ?? "Lagos");
+  await fill(p, "#nationality", card.nationality ?? "Nigerian");
+  if (card.rules !== false) await clickText(p, "[role=dialog] label", "Guest has seen the house rules");
+  await clickText(p, "[role=dialog] button", "Check in and give key");
+}
+
+/** On a booking page: opens the Check out drawer, ticks Key returned and checks out. */
+export async function checkOutWithKey(p, { key = true } = {}) {
+  await clickText(p, "button", "Check out");
+  await p.waitForFunction(() => /Key returned/.test(document.querySelector("[role=dialog]")?.innerText ?? ""));
+  if (key) await clickText(p, "[role=dialog] label", "Key returned");
+  await clickText(p, "[role=dialog] button", "Check out");
+}
+
 export async function finish() {
   await browser.close();
   await proxy.dispose();

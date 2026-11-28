@@ -1,5 +1,5 @@
 // Fix 3: for a paid guest in house, extra nights wait for their payment; taking the payment applies them.
-import { as, check, clickText, finish, go, one, run, settle, text, val, waitForText } from "./lib.mjs";
+import { as, check, clickText, finish, go, one, recordDeskPayment, run, text, val, waitForText } from "./lib.mjs";
 
 const today = await val("SELECT date('now', '+1 hour')");
 const plus = (n) => new Date(Date.parse(today) + n * 86_400_000).toISOString().slice(0, 10);
@@ -35,7 +35,10 @@ await run("UPDATE reservations SET status = 'checked_in' WHERE id = ?", res);
 
 const { ctx, p } = await as("front_desk");
 await go(p, `/app/reservations/${res}`);
-await p.evaluate(() => document.querySelectorAll("details").forEach((d) => (d.open = true)));
+// Next step → Extend or shorten opens the change forms; the dates form is folded under its own heading.
+await clickText(p, "a", "Extend or shorten");
+await clickText(p, "summary", "Extend or shorten the stay");
+await p.waitForSelector("#cd-out", { visible: true });
 await p.$eval("#cd-out", (e, v) => {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(e, v);
   e.dispatchEvent(new Event("input", { bubbles: true }));
@@ -49,12 +52,12 @@ const page = await text(p);
 check("the booking shows the change waiting and Take payment as the next step", /Waiting for payment: Stay extended to/.test(page) && /Take payment · ₦/.test(page));
 
 await go(p, `/app/payments/record?reservation=${res}`);
-check("Take payment says what the money is for", /Includes ₦[\d,]+ for: Stay extended to/.test(await text(p)));
-await p.click("input[name=confirmReceived]");
-await clickText(p, "button", "Take payment");
-await clickText(p, "button", "Yes, take payment");
-await waitForText(p, /RCT-/);
-await settle(p);
+await p.waitForSelector("#amount");
+const form = await text(p);
+check("Take payment says what the money is for", /Includes ₦[\d,]+ for Stay extended to/.test(form), form.slice(0, 400));
+check("and the amount is fixed: a change is paid in one go", await p.$eval("#amount", (e) => e.readOnly));
+const receipt = await recordDeskPayment(p, res);
+check("the payment is recorded with a receipt", /^RCT-/.test(receipt ?? ""), p.url());
 check("taking the payment extends the stay", (await val("SELECT check_out FROM reservations WHERE id = ?", res)) === plus(3));
 check("and the change is recorded as paid", (await val("SELECT count(*) FROM reservation_changes WHERE reservation_id = ? AND status = 'applied' AND payment_id IS NOT NULL", res)) === 1);
 await ctx.close();
