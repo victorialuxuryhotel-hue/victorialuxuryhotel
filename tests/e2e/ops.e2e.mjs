@@ -129,7 +129,8 @@ for (const id of pagingIds) {
   // H8: an old browser gets a warning (not blocked); the browser in use is noted once per session.
   const { ctx, p } = await session();
   await p.setUserAgent("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36");
-  await go(p, "/login");
+  // The sign-in page loads Clerk from its CDN; wait for the page itself, not every resource.
+  await p.goto(`${BASE}/login`, { waitUntil: "domcontentloaded", timeout: 90000 });
   await waitForText(p, /too old for the system/);
   check("an old browser on Windows 7 is warned on the sign-in page", /Use Google Chrome on Windows 10 or 11/.test(await text(p)));
   check("but can still sign in", Boolean(await p.$("input[name=identifier], input[name=username], input[type=password], form")));
@@ -212,8 +213,17 @@ for (const id of pagingIds) {
   });
   check("the calendar fits 1366×768 without scrolling sideways", fit.page && fit.grid, JSON.stringify(fit));
   check("it has the legend and a free count per night for each room type", /Awaiting payment/.test(await text(p)) && (await p.$$("[data-type] [data-free]")).length % 14 === 0);
-  const cell = await p.$("[data-lane]:not([data-lane=unassigned]) a[href*='/app/reservations/new?type='][href*='&room=']");
-  const href = await cell.evaluate((a) => a.getAttribute("href"));
+  // An empty night in a room whose type still has a room free that night (the shared local data has full nights).
+  const firstDay = await val("SELECT date('now', '-5 hours')");
+  const href = await p.$$eval("[data-lane]:not([data-lane=unassigned]) a[href*='/app/reservations/new?type='][href*='&room=']", (as, start) => {
+    for (const a of as) {
+      const q = new URL(a.getAttribute("href"), "http://x").searchParams;
+      const i = Math.round((Date.parse(q.get("checkIn")) - Date.parse(start)) / 86_400_000);
+      const free = a.closest("[data-type]")?.querySelectorAll("[data-free]")[i]?.getAttribute("data-free");
+      if (Number(free) > 0) return a.getAttribute("href");
+    }
+    return null;
+  }, firstDay);
   const q = new URL(href, "http://x").searchParams;
   const roomNumber = await val("SELECT room_number FROM rooms WHERE id = ?", q.get("room"));
   await go(p, href);
@@ -222,7 +232,7 @@ for (const id of pagingIds) {
     type: document.querySelector("input[name=categoryId]:checked")?.value ?? null,
     checkIn: document.querySelector("input[name=checkIn]")?.value,
     asked: document.querySelector("[data-asked-room]")?.getAttribute("data-asked-room") ?? null,
-  })).then((f) => (f.type && f.asked ? f : null)), "form prefilled");
+  })).then((f) => (f.type && f.asked ? f : null)).catch(() => null), "form prefilled"); // the form can re-render mid-poll
   check("an empty night opens New booking with the type, date and room", form.type === q.get("type") && form.checkIn === q.get("checkIn") && form.asked === roomNumber, JSON.stringify(form));
   await ctx.close();
 }
